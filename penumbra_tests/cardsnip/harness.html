@@ -168,8 +168,9 @@
   window.__SNIPPET_CARDS =
     "layout_switch('Table|flat', 'Cards|cards', 'By Dept|group_by|DEPT')\n" +
     "toggle_switch('Big cards', 'on|cards|large', 'off|cards|off')\n" +
+    "toggle_switch('Table at xl', 'on|cards|off|xl', 'off|cards|on')\n" +   // (cleft) the table with the cards' size Extra large
     "<span id=\"cv\">data(cards)</span>/<span id=\"cz\">data(cardsize)</span>\n" +
-    "action(trigger, 'Small', 'cards|small') action(trigger, 'Bad', 'cards|huge') action(trigger, 'Flip', 'cards|toggle')\n" +
+    "action(trigger, 'Small', 'cards|small') action(trigger, 'Bad', 'cards|huge') action(trigger, 'Flip', 'cards|toggle') action(trigger, 'TableXL', 'cards|off|xl')\n" +
     // (dname, 2026-11-02) a mixed-case name: ?Unit= (run.ps1's URL). A [PROMPT] here would hold the boot on its dialog:
     // the driver's D3 calls the lookup itself.
     "<span id=\"du\">data(Unit)</span>";

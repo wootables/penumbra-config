@@ -352,7 +352,7 @@
     eq('state: a bound is read as a plain number', F.state('AMOUNT >= $1,000', AF).range.AMOUNT, { min: '1000', max: '' });
     eq('state: > is not a range bound (typed, kept)', F.state('AMOUNT > 100', AF).rest, ['AMOUNT > 100']);
     var s2 = F.state('AMOUNT >= 100 and AMOUNT >= 200', AF);
-    assert('state: only the first bound of a side is claimed', (s2.range.AMOUNT || {}).min === '100' && JSON.stringify(s2.rest) === '["AMOUNT >= 200"]', JSON.stringify(s2));
+    assert('state: two bounds on one side: the tighter is claimed and the looser absorbed (2026-11-03; the first was claimed, so the box showed 100 while 200 applied)', (s2.range.AMOUNT || {}).min === '200' && JSON.stringify(s2.rest) === '[]', JSON.stringify(s2));
     eq('state: a date range, a US date read as an ISO day', F.state('OPENED >= 2024-01-01 and OPENED <= 01/31/2024', DF).range.OPENED, { min: '2024-01-01', max: '2024-01-31' });
     eq('state: a relative date stays typed', F.state('OPENED >= TODAY-30', DF).rest, ['OPENED >= TODAY-30']);
     eq('state: a year or a month bound on a date field stays typed (it does not mean a day)', [F.state('OPENED <= 2024', DF).rest, F.state('OPENED <= 2024-05', DF).rest], [['OPENED <= 2024'], ['OPENED <= 2024-05']]);
@@ -1272,6 +1272,259 @@
     });
   }
 
+  // ══════ R. the bug sweep (2026-11-03) ══════
+  // A pattern typed in the strip's own shape stays typed (it was read as values and came
+  // back from the next click as literal text); a second condition on a column stays ANDed;
+  // a line break is written \n; a column named OR / AND is quoted; two bounds on one end
+  // show the tighter; a from past its to is refused with a note; focus comes back by WHAT
+  // the control is, and only when the redraw took it; the x and Clear all follow a typed
+  // condition; the last nested chip keeps a __ROW two typed nested conditions need.
+  function sectionR(F, draw, outText, S) {
+    var LIB = window.PenumbraTiles && window.PenumbraTiles.strip;
+    var box = function () { return String($('#tableSearch').val()); };
+    var G = function (col) { return $(S + ' .pnb-fs-group[data-fs-col="' + col + '"]'); };
+    var CH = function (col, v) { return G(col).find('.pnb-fs-chip').filter(function () { return $(this).attr('data-fs-val') === v; }); };
+    var idle = function (pred, ms) { return until(function () { return !F.busy() && !F.motion() && (!pred || pred()); }, ms || 8000); };
+    var act = function () {
+      var a = document.activeElement;
+      if (!a || a === document.body) return 'BODY';
+      if (a.getAttribute('data-fs-val') !== null) return 'chip:' + a.getAttribute('data-fs-val');
+      if (a.getAttribute('data-fs-act')) return 'act:' + a.getAttribute('data-fs-act');
+      if (a.getAttribute('data-fs-bound')) return 'bound:' + a.getAttribute('data-fs-bound');
+      return a.className || a.tagName;
+    };
+    var key = function (el, k) { $(el).trigger($.Event('keydown', { key: k })); };   // a FRESH event per key
+    var rowsOf = function (list, cols) {
+      return list.map(function (o, i) { var m = new Map(); m.set('#', String(i + 1)); cols.forEach(function (c) { m.set(c, o[c] == null ? '' : String(o[c])); }); return m; });
+    };
+    var use = function (rows, cols) {
+      F.setRows(rows);
+      var ix = {}; cols.forEach(function (c, i) { ix[c] = i + 1; });
+      $('#resultsTable').data('columnNameToOriginalIndex', ix);
+      $('#resultsTable tbody').html(rows.map(function (r) {
+        return '<tr><td data-column="0">' + r.get('#') + '</td>' + cols.map(function (c, i) { return '<td data-column="' + (i + 1) + '">' + $('<div>').text(r.get(c)).html() + '</td>'; }).join('') + '</tr>';
+      }).join(''));
+    };
+    var count = function (text, rows, cols) {
+      var all = ['#'].concat(cols), p = F.parseQ(text, all);
+      return rows.filter(function (r) { return F.evalQ(r, p, all); }).length;
+    };
+    if (!LIB || typeof LIB.rangeProblem !== 'function') {
+      assert('sweep: the 2026-11-03 helpers are exported (rangeProblem, rangeMark, literalAlts)', false, LIB ? Object.keys(LIB).join(',') : 'no lib');
+    }
+
+    // ── R.1 the claim: values as the encoder writes them, a field's first condition only ──
+    var SP = [{ label: 'Sponsor', col: 'SPONSOR', mode: 'in', top: 12 }];
+    var s1 = F.state('SPONSOR = /^(?:NIH.*)$/', SP);
+    eq('sweep claim: a pattern typed in the strip\'s shape stays typed (it was read as the value "NIH.*")', [s1.sel.SPONSOR || [], s1.rest], [[], ['SPONSOR = /^(?:NIH.*)$/']]);
+    var s1n = F.state('SPONSOR = /^(?:NIH.*)$/', SP); s1n.sel.SPONSOR = ['NSF'];
+    eq('sweep claim: a chip pressed beside it keeps it verbatim (the next click wrote the literal NIH\\.\\*)', F.compose(s1n, SP), 'SPONSOR = /^(?:NSF)$/ and SPONSOR = /^(?:NIH.*)$/');
+    eq('sweep claim: the two-anchor and \\d forms stay typed too', [F.state('SPONSOR = /^(?:A)$|^(?:B)$/', SP).rest.length, F.state('SPONSOR = /^(?:\\d{2}|\\d{4})$/', SP).rest.length], [1, 1]);
+    var canon = ['SPONSOR = /^(?:A\\|B)$/', 'SPONSOR = /^(?:R\\x2FD Unit)$/', 'SPONSOR = /^(?:\\(lead\\) Smith)$/', 'SPONSOR = /^(?:C:\\\\temp\\\\)$/',
+                 'SPONSOR = /^(?:)$/', 'SPONSOR = /^(?:Eng|)$/', "SPONSOR = /^(?:O'Brien|D'Arcy)$/", 'sponsor = /^(?:nih)$/'];
+    eq('sweep claim: every value the encoder writes is still read back as values (escapes, blank, quotes, case)',
+      canon.map(function (t) { var s = F.state(t, SP); return [s.sel.SPONSOR || null, s.rest.length]; }),
+      [[['A|B'], 0], [['R/D Unit'], 0], [['(lead) Smith'], 0], [['C:\\temp\\'], 0], [[''], 0], [['Eng', ''], 0], [["O'Brien", "D'Arcy"], 0], [['nih'], 0]]);
+    var SPL = [{ label: 'People', col: 'PEOPLE', mode: 'in', top: 12, split: 'dsemi' }], ws = '[ \\t\\n\\r\\x0B]*';
+    var sp1 = F.state('PEOPLE = /(?:^|;)' + ws + '(?:Sm.th)' + ws + '(?:;|$)/', SPL), sp2 = F.state('PEOPLE = /(?:^|;)' + ws + '(?:Smith|Jo)' + ws + '(?:;|$)/', SPL);
+    eq('sweep claim: a split field leaves a pattern typed between its edges typed, and still reads its own values',
+      [sp1.sel.PEOPLE || [], sp1.rest.length, sp2.sel.PEOPLE || [], sp2.rest.length], [[], 1, ['Smith', 'Jo'], 0]);
+    var PF = F.parseArgs(['Sponsor|SPONSOR', '+US|/^US /']).fields;
+    var pp1 = F.state('SPONSOR = /^(?:N.H)$|(?:^US )/', PF), pp2 = F.state('SPONSOR = /^(?:NIH)$|(?:^US )/', PF);
+    eq('sweep claim: a pattern field leaves a typed value block with a pattern in it typed, and still reads its own',
+      [pp1.sel.SPONSOR || [], pp1.pat.SPONSOR || [], pp1.rest.length, pp2.sel.SPONSOR || [], pp2.pat.SPONSOR || [], pp2.rest.length], [[], [], 1, ['NIH'], [0], 0]);
+    var CF = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12 }];
+    var two = 'COLLEGE = /^(?:Eng)$/ and COLLEGE = /^(?:Sci)$/', s4 = F.state(two, CF);
+    eq('sweep claim: a second condition typed on a column stays typed - ANDed with the first, as written (it was merged into "Eng or Sci")',
+      [s4.sel.COLLEGE || [], s4.rest, F.compose(s4, CF)], [['Eng'], ['COLLEGE = /^(?:Sci)$/'], two]);
+
+    // ── R.2 line breaks, columns named like the joiners ──
+    eq('sweep encode: a line break is written \\n / \\r and decoded back', [F.enc('a\nb'), F.enc('a\r\nb'), F.dec(F.enc('a\r\nb')), F.dec('C:\\\\new')], ['a\\nb', 'a\\r\\nb', 'a\r\nb', 'C:\\new']);
+    var NLF = [{ label: 'Name', col: 'NAME', mode: 'in', top: 12 }];
+    var nlText = F.compose({ prefix: '', sel: { NAME: ['line1\nline2'] }, range: {}, rest: [] }, NLF);
+    var inp = document.createElement('input'); inp.value = nlText;
+    var nlRows = rowsOf([{ NAME: 'line1\nline2' }, { NAME: 'line1 line2' }], ['NAME']);
+    eq('sweep encode: a value holding a line break survives the search box (an <input>) and keeps its row', [inp.value === nlText, count(inp.value, nlRows, ['NAME'])], [true, 1]);
+    eq('sweep encode: ... and is read back as that value', F.state(nlText, NLF).sel.NAME || null, ['line1\nline2']);
+    eq('sweep colRef: OR and AND are quoted (bare, the strip read them as the joiner); other names as before', [F.colRef('OR'), F.colRef('AND'), F.colRef('ORDER'), F.colRef('A B')], ["'OR'", "'AND'", 'ORDER', "'A B'"]);
+    var OF = [{ label: 'Or', col: 'OR', mode: 'in', top: 12 }];
+    var oText = F.compose({ prefix: '', sel: { OR: ['x'] }, range: {}, rest: [] }, OF), oSt = F.state(oText, OF), oRows = rowsOf([{ OR: 'x' }, { OR: 'y' }], ['OR']);
+    eq('sweep colRef: a strip on a column named OR reads its chip back, and the engine keeps its row', [oSt.sel.OR || null, oSt.rest.length, count(oText, oRows, ['OR'])], [['x'], 0, 1]);
+
+    // ── R.3 ranges: the tighter of two bounds, a from past its to ──
+    var RF = [{ label: 'Amount', col: 'AMOUNT', mode: 'in', range: true, kind: 'number' }];
+    var r7 = F.state('AMOUNT >= 100 and AMOUNT >= 200 and AMOUNT <= 900 and AMOUNT <= 500', RF);
+    eq('sweep range: two bounds on one end show the tighter, and the strip writes it alone', [r7.range.AMOUNT, r7.rest, F.compose(r7, RF)], [{ min: '200', max: '500' }, [], 'AMOUNT >= 200 and AMOUNT <= 500']);
+    var r7d = F.state('OPENED >= 2024-01-01 and OPENED >= 2024-03-01', [{ label: 'Opened', col: 'OPENED', mode: 'in', range: true, kind: 'date' }]);
+    eq('sweep range: ... days too', r7d.range.OPENED, { min: '2024-03-01', max: '' });
+    var r7u = F.state('X >= 5 and X >= 2024-01-01', [{ label: 'X', col: 'X', mode: 'in', range: true, kind: '' }]);
+    eq('sweep range: a number and a day on one end are not compared: the second stays typed', [r7u.range.X, r7u.rest], [{ min: '5', max: '' }, ['X >= 2024-01-01']]);
+    if (LIB && typeof LIB.rangeProblem === 'function') {
+      var RPB = LIB.rangeProblem;
+      eq('sweep range: a from past its to is a problem with its reason; a bad box names what it wants',
+        [RPB({ min: '500', max: '100' }, 'number'), RPB({ min: '100', max: '500' }, 'number'), RPB({ min: '2024-05-01', max: '2024-01-01' }, 'date'), RPB({ min: '7', max: '7.0' }, 'number'), RPB({ min: '', max: '' }, 'number', true), RPB({ min: '', max: '' }, 'date', true)],
+        ['The from value is larger than the to value', null, 'The from date is after the to date', null, 'Not a number', 'Not a full date']);
+    }
+
+    // ── R.4 the page: claim, line break, range note, focus, the x, nested __ROW ──
+    var nih = rowsOf([{ SPONSOR: 'NIH-A' }, { SPONSOR: 'NIH-A' }, { SPONSOR: 'NIH-B' }, { SPONSOR: 'NSF' }, { SPONSOR: 'NSF' }, { SPONSOR: 'DOE' }], ['SPONSOR']);
+    var mainList = [];
+    for (var s = 1; s <= 10; s++) { for (var k = 0; k < 11 - s; k++) mainList.push({ SPONSOR: 'S' + (s < 10 ? '0' : '') + s, COLLEGE: ['Eng', 'Sci', 'Ag'][mainList.length % 3], AMOUNT: String((mainList.length + 1) * 10) }); }
+    var MC = ['SPONSOR', 'COLLEGE', 'AMOUNT'], mainRows = rowsOf(mainList, MC);
+    var v3 = null, minBox = null;
+    use(nih, ['SPONSOR']);
+    $('#tableSearch').val('SPONSOR = /^(?:NIH.*)$/');
+    return idle().then(function () { return draw("filter_strip('Sponsor|SPONSOR')"); }).then(function () {
+      assert('sweep page: a typed /^(?:NIH.*)$/ draws no chip "NIH.*" and presses nothing', CH('SPONSOR', 'NIH.*').length === 0 && $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0,
+        $(S + ' .pnb-fs-chip').map(function () { return $(this).attr('data-fs-val') + '/' + $(this).attr('aria-pressed'); }).get().join(' '));
+      CH('SPONSOR', 'NSF').trigger('click');
+      return idle(function () { return box() !== 'SPONSOR = /^(?:NIH.*)$/'; });
+    }).then(function () {
+      eq('sweep page: a chip click beside it keeps the typed pattern as written', box(), 'SPONSOR = /^(?:NSF)$/ and SPONSOR = /^(?:NIH.*)$/');
+      use(rowsOf([{ NAME: 'line1\nline2' }, { NAME: 'other' }], ['NAME']), ['NAME']);
+      $('#tableSearch').val('');
+      return idle();
+    }).then(function () { return draw("filter_strip('Name|NAME')"); }).then(function () {
+      var c = CH('NAME', 'line1\nline2');
+      assert('sweep page: a multi-line value is a chip', c.length === 1, $(S + ' .pnb-fs-chip').map(function () { return JSON.stringify($(this).attr('data-fs-val')); }).get().join(' '));
+      c.trigger('click');
+      return idle(function () { return box() !== ''; });
+    }).then(function () {
+      eq('sweep page: its click writes the line break as \\n, and the box keeps its row', [box(), count(box(), rowsOf([{ NAME: 'line1\nline2' }, { NAME: 'other' }], ['NAME']), ['NAME'])], ['NAME = /^(?:line1\\nline2)$/', 1]);
+      use(mainRows, MC);
+      $('#tableSearch').val('');
+      return idle();
+    }).then(function () { return draw("filter_strip('Amount|AMOUNT|range')"); }).then(function () {
+      var bx = G('AMOUNT').find('.pnb-fs-bound');
+      bx.eq(0).val('500'); bx.eq(1).val('100');
+      bx.eq(1)[0].focus(); key(bx.eq(1), 'Enter');
+      return wait(400);
+    }).then(function () {
+      var bx = G('AMOUNT').find('.pnb-fs-bound'), note = G('AMOUNT').find('.pnb-fs-rangemsg');
+      eq('sweep page: a from past its to is refused: nothing written, both boxes marked, a note says why (role=alert, the boxes described by it)',
+        [box(), bx.eq(0).attr('aria-invalid'), bx.eq(1).attr('aria-invalid'), note.text(), note.attr('role'), bx.eq(0).attr('aria-describedby') === note.attr('id') && !!note.attr('id')],
+        ['', 'true', 'true', 'The from value is larger than the to value', 'alert', true]);
+      bx.eq(0).val('abc');
+      key(bx.eq(1), 'Enter');
+      return wait(300);
+    }).then(function () {
+      var bx = G('AMOUNT').find('.pnb-fs-bound'), note = G('AMOUNT').find('.pnb-fs-rangemsg');
+      eq('sweep page: a bad box: only it is marked, and the note names what it wants', [box(), bx.eq(0).attr('aria-invalid'), bx.eq(1).attr('aria-invalid') || '', note.text(), note.length], ['', 'true', '', 'Not a number', 1]);
+      bx.eq(0).val('50'); bx.eq(1).val('900');
+      key(bx.eq(1), 'Enter');
+      return idle(function () { return box() !== ''; });
+    }).then(function () {
+      eq('sweep page: a good pair is written and the note goes', [box(), G('AMOUNT').find('.pnb-fs-rangemsg').length], ['AMOUNT >= 50 and AMOUNT <= 900', 0]);
+      $('#tableSearch').val('');
+      return idle();
+    }).then(function () { return draw("filter_strip('Sponsor|SPONSOR', 'College|COLLEGE')"); }).then(function () {
+      var c0 = $(S + ' .pnb-fs-chip').eq(0);
+      c0[0].focus(); c0.trigger('click');
+      return idle(function () { return box() !== ''; });
+    }).then(function () { return wait(150); }).then(function () {
+      var t3 = $(S + ' .pnb-fs-chip').eq(3); v3 = 'chip:' + t3.attr('data-fs-val');
+      t3[0].focus();
+      return wait(1700);
+    }).then(function () {
+      var at1 = act();
+      return wait(2200).then(function () {
+        eq('sweep focus: after a chip press, focus moved to another chip stays there (it was pulled back for 5 s)', [at1, act()], [v3, v3]);
+      });
+    }).then(function () {
+      $('#tableSearch').val('');
+      return idle();
+    }).then(function () { return draw("filter_strip('Sponsor|SPONSOR', 'Amount|AMOUNT|range')"); }).then(function () {
+      var c0 = $(S + ' .pnb-fs-chip').eq(0);
+      c0[0].focus(); c0.trigger('click');
+      return idle(function () { return box() !== ''; });
+    }).then(function () { return wait(150); }).then(function () {
+      minBox = G('AMOUNT').find('.pnb-fs-bound[data-fs-bound="min"]')[0];
+      minBox.focus(); minBox.value = '5';
+      minBox.dispatchEvent(new Event('input', { bubbles: true }));
+      return wait(1700);
+    }).then(function () {
+      eq('sweep focus: typing in a range box right after a chip press keeps focus and the typed text there, and commits nothing (focus was pulled out and the half bound written)',
+        [act(), G('AMOUNT').find('.pnb-fs-bound[data-fs-bound="min"]').val(), box()], ['bound:min', '5', 'SPONSOR = /^(?:S01)$/']);
+      // a redraw while it is typed in (the second one a search sets off, or any other): focus and text kept, nothing written
+      return draw("filter_strip('Sponsor|SPONSOR', 'Amount|AMOUNT|range')");
+    }).then(function () { return wait(300); }).then(function () {
+      eq('sweep focus: a redraw over a range box being typed in keeps its focus and text and writes nothing (its removal wrote the half bound)',
+        [act(), G('AMOUNT').find('.pnb-fs-bound[data-fs-bound="min"]').val(), box()], ['bound:min', '5', 'SPONSOR = /^(?:S01)$/']);
+      G('AMOUNT').find('.pnb-fs-bound').val('');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      $('#tableSearch').val('');
+      return wait(100).then(function () { return idle(); });
+    }).then(function () { return draw("filter_strip('Sponsor|SPONSOR|list|az')"); }).then(function () {
+      var c = CH('SPONSOR', 'S05');
+      c[0].focus(); c.trigger('click');
+      return idle(function () { return /S05/.test(box()); });
+    }).then(function () { return wait(900); }).then(function () {
+      eq('sweep focus: a list row pressed keeps focus though the pressed rows move first (it landed on the row that took its place)',
+        [act(), $(S + ' .pnb-fs-chip').eq(0).attr('data-fs-val')], ['chip:S05', 'S05']);
+      $('#tableSearch').val('SPONSOR = /^(?:S08)$/');
+      return idle();
+    }).then(function () { return draw("filter_strip('Sponsor|SPONSOR|top=2')"); }).then(function () {
+      var c = CH('SPONSOR', 'S08');
+      c[0].focus(); c.trigger('click');
+      return idle(function () { return box() === ''; });
+    }).then(function () { return wait(900); }).then(function () {
+      eq('sweep focus: a chip released past the fold folds away: focus goes to the group\'s "+n more" (it was lost)', [act(), CH('SPONSOR', 'S08').hasClass('pnb-fs-hid')], ['act:more', true]);
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      return idle();
+    }).then(function () { return draw("filter_strip('Sponsor|SPONSOR', 'College|COLLEGE')"); }).then(function () {
+      var x = G('COLLEGE').find('.pnb-fs-clear');
+      x[0].focus(); x.trigger('click');
+      return idle(function () { return box() === ''; });
+    }).then(function () { return wait(900); }).then(function () {
+      eq('sweep focus: a group\'s x goes with the redraw: focus lands on the group\'s first chip (it was lost)', act(), 'chip:' + G('COLLEGE').find('.pnb-fs-chip').eq(0).attr('data-fs-val'));
+      $('#tableSearch').val('');
+      return idle();
+    }).then(function () { return draw("filter_strip('Sponsor|SPONSOR', 'College|COLLEGE')"); }).then(function () {
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      F.sync();
+      eq('sweep sync: a condition typed by hand brings its group\'s x and Clear all with the pressed chip, before the search runs',
+        [CH('COLLEGE', 'Eng').attr('aria-pressed'), G('COLLEGE').find('.pnb-fs-clear').length, G('SPONSOR').find('.pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length,
+         G('COLLEGE').find('.pnb-fs-clear').attr('aria-label')], ['true', 1, 0, 1, 'Clear College']);
+      $('#tableSearch').val('');
+      F.sync();
+      eq('sweep sync: ... and takes them off when it is typed away', [CH('COLLEGE', 'Eng').attr('aria-pressed'), G('COLLEGE').find('.pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length], ['false', 0, 0]);
+      // nested (the section O rows): two typed nested conditions keep their __ROW past the last chip
+      var P = function (a) { return '@@JSON' + JSON.stringify(a.map(function (x) { return { NAME: x[0], ROLE: x[1], STATE: x[2] }; })); };
+      var data = [['Eng', P([['Ann', 'PI', 'Active'], ['Bob', 'CoPI', 'Closed']])], ['Eng', P([['Cy', 'PI', 'Closed'], ['Di', 'CoPI', 'Active']])],
+                  ['Sci', P([['Ed', 'PI', 'Active']])], ['Sci', P([['Fy', 'CoPI', 'Active'], ['Gu', 'CoPI', 'Closed']])], ['Ag', '']];
+      use(data.map(function (d, i) { var m = new Map(); m.set('#', String(i + 1)); m.set('COLLEGE', d[0]); m.set('PEOPLE', d[1]); return m; }), ['COLLEGE', 'PEOPLE']);
+      $('#tableSearch').val('__ROW NAME = Ann and STATE = Active');
+      return idle();
+    }).then(function () { return draw("filter_strip('Role|ROLE', 'State|STATE')"); }).then(function () {
+      CH('ROLE', 'PI').trigger('click');
+      return idle(function () { return box().indexOf('ROLE') !== -1; });
+    }).then(function () {
+      eq('sweep nested: a chip joins two typed nested conditions under their __ROW', box(), '__ROW ROLE = /^(?:PI)$/ and NAME = Ann and STATE = Active');
+      return wait(250);
+    }).then(function () {
+      CH('ROLE', 'PI').trigger('click');
+      return idle(function () { return box().indexOf('ROLE') === -1; });
+    }).then(function () {
+      eq('sweep nested: releasing the last chip keeps the __ROW those two need (it was taken off, and their meaning with it)', box(), '__ROW NAME = Ann and STATE = Active');
+      $('#tableSearch').val('NAME = Ann');
+      F.sync();
+      return wait(250);
+    }).then(function () {
+      CH('ROLE', 'PI').trigger('click');
+      return idle(function () { return box().indexOf('ROLE') !== -1; });
+    }).then(function () {
+      eq('sweep nested: with one typed nested condition the first chip still writes __ROW', box(), '__ROW ROLE = /^(?:PI)$/ and NAME = Ann');
+      return wait(250);
+    }).then(function () {
+      CH('ROLE', 'PI').trigger('click');
+      return idle(function () { return box().indexOf('ROLE') === -1; });
+    }).then(function () {
+      eq('sweep nested: ... and the last takes it off (one condition does not need it)', box(), 'NAME = Ann');
+      $('#tableSearch').val('');
+      return wait(250);
+    });
+  }
+
   function run() {
     var F = window.__FS;
     if (!F || typeof F.state !== 'function' || typeof F.compose !== 'function') {
@@ -1561,7 +1814,7 @@
       return draw("filter_strip('College|COLLEGE')");
     }).then(function () {
       assert('render: a fresh render with an empty box shows nothing pressed', $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0 && $(S + ' .pnb-fs-chip').length === 4, '');
-      return sectionI(F, draw, outText, S).then(function () { return sectionJ(F, draw, outText, S); }).then(function () { return sectionK(F, draw, outText, S); }).then(function () { return sectionL(F, draw, outText, S); }).then(function () { return sectionM(F, draw, outText, S); }).then(function () { return sectionN(F, draw, outText, S); }).then(function () { return sectionO(F, draw, outText, S); }).then(function () { return sectionP(F, draw, outText, S); });
+      return sectionI(F, draw, outText, S).then(function () { return sectionJ(F, draw, outText, S); }).then(function () { return sectionK(F, draw, outText, S); }).then(function () { return sectionL(F, draw, outText, S); }).then(function () { return sectionM(F, draw, outText, S); }).then(function () { return sectionN(F, draw, outText, S); }).then(function () { return sectionO(F, draw, outText, S); }).then(function () { return sectionP(F, draw, outText, S); }).then(function () { return sectionR(F, draw, outText, S); });
     }).catch(function (e) {
       assert('render/click phases crashed', false, String(e && e.stack ? e.stack : e));
     }).then(finish);

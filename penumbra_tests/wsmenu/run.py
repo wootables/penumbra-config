@@ -38,7 +38,7 @@ SCN = SCN + ['rfit']   # (round 3) the two fit items
 CHK = {
     'rmenu': ['R-opensBar', 'R-items', 'R-title', 'R-foot', 'R-notes', 'R-place', 'R-margin', 'R-header', 'R-status', 'R-claimed', 'R-cellNative', 'R-headNative',
               'R-input', 'R-link', 'R-shift', 'R-selNative', 'R-selElsewhere', 'R-second', 'R-reopen'],
-    'ractions': ['A-header', 'A-headerBack', 'A-settings', 'A-rerun', 'A-rowHeight', 'A-viewLink', 'A-metrics', 'A-history', 'A-quick', 'A-cards', 'A-cardsBack',
+    'ractions': ['A-header', 'A-headerBack', 'A-settings', 'A-rerun', 'A-rowHeight', 'A-viewLink', 'A-metrics', 'A-history', 'A-quick', 'A-cardsList', 'A-cards', 'A-cardsBack',
                  'A-feedback', 'A-theme', 'A-density'],
     'rsubs': ['S-recentOrder', 'S-recentCur', 'S-recentPin', 'S-recentLinks', 'S-recentAgo', 'S-recentRepo', 'S-parity',
               'S-adminHeads', 'S-adminConsole', 'S-adminTools', 'S-adminSave', 'S-tab', 'S-subPlace', 'S-hoverOpens'],
@@ -67,9 +67,19 @@ STATIC = ['S-indexLoads', 'S-chromeLoads', 'S-usersegRows', 'S-es5', 'S-noEmdash
 # (no fit items there) are green on it, as round 2 has none anywhere; they are red on the build before the menu.
 # (Round 2's set, NEW_R2, was checked against round 1's build, 57f6d9e: the share's run.py.bak-20261102-wsm2.)
 NEW_R3 = {'R-items', 'V-items', 'E-items', 'O-items', 'K-enter', 'F-items', 'F-fitAll', 'F-fitPage', 'F-grouped', 'F-groupPage', 'S-help', 'S-readme'}
+# (2026-11-03, menufix) this round's: red on the build live at its cut (CONTROL_REV 920e818), the rest green there
+NEW_R4 = {'A-cardsList', 'G-listItems'}
+# (2026-11-03, menufix2) this round's, red on menufix's live build (5b124ce; --control-rev 5b124ce)
+SCN = SCN + ['dmfx']
+CHK['dmfx'] = ['M-items', 'M-allLink', 'M-clear', 'M-export', 'M-gated']
+NEW_R5 = {'M-items', 'M-allLink', 'M-clear', 'M-export', 'M-gated'}
 
 # Each mutant: ([(file key, exact old, new)], [checks that must go red], [scenarios to run]). Every anchor once.
 MUTANTS = {
+    # (menufix2) Clear all filters never; the platform's metrics always (no breadcrumb needed); no export list
+    'mf2-noclear': ([('ws', "        if (fc && shown(fc)) { out.push({ act: 'anClear',", "        if (false) { out.push({ act: 'anClear',")], ['M-items', 'M-clear', 'M-export'], ['dmfx']),   # (M-export: its click lands on the next item)
+    'mf2-allgate': ([('ws', "        if (rt && up) { out.push({ act: 'anAll',", "        if (rt) { out.push({ act: 'anAll',")], ['M-gated', 'X-dmfx'], ['dmfx']),   # (no breadcrumb: up.getAttribute throws)
+    'mf2-noexport': ([('ws', "        if (xm && xm.querySelector('a[href]')) {", "        if (false) {")], ['M-items', 'M-export', 'M-gated'], ['dmfx']),
     'ws-noprevent': ([('ws', "        if (e.defaultPrevented) { return; }", "        if (false) { return; }")], ['R-claimed'], ['rmenu', 'rcoexist']),
     'ws-noshift': ([('ws', "        if (e.shiftKey && e.button === 2) { lastClosed = 0; return; }", "        if (false) { lastClosed = 0; return; }")], ['R-shift'], ['rmenu']),
     'ws-nosecond': ([('ws', "        if (lastClosed && Date.now() - lastClosed < SECOND_MS) { lastClosed = 0; return; }", "        if (false) { lastClosed = 0; return; }")], ['R-second'], ['rmenu']),
@@ -107,7 +117,9 @@ MUTANTS = {
     'ws-nodashtile': ([('ws', "#logBody, .dash-tile, .dash-home-item';", "#logBody, .dash-home-item';")], ['G-tile'], ['ddash']),
     'ws-nodashrow': ([('ws', "#logBody, .dash-tile, .dash-home-item';", "#logBody, .dash-tile';")], ['G-listRow'], ['ddashlist']),
     'ws-nokiosk': ([('ws', "        if (document.body.classList.contains('dash-kiosk')) { return false; }", "")], ['G-kioskNone'], ['dkiosk']),
-    'ws-dashopen': ([('ws', "else if (kind === 'dashboard' && dashOpen()) { add(dashLinkItem()); }", "else if (kind === 'dashboard') { add(dashLinkItem()); }")], ['G-listItems'], ['ddashlist']),
+    'ws-dashopen': ([('ws', "else if (kind === 'dashboard') { add(dashOpen() ? dashLinkItem() : pageLinkItem()); }", "else if (kind === 'dashboard' && dashOpen()) { add(dashLinkItem()); }")], ['G-listItems'], ['ddashlist']),
+    # (menufix) Show as cards one action again
+    'ws-cardslist': ([('ws', "        if (typeof C.sizes === 'function') {\n            return { act: 'cardsShow', label: 'Show as cards', sub: true,", "        if (false) {\n            return { act: 'cardsShow', label: 'Show as cards', sub: true,")], ['A-cardsList'], ['ractions']),
     'ws-dashkey': ([('ws', "        if (!k) { return ''; }", "        return '';")], ['G-notes'], ['ddash']),
     'ws-dashglobal': ([('ws', "(D ? !!D.isAdmin : ADMIN === '1')", "(D ? false : ADMIN === '1')")], ['G-items', 'G-tools', 'G-recent'], ['ddash']),
     'ws-dashtitle': ([('ws', "            return (dashOpen() && t) ? t : 'Dashboards';", "            return 'Dashboards';")], ['G-title'], ['ddash']),
@@ -155,7 +167,7 @@ control_r1 = flag('--control-r1')
 # cut 1b0f3b2: NEW_R3 red, everything else green); --control-r1 the build before the menu (9a9dfb4^: every check but
 # the guards red). Every file the harness reads comes from there, so a control is one consistent build whatever has
 # shipped since.
-CONTROL_REV = '1b0f3b2'      # round 2 live (25a92a8 + its help cache 040ec4b, then crow 5b78a0c): no fit items
+CONTROL_REV = '5b124ce'      # (menufix2) menufix live: no Metrics / Health items (menufix's control was 920e818, round 3's 1b0f3b2)
 CONTROL_R1_REV = '9a9dfb4^'  # the menu shipped in 9a9dfb4 (2026-11-01): the build before it
 control_rev = opt('--control-rev', CONTROL_R1_REV if control_r1 else CONTROL_REV)
 if control_r1: control = True
@@ -492,7 +504,14 @@ def scenario(name, out):
             run('quick')
             A('A-quick', p.wait('(window.__palOpens || []).length > %d' % n1, 6), p.ev('window.__palOpens'))
             p.key('Escape'); time.sleep(0.2)
+            # (2026-11-03, menufix) Show as cards opens the card sizes and Configure cards..., as the table's menus offer it
             run('cardsShow')
+            time.sleep(0.3)
+            cm = p.menu() or {'subs': []}
+            cl = [i['act'] for i in (cm['subs'][0]['items'] if cm['subs'] else [])]
+            A('A-cardsList', cl == ['cardsShow-compact', 'cardsShow-standard', 'cardsShow-large', 'cardsShow-xl', 'cardsShowConfig'], cl)
+            pt = p.ev('window.__ws.itemAt("cardsShow-standard", 1)')
+            if pt: p.click(pt)
             on = p.wait('window.Penumbra.cards && window.Penumbra.cards.on()', 5)
             time.sleep(0.4)
             p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
@@ -834,7 +853,7 @@ def scenario(name, out):
             elif name == 'ddashlist':
                 p.rclick(gap)
                 m = p.menu() or {'items': [], 'name': None}
-                A('G-listItems', [i['act'] for i in m['items']] == ['quick', 'recent', 'admin', 'dash-dashCreateBtn', 'dash-dashHelpBtn']
+                A('G-listItems', [i['act'] for i in m['items']] == ['pageLink', 'quick', 'recent', 'admin', 'dash-dashCreateBtn', 'dash-dashHelpBtn']   # (menufix: pageLink)
                   and [i['label'] for i in m['items']][-2:] == ['New dashboard', 'Help'], [(i['act'], i['label']) for i in m['items']])
                 A('G-listTitle', m['name'] == 'Dashboards', m['name'])
                 p.key('Escape')
@@ -854,13 +873,47 @@ def scenario(name, out):
                 p.rclick(gap)
                 c = p.lastctx()
                 A('G-kioskNone', not c.get('prevented') and p.menu() is None and c.get('id') == 'dashGap', c)
-        elif name in ('dadmin', 'dzoom', 'dnonadmin'):
-            qs = {'dadmin': 'admin=1&tool=grants', 'dzoom': 'admin=1&tool=grants&dz=easy-read', 'dnonadmin': 'admin=0&tool=grants'}[name]
+        elif name in ('dadmin', 'dzoom', 'dnonadmin', 'dmfx'):
+            qs = {'dadmin': 'admin=1&tool=grants', 'dzoom': 'admin=1&tool=grants&dz=easy-read', 'dnonadmin': 'admin=0&tool=grants', 'dmfx': 'admin=1&tool=grants'}[name]
             p = Pg('adm.html?' + qs)
             p.wait(READY_D, 30)
             time.sleep(0.4)
             gap = p.ev('window.__ws.center("#gap")')
-            if name == 'dadmin':
+            if name == 'dmfx':
+                # (2026-11-03, menufix2) a report's metrics: its filter bar's Clear all (a filter set), the All Reports breadcrumb
+                # (a global admin's), Health's outage export menu - each page's own markup, put on the admin page here
+                p.ev('(function () { var g = document.getElementById("gap"), d = document.createElement("div"); d.id = "mfxBox";'
+                     ' d.innerHTML = \'<a class="an-ctx-title" href="index.php?id=lrfix">LR</a> <a class="an-crumb" href="analytics_all.php?range=30">All Reports</a>\''
+                     ' + \'<button type="button" class="fb-clear" data-clear="all">Clear all</button>\''
+                     ' + \'<span class="pnb-out-expmenu" id="pnbOutExpMenu" hidden><span class="pnb-out-exph">CSV · Last 30 days</span>\''
+                     ' + \'<a href="health.php?out_export=csv&out=t1" download>Everything <span class="n">7</span></a>\''
+                     ' + \'<a href="health.php?out_export=csv&out=t1&kind=db" download>Databases <span class="n">4</span></a>\''
+                     ' + \'<a class="sub" href="health.php?out_export=csv&out=t1&comp=ieprd" download>IEPRD <span class="n">3</span></a></span>\';'
+                     ' g.parentNode.insertBefore(d, g); window.__fbc = 0; d.querySelector(".fb-clear").addEventListener("click", function () { window.__fbc++; }); return 1; })()')
+                time.sleep(0.2)
+                p.rclick(gap)
+                m = p.menu()
+                acts = [i['act'] for i in m['items']] if m else []
+                A('M-items', 'anClear' in acts and 'anAll' in acts and 'hubExport' in acts and acts.index('openReport') < acts.index('anClear') < acts.index('anAll'), acts)
+                aa = [i for i in (m['items'] if m else []) if i['act'] == 'anAll']
+                A('M-allLink', bool(aa) and aa[0]['tag'] == 'A' and aa[0]['href'] == 'analytics_all.php?range=30', aa)
+                p.click(p.ev('window.__ws.itemAt("anClear", 0)'))
+                A('M-clear', p.wait('window.__fbc === 1', 3), p.ev('window.__fbc'))
+                p.rclick(gap)
+                p.click(p.ev('window.__ws.itemAt("hubExport", 0)'))
+                time.sleep(0.4)
+                mm = p.menu() or {'subs': []}
+                ex = mm['subs'][0]['items'] if mm['subs'] else []
+                A('M-export', [i['label'].strip() for i in ex] == ['Everything', 'Databases', 'IEPRD'] and [i['note'] for i in ex] == ['7', '4', '3']
+                  and all(i['tag'] == 'A' for i in ex) and ex[2]['href'] == 'health.php?out_export=csv&out=t1&comp=ieprd', [(i['label'], i['note'], i['tag'], i['href']) for i in ex])
+                p.key('Escape')
+                # nothing to clear (no filter set: no Clear all), no breadcrumb (not a global admin): neither item
+                p.ev('document.querySelector("#mfxBox .fb-clear").remove(); document.querySelector("#mfxBox .an-crumb").remove(); 1')
+                p.rclick(gap)
+                a2 = p.acts() or []
+                A('M-gated', 'anClear' not in a2 and 'anAll' not in a2 and 'hubExport' in a2, a2)
+                p.key('Escape')
+            elif name == 'dadmin':
                 p.rclick(gap)
                 m, c = p.menu(), p.lastctx()
                 A('D-opens', m is not None and c.get('prevented'), c)
@@ -1040,7 +1093,7 @@ try:
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
             # round 2's build: round 3's checks red; the build before the menu: every check but the guards (and no page errors)
-            new = [a for a in want if ((a not in GUARDS and not a.startswith('X-')) if control_r1 else (a in NEW_R3))]
+            new = [a for a in want if ((a not in GUARDS and not a.startswith('X-')) if control_r1 else (a in NEW_R5))]
             wrong = [a for a in want if (a in failed) != (a in new)]
             print('CONTROL: %s' % ('as expected (%d red, %d %s green)' % (len(new), len(want) - len(new), 'guards' if control_r1 else 'others') if not wrong else 'NOT as expected: %s' % ' '.join(wrong)))
             print('RESULT: GREEN' if not wrong else 'RESULT: RED')

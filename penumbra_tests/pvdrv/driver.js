@@ -93,7 +93,8 @@
       var iId = hs.indexOf('V_ID'), lead = t.hasAttribute('data-pnb-bd-lead');
       var rows = Array.prototype.map.call(t.tBodies[0].rows, function (tr) {
         if (tr.cells.length === 1) return null;   // "No matching transactions found."
-        return { id: tr.cells[iId] ? tr.cells[iId].textContent.trim() : null, lead: lead ? tr.cells[1].textContent.trim() : null };
+        return { id: tr.cells[iId] ? tr.cells[iId].textContent.trim() : null, lead: lead ? tr.cells[1].textContent.trim() : null,
+                 src: tr.__pnbBdSrc instanceof Map ? String(tr.__pnbBdSrc.get('V_ID')) : null };
       }).filter(Boolean);
       return { heads: hs, lead: lead, id: t.getAttribute('data-pnb-bd'), rows: rows };
     });
@@ -102,6 +103,7 @@
       note: ((o.querySelector('.pnb-bd-note') || {}).textContent || '').trim(),
       secs: Array.prototype.map.call(o.querySelectorAll('.pnb-bd-sec'), function (h) { return h.textContent.replace(/\s+/g, ' ').trim(); }),
       link: !!o.querySelector('.infobox-drill-to-table'),
+      jump: Array.prototype.map.call(o.querySelectorAll('.pnb-bd-jump .pnb-bd-jumpto'), function (b) { return b.textContent.replace(/\s+/g, ' ').trim(); }),
       tables: tables
     };
   }
@@ -119,6 +121,9 @@
     return { d: d, added: r.added };
   }
   function tIds(t) { return t ? t.rows.map(function (x) { return x.id; }) : []; }
+  // (2026-11-03) every row keeps the source row it shows (bdhl's rules read it): its V_ID is the row's
+  function srcOk(t) { return !!t && t.rows.length > 0 && t.rows.every(function (x) { return x.src !== null && x.src === x.id; }); }
+  function srcInfo(d) { return d && d.tables.map(function (t) { return t.rows.filter(function (x) { return x.src === x.id; }).length + '/' + t.rows.length; }); }
   // a running value's one table: its rows by the cell the Pivot column names
   function byLead(t) {
     var m = {};
@@ -181,6 +186,31 @@
           && d.note === 'Chg compares ' + Y[2] + ' with the column before it, ' + Y[1] + '.' && !d.link && d.title.indexOf('Chg: ') === 0
           && near(v, (amt(a) - amt(b)) / amt(b) * 100, 0.6);
         R.info.chg = { d: d, v: v, want: (amt(a) - amt(b)) / amt(b) * 100, added: r.added };
+        R.chk.srcChg = !!d && d.tables.length === 2 && srcOk(d.tables[0]) && srcOk(d.tables[1]);
+        R.info.srcChg = srcInfo(d);
+      });
+      // (2026-11-03, bdj) the two tables listed at the top, each link naming its table and rows; a link brings that
+      // table's heading to the top of a short dialog, focused (the chg dialog is still open)
+      await step('jump', async function () {
+        var os = overlays(), o = os.length ? os[os.length - 1] : null;
+        var sp = o && o.querySelector('.infobox-content'), bs = o ? o.querySelectorAll('.pnb-bd-jump .pnb-bd-jumpto') : [];
+        var s0 = o && o.querySelector('.pnb-bd-sec[data-pnb-bd-sec="0"]'), s1 = o && o.querySelector('.pnb-bd-sec[data-pnb-bd-sec="1"]');
+        var inf = R.info.jump = { n: bs.length };
+        if (!sp || bs.length !== 2 || !s0 || !s1) { R.chk.jump = false; return; }
+        var d = readDlg(o);
+        inf.labels = d.jump; inf.secs = d.secs;
+        var lab = d.tables.length === 2 && d.tables.every(function (t, k) {
+          var n = t.rows.length;
+          return d.jump[k] === d.secs[k].replace(/ \d+ rows?$/, '') + ' (' + n + ' row' + (n !== 1 ? 's' : '') + ')';
+        });
+        sp.style.maxHeight = '160px'; sp.scrollTop = 0; await sleep(60);
+        var top = function (el) { return Math.round(el.getBoundingClientRect().top - sp.getBoundingClientRect().top); };
+        inf.before = top(s1); inf.h = sp.clientHeight;
+        bs[1].click(); await sleep(150);
+        inf.after = top(s1); inf.f1 = document.activeElement === s1;
+        bs[0].click(); await sleep(150);
+        inf.back = top(s0); inf.f0 = document.activeElement === s0;
+        R.chk.jump = lab && inf.before > inf.h && inf.after >= -2 && inf.after <= 4 && inf.f1 && inf.back >= -2 && inf.back <= 4 && inf.f0;
       });
       await step('chgFirst', async function () {
         var r = await clickCell(cell(G, Y[0], AI.Chg)), d = r.d;
@@ -195,6 +225,7 @@
       });
       await step('share', async function () {
         var td = cell(G, Y[1], AI['Row%']), r = await clickCell(td), d = r.d, a = rs(Y[1]), all = rowsOf([['G', G]]);
+        (R.info.jumpNone = R.info.jumpNone || []).push(d ? d.jump.length : -1);   // (bdj) one table: no list
         R.chk.share = !!d && d.tables.length === 1 && same(tIds(d.tables[0]), ids(a)) && d.link
           && d.note === "Row% is this cell's share of its row's total. These are its rows." && near(num(td), amt(a) / amt(all) * 100, 0.6);
         R.info.share = { v: num(td), want: amt(a) / amt(all) * 100, note: d && d.note };
@@ -205,6 +236,13 @@
         R.chk.run = !!d && r.added === 1 && d.tables.length === 1 && leadOk(d.tables[0], 'Pivot column', cells) && !d.link
           && d.note === 'Run adds up ' + Y[0] + ' through ' + Y[3] + '.' && near(num(td), amt(all), 1.01);
         R.info.run = { v: num(td), want: amt(all), added: r.added, heads: d && d.tables[0] && d.tables[0].heads.slice(0, 3), note: d && d.note };
+        (R.info.jumpNone = R.info.jumpNone || []).push(d ? d.jump.length : -1);   // (bdj) one table with a Pivot column: no list
+        R.chk.srcRun = !!d && d.tables.length === 1 && srcOk(d.tables[0]);
+        R.info.srcRun = srcInfo(d);
+      });
+      await step('jumpNone', async function () {
+        var a = R.info.jumpNone || [];
+        R.chk.jumpNone = a.length === 2 && a.every(function (n) { return n === 0; });
       });
       await step('runFirst', async function () {
         var r = await clickCell(cell(G, Y[0], AI.Run)), d = r.d;

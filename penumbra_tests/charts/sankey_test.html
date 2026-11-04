@@ -26,6 +26,7 @@ window.onerror = function (msg, src, line, col) {
 <script src="chartjs-chart-sankey-0.19.1.min.js"></script>
 <script src="penumbra_charts.js"></script>
 <canvas id="c" width="800" height="500" style="width:800px;height:500px"></canvas>
+<canvas id="c2" width="320" height="240" style="width:320px;height:240px"></canvas>
 <script>
 var LOG=[],PASS=0,FAIL=0;
 function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
@@ -59,6 +60,8 @@ try {
   // ---- refusals ----
   var R0 = rows([{A:'x',B:'y',V:'1'}]);
   ok('refuse: one stage', /two stages/.test(PC.buildSankeyData(R0, {stages:['A'], agg:'count', cleanLabel:clean, parseNum:num})._noData || ''));
+  ok('refuse: Stage 2 = Stage 1 says so (2026-11-03)', /same column as Stage 1 \(A\)/.test(PC.buildSankeyData(R0, {stages:['A'], stage1:'A', stage2:'a', agg:'count', cleanLabel:clean, parseNum:num})._noData || ''));
+  ok('refuse: a blank Stage 2 still asks for one', /pick the Stage 2/.test(PC.buildSankeyData(R0, {stages:['A'], stage1:'A', stage2:'', agg:'count', cleanLabel:clean, parseNum:num})._noData || ''));
   ok('refuse: avg', /Count or a Sum/.test(PC.buildSankeyData(R0, {stages:['A','B'], agg:'avg', valueCol:'V', cleanLabel:clean, parseNum:num})._noData || ''));
   ok('refuse: distinct', /Count or a Sum/.test(PC.buildSankeyData(R0, {stages:['A','B'], agg:'distinct', valueCol:'V', cleanLabel:clean, parseNum:num})._noData || ''));
   ok('refuse: sum with no value column', /Y-Axis column/.test(PC.buildSankeyData(R0, {stages:['A','B'], agg:'sum', valueCol:'none', cleanLabel:clean, parseNum:num})._noData || ''));
@@ -106,8 +109,9 @@ try {
   var oth = S.links.filter(function(l){ return l._fromName === null; });
   ok('build: an Other band carries null as its from-name', oth.length > 0 && oth.every(function(l){ return l._fromCol === 'AGENCY' && l._fromStage === 0; }));
   eq('build: band drill columns', [S.links[0]._fromCol, S.links[0]._toCol], ['AGENCY','ROUTE']);
-  eq('build: a11y rows = one per band', D._a11yRows.rows.length, S.links.length);
-  eq('build: a11y columns', D._a11yRows.columns, ['From (AGENCY)','To','Value']);
+  eq('build: a11y rows = one per band, then one per box (2026-11-03)', D._a11yRows.rows.length, S.links.length + S.nodes.length);
+  ok('build: a box row follows the bands and carries the box total', (D._a11yRows.rows[S.links.length] || [])[1] === '(box total)' && (D._a11yRows.rows[S.links.length] || [])[2] === S.nodes[0].total && String((D._a11yRows.rows[S.links.length] || [])[0]).indexOf(S.nodes[0].name) === 0, JSON.stringify(D._a11yRows.rows[S.links.length]));
+  eq('build: a11y columns (each row names its own stage columns)', D._a11yRows.columns, ['From','To','Value']);
 
   // colours
   var byName0 = {}; S.nodes.forEach(function(n){ if (n.stage === 0) byName0[n.name] = n; });
@@ -139,7 +143,10 @@ try {
   var ds = cfg.data.datasets[0];
   eq('config: one data item per band', ds.data.length, S.links.length);
   var navyId = S.nodes.filter(function(n){ return n.name === 'Navy'; })[0].id;
-  eq('config: box label carries its total', ds.labels[navyId], 'Navy  $700');
+  eq('config: box label = the name, then the total on a second line (2026-11-03)', ds.labels[navyId], 'Navy\n$700');
+  eq('config: the box list for the keyboard point list', ds._pnbSankey.nodes.length, S.nodes.length);
+  eq('config: a box list entry carries what a canvas click parks', [ds._pnbSankey.nodes[0].stage, ds._pnbSankey.nodes[0].other, typeof ds._pnbSankey.nodes[0].name], [0, false, 'string']);
+  eq('config: label fitter, box tip and the negative-row note plugins', cfg.plugins.map(function(p){ return p.id; }).sort(), ['pnbSankeyBoxTip','pnbSankeyLabels','pnbSankeyNote']);
   ok('config: largest box has the lowest priority (top)', ds.priority[navyId] < ds.priority[S.nodes.filter(function(n){ return n.name === 'Army'; })[0].id]);
   ok('config: Other sorts to the bottom', ds.priority[S.nodes.filter(function(n){ return n.other; })[0].id] === 1e15);
   eq('config: drill metadata on the dataset', ds._pnbSankey.stages, ['AGENCY','ROUTE','DEPT']);
@@ -162,6 +169,12 @@ try {
   var nodes = chart.getDatasetMeta(0).controller._nodes;
   eq('render: the plugin laid out every box', nodes.size, S.nodes.length);
   var nv = nodes.get(navyId);
+  // (2026-11-04) the box rectangles main.js's notes markers read: one per box, the plugin's own shift included
+  var G = PC._vizSankeyNodeRects(chart);
+  eq('render: _vizSankeyNodeRects lists every box', G && G.rects.length, S.nodes.length);
+  var gNavy = G && G.rects.filter(function(r){ return r.key === navyId; })[0];
+  ok('render: a stage-0 rectangle sits at its scale pixel, nodeWidth wide, its size tall', !!gNavy && Math.abs(gNavy.x - chart.scales.x.getPixelForValue(nv.x)) < 0.01 && gNavy.w === 12 && gNavy.h > 0 && Math.abs(gNavy.h - Math.abs(chart.scales.y.getPixelForValue(nv.y + nv.size) - chart.scales.y.getPixelForValue(nv.y))) < 0.01, JSON.stringify(gNavy));
+  ok('render: the last column\'s rectangle is drawn left of its scale pixel (the shift the hit-test mirrors)', !!G && G.rects.some(function(r){ return r.col === G.maxX && r.x < chart.scales.x.getPixelForValue(r.col) - 1; }), G && JSON.stringify(G.rects.map(function(r){ return [r.col, Math.round(r.x)]; })));
   var px = chart.scales.x.getPixelForValue(nv.x) + 4, py = chart.scales.y.getPixelForValue(nv.y) + 5;
   var hit = PC._vizSankeyNodeAt(chart, px, py);
   eq('render: box found by its rectangle', hit && [hit.stage, hit.name, hit.other], [0, 'Navy', false]);
@@ -169,12 +182,54 @@ try {
   var oh = PC._vizSankeyNodeAt(chart, chart.scales.x.getPixelForValue(on.x) + 4, chart.scales.y.getPixelForValue(on.y) + 2);
   eq('render: an Other box comes back as other, no name', oh && [oh.name, oh.other], [null, true]);
   eq('render: empty canvas corner hits nothing', PC._vizSankeyNodeAt(chart, 400, 2), null);
+  // (2026-11-03) the plugin pulls every column LEFT by its share of what the node width would overflow the
+  // right padding, so the LAST stage is drawn 7 px left of its scale pixel: the hit-test has to follow it
+  var lastNodes = S.nodes.filter(function(n){ return n.stage === 2; }).sort(function(a,b){ return b.total - a.total; });
+  var lastId = lastNodes[0].id, ln = nodes.get(lastId);
+  var over = Math.max(0, 12 + 3 - (chart.width - chart.chartArea.right)), maxX = chart.getDatasetMeta(0).controller._maxX;
+  ok('render: the last column IS drawn left of its scale pixel here', over > 0 && maxX > 0, 'over=' + over + ' maxX=' + maxX);
+  var lx = chart.scales.x.getPixelForValue(ln.x) - (ln.x / maxX) * over, ly = chart.scales.y.getPixelForValue(ln.y) + 3;
+  eq('render: last-stage box hit on its LEFT edge', (PC._vizSankeyNodeAt(chart, lx + 1, ly) || {}).id, lastId);
+  eq('render: last-stage box hit on its right edge', (PC._vizSankeyNodeAt(chart, lx + 11, ly) || {}).id, lastId);
+  eq('render: 6 px past the last-stage box is empty', PC._vizSankeyNodeAt(chart, lx + 12 + 6, ly), null);
   var said = inner.call(chart, { x: px, y: py }, [], chart);
   eq('render: a box click asks the drill to run', said, { datasetIndex: 0, index: 0 });
   eq('render: and parks the box for it', chart.$pnbSankeyNode && chart.$pnbSankeyNode.name, 'Navy');
   var said2 = inner.call(chart, { x: px, y: py }, [{ index: 0 }], chart);
   ok('render: a band click is left to Chart.js', said2 === undefined && chart.$pnbSankeyNode === null);
+  // (2026-11-03) labels draw as two lines (two fillText calls); a box tip on hover
+  var drawn = [], _ft = CanvasRenderingContext2D.prototype.fillText;
+  var spy = function (s) { drawn.push(String(s)); return _ft.apply(this, arguments); };
+  CanvasRenderingContext2D.prototype.fillText = spy;
+  try { chart.draw(); } finally { CanvasRenderingContext2D.prototype.fillText = _ft; }
+  ok('render: the box label is drawn as its name and its total on separate lines', drawn.indexOf('Navy') !== -1 && drawn.indexOf('$700') !== -1 && drawn.indexOf('Navy  $700') === -1, JSON.stringify(drawn.slice(0, 14)));
+  var tip = cfg.plugins.filter(function(p){ return p.id === 'pnbSankeyBoxTip'; })[0];
+  var evArgs = { event: { type: 'mousemove', x: px, y: py } };
+  tip.afterEvent(chart, evArgs);
+  eq('tip: pointing at a box parks it, asks for a redraw and shows a pointer', [chart.$pnbSankeyHover && chart.$pnbSankeyHover.id, evArgs.changed, chart.canvas.style.cursor], [navyId, true, 'pointer']);
+  drawn = []; CanvasRenderingContext2D.prototype.fillText = spy;
+  try { tip.afterDraw(chart); } finally { CanvasRenderingContext2D.prototype.fillText = _ft; }
+  ok('tip: the box tip names the box, its column, total + share, and rows', drawn[0] === 'Navy' && drawn[1] === 'AGENCY' && /^\$700  \(\d+\.\d% of the total\)$/.test(drawn[2]) && /^\d+ rows?$/.test(drawn[3]), JSON.stringify(drawn));
+  tip.afterEvent(chart, { event: { type: 'mousemove', x: 400, y: 2 } });
+  eq('tip: leaving the box clears it and the pointer', [chart.$pnbSankeyHover, chart.canvas.style.cursor], [null, '']);
+  var evOut = { event: { type: 'mouseout' } };
+  tip.afterEvent(chart, evArgs); tip.afterEvent(chart, evOut);
+  eq('tip: mouseout clears it too', [chart.$pnbSankeyHover, evOut.changed], [null, true]);
   chart.destroy();
+  // (2026-11-03) a narrow chart: a long name is cut to an ellipsis, a short one and the totals stay
+  var LR = rows([{A:'National Institutes of Health Research',B:'Direct',V:'900'},{A:'National Science Foundation Programs',B:'Direct',V:'800'},{A:'USDA',B:'Flow-through',V:'100'}]);
+  var DL = PC.buildSankeyData(LR, {stages:['A','B'], agg:'sum', valueCol:'V', cleanLabel:clean, parseNum:num});
+  var cfgL = { type: 'bar', data: {}, options: { plugins: {} }, plugins: [] };
+  PC.applySankeyChartConfig(cfgL, DL, { textColor: '#111', isDark: false, currencyPrefix: '$', fsBoost: 0 });
+  cfgL.options.animation = false; cfgL.options.responsive = false;
+  drawn = []; CanvasRenderingContext2D.prototype.fillText = spy;
+  var chartL;
+  try { chartL = new Chart(document.getElementById('c2').getContext('2d'), cfgL); chartL.draw(); } finally { CanvasRenderingContext2D.prototype.fillText = _ft; }
+  var cut = drawn.filter(function(s){ return /…$/.test(s); });
+  ok('fit: on a 320 px chart the two long names are cut to an ellipsis', cut.length >= 2 && cut.every(function(s){ return s.length < 'National Institutes of Health Research'.length; }), JSON.stringify(drawn));
+  ok('fit: a short name is left whole', drawn.indexOf('USDA') !== -1 && drawn.indexOf('Direct') !== -1, JSON.stringify(drawn));
+  ok('fit: the totals still draw', drawn.indexOf('$900') !== -1 && drawn.indexOf('$1,700') !== -1, JSON.stringify(drawn));
+  chartL.destroy();
 } catch (e) { FAIL++; LOG.push('FAIL  threw: ' + (e && e.stack || e)); }
 document.getElementById('out').textContent = 'pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
 document.title = FAIL ? 'FAIL' : 'PASS';

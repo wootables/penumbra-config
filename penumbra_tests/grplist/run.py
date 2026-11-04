@@ -120,7 +120,7 @@ CHK = {
     'n3crumb': ['twoNames', 'pointer', 'rootGoes', 'rootOpen', 'rootShown', 'midGoes', 'nameNot', 'clipped', 'bandDom'],
     # glmerge (2026-10-14): a selected branch is one table
     'nmerge': ['clickSelects', 'allLeaves', 'oneHead', 'aligned', 'noFoot', 'oneScroll', 'rowsAll', 'headStays',
-               'stripes', 'foldArrow', 'keysPass', 'enterSelects', 'backToLeaf', 'stripesBack', 'exitClean',
+               'stripes', 'foldArrow', 'rowReopens', 'rowFolds', 'keysPass',   # glrefold: rowFolds 'enterSelects', 'backToLeaf', 'stripesBack', 'exitClean',
                'ptotal', 'ptAligned', 'ptPinned', 'ptNotTable', 'ptGone', 'boxKeep',   # gltot
                'hScroll', 'farCols',   # glhs
                'iconsInCells',   # glsweep: sort icons and grips stay in their header cell
@@ -237,9 +237,11 @@ NEW_RGPATHS = ['L-rpsearch-clearSorted', 'L-rpsearch-clearMarks', 'L-rpsearchlis
                'L-rpcmpflat-pivotCmpRepaint', 'L-rpcmpflat-abPivotGone', 'L-rpmarksoff-offSearchUnmarked', 'L-rpmarksoff-offApplyUnmarked']
 NEW_BDLAY = ['L-trigboard-boardKept', 'L-trigboard-boardSaved', 'L-trigboard-copyWritesBoard']   # (bdlay, 2026-10-31) boardLeft holds on live too
 NEW_GRPCNT = ['L-colcount-countShown', 'L-colcount-countLevel2', 'L-colcount-blanksOut', 'L-colcount-countDrawn', 'L-tip-tipReaderNoSnippet']   # (grpcnt, 2026-10-31) textKept, nestedNone, tipEditorSnippet hold on live too
+NEW_GLREFOLD = ['L-nmerge-rowFolds']   # (glrefold, 2026-11-03) rowReopens holds on live too
 NEW_SETS = [('cmpgsort', 'function _pnbResortGroupedView()', NEW_CMPGSORT), ('rgsort', 'function _pnbResortFlatView(', NEW_RGSORT),
             ('rgpaths', 'function _pnbPreCompareGroupingBack(', NEW_RGPATHS),
-            ('bdlay', 'function _groupLayoutNorm(v)', NEW_BDLAY), ('grpcnt', 'function _groupValueCount(col)', NEW_GRPCNT)]
+            ('bdlay', 'function _groupLayoutNorm(v)', NEW_BDLAY), ('grpcnt', 'function _groupValueCount(col)', NEW_GRPCNT),
+            ('glrefold', '(glrefold, 2026-11-03)', NEW_GLREFOLD)]   # its marker is in the MODULE (texts['mod'])
 # rgsort re-sorts on every Apply, so cmpgsort's "next" flag went with it: these mutants edit the flag and are
 # reported as superseded on a build without it (the marker), not run
 FLAG_MUTANTS = ('cg-noresort', 'cg-noask', 'cg-reentry', 'cg-noconsume')
@@ -370,6 +372,9 @@ MUTANTS = {
     'mgnosel': ([('mod', "        else if (fromClick) { selPath = path; expanded[path] = true; }\n", "        else if (fromClick) { expanded[path] = true; }\n")],
                 ['L-nmerge-clickSelects'], ['nmerge']),
     # glmerge: every group's header drawn
+    # glrefold: a second click on a selected, unfolded branch's row does nothing again
+    'refold': ([('mod', "        else if (fromClick && selPath === path && expanded[path]) { expanded[path] = false; }\n", "")],
+               ['L-nmerge-rowFolds'], ['nmerge']),
     'mghead': ([('css', "    visibility: collapse;\n", "")],
                ['L-nmerge-oneHead'], ['nmerge']),
     # glmerge: the other tables keep their own widths
@@ -973,7 +978,7 @@ try:
         if live_control:
             NEW = []
             for nm, marker, ids in NEW_SETS:
-                if marker in texts['main']: print('CONTROL: %s is in live main.js already - its checks are expected GREEN' % nm)
+                if marker in texts['main'] + texts.get('mod', ''): print('CONTROL: %s is in live main.js already - its checks are expected GREEN' % nm)
                 else: NEW += ids; print('CONTROL: %s is not in live main.js - its %d checks are expected RED' % (nm, len(ids)))
             seen = [a for a, _, _ in res]
             new_green = [a for a in NEW if a in seen and a not in failed]
@@ -987,7 +992,7 @@ try:
             # a build without a fix (live before its deploy, another session's stage) fails that fix's checks: say so
             for nm, marker, ids in NEW_SETS:
                 red = [a for a in ids if a in failed]
-                if red and marker not in texts['main']:
+                if red and marker not in texts['main'] + texts.get('mod', ''):
                     print('NOTE: %s is not in this build: %d of its checks are red as on the build before it (expected until it is in): %s' % (nm, len(red), ' '.join(red)))
             print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
 finally:

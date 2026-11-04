@@ -150,7 +150,7 @@ try {
                          grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseBands(')+'\n'+
                          grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseRefMarker(')+'\n'+grab('function _vizParseTarget(')+'\n'+
                          grab('function _vizGaugeRange(')+'\n'+
-                         grab('function _vizParseVizOptions(')+'\n'+(/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(')+'\n'+grab('function _vizParseUserNumber(')+'\n'+grab('function generateChartDataFromMaps(')+'\n'+grab('function _generateChartDataFromMaps(')+'\n'+(code.indexOf('function _vizRowNum(')!==-1?grab('function _vizNoYCol(')+'\n'+grab('function _vizCountsRows(')+'\n'+grab('function _vizRowNum(')+'\n'+grab('function _vizOtherBucketLabel(')+'\n'+grab('function _vizIsBucketLabel(')+'\n':'')+(code.indexOf('function penumbraComboAutoSlots(')!==-1?grab('function penumbraComboAutoSlots(')+'\n'+grab('function penumbraButterflyAutoColor(')+'\nfunction _penumbraPaletteHex(i){ return "#00000"+i; }\nvar _penumbraActivePalette = "auto";':'')+
+                         grab('function _vizParseVizOptions(')+'\n'+(/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(')+'\n'+grab('function _vizParseUserNumber(')+'\n'+grab('function _vizGanttEndFixedMs(')+'\n'+grab('function generateChartDataFromMaps(')+'\n'+grab('function _generateChartDataFromMaps(')+'\n'+(code.indexOf('function _vizRowNum(')!==-1?grab('function _vizNoYCol(')+'\n'+grab('function _vizCountsRows(')+'\n'+grab('function _vizRowNum(')+'\n'+grab('function _vizOtherBucketLabel(')+'\n'+grab('function _vizIsBucketLabel(')+'\n':'')+(code.indexOf('function penumbraComboAutoSlots(')!==-1?grab('function penumbraComboAutoSlots(')+'\n'+grab('function penumbraButterflyAutoColor(')+'\nfunction _penumbraPaletteHex(i){ return "#00000"+i; }\nvar _penumbraActivePalette = "auto";':'')+
                          '\nreturn generateChartDataFromMaps;')();
 
   function rows(list){ return list.map(function(r){ var m=new Map(); m.set('TASK',r[0]); m.set('START',r[1]); m.set('END',r[2]); return m; }); }
@@ -206,6 +206,28 @@ try {
   // hand-coded with a stale sortBy always has.
   var gUnk = gen(R,'TASK','START','END','sum',10,'gantt','nonsense','asc','default',false,false,null,'',{});
   eq('gantt: unknown sortBy still sorts by start', gUnk.labels, ['Proposal','Review','Negotiate','Award']);
+
+  // ---- (gone, 2026-11-03) a FIXED end - '@today' / '@date:YYYY-MM-DD' in the slot ----
+  var gfx = new Function(grab('function _vizGanttEndFixedMs(') + '\n' + grab('function _vizGanttEndFixedLabel(') + '\nreturn { ms: _vizGanttEndFixedMs, label: _vizGanttEndFixedLabel };')();
+  ok('fixed: a column name is no fixed end', gfx.ms('END_DATE') === null);
+  eq('fixed: @date resolves to the end of that day', moment(gfx.ms('@date:2026-12-31')).format('YYYY-MM-DD HH:mm'), '2026-12-31 23:59');
+  eq('fixed: @today is the end of today', moment(gfx.ms('@today')).format('YYYY-MM-DD HH:mm'), moment().format('YYYY-MM-DD') + ' 23:59');
+  eq('fixed: label for @today', gfx.label('@today'), 'today');
+  eq('fixed: label for @date', gfx.label('@date:2026-06-30'), '2026-06-30');
+  eq('fixed: a column has no fixed label', gfx.label('END_DATE'), '');
+  var RF = rows([
+    ['Open A',  '01/01/2026', ''],
+    ['Open B',  '03/01/2026', ''],
+    ['NoStart', '',           '']
+  ]);
+  var gToday = gen(RF,'TASK','START','@today','sum',10,'gantt','value','asc','default',false,false,null,'',{});
+  eq('gantt fixed: @today needs only a start - the startless row is skipped', gToday.labels, ['Open A','Open B']);
+  ok('gantt fixed: every bar ends at the end of today', gToday.datasets[0].data.every(function(p){ return p[1] === gfx.ms('@today'); }), JSON.stringify(gToday.datasets[0].data));
+  ok('gantt fixed: the note blames only the start date', /1 row with no start date is not shown/.test(gToday._ganttNote), gToday._ganttNote);
+  var gFixDate = gen(RF,'TASK','START','@date:2026-06-30','sum',10,'gantt','value','asc','default',false,false,null,'',{});
+  eq('gantt fixed: @date bars end on that day', gFixDate.datasets[0].data.map(function(p){ return moment(p[1]).format('YYYY-MM-DD'); }), ['2026-06-30','2026-06-30']);
+  var gFixBad = gen(R,'TASK','START','@date:','sum',10,'gantt','value','asc','default',false,false,null,'',{});
+  ok('gantt fixed: a dateless @date: is read as a (missing) column, not guessed', !!gFixBad._noData, JSON.stringify(gFixBad).slice(0,120));
   // Limit is applied AFTER the sort, so a limited duration chart keeps the
   // longest bars rather than the first ones on the calendar.
   var gDurLim = gen(R,'TASK','START','END','sum',2,'gantt','duration','desc','default',false,false,null,'',{});

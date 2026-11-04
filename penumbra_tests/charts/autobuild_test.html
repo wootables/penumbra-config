@@ -108,6 +108,19 @@ try {
   ok('static: a kept type is announced in the HEADS UP', /Kept the selected ' \+ _selLabel \+ ' type/.test(code));
   ok('static: the applier writes axis titles for axis types only', /VIZ_NO_AXIS_LABELS\.indexOf\(_autoType\) === -1 && _autoType !== 'gantt'/.test(grab('function _vizApplyAutoConfig(')));
   eq('static: all three Auto-build tips say a picked type is kept', (code.match(/A chart type you have already picked is kept/g) || []).length, 3);
+  // autoviz3 (2026-11-03): a fresh query keys cni by the SQL alias AS RETURNED
+  // (mixed case stays), while headers are uppercased - the props lookup and the
+  // type glyph both need a case-insensitive fallback (UnderRev's "no date columns").
+  ok('static: props lookup falls back to a case-insensitive key match',
+     /var _want = String\(colName\)\.toUpperCase\(\);/.test(grab('function _vizPropsForCol(')));
+  ok('static: the type glyph falls back the same way',
+     /String\(_gk\)\.toUpperCase\(\) === key\.toUpperCase\(\)/.test(code));
+  // gone (2026-11-03): a Gantt end may be FIXED - '@today' / '@date:YYYY-MM-DD'.
+  ok('static: the data builder reads a fixed end for every row',
+     /var e = \(gtEndFixed !== null\) \? gtEndFixed : _vizDateMs\(map\.get\(gtEndCol\)\);/.test(code));
+  eq('static: all three End Date reads go through _vizGanttEndVal', (code.match(/_vizGanttEndVal\(\) \|\| /g) || []).length, 3);
+  ok('static: a report with no end-like column prefills Today', /if \(!guess\) guess = '@today';/.test(code));
+  eq('static: the prefill guess never lands on a fixed-choice option', (code.match(/v\.charAt\(0\) === '@' \|\| v\.toUpperCase\(\) === start/g) || []).length, 2);
 
   // ---- 1. Sandbox: real readers + shape rules, stubbed DOM ----------------
   var stubs = [
@@ -150,7 +163,9 @@ try {
     // autoviz (2026-11-02): auto-build keeps a deliberately picked type
     grab('function _vizAutoColClasses('), grab('function _vizAutoMeasureList('), grab('function _vizAutoSecondCat('),
     grab('function _vizAutoStateCol('), grab('function _vizAutoGanttDates('), grabVar('_VIZ_AGG_TITLE_WORDS'),
-    grab('function _vizAutoYAxisTitle('), grab('function _vizAutoRetype(')
+    grab('function _vizAutoYAxisTitle('), grab('function _vizAutoRetype('),
+    // gone (2026-11-03): the retype gantt case words a fixed end through this
+    grab('function _vizGanttEndFixedLabel(')
   ].join('\n');
 
   var SB = new Function(stubs + '\n' + real + '\n' +
@@ -607,6 +622,19 @@ try {
   m10 = SB.report();
   rt = SB.retype('gantt', 'Gantt', m10);
   ok('retype gantt: a lone date-class pair fails honestly when only one real pair is absent', !rt.ok || (m10.config.yAxis && m10.config.groupBy), rt.reason);
+  // gone (2026-11-03): ONE date column still drives a Gantt - start to '@today'
+  setTable([['PAM_NUMBER', 'text'], ['UNDER_REVIEW_SINCE', 'date'], ['ASSIGNED_TO', 'text']]);
+  setRows(40, function (i) { return { PAM_NUMBER: 'PAM' + i, UNDER_REVIEW_SINCE: iso(2025, 1 + (i % 12), 1 + (i % 25)), ASSIGNED_TO: ['Pat', 'Sam', 'Lee'][i % 3] }; });
+  m10 = SB.report();
+  rt = SB.retype('gantt', 'Gantt', m10);
+  eq('retype gantt: one date column -> start to @today (age chart)', [rt.ok, m10.config.yAxis, m10.config.groupBy], [true, 'UNDER_REVIEW_SINCE', '@today']);
+  has('retype gantt: the HEADS UP says "to today" in words', m10.warnings, /^Each bar runs UNDER_REVIEW_SINCE to today, labelled by PAM_NUMBER/);
+  setTable([['A', 'text'], ['B', 'text']]);
+  setRows(10, function (i) { return { A: 'a' + i, B: 'b' + i }; });
+  m10 = SB.report();
+  rt = SB.retype('gantt', 'Gantt', m10);
+  ok('retype gantt: no date columns refused', !rt.ok && /no date columns/.test(rt.reason), rt.reason);
+  setTable(AWD); awdRows(200);   // the sankey block below reads this table
 
   // sankey: a second category column becomes Stage 2
   m10 = SB.report();
@@ -644,6 +672,21 @@ try {
   eq('ytitle: histogram always counts', SB.ytitle('histogram', 'count', ''), 'Count of Records');
   eq('ytitle: percentile', SB.ytitle('bar', 'p90', 'AMT'), 'P90 AMT');
   eq('ytitle: scatter names the column alone', SB.ytitle('scatter', 'sum', 'HEADCOUNT'), 'HEADCOUNT');
+
+  // ---- 11. Mixed-case SQL aliases (autoviz3, 2026-11-03) -------------------
+  // A fresh query keys columnNameToOriginalIndex by the alias AS RETURNED,
+  // while the header names every helper passes are uppercased. UnderRev's
+  // quoted aliases ("Under_Review_Since") then classified every column as
+  // text, and a Gantt Auto-build claimed the report had no date columns.
+  setTable([['PAM_NUMBER', 'text'], ['PAM_TITLE', 'text'], ['WORKFLOW_CREATED', 'date'], ['UNDER_REVIEW_SINCE', 'date'], ['ASSIGNED_TO', 'text']]);
+  SB.DOM.cni = { 'PAM_Number': 0, 'PAM_Title': 1, 'Workflow_Created': 2, 'Under_Review_Since': 3, 'Assigned_To': 4 };
+  setRows(40, function (i) { return { PAM_NUMBER: 'PAM' + (1000 + i), PAM_TITLE: 'Title ' + i, WORKFLOW_CREATED: iso(2024, 1 + (i % 12), 1 + (i % 25)), UNDER_REVIEW_SINCE: iso(2026, 1 + (i % 12), 1 + (i % 25)), ASSIGNED_TO: ['Pat', 'Sam', 'Lee'][i % 3] }; });
+  var cls11 = SB.classes();
+  eq('mixedcase: date columns classify as dates through the case-insensitive fallback', cls11.date, ['WORKFLOW_CREATED', 'UNDER_REVIEW_SINCE']);
+  eq('mixedcase: the rest stay text', cls11.text, ['PAM_NUMBER', 'PAM_TITLE', 'ASSIGNED_TO']);
+  m10 = SB.report();
+  rt = SB.retype('gantt', 'Gantt', m10);
+  eq('mixedcase: gantt retype finds the date pair (start / end rides groupBy)', [rt.ok, m10.config.yAxis, m10.config.groupBy], [true, 'WORKFLOW_CREATED', 'UNDER_REVIEW_SINCE']);
 
 } catch (e) {
   FAIL++; LOG.push('HARNESS-ERROR ' + (e && e.stack || e));

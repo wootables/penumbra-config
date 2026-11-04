@@ -13,6 +13,11 @@
 # Control: the live build before the fix fails F1-F7 + V1-V7 + F7b.
 # Mutants (each only its own): engine (runTableSearch call), preview (the twin's
 # call), hollow (the empty-result branch).
+# 2026-11-03 (parennames): F9 / F10 the label inside a group (typed, and braced the way the
+# builder writes it). F2-F4 + V2-V4 went red with the parens grammar (778acc9, 10-30); the
+# fix (penumbraParenNameMask) reads a pair followed straight by an operator as part of the
+# name. Control: the build before it fails F2-F4, V2-V4, F9, V9, F10, V10. Mutant names (the
+# mask call undone) = exactly those.
 #
 #   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivformula'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -MainJs <path> [-Mutant name]
@@ -31,6 +36,7 @@ $mutants = @{
   'engine'  = @('                            penumbraPivotSearchFormulaPass(_derivedMap, postFilterAggTypes,', '                            (function () {})(_derivedMap, postFilterAggTypes,')
   'preview' = @('                penumbraPivotSearchFormulaPass(derivedMap, aggTypes,', '                (function () {})(derivedMap, aggTypes,')
   'hollow'  = @('                if (finalDataToRender.length === 0) {', '                if (false) {')
+  'names'   = @('        var _pnMask = penumbraParenNameMask(tokens, operatorKeys);', '        var _pnMask = null;')
 }
 
 Write-Host "[1/3] staging ... main.js under test: $MainJs"

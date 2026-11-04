@@ -93,6 +93,15 @@ ok('P-cols', substr_count($h, '<tr><td valign="top" width="33%"') === 2, (string
 ok('P-title', strpos($cs[0], '>ID-1</span></div>') !== false && strpos($cs[2], '(blank)') !== false, substr($cs[2], 0, 200));
 ok('P-sub', strpos($cs[0], 'color:' . $th['muted'] . ';margin:0 0 4px;"><span style="">Ann</span></div>') !== false && strpos($cs[3], 'margin:0 0 4px;') === false);
 ok('P-pillRuled', strpos($cs[1], 'border-radius:10px;font-size:11px;border:1px solid transparent;color:#c62828;background-color:#ffebee;">Closed</span>') !== false, substr($cs[1], 0, 400));   // (cfb8) the rule's colours, the outline clear
+// (cedge, 2026-11-03) the status edge: the Closed card's border-left in its pill's rule colour - the dark red text over
+// the pale fill (the more colourful); no other card one. The pick: a green fill over white text = the fill (on a white
+// card and a dark one); white text alone on a white card = none (the card's own colour)
+preg_match_all('/<div style="(border:1px solid [^"]*border-radius:8px;[^"]*)">/', $h, $_esm); $_es = $_esm[1];
+ok('P-edge', count($_es) === 5 && substr($_es[1], -strlen('border-left:4px solid #c62828;')) === 'border-left:4px solid #c62828;'
+    && strpos($_es[0] . $_es[2] . $_es[3] . $_es[4], 'border-left') === false, json_encode($_es));
+$_eg = function_exists('_pnb_cm_edge') ? array(_pnb_cm_edge(array('background-color' => '#2e7d32', 'color' => '#ffffff'), '#ffffff'), _pnb_cm_edge(array('background-color' => '#2e7d32', 'color' => '#ffffff'), '#1e1e1e'),
+    _pnb_cm_edge(array('color' => '#ffffff'), '#ffffff'), _pnb_cm_edge(array('color' => 'rgb(198, 40, 40)', 'background-color' => 'rgba(198, 40, 40, 0.1)'), '#ffffff')) : null;
+ok('P-edgePick', $_eg === array('#2e7d32', '#2e7d32', '', 'rgb(198, 40, 40)'), json_encode($_eg));
 ok('P-pillThemed', strpos($cs[0], 'border-radius:10px;font-size:11px;border:1px solid ' . $th['text'] . ';color:' . $th['text'] . ';">Open</span>') !== false && strpos($cs[3], 'border-radius:10px') === false);   // (cfb8) outlined as on screen, no fill
 ok('P-big', strpos($cs[0], 'font-size:19px;font-weight:bold;color:' . $th['text'] . ';">$1,000.00</span> <span style="font-size:11px;color:' . $th['muted'] . ';">AMT</span>') !== false);
 // bars: the rank among 10 20 30 0 50 (abs, sorted 0 10 20 30 50): 10 -> 25%, 30 -> 75%; row 5's own gradient 33% in its colour; 0 draws a 1% floor? no: 0 -> rank 0 -> max(1) width
@@ -139,6 +148,12 @@ $pal = $T['theme-dark-blue']['emailGroup'];
 preg_match_all('/<div style="margin:14px 0 6px;[^"]*"><span style="[^"]*">([^<]*)<\/span> <span style="[^"]*">(\d+)<\/span><\/div>/', $hg, $gm, PREG_SET_ORDER);
 ok('P-groupHeads', count($gm) === 2 && $gm[0][1] === 'Engineering / Civil' && $gm[0][2] === '2' && $gm[1][1] === 'Science' && $gm[1][2] === '1', json_encode($gm));
 ok('P-groupPalette', strpos($hg, 'background-color:' . $pal['headerBg'] . ';') !== false && strpos($hg, 'color:' . $pal['nameColor'] . ';">Engineering') !== false && strpos($hg, 'background-color:' . $pal['countBg'] . ';color:' . $pal['countColor'] . ';">2<') !== false);
+// (cleft) the group's summary on its heading, on the right, as the table email's; none for a group without one; the
+// runner's text (its column htmlspecialchars'd) shown once escaped, never twice
+$aggFn = function ($rows, $path) { return $path === 'Science' ? null : 'Sum of A&amp;B: ' . count($rows); };
+$ra = penumbra_cards_email_html($grp, true, $cfg, 'theme-dark-blue', $cellFn, 0, $aggFn); $ha = $ra['html'];
+preg_match_all('/<td align="right"[^>]*>([^<]*)<\/td>/', $ha, $am);
+ok('P-groupAgg', $am[1] === array('Sum of A&amp;B: 2') && substr_count($ha, 'margin:14px 0 6px;') === 2 && count($cards($ha)) === 3, json_encode($am[1]));
 ok('P-groupCards', count($cards($hg)) === 3 && $rg['total'] === 3 && strpos($hg, 'background-color:' . $T['theme-dark-blue']['vars']['bg-surface'] . ';') !== false);
 
 // ---- the runner's wiring (source) ------------------------------------------------------------------
@@ -147,8 +162,10 @@ ok('S-globalGuarded', strpos($run, "\$GLOBALS['penumbra_cards_email'] = function
 ok('S-bodyOnly', strpos($run, "(\$isEmail && \$viewMode !== 'pivot' && !empty(\$data) && !empty(\$GLOBALS['penumbra_cards_email']) && function_exists('penumbra_cards_email_html'))") !== false);
 ok('S-sameCell', strpos($run, "\$cellValue = isset(\$rwMap[\$colUpper]) ? \$rwMap[\$colUpper] : (\$hlEmail ? penumbra_email_cell_format(\$colUpper, \$cell) : \$cell);\r\n                \$o['cells']") !== false
     && strpos($run, "'html' => penumbra_notes_cell_html(formatCellContent(\$cellValue), \$colName)") !== false);
-ok('S-budget', strpos($run, "penumbra_cards_email_html(\$data, \$viewMode === 'grouped', \$_cardsCfg, \$themeName, \$_cardsCell, \$_truncLimit ? max(1, \$_truncLimit - strlen(\$html)) : 0);") !== false
+ok('S-budget', strpos($run, "penumbra_cards_email_html(\$data, \$viewMode === 'grouped', \$_cardsCfg, \$themeName, \$_cardsCell, \$_truncLimit ? max(1, \$_truncLimit - strlen(\$html)) : 0") !== false   // (cleft) up to the budget
     && strpos($run, '" cards &mdash; "') !== false);
+ok('S-aggWired', strpos($run, "return compute_group_agg_summary(\$rows, \$groupAgg['column'], \$groupAgg['type'], isset(\$groupAgg['groupByCol']) ? \$groupAgg['groupByCol'] : null, \$path);") !== false
+    && strpos($run, "strlen(\$html)) : 0, \$_cardsAgg);") !== false);   // (cleft) the summary to the card email's headings
 ok('S-tableKept', substr_count($run, "    } else if (empty(\$data)) {\r\n        \$html .= \"<p>No results found.</p>\";") === 1);
 foreach (array('inc' => $INC, 'runner' => $RUN) as $k => $p) { $l = shell_exec(escapeshellarg(PHP_BINARY) . ' -n -l ' . escapeshellarg($p) . ' 2>&1'); ok('P-lint-' . $k, strpos((string)$l, 'No syntax errors') !== false, trim((string)$l)); }
 // (csz, the user) each card's notes: the runner's Notes column (penumbra_sched_notes_col, lifted), under its name, not on Small,

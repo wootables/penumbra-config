@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>repository list menus</title>
+<link rel="stylesheet" href="menu_cand.css"></head>
+<body>
+<!-- repomenu suite (2026-11-03, menufix): the REAL penumbra_repository.js (repo_cand.js) and penumbra_colmenu.js
+     (menu_cand.js) - the list's right-click menus - on the Repository lightbox against a stubbed get_server_reports.php
+     (driver.js mocks $.ajax, as repoorder's does). index.php supplies the lightbox shell and the penumbra_vars const;
+     both are reduced here to what the modules read. -->
+<div id="openReportListLightbox" style="display:none"><div class="lightbox-content"></div></div>
+<!-- (menufix4) the Settings panel's Clear button, as index.php has it: the menu engine offers Clear all where it is -->
+<button type="button" id="spClearStorage" style="display:none">Clear</button>
+<script>
+// index.php declares this as a top-level const (global lexical scope): the module reads it by bare name
+const penumbra_vars = { isAdmin: false, isGlobalAdmin: false, repoMode: false, currentUserKey: 'tester', shibboleth: { ouc: '' } };
+window.__ERR = [];
+window.addEventListener('error', function (e) { window.__ERR.push(String(e.message) + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno + ':' + e.colno); });
+window.addEventListener('unhandledrejection', function (e) { window.__ERR.push('rejection: ' + String(e.reason)); });
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="driver.js"></script>
+<script src="menu_cand.js"></script>
+<script src="repo_cand.js"></script>
+<script>RM.start();</script>
+</body></html>

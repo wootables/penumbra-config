@@ -30,6 +30,10 @@ NEW = {'P-cutNoHeads', 'P-rankFast', 'S-changeNoCards'}   # (cnest sweep: the cu
 NEW = set()   # (cnest is LIVE since ab526da: the control expects every check green)
 NEW = {'P-pctShown'}   # (csw2: a Percent format's bar by its shown text)
 NEW = set()   # (csw2 is LIVE since a7d63c3: the control expects every check green)
+NEW = {'P-groupAgg', 'S-aggWired'}   # (cleft: the group summary on the card email's headings)
+NEW = set()   # (cleft is LIVE since 4300d47: the control expects every check green)
+NEW = {'P-edge', 'P-edgePick'}   # (cedge: the status edge on the scheduled email's cards)
+NEW = set()   # (cedge is LIVE since ac211e9: the control expects every check green)
 EITHER = {'P-budget'}
 MUTANTS = {
     'm-open': ([('inc', "    if (!$c || empty($c['open']) || !isset($c['sent']) || !is_array($c['sent'])) return null;", "    if (!$c || !isset($c['sent']) || !is_array($c['sent'])) return null;")], ['P-cfgNoOpen']),
@@ -58,7 +62,14 @@ MUTANTS = {
     # (csw2) the bar's shown percentage: not passed / not read
     'w2-pctcall': ([('inc', "$vals, $rc['html']);", "$vals);")], ['P-pctShown']),
     'w2-pctread': ([('inc', "    if ($st !== '' && preg_match", "    if (false && preg_match")], ['P-pctShown']),
+    'l3-aggfn': ([('inc', "$_ga = $aggFn ? $aggFn($rows, $path) : null;", "$_ga = null;")], ['P-groupAgg']),   # (cleft)
+    'l3-aggdec': ([('inc', "html_entity_decode((string)$_ga, ENT_QUOTES, 'UTF-8')", "(string)$_ga")], ['P-groupAgg']),
+    'l3-aggcall': ([('run', "strlen($html)) : 0, $_cardsAgg);", "strlen($html)) : 0);")], ['S-aggWired']),
     'm-labels': ([('inc', "($cfg['nolabels'] ? '' :", "(false ? '' :")], ['P-nolabels']),
+    # (cedge) the edge left off / picked by contrast alone / the card's own colour kept
+    'ed-pmail': ([('inc', "($eg !== '' ? 'border-left:4px solid ' . _pnb_cm_h($eg) . ';' : '')", "''")], ['P-edge']),
+    'ed-pchroma': ([('inc', "        if ($ch >= 24) { if ($ch > $bc) { $bc = $ch; $best = $v; } }\n        elseif ($k > $gk) { $gk = $k; $grey = $v; }\n", "        if ($k > $gk) { $gk = $k; $grey = $v; }\n")], ['P-edgePick']),
+    'ed-pown': ([('inc', "        if ($k < 1.05) continue;\n", "")], ['P-edgePick']),
     'm-rowcss': ([('inc', "            $cs = (is_array($f['row']) && isset($f['row']['background-color']))", "            $cs = (false && isset($f['row']['background-color']))")], ['P-rowCss']),
     # schedule_runner.php
     'm-pdf': ([('run', "($isEmail && $viewMode !== 'pivot' && !empty($data)", "($viewMode !== 'pivot' && !empty($data)")], ['S-bodyOnly']),

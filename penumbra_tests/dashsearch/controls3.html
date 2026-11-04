@@ -190,6 +190,13 @@ until(function () { return stat('d1') !== '' && tile('d2').find('tbody tr').leng
   return wait(250);
 }).then(function () {
   eq('... and nothing is written', box(), 'AMOUNT >= 100 and OPENED >= 2024-01-15 and OPENED <= 2024-02-01');
+  // (2026-11-03) a refused pair says why beside its boxes, the report page's rule (PenumbraTiles.strip.rangeMark)
+  eq('the bad box says why beside the pair, as an alert', [G('AMOUNT').find('.pnb-fs-rangemsg').text(), G('AMOUNT').find('.pnb-fs-rangemsg').attr('role')], ['Not a number', 'alert']);
+  B('AMOUNT', 'max').val('50');
+  enterIn(B('AMOUNT', 'max'));
+  eq('a from past its to is refused: both boxes marked, a note says why, nothing written',
+    [B('AMOUNT', 'min').attr('aria-invalid'), B('AMOUNT', 'max').attr('aria-invalid'), G('AMOUNT').find('.pnb-fs-rangemsg').text(), box()],
+    ['true', 'true', 'The from value is larger than the to value', 'AMOUNT >= 100 and OPENED >= 2024-01-15 and OPENED <= 2024-02-01']);
   B('AMOUNT', 'max').val('999').trigger('focus');
   $('#dashSearchInput').val(box() + ' and COLLEGE = /^(?:Eng)$/').trigger('input');
   return wait(500);

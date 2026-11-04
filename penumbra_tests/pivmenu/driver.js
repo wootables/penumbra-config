@@ -199,11 +199,93 @@
       R.chk.colExclude = !head('Open') && !!head('Closed') && /V_STATUS/i.test(searchVal());
       R.info.search = searchVal();
     },
+    // (2026-11-03, menufix) the Grand Total row: a column total's menu (Show the breakdown, Copy this value, Filter to this
+    // column) and its drill; the label's menu (the pivot's own items, Clear all); a row label's Collapse all / Expand all;
+    // Clear all last under a separator and no separator first in every pivot menu
+    pmfix: async function () {
+      var foot = document.querySelector('#pivotResultTable tfoot tr');
+      var tot = foot ? Array.prototype.filter.call(foot.cells, function (c) { return c.hasAttribute('data-col-key'); })[0] || null : null;
+      var gl = foot ? foot.cells[0] : null;
+      var totOpen = !!tot && rclick(tot) && !!menu(), a = acts(), cf = item('pvCellFilter');
+      R.chk.totalMenu = totOpen && a[0] === 'pvDrill' && a[1] === 'pvCopy' && !!cf && /this column/.test(cf.textContent);
+      closeMenu();
+      var glOpen = !!gl && rclick(gl) && !!menu(), b = acts();
+      R.chk.totalLabel = glOpen && b.indexOf('pvEdit') >= 0 && b[b.length - 1] === 'clearPrefs' && b.indexOf('pvDrill') < 0;
+      R.info.total = { tot: a, label: b, foot: foot ? foot.outerHTML.slice(0, 300) : null };
+      closeMenu();
+      var lab = Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody td[data-row-field="0"]'), function (td) { return !!td.querySelector('.pivot-collapse-toggle'); })[0] || null;
+      var labOpen = !!lab && rclick(lab) && !!menu(), c = acts();
+      R.chk.labelAll = labOpen && c[0] === 'pvToggle' && c[1] === 'pvCollapseAll' && c[2] === 'pvExpandAll';
+      if (item('pvCollapseAll')) { item('pvCollapseAll').click(); await sleep(800); }
+      R.chk.labelCollapse = labOpen && document.querySelectorAll('#pivotResultTable .pivot-collapse-toggle').length > 0
+        && document.querySelectorAll('#pivotResultTable .pivot-collapse-toggle:not(.pivot-group-collapsed)').length === 0;
+      closeMenu();
+      lab = Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody td[data-row-field="0"]'), function (td) { return !!td.querySelector('.pivot-collapse-toggle'); })[0] || null;
+      rclick(lab);
+      if (item('pvExpandAll')) { item('pvExpandAll').click(); await sleep(800); }
+      closeMenu();
+      var spread = heads().filter(function (h) { return h.hasAttribute('colspan') && !h.hasAttribute('data-row-field'); })[0] || null;
+      var spots = [field(0), heads().filter(function (h) { return !h.hasAttribute('data-row-field') && !h.hasAttribute('colspan'); })[0], cells()[0], lab, spread].filter(Boolean);
+      var seen = spots.map(function (el) {
+        rclick(el);
+        var x = acts(), m = menu(), t = m ? m.querySelector('.pnb-hm-title') : null, first = t ? t.nextElementSibling : null, ci = item('clearPrefs');
+        var out = { last: x[x.length - 1], lastSep: !!ci && !!ci.previousElementSibling && ci.previousElementSibling.classList.contains('pnb-hm-sep'), firstSep: !!first && first.classList.contains('pnb-hm-sep') };
+        closeMenu();
+        return out;
+      });
+      R.chk.clearLast = seen.length >= 4 && seen.every(function (o) { return o.last === 'clearPrefs' && o.lastSep; });
+      // two values under each column value: its heading spans them (the one that opened on a separator)
+      var s2 = P().settings(), h1 = window.__HC_HIDES || 0;
+      s2.agg = ['count', 'sum']; s2.aggLabels = null; s2.aggShade = null; s2.aggFormat = null;
+      P().rebuild(s2);
+      await rebuilt(h1);
+      spread = heads().filter(function (h) { return h.hasAttribute('colspan') && !h.hasAttribute('data-row-field'); })[0] || null;
+      var sp = null;
+      if (spread) {
+        rclick(spread);
+        var m2 = menu(), t2 = m2 ? m2.querySelector('.pnb-hm-title') : null, f2 = t2 ? t2.nextElementSibling : null, x2 = acts();
+        sp = { open: !!m2, firstSep: !!f2 && f2.classList.contains('pnb-hm-sep'), last: x2[x2.length - 1], acts: x2 };
+        closeMenu();
+      }
+      R.chk.noLeadSep = !!sp && sp.open && !sp.firstSep && sp.last === 'clearPrefs' && seen.every(function (o) { return !o.firstSep; });
+      R.info.spots = { n: seen.length, seen: seen, spread: sp };
+      foot = document.querySelector('#pivotResultTable tfoot tr');   // (the pivot was rebuilt: its cells are new)
+      tot = foot ? Array.prototype.filter.call(foot.cells, function (c) { return c.hasAttribute('data-col-key'); })[0] || null : null;
+      if (tot) { await choose(tot, 'pvDrill'); await sleep(900); }
+      R.chk.totalDrill = !!document.querySelector('table.pnb-breakdown');
+    },
+    // (2026-11-03, menufix2) a breakdown's footer: the summary menu (the types, ticked, a pick redrawing it; no Clear all, as a
+    // breakdown's menus); its label cell: the badges switch
+    pmfix2: async function () {
+      var HM = window.Penumbra.headerMenu, col = null;
+      Array.prototype.forEach.call(document.querySelectorAll('#tableHeader th[data-colname]'), function (th) { if (!col && /AMOUNT/i.test(th.getAttribute('data-colname'))) col = th.getAttribute('data-colname'); });
+      if (col && typeof HM.sumPick === 'function') { HM.sumPick(col, 'sum'); await sleep(900); }
+      function leaf2() {
+        return Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody tr:not(.pivot-group-summary-row) td[data-row-key][data-col-key]'), function (td) {
+          return td.parentNode.style.display !== 'none' && !td.classList.contains('pivot-grand-total') && /\d/.test(td.textContent);
+        })[0] || null;
+      }
+      await choose(leaf2(), 'pvDrill');
+      await sleep(900);
+      var bt = document.querySelector('table.pnb-breakdown'), ft = bt ? bt.querySelector('tfoot td[data-sum-col="' + col + '"]') : null;
+      var op = !!ft && rclick(ft) && !!menu(), a = acts(), st = menu() ? (menu().querySelector('.pnb-hm-stats') || {}).textContent : '';
+      R.chk.bdFootMenu = op && a[0] === 'sum-none' && a[1] === 'sum-sum' && item('sum-sum').getAttribute('aria-checked') === 'true' && a.indexOf('clearPrefs') < 0 && st === 'Breakdown summary';
+      R.info.bdFoot = { col: col, acts: a, st: st, ft: ft ? ft.outerHTML.slice(0, 200) : null };
+      var av = item('sum-avg'); if (av) { av.click(); }
+      await sleep(900);
+      ft = bt ? bt.querySelector('tfoot td[data-sum-col="' + col + '"]') : null;
+      R.chk.bdFootPick = !!av && !!ft && ft.getAttribute('data-sum-type') === 'avg';
+      var lab = bt ? bt.querySelector('tfoot td:first-child') : null;
+      var lo = !!lab && !lab.hasAttribute('data-sum-col') && rclick(lab) && !!menu();
+      R.chk.bdFootLabel = lo && acts().join() === 'sumBadges';
+      closeMenu();
+    },
     pmfield: async function () {
       rclick(field(1));
       R.chk.fieldItems = has(['pvSortAsc', 'pvSortDesc', 'pvCollapseAll', 'pvExpandAll', 'pvFieldUp', 'pvFieldDown', 'pvFieldRemove', 'pvSwap', 'pvEdit'])
         && item('pvFieldDown').getAttribute('aria-disabled') === 'true' && item('pvFieldUp').getAttribute('aria-disabled') !== 'true';
-      R.chk.sortAZ = !!item('pvSortAsc') && /A to Z/.test(item('pvSortAsc').textContent);
+      R.chk.sortAZ = !!item('pvSortAsc') && /^\s*Sort ascending\s*$/.test(item('pvSortAsc').querySelector('.pnb-hm-label').textContent)
+        && /^\s*Sort descending\s*$/.test(item('pvSortDesc').querySelector('.pnb-hm-label').textContent);   // (2026-11-03, menufix: it read Sort A to Z)
       R.info.acts = acts();
       closeMenu();
       // (colmenu round 33) Layout and Freeze row labels: the builder's own choices, each pick a rebuild with Undo
@@ -278,7 +360,14 @@
       function num(v) { var t = String(v).replace(/[$,\s]/g, ''); return /^[-+]?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : null; }
       function cmp(a, b) { var x = num(a), y = num(b); if (x !== null && y !== null) return x - y; return String(a).localeCompare(String(b)); }
       function ordered(arr, dir) { return arr.length > 1 && arr.every(function (v, k) { return k === 0 || (dir === 'asc' ? cmp(arr[k - 1], v) <= 0 : cmp(arr[k - 1], v) >= 0); }); }
-      R.chk.bdNumNative = !rclick(ths[0]) && !menu();
+      // (2026-11-03, menufix) the '#' column has a menu now, as the table's: no sort; a cell's Copy is its row
+      var numOpen = rclick(ths[0]) && !!menu(), numActs = acts(), numName = menu() ? menu().querySelector('.pnb-hm-name').textContent : '';
+      closeMenu();
+      var numCell = bt.tBodies[0].rows[0].cells[0], numCellOpen = rclick(numCell) && !!menu(), numCellActs = acts();
+      closeMenu();
+      R.chk.bdNumMenu = numOpen && numName === '# (Row Number)' && numActs.indexOf('bdSortAsc') < 0 && numActs.indexOf('rowHeight') >= 0;
+      R.chk.bdNumRow = numCellOpen && numCellActs[0] === 'bdCopyRow' && numCellActs.indexOf('bdSortAsc') < 0;
+      R.info.bdNum = { head: numActs, cell: numCellActs };
       var rB = th.getBoundingClientRect();
       R.chk.bdNativeShift = !th.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true, clientX: Math.round(rB.left + 6), clientY: Math.round(rB.top + 6) })) === false && !menu();
       R.chk.bdHeadOpens = rclick(th) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === txt(th) && !menu().querySelector('.pnb-hm-stats');   // (round 28) the counts moved into Column stats
@@ -380,7 +469,8 @@
       var topBd = acts();
       if (item('bdWidth')) { item('bdWidth').click(); await sleep(200); }
       var bwl = subActs();
-      R.chk.bdWidthItems = !!CW && topBd.indexOf('bdWidth') >= 0 && topBd.indexOf('bdWidth') < topBd.indexOf('bdCopyMenu') && topBd.indexOf('bdFit') < 0
+      var bo = ['bdSortAsc', 'bdCopyMenu', 'bdStats', 'bdWidth'].map(function (x) { return topBd.indexOf(x); });   // (2026-11-03, menufix) the table heading's order
+      R.chk.bdWidthItems = !!CW && bo.every(function (v, k) { return v >= 0 && (k === 0 || v > bo[k - 1]); }) && (topBd.indexOf('bdFormat') < 0 || topBd.indexOf('bdFormat') > bo[3]) && topBd.indexOf('bdFit') < 0
         && ['bdFit', 'bdFitAll', 'bdFitPage', 'bdResetWidth', 'bdResetWidths'].every(function (x) { return bwl.indexOf(x) >= 0; });
       R.info.bdWidthList = { top: topBd, list: bwl };
       closeMenu();

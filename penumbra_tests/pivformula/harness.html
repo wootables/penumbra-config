@@ -146,6 +146,9 @@
       'msg ' + r7.msg + ', tables ' + r7.tables + ', grand rows ' + r7.grand);
     t('F7c ...and the count says 0 filtered results', r7.pivotRows === 0, r7.text);
     await kase('F8', 'Proposals > 3', ['Ann', 'Cy']);   // control: a base aggregate, unchanged
+    // parennames (2026-11-03): the label's own parentheses inside a group, typed and as the builder braces it
+    await kase('F9', '(Hit Ratio (Decided) > 60 or Proposals > 4) and Awarded > 0', ['Ann', 'Cy', 'Ed']);
+    await kase('F10', '({Hit Ratio (Decided)} > 60 or Proposals > 4) and Awarded > 0', ['Ann', 'Cy', 'Ed']);
     report('RESULTS_JSON:' + JSON.stringify({ results: results, pageErrors: window.__errors.slice(0, 6) }));
   }
   setTimeout(function () { run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: String(e && e.stack || e), results: results, pageErrors: window.__errors.slice(0, 6) })); }); }, 1500);

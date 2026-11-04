@@ -7,7 +7,8 @@ error_reporting(E_ALL & ~E_DEPRECATED);
 require $argv[1];
 $R = array();
 function rec($name, $pass, $detail) { global $R; $R[] = array('name' => $name, 'pass' => (bool)$pass, 'detail' => (string)$detail); }
-function d($key, $view) { return strip_tags((string)_snippet_dispatch('data', array($key), array(), array(), $view, array(), array())); }
+// (cleft) the snippet's data: the report's rows (one here); none = the email's No results found
+function d($key, $view, $rows = null) { return strip_tags((string)_snippet_dispatch('data', array($key), $rows === null ? array(array('NAME' => 'Ann')) : $rows, array('NAME'), $view, array(), array())); }
 
 $GLOBALS['penumbra_cards_email'] = array('title' => 'NAME', 'big' => '', 'fields' => array(), 'size' => 'large');
 $a = d('cards', 'standard'); $b = d('cardsize', 'standard'); $g = d('cards', 'grouped');
@@ -22,8 +23,11 @@ $a = d('cards', 'pivot'); $b = d('cardsize', 'standard');
 rec('X3 a pivot email is never cards: data(cards)=false over a pivot; Small = small', $a === 'false' && $b === 'small', "pivot cards=$a size=$b");
 
 // a prompt answer named "cards" does not shadow the key (reserved, as in the browser)
-$a = strip_tags((string)_snippet_dispatch('data', array('cards'), array(), array(), 'standard', array('cards' => 'PROMPTVAL'), array()));
+$a = strip_tags((string)_snippet_dispatch('data', array('cards'), array(array('NAME' => 'Ann')), array('NAME'), 'standard', array('cards' => 'PROMPTVAL'), array()));
 rec('X4 a prompt named cards does not shadow data(cards)', $a === 'true', "cards=$a");
+// (cleft) no rows: the body is No results found, never cards; the size is still the saved one
+$a = d('cards', 'standard', array()); $b = d('cardsize', 'standard', array());
+rec('X5 no rows: data(cards)=false (the body is No results found), data(cardsize)=small (the saved size)', $a === 'false' && $b === 'small', "cards=$a size=$b");
 $GLOBALS['penumbra_cards_email'] = null;
 
 echo 'RESULTS_JSON:' . json_encode($R) . "\n";

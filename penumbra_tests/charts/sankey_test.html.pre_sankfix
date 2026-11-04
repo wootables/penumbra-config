@@ -1,0 +1,181 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<!--
+  SANKEY (2026-10-12) - js/penumbra_charts.js standing alone, plus the real
+  Chart.js 4.5.1 + chartjs-chart-sankey 0.19.1 drawing what it builds.
+    stages     _vizSankeyStages: X + groupBy + options.stages, de-duplicated, max 4
+    build      buildSankeyData: every stage carries the SAME total; bands add up to
+               their boxes; the tail ALWAYS folds into "Other (n)"; a single leftover
+               is not folded; negatives are left out and counted; blanks = Unknown;
+               only count / sum; the drill metadata (stage columns, names, kept lists)
+    colour     Stage 1 boxes take palette slots by size, Other / Unknown neutral;
+               a band takes the slot of the Stage 1 box most of its value came from
+    config     applySankeyChartConfig: type, no scales / datalabels / legend, labels
+               carry totals, largest box on top, the negative-row note
+    render     a real chart: the plugin lays out every node; a click on a BOX is
+               found by rectangle and parked on the chart for the drill handler
+-->
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  return false;
+};
+</script>
+<script src="moment.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script src="chartjs-chart-sankey-0.19.1.min.js"></script>
+<script src="penumbra_charts.js"></script>
+<canvas id="c" width="800" height="500" style="width:800px;height:500px"></canvas>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+function rows(list){ return list.map(function(o){ var m = new Map(); Object.keys(o).forEach(function(k){ m.set(k.toUpperCase(), o[k]); }); return m; }); }
+function clean(v){ var s = String(v == null ? '' : v).trim(); return s || 'Unknown'; }
+function num(v){ var n = parseFloat(String(v == null ? '' : v).replace(/[$,\s]/g,'')); return n; }
+function sum(a, f){ return a.reduce(function(s, x){ return s + f(x); }, 0); }
+
+try {
+  var PC = window.PenumbraCharts;
+  eq('arm', PC.init({
+    getChartColor: function(i,a){ return ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'][i % 8]; },
+    getChartBorderColor: function(i){ return '#000'; },
+    hexToRgba: function(c,a){ return c; },
+    parseDate: function(){ return null; },
+    penumbraPercentileOf: function(){ return 0; }
+  }), true);
+  ['buildSankeyData','applySankeyChartConfig','_vizSankeyStages','_vizSankeyNodeAt'].forEach(function(k){
+    ok('export ' + k, typeof PC[k] === 'function');
+  });
+  ok('plugin registered', !!(Chart.registry && Chart.registry.getController('sankey')));
+
+  // ---- stages ----
+  eq('stages: X + groupBy', PC._vizSankeyStages('A', 'B', ''), ['A','B']);
+  eq('stages: + options, de-duplicated (any case), capped at 4', PC._vizSankeyStages('A', 'B', '{"stages":["C","a","D"]}'), ['A','B','C','D']);
+  eq('stages: only the first two option stages are read', PC._vizSankeyStages('A', 'B', '{"stages":["C","D","E"]}'), ['A','B','C','D']);
+  eq('stages: none / blank groupBy skipped', PC._vizSankeyStages('A', 'none', '{"stages":["C"]}'), ['A','C']);
+  eq('stages: broken options degrade', PC._vizSankeyStages('A', 'B', '{broken'), ['A','B']);
+
+  // ---- refusals ----
+  var R0 = rows([{A:'x',B:'y',V:'1'}]);
+  ok('refuse: one stage', /two stages/.test(PC.buildSankeyData(R0, {stages:['A'], agg:'count', cleanLabel:clean, parseNum:num})._noData || ''));
+  ok('refuse: avg', /Count or a Sum/.test(PC.buildSankeyData(R0, {stages:['A','B'], agg:'avg', valueCol:'V', cleanLabel:clean, parseNum:num})._noData || ''));
+  ok('refuse: distinct', /Count or a Sum/.test(PC.buildSankeyData(R0, {stages:['A','B'], agg:'distinct', valueCol:'V', cleanLabel:clean, parseNum:num})._noData || ''));
+  ok('refuse: sum with no value column', /Y-Axis column/.test(PC.buildSankeyData(R0, {stages:['A','B'], agg:'sum', valueCol:'none', cleanLabel:clean, parseNum:num})._noData || ''));
+  ok('refuse: every value negative', /negative/.test(PC.buildSankeyData(rows([{A:'x',B:'y',V:'-5'}]), {stages:['A','B'], agg:'sum', valueCol:'V', cleanLabel:clean, parseNum:num})._noData || ''));
+  ok('refuse: no rows', /No matching data/.test(PC.buildSankeyData([], {stages:['A','B'], agg:'count', cleanLabel:clean, parseNum:num})._noData || ''));
+
+  // ---- a 3-stage sum with a tail, a blank, negatives and a zero ----
+  var src = [];
+  // AGENCY: Navy 600, Army 300, NSA 200, AF 50, DTRA 30, DARPA 20  (limit 3 -> Navy, Army, NSA + Other(3))
+  [['Navy',600,'Direct','ECE'],['Army',300,'Pass','ECE'],['NSA',200,'Direct','LAS'],
+   ['AF',50,'Pass','MAE'],['DTRA',30,'Direct','MAE'],['DARPA',20,'Pass','ECE']].forEach(function(r){
+    // split each agency's money over two rows so bands merge
+    src.push({AGENCY:r[0], ROUTE:r[2], DEPT:r[3], AMT:'$' + (r[1]/2).toLocaleString()});
+    src.push({AGENCY:r[0], ROUTE:r[2], DEPT:r[3], AMT:String(r[1]/2)});
+  });
+  src.push({AGENCY:'Navy', ROUTE:'', DEPT:'ECE', AMT:'100'});          // blank route -> Unknown
+  src.push({AGENCY:'Army', ROUTE:'Pass', DEPT:'ECE', AMT:'-75'});      // negative -> left out
+  src.push({AGENCY:'NSA', ROUTE:'Direct', DEPT:'LAS', AMT:'(1,000)'}); // num() -> NaN here, skipped
+  src.push({AGENCY:'Army', ROUTE:'Pass', DEPT:'ECE', AMT:'0'});        // zero -> skipped
+  var D = PC.buildSankeyData(rows(src), {stages:['AGENCY','ROUTE','DEPT'], valueCol:'AMT', agg:'sum', limit:3, cleanLabel:clean, parseNum:num});
+  ok('build: is sankey', D._isSankey === true && D._chartType === 'sankey', JSON.stringify(D._noData));
+  var S = D._sankey;
+  eq('build: total = positive rows', S.total, 1300);
+  eq('build: negatives counted', [S.negCount, S.negSum], [1, -75]);
+  eq('build: rowCount', S.rowCount, 13);
+  [0,1,2].forEach(function(st){
+    eq('build: stage ' + (st+1) + ' boxes carry the total', sum(S.nodes.filter(function(n){ return n.stage === st; }), function(n){ return n.total; }), 1300);
+  });
+  [0,1].forEach(function(st){
+    eq('build: bands ' + (st+1) + '->' + (st+2) + ' carry the total', sum(S.links.filter(function(l){ return l._fromStage === st; }), function(l){ return l.flow; }), 1300);
+  });
+  S.nodes.forEach(function(n){
+    if (n.stage === 2) return;
+    var out = sum(S.links.filter(function(l){ return l.from === n.id; }), function(l){ return l.flow; });
+    if (out !== n.total) ok('build: box ' + n.name + ' = its outgoing bands', false, out + ' vs ' + n.total);
+  });
+  ok('build: every non-last box equals its outgoing bands', true);
+  var st1 = S.nodes.filter(function(n){ return n.stage === 0; }).map(function(n){ return n.name; }).sort();
+  eq('build: stage 1 keeps 3 + Other (3)', st1, ['Army','NSA','Navy','Other (3)']);
+  eq('build: Other holds the tail total', S.nodes.filter(function(n){ return n.other && n.stage === 0; })[0].total, 100);
+  eq('build: kept lists (largest first)', S.kept[0], ['Navy','Army','NSA']);
+  eq('build: folded counts', S.folded, [3, 0, 0]);
+  ok('build: blank -> Unknown box', S.nodes.some(function(n){ return n.stage === 1 && n.name === 'Unknown' && n.total === 100; }));
+  eq('build: Navy -> Unknown band', S.links.filter(function(l){ return l._fromName === 'Navy' && l._toName === 'Unknown'; }).map(function(l){ return l.flow; }), [100]);
+  var oth = S.links.filter(function(l){ return l._fromName === null; });
+  ok('build: an Other band carries null as its from-name', oth.length > 0 && oth.every(function(l){ return l._fromCol === 'AGENCY' && l._fromStage === 0; }));
+  eq('build: band drill columns', [S.links[0]._fromCol, S.links[0]._toCol], ['AGENCY','ROUTE']);
+  eq('build: a11y rows = one per band', D._a11yRows.rows.length, S.links.length);
+  eq('build: a11y columns', D._a11yRows.columns, ['From (AGENCY)','To','Value']);
+
+  // colours
+  var byName0 = {}; S.nodes.forEach(function(n){ if (n.stage === 0) byName0[n.name] = n; });
+  eq('colour: stage 1 slots by size', [byName0.Navy.colorIdx, byName0.Army.colorIdx, byName0.NSA.colorIdx], [0,1,2]);
+  eq('colour: Other is neutral', byName0['Other (3)'].colorIdx, -1);
+  ok('colour: later stages carry no slot', S.nodes.filter(function(n){ return n.stage > 0; }).every(function(n){ return n.colorIdx === -1; }));
+  var directToLas = S.links.filter(function(l){ return l._fromName === 'Direct' && l._toName === 'LAS'; })[0];
+  eq('colour: a band takes its dominant origin (NSA -> slot 2)', directToLas.colorIdx, 2);
+  var directToEce = S.links.filter(function(l){ return l._fromName === 'Direct' && l._toName === 'ECE'; })[0];
+  eq('colour: Direct->ECE is all Navy (slot 0)', directToEce.colorIdx, 0);
+
+  // folding rules
+  var F1 = PC.buildSankeyData(rows([{A:'a',B:'x'},{A:'a',B:'x'},{A:'b',B:'y'},{A:'c',B:'y'}]), {stages:['A','B'], agg:'count', limit:2, cleanLabel:clean, parseNum:num});
+  eq('fold: a single leftover is shown, not folded', F1._sankey.nodes.filter(function(n){ return n.stage === 0; }).map(function(n){ return n.name; }).sort(), ['a','b','c']);
+  var F2 = PC.buildSankeyData(rows([{A:'a',B:'x'},{A:'b',B:'y'},{A:'c',B:'y'},{A:'d',B:'y'}]), {stages:['A','B'], agg:'count', limit:9999, cleanLabel:clean, parseNum:num});
+  eq('fold: 9999 = unlimited', F2._sankey.folded, [0,0]);
+  eq('count: one per row', F2._sankey.total, 4);
+  var F3 = PC.buildSankeyData(rows([{A:'a',B:'x'},{A:'a',B:'x'},{A:'b',B:'y'},{A:'c',B:'y'},{A:'d',B:'z'}]), {stages:['A','B'], agg:'count', limit:1, cleanLabel:clean, parseNum:num});
+  eq('fold: tail always folds (limit 1)', F3._sankey.nodes.filter(function(n){ return n.stage === 0; }).map(function(n){ return n.name; }).sort(), ['Other (3)','a']);
+  eq('fold: stages still agree after folding', sum(F3._sankey.nodes.filter(function(n){ return n.stage === 0; }), function(n){ return n.total; }), sum(F3._sankey.nodes.filter(function(n){ return n.stage === 1; }), function(n){ return n.total; }));
+
+  // ---- config ----
+  var cfg = { type: 'bar', data: {}, options: { scales: { x: {}, y: {} }, plugins: { datalabels: {}, legend: { display: true } } }, plugins: [{ id: 'x' }] };
+  D._fmt = null;
+  PC.applySankeyChartConfig(cfg, D, { textColor: '#111', isDark: false, currencyPrefix: '$', fsBoost: 0 });
+  eq('config: type', cfg.type, 'sankey');
+  ok('config: scales removed', cfg.options.scales === undefined);
+  eq('config: datalabels off, legend off', [cfg.options.plugins.datalabels, cfg.options.plugins.legend.display], [false, false]);
+  var ds = cfg.data.datasets[0];
+  eq('config: one data item per band', ds.data.length, S.links.length);
+  var navyId = S.nodes.filter(function(n){ return n.name === 'Navy'; })[0].id;
+  eq('config: box label carries its total', ds.labels[navyId], 'Navy  $700');
+  ok('config: largest box has the lowest priority (top)', ds.priority[navyId] < ds.priority[S.nodes.filter(function(n){ return n.name === 'Army'; })[0].id]);
+  ok('config: Other sorts to the bottom', ds.priority[S.nodes.filter(function(n){ return n.other; })[0].id] === 1e15);
+  eq('config: drill metadata on the dataset', ds._pnbSankey.stages, ['AGENCY','ROUTE','DEPT']);
+  eq('config: a11y rows + type ride chart.data (the a11y layer reads them there)', [cfg.data._a11yRows === D._a11yRows, cfg.data._chartType], [true, 'sankey']);
+  ok('config: negative-row note plugin', cfg.plugins.some(function(p){ return p.id === 'pnbSankeyNote'; }));
+  ok('config: replaced the other plugins', !cfg.plugins.some(function(p){ return p.id === 'x'; }));
+  var tip = cfg.options.plugins.tooltip.callbacks.label({ raw: ds.data[0] });
+  ok('config: tooltip names both boxes, the value and the share', /→/.test(tip[0]) && /\$/.test(tip[1]) && /% of the total/.test(tip[1]) && /row/.test(tip[2]), JSON.stringify(tip));
+  var cfgC = { options: { plugins: {} } };
+  PC.applySankeyChartConfig(cfgC, F2, { currencyPrefix: '$' });
+  ok('config: a count carries no currency prefix', !/\$/.test(JSON.stringify(cfgC.data.datasets[0].labels)), JSON.stringify(cfgC.data.datasets[0].labels));
+  ok('config: no note without negatives', !cfgC.plugins.some(function(p){ return p.id === 'pnbSankeyNote'; }));
+
+  // ---- a real chart ----
+  cfg.options.animation = false;
+  cfg.options.responsive = false;
+  var drillSaw = null;
+  var inner = cfg.options.onClick;
+  var chart = new Chart(document.getElementById('c').getContext('2d'), cfg);
+  var nodes = chart.getDatasetMeta(0).controller._nodes;
+  eq('render: the plugin laid out every box', nodes.size, S.nodes.length);
+  var nv = nodes.get(navyId);
+  var px = chart.scales.x.getPixelForValue(nv.x) + 4, py = chart.scales.y.getPixelForValue(nv.y) + 5;
+  var hit = PC._vizSankeyNodeAt(chart, px, py);
+  eq('render: box found by its rectangle', hit && [hit.stage, hit.name, hit.other], [0, 'Navy', false]);
+  var otherId = S.nodes.filter(function(n){ return n.other; })[0].id, on = nodes.get(otherId);
+  var oh = PC._vizSankeyNodeAt(chart, chart.scales.x.getPixelForValue(on.x) + 4, chart.scales.y.getPixelForValue(on.y) + 2);
+  eq('render: an Other box comes back as other, no name', oh && [oh.name, oh.other], [null, true]);
+  eq('render: empty canvas corner hits nothing', PC._vizSankeyNodeAt(chart, 400, 2), null);
+  var said = inner.call(chart, { x: px, y: py }, [], chart);
+  eq('render: a box click asks the drill to run', said, { datasetIndex: 0, index: 0 });
+  eq('render: and parks the box for it', chart.$pnbSankeyNode && chart.$pnbSankeyNode.name, 'Navy');
+  var said2 = inner.call(chart, { x: px, y: py }, [{ index: 0 }], chart);
+  ok('render: a band click is left to Chart.js', said2 === undefined && chart.$pnbSankeyNode === null);
+  chart.destroy();
+} catch (e) { FAIL++; LOG.push('FAIL  threw: ' + (e && e.stack || e)); }
+document.getElementById('out').textContent = 'pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+document.title = FAIL ? 'FAIL' : 'PASS';
+</script>

@@ -69,9 +69,10 @@
     var corpus = window.__CORPUS;
     var columns = corpus.columns.map(function (c) { return c.toUpperCase(); });
     // main.js uppercases row-map keys at ingestion; mirror that exactly.
-    var maps = corpus.rows.map(function (r) {
+    var maps = corpus.rows.map(function (r, ri) {
       var m = new Map();
       Object.keys(r).forEach(function (k) { m.set(k.toUpperCase(), r[k]); });
+      m.set('#', String(ri + 1));   // (2026-11-03, hashc) the page numbers its rows before a snippet reads them
       return m;
     });
 

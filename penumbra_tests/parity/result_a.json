@@ -417,37 +417,37 @@
     {
         "id":  "now_default",
         "snippet":  "now()",
-        "out":  "10/26/2026"
+        "out":  "11/03/2026"
     },
     {
         "id":  "now_iso",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027)",
-        "out":  "2026-10-26"
+        "out":  "2026-11-03"
     },
     {
         "id":  "now_offset_1",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027)",
-        "out":  "2025-10-26"
+        "out":  "2025-11-03"
     },
     {
         "id":  "now_offset_chain",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027, \u0027+6 days\u0027)",
-        "out":  "2025-11-01"
+        "out":  "2025-11-09"
     },
     {
         "id":  "now_long",
         "snippet":  "now(\u0027MMMM D, YYYY\u0027)",
-        "out":  "OCTOBER 26, 2026"
+        "out":  "NOVEMBER 3, 2026"
     },
     {
         "id":  "now_unquoted",
         "snippet":  "now(MM/DD/YYYY)",
-        "out":  "10/26/2026"
+        "out":  "11/03/2026"
     },
     {
         "id":  "now_bracket_lit",
         "snippet":  "now(\u0027[Run on] MMM D\u0027)",
-        "out":  "RUN ON OCT 26"
+        "out":  "RUN ON NOV 3"
     },
     {
         "id":  "rank_top",
@@ -853,5 +853,25 @@
         "id":  "cf_global",
         "snippet":  "count(eacute)",
         "out":  "1"
+    },
+    {
+        "id":  "hash_count_le",
+        "snippet":  "count(# \u003c= 3)",
+        "out":  "3"
+    },
+    {
+        "id":  "hash_count_set",
+        "snippet":  "count(# = /^(?:1|3)$/)",
+        "out":  "2"
+    },
+    {
+        "id":  "hash_sum",
+        "snippet":  "sum(AMOUNT, # \u003c= 2)",
+        "out":  "1,500.75"
+    },
+    {
+        "id":  "hash_lookup",
+        "snippet":  "lookup(NAME, # = 2)",
+        "out":  "Beta"
     }
 ]

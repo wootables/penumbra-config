@@ -541,6 +541,9 @@ eq($c, 200, 'save: GRANT HOLDER saves');
 FakeDb::reset();
 list($c, $r) = run('save', 'adm', true, array(), array(), $body);
 eq($c, 200, 'save: ADMIN saves');
+FakeDb::reset();
+list($c, $r) = run('save', 'owner1', false, array(), array(), array_merge($body, array('ns' => 'cards', 'name' => 'PI view', 'data' => array('v' => 1, 'setup' => array('own' => 1, 'title' => 'NAME'), 'size' => 'large'))));
+eq($c, 200, 'save: cards (clay, named card layouts) is a namespace an author saves into');
 
 echo "save - validation\n";
 FakeDb::reset();
@@ -714,6 +717,8 @@ list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($body
 eq($c, 200, 'reader cap: ...and per namespace');
 list($c, $r) = run('save', 'owner1', false, array(), array(), array_merge($body, array('name' => 'auth')));
 eq($c, 200, 'reader cap: an author is not bound by the reader cap');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($body, array('ns' => 'cards', 'name' => 'My cards', 'data' => array('v' => 1, 'setup' => array('own' => 1, 'title' => 'NAME')))));
+eq($c, 200, 'clay: a Preset Sharing reader shares a card layout (Configure cards shows a Shared section)');
 
 echo "preset sharing - reader deletes\n";
 FakeDb::reset(); FakeDb::setState(101, FakeDb::SHARING_ON);

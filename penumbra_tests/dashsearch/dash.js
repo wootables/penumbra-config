@@ -1153,7 +1153,10 @@
             $(this).removeAttr('aria-invalid');
             rg[$(this).attr('data-fs-bound')] = b;
         });
-        if (bad) { return; }
+        // ...and so is a from past its to, which matches no row; either way a note says why (2026-11-03)
+        var why = T.strip.rangeProblem(rg, kind, bad);
+        T.strip.rangeMark(grp, why);
+        if (why) { return; }
         var cur = st.range[col] || { min: '', max: '' };
         if (cur.min === rg.min && cur.max === rg.max) { return; }   // nothing changed
         st.range[col] = rg;
@@ -3846,7 +3849,8 @@
                         // (cdash, 2026-11-01) the report's table or its cards, for the whole report or the table alone
                         '<div id="teViewField"' + (t.show === 'header' || t.show === 'chart' ? ' style="display:none;"' : '') + '>' +
                         fieldRow('View', '<select id="teView">' +
-                            '<option value="table"' + (t.view === 'cards' ? '' : ' selected') + '>Table</option>' +
+                            '<option value=""' + (t.view === 'cards' || t.view === 'table' ? '' : ' selected') + '>The report&#39;s view</option>' +   // (cnest sweep) a tile with no view follows the report, as before the choice
+                            '<option value="table"' + (t.view === 'table' ? ' selected' : '') + '>Table</option>' +
                             '<option value="cards"' + (t.view === 'cards' ? ' selected' : '') + '>Cards</option></select> ' +
                             '<select id="teCardSize" aria-label="Card size"' + (t.view === 'cards' ? '' : ' style="display:none;"') + '>' +
                             '<option value=""' + (t.cardSize ? '' : ' selected') + '>The report&#39;s card size</option>' +
@@ -4256,7 +4260,8 @@
                         next.search = $.trim($('#teSearch').val());
                         next.show = $('#teShow').val();
                         if (next.show === 'both' || next.show === 'table') {   // (cdash) the View, for the whole report or the table alone
-                            next.view = $('#teView').val() === 'cards' ? 'cards' : 'table';
+                            var tv = $('#teView').val();   // (cnest sweep) The report's view: none saved (it forced the table on every edit)
+                            if (tv === 'cards' || tv === 'table') { next.view = tv; } else { delete next.view; }
                             if (next.view === 'cards' && $('#teCardSize').val()) { next.cardSize = $('#teCardSize').val(); }
                         }
                         if (next.show === 'chart') {

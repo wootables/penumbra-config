@@ -231,6 +231,12 @@
     // its arrow only folds it: the selection stays
     itemOf(p0).querySelector('.pnb-gl-twisty').click(); await frames(3);
     R.chk.foldArrow = itemOf(p0).getAttribute('aria-expanded') === 'false' && selected() === t0;
+    // glrefold (2026-11-03): its row unfolds it again, and a second click on the row folds
+    // it as the arrow does - the selection stays (and it is left folded, as before)
+    itemOf(p0).querySelector('.pnb-gl-name').click(); await frames(3);
+    R.chk.rowReopens = itemOf(p0).getAttribute('aria-expanded') === 'true' && selected() === t0;
+    itemOf(p0).querySelector('.pnb-gl-name').click(); await frames(3);
+    R.chk.rowFolds = itemOf(p0).getAttribute('aria-expanded') === 'false' && selected() === t0 && t0.classList.contains('pnb-gl-merge');
     // the arrow keys pass a branch by; Enter selects it
     var t1 = top()[1], p1 = t1.getAttribute('data-group-path'), l = list(); l.focus();
     window.Penumbra.groupList.select(p1); await frames(3);

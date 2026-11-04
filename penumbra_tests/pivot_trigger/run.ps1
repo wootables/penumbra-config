@@ -29,6 +29,12 @@
 #                                             js\main.js.bak-20260904-autobuild, the last
 #                                             file before the series slot took bucket
 #                                             tokens: it fails exactly those two, 394/2.)
+#     2026-11-03 (the pivot kind caches follow the data, _pivotColCacheSync):
+#       kindcache    415/5  the caches never reset with a new masterRowData: the
+#                           chart-bucket tests read AMOUNT on no rows, so the five
+#                           bin round-trip asserts lose their split again. Control:
+#                           the pre-fix live main.js fails exactly those five, 415/5
+#                           (red since 10cb44d, 2026-10-26).
 #
 # If the UNC execution policy refuses the script ("not digitally signed"), run
 # its body as a scriptblock from the workstation:
@@ -82,6 +88,9 @@ $mutants = @{
   # penumbraColIdFor, leaving exact + upper case.
   'curcase'   = @('var cid = penumbraColIdFor(nameToIdx, colName);', 'var cid = nameToIdx[String(colName).toUpperCase()];')
   'colidscan' = @('if (keys[i].toUpperCase() === up) return nameToIdx[keys[i]];', 'if (false) return nameToIdx[keys[i]];')
+  # The pivot kind caches follow the data (2026-11-03): 'kindcache' never resets
+  # them for a new masterRowData, the pre-fix behaviour.
+  'kindcache' = @('if (rows === _pivotColCacheFor) return;', 'if (true) return;')
 }
 if ($Mutant) {
   if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant' (known: $(($mutants.Keys | Sort-Object) -join ', '))" }

@@ -42,13 +42,16 @@
   function panelsAll() { return Array.prototype.slice.call(document.querySelectorAll('#pnbHeadMenu, .pnb-hm-sub')); }
   function item(act) { var ps = panelsAll(); for (var i = 0; i < ps.length; i++) { var x = ps[i].querySelector('[data-act="' + act + '"]'); if (x) return x; } return null; }
   function subPanel() { var s = document.querySelectorAll('.pnb-hm-sub'); return s.length ? s[s.length - 1] : null; }
-  function subActs() { var p = subPanel(); return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-item'), function (e) { return e.getAttribute('data-act'); }) : []; }
-  function subLabels() { var p = subPanel(); return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-item .pnb-hm-label'), function (e) { return e.textContent; }) : []; }
+  // (2026-11-03, pgflt) Filter to this page joins the Filter lists, the '#' heading's menu and the last-page row's: the
+  // older checks' exact lists read the menus without it (PG_HIDE), mpage reads it
+  var PG_HIDE = true;
+  function subActs() { var p = subPanel(); return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-item' + (PG_HIDE ? ':not([data-act="pageFilter"])' : '')), function (e) { return e.getAttribute('data-act'); }) : []; }
+  function subLabels() { var p = subPanel(); return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-item' + (PG_HIDE ? ':not([data-act="pageFilter"])' : '') + ' .pnb-hm-label'), function (e) { return e.textContent; }) : []; }
   // (round 21) the Column stats list's facts, label -> value
   function infoMap() { var p = subPanel(), o = {}; if (p) Array.prototype.forEach.call(p.querySelectorAll('.pnb-hm-info'), function (d) { o[d.querySelector('.pnb-hm-info-k').textContent] = d.querySelector('.pnb-hm-info-v').textContent; }); return o; }
   function anyHead() { var ps = panelsAll(); for (var i = ps.length - 1; i >= 0; i--) { var h = ps[i].querySelector('.pnb-hm-head'); if (h) return h; } return null; }
   function allItems() { var out = []; panelsAll().forEach(function (p) { out = out.concat(Array.prototype.slice.call(p.querySelectorAll('.pnb-hm-item'))); }); return out; }
-  function acts() { var m = menu(); return m ? Array.prototype.map.call(m.querySelectorAll('.pnb-hm-item'), function (e) { return e.getAttribute('data-act'); }) : []; }
+  function acts() { var m = menu(); return m ? Array.prototype.map.call(m.querySelectorAll('.pnb-hm-item' + (PG_HIDE ? ':not([data-act="pageFilter"])' : '')), function (e) { return e.getAttribute('data-act'); }) : []; }
   function closeMenu() { if (window.Penumbra && window.Penumbra.colMenu) window.Penumbra.colMenu.close(); }
   // (round 12) the lists under one item: an act inside one is reached through its parent
   var SUBS = { 'move-left': 'move', 'move-right': 'move', 'move-start': 'move', 'move-end': 'move', 'move-swap': 'move',
@@ -3845,6 +3848,196 @@
       R.info.g = { n: n, list: l, q: q };
       R.chk.gsMenu = n === 2 && l[0] === 'selFilter' && l[1] === 'selExclude';
       R.chk.gsFilter = /V_NAME = \/\^\(\?:/.test(q) && /V_STATUS = \/\^\(\?:/.test(q);
+    },
+    // (2026-11-03, menufix) Freeze past the first five greyed with its reason; the '#' heading's Copy (the view link alone);
+    // the summary row's menu: the types (None first, the one in force ticked, no Custom Formula), a pick redraws the footer,
+    // Copy this value, the badges switch (the footer's badge goes, the types stay), Clear all last; the label cell; the
+    // keyboard; None (with its Undo); a viewer kept out of column customization (no types, no switch)
+    mfix: async function () {
+      var H = A();
+      var ths = Array.prototype.filter.call(document.querySelectorAll('#tableHeader th'), function (t) { return t.offsetParent !== null && t.style.display !== 'none'; });
+      var far = ths[H.frozenMax] || null;
+      closeMenu(); rclick(far);
+      var fz = item('freeze');
+      R.chk.freezeGrey = !!far && far !== ths[ths.length - 1] && !!fz && fz.getAttribute('aria-disabled') === 'true' && /^past the first 5$/.test(fz.getAttribute('title') || '');
+      R.info.fz = { n: ths.length, far: far && far.getAttribute('data-colname'), acts: acts() };
+      closeMenu();
+      var VL = window.PenumbraViewLink, keep = VL ? { av: VL.available, cp: VL.copy } : null, calls = 0;
+      if (VL) { VL.available = function () { return true; }; VL.copy = function () { calls++; return Promise.resolve({}); }; }
+      try {
+        rclick(document.querySelector('#tableHeader th[data-column="#"]'));
+        R.info.numHead = acts();
+        var nl = item('copyViewLink');
+        if (nl) { nl.click(); await sleep(300); }
+        R.chk.numLink = !!nl && calls === 1;
+      } finally { if (keep) { VL.available = keep.av; VL.copy = keep.cp; } closeMenu(); }
+      var ftd = function () { return document.querySelector('#resultsTable tfoot tr.total-row-data td[data-sum-col="V_AMOUNT"]'); };
+      if (typeof H.sumPick === 'function') { H.sumPick('V_AMOUNT', 'sum'); await sleep(900); }
+      var fc = ftd(), opened = !!fc && rclick(fc) && !!menu(), a = acts(), hd = menu() && menu().querySelector('.pnb-hm-head');
+      R.chk.sumMenu = opened && !!hd && hd.textContent === 'Summary' && a[0] === 'sum-none' && a[1] === 'sum-sum' && a.indexOf('sum-avg') > 1 && a.indexOf('sum-formula') < 0
+        && item('sum-sum').getAttribute('aria-checked') === 'true' && item('sum-none').getAttribute('aria-checked') === 'false' && !!fc && fc.classList.contains('pnb-hm-for');
+      R.chk.sumTail = a.indexOf('sumCopy') > 0 && a.indexOf('options') > a.indexOf('sumCopy') && a.indexOf('sumBadges') > a.indexOf('options') && a[a.length - 1] === 'clearPrefs';
+      R.info.sum = { a: a, ft: fc ? fc.outerHTML.slice(0, 240) : null };
+      var avg = item('sum-avg'); if (avg) avg.click();
+      await sleep(900);
+      R.chk.sumPick = !!ftd() && ftd().getAttribute('data-sum-type') === 'avg' && !menu() && !document.querySelector('#resultsTable tfoot .pnb-hm-for');
+      var badgeBefore = !!(ftd() && ftd().querySelector('.pnb-sum-badge'));
+      rclick(ftd());
+      var bi = item('sumBadges'), wasOn = !!bi && bi.getAttribute('aria-checked') === 'true';
+      if (bi) bi.click();
+      await sleep(900);
+      R.chk.sumBadges = badgeBefore && wasOn && !!ftd() && !ftd().querySelector('.pnb-sum-badge') && H.sumBadgesOn() === false;
+      rclick(ftd());
+      R.chk.sumNoBadge = !!item('sum-avg') && !!item('sumBadges') && item('sumBadges').getAttribute('aria-checked') === 'false';
+      closeMenu();
+      var lab = document.querySelector('#resultsTable tfoot tr.total-row-data td.pnb-sum-label');
+      rclick(lab);
+      var la = acts();
+      R.chk.sumLabel = !!lab && la.join() === 'sumBadges,clearPrefs';
+      R.info.lab = la;
+      closeMenu();
+      if (typeof H.setSumBadges === 'function') { H.setSumBadges(true); await sleep(600); }
+      R.chk.sumKbd = !!ftd() && rclick(ftd(), true) && !!menu() && document.activeElement === item('sum-none');
+      closeMenu();
+      // None, with another column's summary keeping the row: the cell empties, the badge's Undo notice; that empty cell's
+      // menu has None ticked
+      if (typeof H.sumPick === 'function') { H.sumPick('V_NAME', 'count'); await sleep(900); }
+      var nT = (window.__HC_MAIN_TOASTS || []).length;
+      rclick(ftd());
+      var nn = item('sum-none'); if (nn) nn.click();
+      await sleep(900);
+      R.chk.sumNone = !ftd() && (window.__HC_MAIN_TOASTS || []).slice(nT).some(function (t) { return /Undo/i.test(t); });
+      var amtId = fth('V_AMOUNT') ? fth('V_AMOUNT').getAttribute('data-column') : null;
+      var emp = amtId !== null ? document.querySelector('#resultsTable tfoot tr.total-row-data td[data-column="' + amtId + '"]') : null;
+      R.chk.sumNoneTick = !!emp && rclick(emp) && !!item('sum-none') && item('sum-none').getAttribute('aria-checked') === 'true' && !item('sumCopy');
+      closeMenu();
+      if (typeof H.sumPick === 'function') { H.sumPick('V_AMOUNT', 'sum'); await sleep(900); }
+      var wasAdmin = window.penumbra_vars.isAdmin, wasHide = window._penumbraHideColumns;
+      window.penumbra_vars.isAdmin = false; window._penumbraHideColumns = true;
+      try {
+        rclick(ftd());
+        var ra = acts();
+        R.chk.sumRestr = !!menu() && ra.indexOf('sum-sum') < 0 && ra.indexOf('sum-none') < 0 && ra.indexOf('sumBadges') < 0 && ra.indexOf('options') < 0;
+        R.info.restr = ra;
+      } finally { closeMenu(); window.penumbra_vars.isAdmin = wasAdmin; window._penumbraHideColumns = wasHide; }
+    },
+    // (2026-11-03, menufix) the group band and the List row end with Clear all customizations..., under a separator; the
+    // grouped view's summary row has the summary menu
+    ggfix: async function () {
+      var band = tops()[0] ? tops()[0].querySelector(':scope > .group-header') : null;
+      rclick(band);
+      var a = acts(), ci = item('clearPrefs');
+      R.chk.bandClear = a.length > 3 && a.indexOf('clearPrefs') === a.length - 1 && !!ci && !!ci.previousElementSibling && ci.previousElementSibling.classList.contains('pnb-hm-sep');
+      closeMenu();
+      if (typeof A().sumPick === 'function') { A().sumPick('V_AMOUNT', 'sum'); await sleep(1000); }
+      var gft = document.querySelector('#groupedResultsContainer tfoot tr.total-row-data td[data-sum-col="V_AMOUNT"]');
+      R.chk.gSumMenu = !!gft && rclick(gft) && acts()[1] === 'sum-sum';
+      closeMenu();
+      $('#collapseAllGroups').trigger('click');   // (as gglist: the List layout is offered on collapsed groups)
+      await sleep(250);
+      band = tops()[0] ? tops()[0].querySelector(':scope > .group-header') : null;
+      await choose(band, 'gList');
+      await sleep(500);
+      var row = document.querySelector('#pnbGroupList .pnb-gl-item');
+      rclick(row);
+      var b = acts();
+      R.chk.listClear = !!row && b.length > 3 && b.indexOf('clearPrefs') === b.length - 1;
+      R.info.gx = { band: a, list: b, gft: !!gft };
+      closeMenu();
+    },
+    // (2026-11-03, menufix2) the row standing in for the summary on a page before the last ("View Last Page to see the
+    // summary row"): its menu (View the last page, Show every row on one page, the badges switch, Clear all), over the
+    // link too; View the last page goes there (the summary shows); Show every row on one page shows them all
+    mfix2: async function () {
+      var H = A();
+      if (typeof H.sumPick === 'function') { H.sumPick('V_AMOUNT', 'sum'); await sleep(900); }
+      var lr = document.querySelector('#resultsTable tfoot tr.total-row-link'), ltd = lr ? lr.querySelector('td') : null, lk = document.getElementById('viewLastPageLink');
+      var shownLink = !!lr && lr.style.display !== 'none' && lr.getClientRects().length > 0;
+      var op = !!ltd && rclick(ltd) && !!menu(), a = acts();
+      R.chk.linkMenu = shownLink && op && a.join() === 'sumLastPage,sumAllRows,sumBadges,clearPrefs' && menu().querySelector('.pnb-hm-name').textContent === 'Summary row';
+      R.info.link = { shown: shownLink, acts: a, page: (document.getElementById('pageInfo') || {}).textContent };
+      closeMenu();
+      R.chk.linkOnLink = !!lk && rclick(lk) && acts()[0] === 'sumLastPage';
+      // (this harness has no pager buttons: the link's own click - its handler presses Last page - is what is checked)
+      var lkClicks = 0, lkSpy = function (ev) { if (ev.target && ev.target.id === 'viewLastPageLink') lkClicks++; };
+      document.addEventListener('click', lkSpy, true);
+      var go = item('sumLastPage'); if (go) { go.click(); }
+      await sleep(700);
+      document.removeEventListener('click', lkSpy, true);
+      R.chk.linkLast = !!go && lkClicks === 1;
+      R.info.last = { page: (document.getElementById('pageInfo') || {}).textContent, go: !!go, lpb: !!document.getElementById('lastPageBtn'), lk: !!document.getElementById('viewLastPageLink'), menuOpen: !!menu() };
+      var fb = document.getElementById('firstPageBtn'); if (fb) { fb.click(); await sleep(500); }
+      rclick(document.querySelector('#resultsTable tfoot tr.total-row-link td'));
+      var al = item('sumAllRows'); if (al) { al.click(); }
+      await sleep(1200);
+      R.chk.linkAll = !!al && document.getElementById('rowsPerPageSelector').value === 'all' && document.querySelector('#resultsTable tfoot tr.total-row-data').style.display !== 'none';
+    },
+    // (2026-11-03, pgflt; the user) Filter to this page: in a cell's Filter list (after At least / At most, before Click to
+    // filter), on the '#' heading, in the last-page row's menu; it writes the page's row numbers (a range on an unsorted
+    // page, the set of them once sorted) in place of a # condition already there; greyed with one page and with All
+    mpage: async function () {
+      PG_HIDE = false;
+      function visTrs() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && !!tr.querySelector('td[data-column]'); }); }
+      function nums() { return visTrs().map(function (tr) { var h = tr.querySelector('td[data-column="#"]'); return h ? parseInt(h.textContent, 10) : NaN; }); }
+      function cellAt(name, i) { var t = fth(name), tr = visTrs()[i || 0]; return (t && tr) ? tr.querySelector('td[data-column="' + t.getAttribute('data-column') + '"]') : null; }
+      function setBox(q) { var s = document.getElementById('tableSearch'); s.value = q; $(s).trigger('input'); s.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', keyCode: 13, which: 13, bubbles: true })); $(s).trigger($.Event('keyup', { key: 'Enter', keyCode: 13, which: 13 })); }
+      function pgItem() { var p = subPanel(); return p ? p.querySelector('[data-act="pageFilter"]') : null; }
+      function sameSet(a, b) { a = a.slice().sort(function (x, y) { return x - y; }); b = b.slice().sort(function (x, y) { return x - y; }); return a.join() === b.join(); }
+      var rpp = document.getElementById('rowsPerPageSelector'), rpp0 = rpp.value;
+      SUBS.pageFilter = 'filterMenu';
+      setBox(''); await sleep(600);
+      // a cell: its Filter list holds it, a separator before it, Click to filter after it; its note the page's rows
+      var c0 = cellAt('V_NAME', 0), n0 = nums();
+      closeMenu(); rclick(c0); sub('filterMenu'); await sleep(100);
+      var l0 = subActs(), pi = pgItem(), pv = pi ? pi.previousElementSibling : null;
+      R.info.cell = { list: l0, page: (document.getElementById('pageInfo') || {}).textContent, n: n0.length, title: pi ? pi.getAttribute('title') : null, note: pi ? pi.textContent : null };
+      R.chk.pgCell = !!pi && pi.getAttribute('aria-disabled') !== 'true' && l0.indexOf('pageFilter') === l0.indexOf('clickFilter') - 1 && l0.indexOf('pageFilter') > l0.indexOf('filter')
+        && !!pv && pv.classList.contains('pnb-hm-sep') && pi.textContent.indexOf(n0.length + ' rows') >= 0 && /saved view/.test(pi.getAttribute('title') || '');
+      closeMenu();
+      // run on the unsorted first page: a range of its numbers; only its rows left, on one page, the summary under them
+      await choose(cellAt('V_NAME', 0), 'pageFilter'); await sleep(900);
+      var q1 = searchVal(), lo = Math.min.apply(null, n0), hi = Math.max.apply(null, n0), tf = document.querySelector('#resultsTable tfoot tr.total-row-data');
+      R.info.run = { q: q1, shown: nums().length, lo: lo, hi: hi };
+      R.chk.pgRun = q1.indexOf('# >= ' + lo) >= 0 && q1.indexOf('# <= ' + hi) >= 0 && q1.indexOf('/^(?:') < 0 && sameSet(nums(), n0) && (!tf || tf.style.display !== 'none');
+      // now one page: greyed, saying why
+      closeMenu(); rclick(cellAt('V_NAME', 0)); sub('filterMenu'); await sleep(100);
+      var p1 = pgItem();
+      R.chk.pgOne = !!p1 && p1.getAttribute('aria-disabled') === 'true' && /only one page/i.test(p1.getAttribute('title') || p1.textContent || '');
+      R.info.one = p1 ? [p1.getAttribute('aria-disabled'), p1.getAttribute('title'), p1.textContent] : null;
+      closeMenu();
+      // sorted, with a # condition already in the box: the page's own set of numbers in its place
+      setBox(''); await sleep(900); setBox('# >= 1'); await sleep(1200);
+      R.info.reset = (document.getElementById('pageInfo') || {}).textContent;
+      A().sort(fth('V_NAME'), 'desc'); await sleep(700);
+      var n2 = nums();
+      await choose(cellAt('V_NAME', 0), 'pageFilter'); await sleep(900);
+      var q2 = searchVal();
+      R.info.sorted = { q: q2, before: n2, after: nums() };
+      R.chk.pgSorted = q2.indexOf('# = /^(?:') >= 0 && sameSet(nums(), n2);
+      R.chk.pgReplace = q2.indexOf('>=') < 0 && (q2.match(/#/g) || []).length === 1;
+      A().sort(fth('V_NAME'), null); await sleep(500);
+      setBox(''); await sleep(700);
+      // the '#' heading and the last-page row offer it too
+      closeMenu(); rclick(document.querySelector('#tableHeader th[data-column="#"]'));
+      var hi1 = item('pageFilter');
+      R.chk.pgNumHead = !!hi1 && hi1.getAttribute('aria-disabled') !== 'true' && hi1.closest('#pnbHeadMenu') === menu();
+      R.info.head = acts();
+      closeMenu();
+      var lr = document.querySelector('#resultsTable tfoot tr.total-row-link td');
+      if (lr) { rclick(lr); }
+      var la = acts();
+      R.info.link = la;
+      R.chk.pgLink = !!lr && la.indexOf('pageFilter') === la.indexOf('sumAllRows') + 1;
+      closeMenu();
+      // Rows per page All: greyed, saying why
+      rpp.value = 'all'; $(rpp).trigger('change'); await sleep(900);
+      closeMenu(); rclick(cellAt('V_NAME', 0)); sub('filterMenu'); await sleep(100);
+      var p3 = pgItem();
+      R.chk.pgAll = !!p3 && p3.getAttribute('aria-disabled') === 'true' && /All/.test(p3.getAttribute('title') || p3.textContent || '');
+      R.info.all = p3 ? [p3.getAttribute('aria-disabled'), p3.getAttribute('title'), p3.textContent] : null;
+      closeMenu();
+      rpp.value = rpp0; $(rpp).trigger('change'); await sleep(700);
+      PG_HIDE = true;
     },
     mexcl: async function () {
       var td = document.querySelector('#resultsTable tbody tr td a');

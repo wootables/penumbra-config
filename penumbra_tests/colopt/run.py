@@ -394,7 +394,8 @@ MUTANTS = {
     'i-cellback': ([('index', "                        <!-- (Deep Link Vendor Codes was a cell here until 2026-10-13: it is",
                      "                        <input type=\"checkbox\" id=\"serverSaveResolver\">\n                        <!-- (Deep Link Vendor Codes was a cell here until 2026-10-13: it is")],
                    ['S-noSaveDeepCell'], []),
-    'h-lastdeep': ([('help', "Defaults: Row Height, Page Size &amp; Sort</h4>", "Defaults: Row Height, Deep Links, Page Size &amp; Sort</h4>")], ['S-helpNoDeepDefault'], []),
+    # (2026-11-03) the heading lives in the Save dialog's topic (Help v2, 10-15), never in the tip store 'help' reads
+    'h-lastdeep': ([('stopic', "Defaults: Row Height, Page Size &amp; Sort</h4>", "Defaults: Row Height, Deep Links, Page Size &amp; Sort</h4>")], ['S-helpNoDeepDefault'], []),
     # --- (colopt g) Filter its own row, "Click a table cell to filter by that value"
     'j-filterrow': ([('mod', "data-sec=\"filter\"><div class=\"pnb-colopt-lbl\">Filter</div>", "data-sec=\"links\"><div class=\"pnb-colopt-lbl\">Links</div>")],
                     ['L-fform-filterOwnRow', 'L-fform-formRows'], ['fform']),
@@ -439,7 +440,8 @@ MUTANTS = {
     # through jQuery a highlight's var() came out as its light fallback (jQuery UI's color hooks)
     'm-hlnative': ([('main', "                                    if (applyOnly) _pnbCfSetCss(rowEl.cells[cellPos], safeCss);",
                      "                                    if (applyOnly) $(rowEl.cells[cellPos]).css(safeCss);")], ['L-fhlseed-darkTint'], ['fhlseed']),
-    'm-hlpopcfg': ([('main', "            highlight: isData && window.PenumbraColFmt.hlColOk && window.PenumbraColFmt.hlColOk(col) ? _pnbHlPopCfg(col) : null,",
+    # (2026-11-03) re-anchored: hl phase 4 (9de1738, 10-20) gave a journal column the card too
+    'm-hlpopcfg': ([('main', "            highlight: (isData || _pnbHlIsJournal(col)) && window.PenumbraColFmt.hlColOk && window.PenumbraColFmt.hlColOk(col) ? _pnbHlPopCfg(col) : null,",
                      "            highlight: null,")], ['L-fhl-popHasHl', 'L-fform-formRows'], ['fhl', 'fform']),
     # --- (2026-10-20, hl) the rules' engine and editor (the module)
     'j-hlis': ([('mod', "            return c + (op === 'is' ? ' = ' : ' != ') + (plain ? '//' + v + '//' : '/^' + hlLit(v) + '$/');",
@@ -634,7 +636,9 @@ def static_checks(texts):
         ('S-helpHlHd', "or the column's <em>Header</em>" in top and 'A header takes color, background-color' in top
          and '<strong>Highlight...</strong></td>' not in top and '(<em>Column options...</em> in its right-click menu), click <em>+ Add a rule</em>' in top, ''),   # (2026-10-27, fltmenu) Highlight... left the menu
         ('S-noSaveDeepCell', 'serverSaveResolver' not in idx, 'index.php: serverSaveResolver x%d' % idx.count('serverSaveResolver')),
-        ('S-helpNoDeepDefault', 'Defaults: Row Height, Deep Links' not in hlp and "can set the report's default under <em>Last Stop Changes</em>" not in hlp
+        # (2026-11-03) the Defaults heading is the Save dialog topic's (stp), as h-lastdeep plants it there
+        ('S-helpNoDeepDefault', 'Defaults: Row Height, Deep Links' not in hlp and 'Defaults: Row Height, Deep Links' not in stp
+         and "can set the report's default under <em>Last Stop Changes</em>" not in hlp
          and 'Deep Link Vendor Codes</strong> - when on, recognized vendor codes' not in hlp, ''),
         # (colopt g) the help names the option as the popover does, in a Filter row of its own
         ('S-helpFilterRow', '<li><strong>Filter</strong> - click a table cell to filter by that value.</li>' in hlp   # (2026-10-19) the tip store; the topic's <em> wording no longer read here

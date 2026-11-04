@@ -559,8 +559,10 @@
                 <div id="vizGanttRow" style="display:none" class="viz-combo-strip">
                     <span class="viz-combo-badge">Gantt<br>only</span>
                     <div class="viz-fld" style="flex:1; min-width:0">
-                        <span class="viz-lbl"><span class="viz-lbl-text" id="vizGanttEndLt">End Date Column</span> <span class="bld-help-icon" data-tip="viz-gantt-end"></span></span>
+                        <span class="viz-lbl"><span class="viz-lbl-text" id="vizGanttEndLt">End Date</span> <span class="bld-help-icon" data-tip="viz-gantt-end"></span></span>
                         <select id="vizGanttEnd" aria-labelledby="vizGanttEndLt"><option value="">Select column...</option></select>
+                        <!-- (gone, 2026-11-03) shown only while End Date = "A fixed date..." -->
+                        <input type="date" id="vizGanttEndDate" aria-label="Fixed end date" style="display:none; margin-top:4px; width:100%">
                     </div>
                     <!-- (gcolor, 2026-11-02) one color per value of a column; rides the options object -->
                     <div class="viz-fld" style="flex:1; min-width:0">
@@ -568,7 +570,7 @@
                         <select id="vizGanttColor" aria-labelledby="vizGanttColorLt"><option value="">None (each bar its own color)</option></select>
                     </div>
                     <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
-                        <span class="viz-funnel-hint" id="vizGanttHint">Y-Axis is the <b>start</b> date and this is the <b>end</b> date. On the <b>Axes &amp; Scale</b> tab, <code>today</code> in <b>Marker Date</b> marks today, and <b>Show From</b> / <b>Show To</b> set a window: a date, <code>today+90d</code> or <code>fy27</code>.</span>
+                        <span class="viz-funnel-hint" id="vizGanttHint">Y-Axis is the <b>start</b> date; the <b>end</b> is a column, <b>Today</b>, or <b>A fixed date&hellip;</b> (bars then run from each start to that day). On the <b>Axes &amp; Scale</b> tab, <code>today</code> in <b>Marker Date</b> marks today, and <b>Show From</b> / <b>Show To</b> set a window: a date, <code>today+90d</code> or <code>fy27</code>.</span>
                     </div>
                 </div>
                 <!-- ── SANKEY STRIP - shown only for Sankey. Stage 1 is the X-Axis;
@@ -588,7 +590,7 @@
                         <select id="vizSankeyStage4" aria-labelledby="vizSankeyStage4Lt"><option value="">None</option></select>
                     </div>
                     <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
-                        <span class="viz-funnel-hint" id="vizSankeyHint">Each row flows from its <b>X-Axis</b> value through each stage. Bands add up, so <b>Aggregation</b> must be Count or Sum; <b>Boxes per Stage</b> keeps the largest and folds the rest into Other.</span>
+                        <span class="viz-funnel-hint" id="vizSankeyHint">Each row flows from its <b>Stage 1</b> value through each stage. Bands add up, so <b>Aggregation</b> must be Count or Sum; <b>Boxes per Stage</b> keeps the largest and folds the rest into Other.</span>
                     </div>
                 </div>
                 <!-- ── BOX PLOT STRIP - shown only for Box Plot ── -->
@@ -746,7 +748,7 @@
 <script src="main_patched.js"></script>
 <script>
 (function () {
-  var ONLY = '';
+  var ONLY = 'K';
   function report(txt) { document.getElementById('out').textContent = txt; }
   var results = [];
   function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
@@ -1388,6 +1390,49 @@
     });
   }
 
+  // ---- E (gone, 2026-11-03): a FIXED Gantt end - Today or a calendar date ----
+  async function runE() {
+    var F = window.__CI;
+    await asection('E', async function () {
+      openBuilder(); setv('#vizXAxis', 'AWARD_ID'); clickType('gantt'); setv('#vizYAxis', 'START_DATE');
+      assert('E the End Date list offers Today and A fixed date', $('#vizGanttEnd option[value="@today"]').length === 1 && $('#vizGanttEnd option[value="@date"]').length === 1,
+             $('#vizGanttEnd option').map(function () { return this.value; }).get().join(','));
+      setv('#vizGanttEnd', '@today');
+      window.vizRunLiveUpdate();
+      var ch = Chart.getChart('vizChart');
+      assert('E @today: the preview drew', !!ch);
+      var d0 = new Date(); var endMs = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate(), 23, 59, 59, 999).getTime();
+      assert('E @today: every bar ends at the end of today', !!ch && ch.data._ganttBars.every(function (b) { return b.end === endMs; }), ch && JSON.stringify((ch.data._ganttBars || []).slice(0, 2)));
+      var codeToday = window.vizBuildCodeFromForm();
+      assert('E @today rides the groupBy slot of vis()', codeToday.indexOf("vis('gantt', 'AWARD_ID', 'START_DATE', '@today'") === 0, codeToday.slice(0, 80));
+      // the calendar choice: the field shows, prefilled with today
+      setv('#vizGanttEnd', '@date');
+      // the element's own display, not :visible - the harness keeps the lightbox hidden
+      assert('E A fixed date: the calendar field shows, prefilled', $('#vizGanttEndDate').css('display') !== 'none' && /^\d{4}-\d{2}-\d{2}$/.test($('#vizGanttEndDate').val() || ''), $('#vizGanttEndDate').css('display') + ' / ' + $('#vizGanttEndDate').val());
+      setv('#vizGanttEndDate', '2031-12-31');
+      var ch2 = Chart.getChart('vizChart');
+      var wantMs = new Date(2031, 11, 31, 23, 59, 59, 999).getTime();
+      assert('E a picked date: every bar ends on it', !!ch2 && ch2.data._ganttBars.every(function (b) { return b.end === wantMs; }), ch2 && JSON.stringify((ch2.data._ganttBars || []).slice(0, 2)));
+      var codeDate = window.vizBuildCodeFromForm();
+      assert('E the picked date rides the slot as @date:YYYY-MM-DD', codeDate.indexOf("vis('gantt', 'AWARD_ID', 'START_DATE', '@date:2031-12-31'") === 0, codeDate.slice(0, 90));
+      // reopening each saved chart brings the choice (and the date) back
+      F.setSnippet(codeDate);
+      var parsed = F.enumVis();
+      openBuilder();
+      if (parsed.length) F.restore(parsed[0].config);
+      assert('E reopening restores the calendar choice and its date', parsed.length === 1 && $('#vizGanttEnd').val() === '@date' && $('#vizGanttEndDate').val() === '2031-12-31' && $('#vizGanttEndDate').css('display') !== 'none', $('#vizGanttEnd').val() + ' / ' + $('#vizGanttEndDate').val() + ' / ' + $('#vizGanttEndDate').css('display'));
+      F.setSnippet(codeToday);
+      var p2 = F.enumVis();
+      openBuilder();
+      if (p2.length) F.restore(p2[0].config);
+      assert('E reopening a Today chart lands on Today, calendar hidden', p2.length === 1 && $('#vizGanttEnd').val() === '@today' && $('#vizGanttEndDate').css('display') === 'none', $('#vizGanttEnd').val() + ' / ' + $('#vizGanttEndDate').css('display'));
+      // the report page renders the Today chart too
+      var rr = await renderReport(codeToday);
+      assert('E the report draws the Today chart', !!rr.chart, rr.text || '');
+      if (rr.chart) assert('E ...with bars ending today', rr.chart.data._ganttBars.every(function (b) { return b.end === endMs; }));
+    });
+  }
+
   async function runK() {
     var F = window.__CI, P = window.Penumbra || {};
     var saved = { active: P.chartNotesActive, count: P.chartNoteCount, open: P.openChartNote };
@@ -1469,6 +1514,26 @@
           assert('K treemap: the entry itself says how many notes', /\(2 notes\)/.test($sub.children('li.ctx-drill-cat').first().children('.ctx-cat-label').text()), $sub.children('li.ctx-drill-cat').first().children('.ctx-cat-label').text());
           OPENED.length = 0; $notes.first().trigger('click');
           assert('K treemap: the notes entry opens that point\'s thread', OPENED.length === 1 && !!OPENED[0], JSON.stringify(OPENED));
+        } else if (cs[0] === 'sankey') {
+          // (2026-11-04) a band is the pivot row of its two stages' values, a box the row of its one; an Other box,
+          // or a band into one, takes none. The markers list them too, and the hidden line names them.
+          var okBands = ds0.data.filter(function (r) { return r && r._l && r._l._fromName != null && r._l._toName != null; }).length;
+          var okBoxes = (ds0._pnbSankey.nodes || []).filter(function (n) { return !n.other; }).length;
+          assert('K sankey: every band and every named box offers its notes, with the count', okBands > 0 && okBoxes > 0 && $notes.length === okBands + okBoxes && /Notes \(2\)/.test($notes.first().text()), $notes.length + ' / ' + okBands + '+' + okBoxes + ' / ' + $notes.first().text());
+          OPENED.length = 0; $notes.first().trigger('click');
+          var bandKey = OPENED[0] ? JSON.parse(OPENED[0]) : null;
+          assert('K sankey: a band\'s thread is the pivot row of its two stages (DEPT, STATUS)', Array.isArray(bandKey) && bandKey.map(function (p) { return p[0]; }).join(',') === 'DEPT,STATUS', OPENED[0]);
+          $sub = openMenu(rr.canvas);
+          var $boxCat = $sub.children('li.ctx-drill-cat').filter(function () { var t = $(this).children('.ctx-cat-label').text(); return /^Box: /.test(t) && !/^Box: Other( |$)/.test(t); }).first();   // a NAMED box: the Other box offers none
+          assert('K sankey: a box entry carries its count and its own Notes row', /\(2 notes\)/.test($boxCat.children('.ctx-cat-label').text()) && $boxCat.find('.ctx-drill-notes').length === 1, $boxCat.children('.ctx-cat-label').text());
+          OPENED.length = 0; $boxCat.find('.ctx-drill-notes').trigger('click');
+          var boxKey = OPENED[0] ? JSON.parse(OPENED[0]) : null;
+          assert('K sankey: a box\'s thread is the pivot row of its one field (a stage column)', Array.isArray(boxKey) && boxKey.length === 1 && /^(DEPT|STATUS)$/.test(boxKey[0][0]), OPENED[0]);
+          ch.draw();   // the paint's key list (afterDraw) with the stubbed counts
+          var cn = ch.$pnbCn || [];
+          assert('K sankey: the markers list every band and box with notes', cn.length === okBands + okBoxes && cn.filter(function (e) { return e.node; }).length === okBoxes, cn.length + ' / ' + okBands + '+' + okBoxes);
+          var sr = rr.canvas.parentNode.querySelector('.journal-chartnote-sr');
+          assert('K sankey: the hidden line names a band (From → To) and a box', !!sr && sr.textContent.indexOf('→') !== -1 && sr.textContent.indexOf('Box ') !== -1, sr ? sr.textContent.slice(0, 160) : 'none');
         } else {
           eq('K ' + cs[0] + ': no notes offered on a chart type without point notes', $notes.length, 0);
         }
@@ -1518,6 +1583,7 @@
     if (!ONLY || ONLY === 'T') runT();   // (gtl)
     if (!ONLY || ONLY === 'G') await runG();   // (glong)
     if (!ONLY || ONLY === 'S') await runS();   // (gsortcolor)
+    if (!ONLY || ONLY === 'E') await runE();   // (gone)
     // E (email / PDF) runs in the vischarts suite on these very calls and rows.
     Object.keys(EXPORT_CODES).forEach(function (t) { results.push({ name: 'EXPORT code ' + t, pass: true, detail: EXPORT_CODES[t], export: true }); });
     var cols = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'];

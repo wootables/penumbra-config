@@ -23,7 +23,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 SCN = ['pdyear', 'pdnob', 'pdq', 'pddown', 'pdgrp', 'pdbase']
 CHK = {
     'pdyear': ['marks', 'chg', 'chgFirst', 'diff', 'share', 'run', 'runFirst', 'idx', 'ix23', 'yoy', 'yoyNone', 'ly', 'lyNone',
-               'formulaNone', 'menuDrv', 'menuBase'],
+               'formulaNone', 'menuDrv', 'menuBase', 'srcChg', 'srcRun', 'jump', 'jumpNone'],
     'pdnob': ['nobMarks'],
     'pdq': ['ytd', 'freezeLead', 'ytdStart', 'roll', 'rollPartial', 'rollsum', 'cum', 'runN', 'yoyQ'],
     'pddown': ['chgDown', 'runDown', 'yoyDown', 'idxDown', 'rollDown'],
@@ -31,8 +31,14 @@ CHK = {
     'pdbase': ['grabbed'],
 }
 # the round's checks: red on live (7e005bb, before brk); the rest guard what live already does
-OLD = {'L-pdyear-formulaNone', 'L-pdyear-menuBase', 'L-pdnob-nobMarks', 'L-pdbase-grabbed', 'B-same'}
+# (2026-11-03) srcRun holds on live too: there a running total's cell opens its own column's rows, one table, each
+# row with its source row (bdhl) - a guard; p-span is what makes it the derived drill's
+OLD = {'L-pdyear-formulaNone', 'L-pdyear-menuBase', 'L-pdnob-nobMarks', 'L-pdbase-grabbed', 'B-same', 'L-pdyear-srcRun',
+       'L-pdyear-jumpNone'}   # (bdj) a one-table breakdown has no list on live either: a guard
 NEW = {'L-%s-%s' % (s, c) for s in CHK for c in CHK[s]} - OLD
+NEW = set()   # (brk is LIVE since b573316, 2026-11-03: old checks now)
+NEW = {'L-pdyear-jump'}   # (bdj, 2026-11-03: the list of tables at the top of a derived value's breakdown)
+NEW = set()   # (bdj is LIVE since 3b4c8be, 2026-11-03: old checks now)
 MUTANTS = {
     # a derived value's cells never marked; a group summary's; marked with the breakdowns off; every summary type
     'k-mark': ([('main', "                    if (!_noBreakdown && _pnbPvDrvOk(aggType, false)) drillAttr += ' data-pv-drv=\"1\"';",
@@ -77,6 +83,18 @@ MUTANTS = {
     # (a markup-only drift such as an HTML comment never shows: the dialog's content goes through DOMPurify)
     'b-drift': ([('main', "            tableHtml += penumbraDrillFooterHtml(lead ? ['#', '\\u0000lead'].concat(drillCols.slice(1)) : drillCols, ds,",
                   "            tableHtml += penumbraDrillFooterHtml(lead ? ['#', '\\u0000lead'].concat(drillCols.slice(1)) : drillCols.slice(0, -1), ds,")], ['B-same'], ['pdbase']),
+    # (2026-11-03) a derived value's tables lose their rows' source rows; a running value's one table gets the first cell's
+    'p-src': ([('main', "        if (perTable) {\n            window._pnbModalHost()", "        if (false) {\n            window._pnbModalHost()")], ['L-pdyear-srcChg'], ['pdyear']),
+    'p-span': ([('main', "            drawn = rows; perTable = false;", "            drawn = parts[0]; perTable = false;")], ['L-pdyear-srcRun'], ['pdyear']),
+    # (2026-11-03, bdj) the list of tables: never drawn; the link neither scrolls, nor focuses, nor can (no tabindex);
+    # a list on a one-table breakdown too
+    'q-nav': ([('main', "content += '<nav class=\"pnb-bd-jump\" aria-label=", "content += '<nav class=\"pnb-bd-jumpX\" aria-label=")], ['L-pdyear-jump'], ['pdyear']),
+    'q-scroll': ([('main', "        sec.scrollIntoView({ block: 'start' });\n", "")], ['L-pdyear-jump'], ['pdyear']),
+    'q-focus': ([('main', "        try { sec.focus({ preventScroll: true }); } catch (x) { sec.focus(); }\n", "")], ['L-pdyear-jump'], ['pdyear']),
+    'q-tab': ([('main', "data-pnb-bd-sec=\"' + k + '\" tabindex=\"-1\" style=", "data-pnb-bd-sec=\"' + k + '\" style=")], ['L-pdyear-jump'], ['pdyear']),
+    'q-one': ([('main', "            content += _pnbPvDrillTable(parts[0], cols, null);\n            drawn = parts[0]; perTable = false;",
+                "            content += '<nav class=\"pnb-bd-jump\"><button class=\"pnb-bd-jumpto\">x</button></nav>' + _pnbPvDrillTable(parts[0], cols, null);\n            drawn = parts[0]; perTable = false;")],
+              ['L-pdyear-jumpNone'], ['pdyear']),
     'b-gt': ([('main', "            titleParts.push('Grand Total');\n        }\n\n        var matchingRows = sourceData.filter(", "        }\n\n        var matchingRows = sourceData.filter(")],
              ['B-same'], ['pdbase']),
 }

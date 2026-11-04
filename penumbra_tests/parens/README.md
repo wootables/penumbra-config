@@ -159,3 +159,39 @@ Builder: `builder_run.py` gained the `leakor` mutant (the joiner reset), pinned 
 --mutant leakor` (EXACTLY the three cases with a group followed by a bare row go red). `walkers.py`'s S- asserts
 read the GROUP part's side. pivotsrc: E14 (a mixed group with `FUNDER = Alpha` outside it) and the `unsafekeep`
 mutant (`-Mutant unsafekeep`: E14 / V14 red).
+
+## Names with parentheses (2026-11-03, parennames)
+
+Phase 1 read a NAME's own parentheses as a group: `Hit Ratio (Decided) > 10`, a pivot value's label on
+?id=hitratio (the query reported and fixed on 10-17), matched nothing after 778acc9, and the builder's grouped
+row on such a column, `({Hit Ratio (Decided)} > 60 or ...)`, fell back to the flat reading (the brace name cut
+open by its opener held a `(` the split counted). Now the parentheses that belong to a name are masked before
+the split and come back as written:
+
+- a pair whose closer is followed straight by an operator is part of the name (a group is never compared), with
+  every pair inside it;
+- inside a brace name an opener cut open across tokens (`({HR (D)} ...`), every paren up to its `}`.
+
+When every paren of a query is a name's, the old reading, exactly; unbalanced parens mask nothing. Where:
+`js/main.js` `penumbraParenNameMask` / `penumbraParenUnmask` (called first in `penumbraSplitParenTokens`, which
+re-runs itself on the masked tokens), `penumbra_search.php` `_search_paren_name_mask`, `schedule_runner.php`
+`_cf_paren_name_mask` (positions are the original BYTES; the mask is U+E000 / U+E001 in UTF-8),
+`js/penumbra_tiles.js` `fsParenNameMask` (flips those pieces to text in `fsParenPieces`), `js/search_builder.js`
+`sbParenNameMask` (the operator half only: `_sbProtect` makes braces placeholders already). Help: the search
+topic's parentheses section names it.
+
+| file | what |
+|---|---|
+| `corpus4.json` | 20 queries over three columns whose names hold parentheses (`HR (D)`, `AMT (USD)`, `S (NOT X)`) through the three engines; control = 5b20af4 (the build before the fix: 45 reds EXACT; `n-brace-words` reads right there by luck, its parens unbalanced); 7 mutants: `js-/php-/cf-namemask` (the mask never consulted), `js-/php-nameop` (no operator half), `js-/cf-namebrace` (no brace half) |
+| `builder_names.py` + `builder_names.html` | the builder (made from builder.html; its columns add `HR (D)` and `S (NOT X)`): a name's pair is one row, inside a group too, never "nested"; control 5b20af4 (11 reds EXACT: live mangled `HR (D) > 50 and A = 1` into four rows), mutant `nomask` = the same 11 |
+| `strip_units.py` | the strip library's pure functions (the sweep's 32 cases + 7 `name:` cases); on 5b20af4 EXACTLY "a brace name the opener cut open" fails (the strip already split around a name's pair at the top level); `--mutant fsnamemask` = that case |
+| `..\pivformula` F9 / F10 | the user's label inside a group, typed and braced; control = F2-F4, V2-V4, F9, V9, F10, V10; mutant `names` = the same |
+
+    py -3 run.py --stage DIR --corpus corpus4.json --all    target GREEN, control EXACT, 7 mutants EXACT
+    py -3 builder_names.py --stage DIR --all                target GREEN, control EXACT, nomask EXACT
+    py -3 strip_units.py DIR\js\penumbra_tiles.js [--mutant fsnamemask]
+
+**Traps.** A helper must not repeat a line another suite's mutant anchors on: the first draft's
+`var valueSlot = ...` / `$valueSlot = ...` lines doubled the `js-/php-/cf-valueslot` anchors (renamed `slot`);
+an anchor sweep that also counts DUPLICATES caught it. The Write tool turned `\uE000` escapes inside a raw
+string into the characters themselves: grep a patch script for non-ASCII before running it.

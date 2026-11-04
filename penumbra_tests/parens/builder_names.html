@@ -1,0 +1,88 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>parens builder harness: names with parentheses</title></head>
+<body>
+<!-- parennames (2026-11-03): a column name that holds parentheses (`HR (D) > 50`) is one row, inside a group too, never a group of its own. Made from builder.html (parens, 2026-10-30, phase 2): the Visual Filter Builder's group rows and its guard. Boots the
+     REAL js/search_builder.js with the real lightbox markup (content.js = the body of
+     search_builder_content.php, served by a stubbed $.get) and drives openSearchBuilder with
+     grouped, nested and plain filter text. The page's engine is stubbed: _penumbraSearchAPI
+     .parseQuery answers as window.__engine says ('none' / 'one' / 'nested'); null removes it
+     for the text-fallback cases. PenumbraPresets is stubbed so getState / applyState (the
+     preset round trip) can be called. It asserts nothing: builder_run.py reads what it prints. -->
+<input id="tableSearch" value="">
+<div id="searchBuilderContainer"></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="purify.min.js"></script>
+<script src="content.js"></script>
+<script>
+  window.penumbra_vars = { isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' }, reports: [], grants: [] };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax;
+  jQuery.get = function (url, cb) {
+    setTimeout(function () { if (typeof cb === 'function') cb(window.__SB_CONTENT); }, 0);
+    return { fail: function () { return this; }, done: function () { return this; }, always: function () { return this; } };
+  };
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+  window.__engine = 'none';
+  function engineParse() {
+    if (window.__engine === 'one') return [{ type: 'group', parts: [{ type: 'condition' }, { type: 'logical', op: 'or' }, { type: 'condition' }] }, { type: 'logical', op: 'and' }, { type: 'condition' }];
+    if (window.__engine === 'nested') return [{ type: 'group', parts: [{ type: 'group', parts: [{ type: 'condition' }] }] }];
+    return [{ type: 'condition', column: 'A', op: '=', value: '1' }];
+  }
+  window._penumbraSearchAPI = {
+    getColumns: function () { return ['A', 'B', 'C', 'D', 'HR (D)', 'S (NOT X)'].map(function (n) { return { name: n, visible: true }; }); },
+    buildVirtualColumnNames: function () { return []; },
+    runTableSearch: function () {},
+    getCurrentReportId: function () { return 'harness'; },
+    parseQuery: engineParse
+  };
+  window.PenumbraPresets = {
+    NS: { SEARCH: 'search' },
+    reportId: function () { return 'harness'; },
+    create: function (opts) { window.__presetOpts = opts; var noop = function () {}; return { setLoaded: noop, refresh: noop, close: noop, open: noop, destroy: noop, setLabel: noop, loaded: function () { return null; } }; },
+    list: function () { return []; }, save: function () { return true; }, remove: function () {},
+    getPin: function () { return null; }, setPin: function () {}
+  };
+</script>
+<script src="search_builder.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function state() {
+    var $n = $('#sbGroupedNotice'), $rows = $('#sbConditionsContainer .sb-condition-row');
+    return {
+      rows: $rows.length,
+      toggles: $rows.map(function () { return $(this).find('.sb-row-group').attr('aria-pressed') === 'true'; }).get(),
+      notice: ($n.length && $n.css('display') !== 'none') ? $n.text() : '',
+      disabled: !!$('#sbSubmitBtn').prop('disabled'),
+      preview: $('#sbQueryPreview').text(),
+      box: $('#tableSearch').val()
+    };
+  }
+  function openWith(q) { $('#tableSearch').val(q); window.openSearchBuilder(); return wait(120); }
+  var out = {};
+  (async function () {
+    try {
+      window.__engine = 'one';
+      await openWith('(HR (D) > 50 or A = 1) and B = 2');        out.n1 = state();   // a name's pair inside a group: one group of two rows
+      await openWith('(A = 1 or B = 2) and C = 3');              out.n4 = state();   // a plain group, unchanged
+      var keep = window._penumbraSearchAPI.parseQuery;
+      delete window._penumbraSearchAPI.parseQuery;
+      await openWith('HR (D) > 50 and A = 1');                   out.n2 = state();   // no engine: a name's pair is no group, flat rows
+      await openWith('(S (NOT X) = yes or A = 1) and B = 2');    out.n3 = state();   // no engine: two words in the name, inside a group
+      await openWith('(HR (D) > 50 or (A = 1 and B = 2))');      out.n5 = state();   // no engine: a real group inside a group is still nested
+      window._penumbraSearchAPI.parseQuery = keep;
+      out.errors = window.__errors.slice(0, 6);
+      report('RESULTS_JSON:' + JSON.stringify(out));
+    } catch (e) {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: String((e && e.stack) || e), errors: window.__errors.slice(0, 6) }));
+    }
+  })();
+})();
+</script>
+</body></html>

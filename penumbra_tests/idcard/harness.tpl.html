@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"><title>RUN</title><script>
+window.__errs=[]; window.onerror=function(m){window.__errs.push(String(m));};
+const penumbra_vars = {lastAccess: 90000, isReportOwner:false, canEditReport:false, isGlobalAdmin:false, noadm:false,
+ reportTags:['A','B'], reportTables:['T1','T2','T3','T4'], journal:{installed:true,enabled:true,total:2,unseen:1},
+ reportIdCard:{id:'demoX', created:'2026-01-05 00:07', createdAgo: 90000, updated:'2026-10-30 16:05', updatedAgo: 30, owner:'JDoe'}};
+window.penumbraOpenFeedbackDialog=function(spec,label){window.__fb=[spec,label];};
+window.__fetches=[];
+window.fetch=function(url){ window.__fetches.push(String(url)); return Promise.resolve({ok:true, json:function(){ return Promise.resolve([
+  {username:'jdoex', value:'jdoex@ncsu.edu', name:'Wrong Person'},
+  {username:'jdoe', value:'jdoe@ncsu.edu', name:'Jane <b>Doe</b>', title:'Analyst', dept:'', active:0}]); }}); };
+history.replaceState(null,'','?id=demoX');
+</script></head><body>
+<nav><span class="pnb-crumb-step" id="pnbCrumbReport"><a class="pnb-crumb-item" href="index.php?id=demoX" title="Reload this report">demox</a></span></nav>
+<h2 id="mainReportTitle">My  Report</h2>
+<script src="__TARGET__"></script>
+<script>
+window.addEventListener("load", function(){
+ var out=[], pass=0, fail=0;
+ function ok(name, cond){ if(cond){pass++;} else {fail++; out.push('FAIL '+name);} }
+ function finish(){ document.title='DONE pass='+pass+' fail='+fail+' errs='+JSON.stringify(window.__errs)+' '+out.join(' | '); document.body.setAttribute('data-r', document.title); }
+ try {
+  var I=window.penumbraIdCard; ok('api', !!I);
+  var h=I.html('demoX');
+  ok('author-id-before-fetch', h.indexOf('Authored by</span> <strong>JDoe</strong>')>=0 && window.__fetches.length===0);
+  ok('created', h.indexOf('Jan 5, 2026, 12:07 AM')>=0 && h.indexOf('yesterday')>=0);
+  ok('modified', h.indexOf('Oct 30, 2026, 4:05 PM')>=0 && h.indexOf('just now')>=0);
+  ok('lastvisit', h.indexOf('Last visit')>=0 && h.indexOf('first visit')<0);
+  ok('viewer', h.indexOf('Viewer')>=0);
+  ok('viewer-no-tables', h.indexOf('T1')<0 && h.indexOf('tables')<0);
+  ok('journal', h.indexOf('2 notes')>=0 && h.indexOf('1 new to you')>=0);
+  ok('feedback-generic', h.indexOf('Send feedback to the author')>=0);
+  ok('title', h.indexOf('>My Report<')>=0);
+  ok('caseid', I.html('DEMOX').indexOf('Authored by')>=0);
+  var o=I.html('otherId'); ok('mismatch-nofacts', o.indexOf('Authored by')<0 && o.indexOf('Your access')>=0 && o.indexOf('Send feedback')<0);
+  penumbra_vars.canEditReport=true; var ed=I.html('demoX'); ok('editor-tables', ed.indexOf('4 tables')>=0 && ed.indexOf('+1 more')>=0 && ed.indexOf('Editor')>=0); penumbra_vars.canEditReport=false;
+  penumbra_vars.isReportOwner=true; var ow=I.html('demoX'); ok('owner', ow.indexOf('pnb-idc-pill')>=0 && ow.indexOf('Send feedback')<0 && ow.indexOf('Owner')>=0); penumbra_vars.isReportOwner=false;
+  penumbra_vars.lastAccess=-1; ok('firstvisit', I.html('demoX').indexOf('This is your first visit')>=0);
+  ok('ago', I.ago(59)==='just now' && I.ago(3600)==='1 hour ago' && I.ago(86400*3)==='3 days ago' && I.ago(86400*400)==='1 year ago');
+  var a=document.querySelector('#pnbCrumbReport .pnb-crumb-item'); ok('titledropped', !a.hasAttribute('title') && /reload/.test(a.getAttribute('aria-label')||''));
+  I.show(a); var c=document.getElementById('pnbIdCard'); ok('show', !!c && c.getAttribute('role')==='tooltip' && a.getAttribute('aria-describedby')==='pnbIdCard');
+  ok('fetch-once', window.__fetches.length===1 && window.__fetches[0]==='get_email_recipients.php?term=jdoe');
+  setTimeout(function(){
+   try {
+    var c2=document.getElementById('pnbIdCard'), t=c2 ? c2.innerHTML : '';
+    ok('name-arrives', t.indexOf('<strong>Jane &lt;b&gt;Doe&lt;/b&gt;</strong>')>=0 && t.indexOf('Wrong Person')<0);
+    ok('inactive', t.indexOf('No longer active')>=0 && t.indexOf('Analyst')>=0);
+    ok('feedback-name', t.indexOf('Send feedback to Jane')>=0);
+    I.hide(); I.show(a); ok('no-refetch', window.__fetches.length===1);
+    document.getElementById('pnbIdCard').querySelector('[data-idc="feedback"]').click();
+    ok('fbclick', window.__fb && window.__fb[1]==='Send feedback to the author' && !document.getElementById('pnbIdCard'));
+    document.getElementById('pnbCrumbReport').hidden=true; I.show(a); ok('hiddenstep', !document.getElementById('pnbIdCard'));
+   } catch(e){ fail++; out.push('THREW2 '+e.message); }
+   finish();
+  }, 50);
+ } catch(e){ fail++; out.push('THREW '+e.message); finish(); }
+});
+</script></body></html>

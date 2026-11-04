@@ -32,6 +32,7 @@ CFG = {
     # (curl) curl1 and curl4 have NO entry: the report's option is off there; curl2 / curl3 / cshare have it on
     'curl2': {}, 'curl3': {}, 'cshare': {},
     'cnote': {}, 'cnotedet': {}, 'ctmenu': {}, 'cflink': {}, 'ctrow': {'title': 'V_NAME'}, 'gtrow': {'title': 'V_NAME'}, 'cnest': {'title': 'V_NAME', 'fields': ['H_TEXT', 'V_DATE']}, 'ctclear': {},
+    'clay1': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'pw3dup': {},   # (clay) named card layouts 'gw3agg': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']},   # (cleft) the sweep's leftovers
     'cw2det': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'cw2nest': {'title': 'V_NAME', 'fields': ['H_TEXT', 'V_DATE']}, 'cw2more': {'title': 'V_NAME'}, 'cw2pdf': {'title': 'V_NAME'},
     'gw2band': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'gw2mail': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'pw2piv': {}, 'pw2next': {},   # (csw2) the second card sweep
     'csweep': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'gsweep': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'gbcols': {}, 'cpct': {'title': 'V_NAME', 'bar': 'V_AMOUNT'},
@@ -86,6 +87,13 @@ CFG = {
 # the viewer's own saved pick (penumbra_column_prefs.lrfix.view = cards), seeded before boot
 PREF_CARDS = ['cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'cdpack', 'cflt', 'cdens', 'cdensph', 'gbandbig', 'cfmtbig', 'cfmt', 'cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'pvhtml', 'cfields', 'cfieldsB', 'cboard', 'cbarrank', 'cvlC', 'pfsort', 'cvlE', 'pvcfg', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cboardrx', 'cchips', 'cmail', 'gmail', 'csave']
 PREF_CARDS = PREF_CARDS + ['citem']   # (cfsplit 4)
+PREF_CARDS = PREF_CARDS + ['pw3dup', 'gw3agg']   # (cleft)
+PREF_CARDS = PREF_CARDS + ['clay1']   # (clay)
+PREF_CARDS = PREF_CARDS + ['pvgt', 'pvgtB']   # (pvgt)
+PREF_CARDS = PREF_CARDS + ['pvgtD', 'pvgtC']   # (pvgt2)
+CFG.update({'pvgtD': {}, 'pvgtC': {}})   # (pvgt2) no setup: the guesses
+PREF_CARDS = PREF_CARDS + ['pw4drv']   # (bdj)
+CFG.update({'pvgt': {}, 'pvgtB': {'pivot': {'fields': ['N']}}})   # (pvgt) the Grand Total tile: no setup; N picked alone
 PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu', 'ctrow', 'gtrow', 'ctclear', 'ctsel']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
 
 
@@ -122,8 +130,9 @@ def build(index_src):
     rep('<script src="penumbra_colmenu.js"></script>\n', '<script defer src="penumbra_cards.js"></script>\n<script defer src="penumbra_colmenu.js"></script>\n')
     rep('<script src="driver.js"></script>\n', '<script src="themes.js"></script>\n<script src="driver.js"></script>\n')
     # (round K) Find in results for the scenarios that use it (index.php loads it after the card view)
+    rep('<script defer src="penumbra_cards.js"></script>\n', '<script>if (/^(clay1)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_presets.css"><script src="penumbra_presets.js"></scr\' + \'ipt>\');</script>\n<script defer src="penumbra_cards.js"></script>\n')   # (clay)
     rep('<script defer src="penumbra_colmenu.js"></script>\n', '<script defer src="penumbra_colmenu.js"></script>\n'
-        '<script>if (/^(cfind|gfind|pfind|pvfind|cchips|cfindgo)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_find.css"><script defer src="penumbra_find.js"></scr\' + \'ipt>\');</script>\n')   # (deferred, after the engine, as index.php)
+        '<script>if (/^(cfind|gfind|pfind|pvfind|cchips|cfindgo|pvgtB|pvgtD|pvgtC)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_find.css"><script defer src="penumbra_find.js"></scr\' + \'ipt>\');</script>\n')   # (deferred, after the engine, as index.php)
     # the switch, after the row count (index.php: inside #tableSearchContainer; the harness keeps the count beside it)
     # (round O) the status bar's Cards segment - the switch, the size, the Sort list, Configure cards - after Cols, as
     # index.php draws it; a build without one (the control: live) has the controls beside the row count
@@ -198,6 +207,8 @@ def build(index_src):
         '    if (S === "cw2more" || S === "pw2next") st.rowsPerPage = "all";   // (csw2) past the 1,000 drawn\n'
         '    if (S === "cw2pdf") st.rowsPerPage = "25";   // (csw2) a PDF of 25 cards\n'
         '    if (S === "pw2piv" || S === "pw2next") st.pivot.rows = ["V_ID"];   // (csw2) a tile per row\n'
+        '    if (S === "pw3dup") { st.pivot.agg = ["sum", "sum"]; st.pivot.aggLabels = null; st.pivot.aggColOverrides = ["H_AMT", "H_AMT"]; }   // (cleft) two Sums the builder names alike\n'
+        '    if (S === "gw3agg") st.groupAgg = { column: "H_AMT", type: "sum" };   // (cleft) the group summary on the headings\n'
         '    if (S === "cpct") st.columnFormats = { V_AMOUNT: "percent" };\n'
         '    if (S === "gbcols") st.groupLayout = "board";\n'
         '    if (S === "cperf" || S === "cmore" || S === "cdetmore" || S === "cxl2" || S === "cxl2ph") st.rowsPerPage = "all";\n'
@@ -215,6 +226,10 @@ def build(index_src):
         '    if (S === "pvlA" || S === "pvlB") { st.pivot.rows = ["V_ID"]; st.pivot.cols = ["H_GROUP", "V_STATUS"]; }   // (linkpos) a pivot tall and wide enough to scroll\n'
         '    if (S === "pvcfg" || S === "pvcfgB") { st.pivot.agg = ["sum", "count", "avg"]; st.pivot.aggLabels = ["Amt", "N", "Mean"]; st.pivot.aggColOverrides = ["H_AMT", "H_AMT", "H_AMT"]; }   // (pvcfg) three measures\n'
         '    if (S === "plab") st.pivot.aggLabels = null;   // (pvlab) the one measure has no label (no sub-header: pvMeasureLabels finds none)\n'
+        '    if (S === "pvgt") st.pivot.cols = [];   // (pvgt) no column field, as ?id=cprojects: the Grand Total row keyed ""\n'
+        '    if (S === "pvgtD") st.pivot.cols = [];   // (pvgt2) no column field, Find loaded\n'
+        '    if (S === "pvgtC") st.pivot.noBreakdown = true;   // (pvgt2) no breakdown: the Grand Total row\'s totals carry no keys\n'
+        '    if (S === "pw4drv") { st.pivot.agg = ["sum", "pct_change"]; st.pivot.aggLabels = ["Amt", "Chg"]; st.pivot.aggColOverrides = ["H_AMT", "H_AMT"]; }   // (bdj) a % change measure\n'
         '    window.__STORED = st;\n')
     # a viewer (cviewer): no View Options form, the report's option alone
     rep('    window.__queryResponse = { data: rows };\n',

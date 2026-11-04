@@ -139,6 +139,105 @@
     R.chk.prefTable = (prefs().lrfix || {}).view === 'table';   // (csize) an explicit Table pick is kept: the phone default yields to it
     if (P.get('shot')) { await pickView('cards'); if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); } await sleep(300); }
   };
+  // (2026-11-03, menufix) the space between two cards: the cards' own menu (Card size, Configure cards..., Show as table,
+  // Clear all), never the page's or the browser's; Show as table there goes back to the table; inside a card: the card's
+  S.cgapm = async function () {
+    await pickView('cards');
+    var cs = cards(), a = cs[0], b = null;
+    for (var i = 1; i < cs.length && !b; i++) { var ra = a.getBoundingClientRect(), rb = cs[i].getBoundingClientRect(); if (Math.abs(rb.top - ra.top) < 2 && rb.left > ra.right) b = cs[i]; }
+    var r0 = a.getBoundingClientRect(), r1 = b ? b.getBoundingClientRect() : null;
+    var x = r1 ? Math.round((r0.right + r1.left) / 2) : 0, y = Math.round(r0.top + 12), el = r1 ? document.elementFromPoint(x, y) : null;
+    var gap = !!el && !el.closest('.pnb-card') && !!el.closest('#pnbCardsHost');
+    var ev = gap ? rclick(el, { x: x, y: y }) : null; await sleep(100);
+    var m = menu(), ga = acts();
+    R.info.gap = { el: el ? el.className : null, x: x, y: y, acts: ga, prevented: ev && ev.defaultPrevented, page: !!q('#pnbPageMenu') };
+    R.chk.gapMenu = gap && !!m && text(q('.pnb-hm-name', m)) === 'Cards' && ga.join() === 'cardSize,cardConfig,cardsTable,clearPrefs' && !!ev && ev.defaultPrevented && !q('#pnbPageMenu');
+    var sizes = false;
+    if (m) { q('.pnb-hm-item[data-act="cardSize"]', m).click(); await sleep(150); sizes = qa('.pnb-hm-sub .pnb-hm-item').map(function (i) { return i.getAttribute('data-act'); }).join() === 'cardSize-compact,cardSize-standard,cardSize-large,cardSize-xl'; }
+    R.chk.gapSizes = sizes;
+    window.Penumbra.colMenu.close();
+    var cev = rclickWhite(a); await sleep(100);
+    R.chk.gapCardStill = !!menu() && acts().indexOf('cardOpen') >= 0 && cev.defaultPrevented;
+    window.Penumbra.colMenu.close();
+    if (gap) { rclick(el, { x: x, y: y }); await sleep(100); }
+    var went = hmClick('cardsTable'); await until(function () { return !on(); }, 4000); await sleep(150);
+    R.chk.gapTable = went && !on();
+  };
+  // (2026-11-03, menufix2) a card's Show all pill: right-clicked, its card's menu (the browser's before); the card menu's
+  // Show every card in full (where a card is cut) and Trim every card again (where one is whole); for this visit
+  S.cmore2 = async function () {
+    await pickView('cards');
+    // three cards taller than the cap: Consistent Row Height on (the harness starts with it off), content added to them
+    var rx = q('#spRowExpandToggle');
+    if (rx && !rx.checked) { rx.checked = true; rx.dispatchEvent(new Event('change', { bubbles: true })); }
+    await until(function () { return host().style.getPropertyValue('--pnb-card-cap') !== ''; }, 3000);
+    cards().slice(0, 3).forEach(function (c) { var f = q('.pnb-card-fields', c) || c, d = document.createElement('div'); d.className = 'zz-tall'; d.style.height = '700px'; d.textContent = 'tall'; f.appendChild(d); });
+    await until(function () { return cards().some(function (c) { return !!q(':scope > .pnb-card-more', c); }); }, 4000);
+    var cut = cards().filter(function (c) { return c.classList.contains('is-clipped'); }), c0 = cut[0], pill = c0 ? q(':scope > .pnb-card-more', c0) : null;
+    var ev = pill ? rclick(pill) : null; await sleep(120);
+    var a0 = acts();
+    R.info.pill = { cut: cut.length, acts: a0, name: menu() ? text(q('.pnb-hm-name', menu())) : null };
+    R.chk.pillMenu = !!pill && !!ev && ev.defaultPrevented && !!menu() && a0.indexOf('cardOpen') >= 0 && text(q('.pnb-hm-name', menu())) === text(q('.pnb-card-title', c0));
+    R.chk.allOffered = a0.indexOf('cardsAllOpen') > a0.indexOf('cardOpen') && a0.indexOf('cardsAllClose') < 0;
+    hmClick('cardsAllOpen'); await sleep(400);
+    var stillCut = cards().filter(function (c) { return c.classList.contains('is-clipped'); }).length, opened = cards().filter(function (c) { return c.classList.contains('is-open'); }).length;
+    R.chk.allOpens = cut.length > 1 && stillCut === 0 && opened >= cut.length;
+    rclickWhite(cards()[0]); await sleep(120);
+    var a1 = acts();
+    R.chk.trimOffered = a1.indexOf('cardsAllClose') >= 0 && a1.indexOf('cardsAllOpen') < 0;
+    hmClick('cardsAllClose'); await sleep(400);
+    R.chk.allTrims = cards().filter(function (c) { return c.classList.contains('is-open'); }).length === 0 && cards().filter(function (c) { return c.classList.contains('is-clipped'); }).length === cut.length;
+    R.info.counts = { cut: cut.length, stillCut: stillCut, opened: opened };
+  };
+  // (2026-11-03, menufix3; the user's picks) a card's Hide this field / Show only this field: the card layout (the table's
+  // columns as they were), each with Undo; a card's sorts named by the field; the details window: Print this card..., and
+  // its Hide still the table's (the window shows the table's columns)
+  S.cfld3 = async function () {
+    await pickView('cards');
+    function slots() { var st = C().state(); return st && st.slots ? JSON.parse(JSON.stringify(st.slots)) : null; }
+    function shownCols() { return qa('#tableHeader th[data-colname]').filter(function (t) { return t.style.display !== 'none'; }).map(function (t) { return t.getAttribute('data-colname'); }); }
+    function fieldEl(card, name) { return q('.pnb-card-fields [data-col="' + name + '"]', card) || q('[data-col="' + name + '"]', card); }
+    var s0 = slots(), cols0 = shownCols(), c0 = cards()[0], fx = s0 && s0.fields && s0.fields[0], fe = fx ? fieldEl(c0, fx) : null;
+    // its sorts: named by the field
+    rclick(q('.pnb-card-title', c0)); await sleep(120);
+    var sa = menu() ? q('.pnb-hm-item[data-act="sortAsc"] .pnb-hm-label', menu()) : null;
+    R.chk.sortNamed = !!sa && sa.textContent === 'Sort by ' + s0.title + ': ascending';
+    R.info.sort = { label: sa ? sa.textContent : null, title: s0 && s0.title };
+    window.Penumbra.colMenu.close();
+    // Hide this field: off the card, the table untouched; Undo puts it back
+    if (fe) { rclick(fe); await sleep(120); }
+    var hid = hmClick('hide'); await sleep(500);
+    var s1 = slots(), cols1 = shownCols();
+    R.chk.hideCard = !!fx && hid && s1.fields.indexOf(fx) < 0 && same(cols1, cols0);
+    var ub = qa('button.pnb-hm-undo').filter(function (b) { return !b.disabled; }).pop();
+    if (ub) { ub.click(); await sleep(500); }
+    R.chk.hideUndo = !!ub && slots().fields.indexOf(fx) >= 0;
+    R.info.hide = { fx: fx, s1: s1, cols: [cols0.length, cols1.length], undo: !!ub };
+    // Show only this field: the title and this field; the table untouched
+    c0 = cards()[0]; fe = fieldEl(c0, fx);
+    if (fe) { rclick(fe); await sleep(120); }
+    var sh = menu() ? q('.pnb-hm-item[data-act="show"]', menu()) : null; if (sh) { sh.click(); await sleep(200); }
+    var on = q('.pnb-hm-sub .pnb-hm-item[data-act="only"]'); if (on) { on.click(); await sleep(500); }
+    var s2 = slots();
+    R.chk.onlyCard = !!on && s2.title === s0.title && s2.fields.length === 1 && s2.fields[0] === fx && !s2.sub.length && !s2.pill && !s2.bar && same(shownCols(), cols0);
+    R.info.only = s2;
+    ub = qa('button.pnb-hm-undo').filter(function (b) { return !b.disabled; }).pop(); if (ub) { ub.click(); await sleep(500); }
+    // the details window: Print this card... (its own button's press), and Hide there the table's (it shows the table's columns)
+    C().openDetails(cards()[0]); await until(detOpen, 3000); await sleep(150);
+    var pr = 0, spy = function (e) { if (e.target && e.target.closest && e.target.closest('.pnb-cdet-print')) { pr++; e.stopImmediatePropagation(); e.preventDefault(); } };
+    document.addEventListener('click', spy, true);
+    var body = q('#pnbCardDetails .pnb-cdet-body'), br = body.getBoundingClientRect();
+    rclick(body, { x: br.right - 6, y: br.bottom - 6 }); await sleep(120);
+    var da = acts(); hmClick('cardPrint'); await sleep(200);
+    document.removeEventListener('click', spy, true);
+    R.chk.detPrint = da.indexOf('cardPrint') >= 0 && pr === 1;
+    var dv = q('#pnbCardDetails .pnb-cdet-fields .pnb-card-val[data-col]') || q('#pnbCardDetails .pnb-card-val[data-col]'), dn = dv ? dv.getAttribute('data-col') : null;
+    if (dv) { rclick(dv); await sleep(120); }
+    var dfa = acts(); hmClick('hide'); await sleep(500);
+    R.chk.detHideTable = !!dn && dfa.indexOf('cardPrint') >= 0 && shownCols().indexOf(dn) < 0;
+    R.info.det = { acts: da, fieldActs: dfa, dn: dn, printed: pr };
+    C().closeDetails(); await sleep(100);
+  };
   S.cpage = async function () {
     await pickView('cards');
     R.chk.pageSize = cards().length === 25 && same(cardRows(), shownRows().map(rowIdx)) && /Page 1 of 12/.test(text(q('#pageInfo')));
@@ -187,6 +286,44 @@
     R.chk.plainPills = open.length > 0 && open.every(function (p) { return !p.classList.contains('is-ruled') && !p.getAttribute('style'); });
     R.chk.pillMatchesCell = closed.length > 0 && mism.length === 0;
     R.info.hl = [closed.length, open.length, mism.slice(0, 3)];
+    // (cedge, 2026-11-03) the status edge: a Closed card's left edge in its pill's colour - the rule's dark red text over
+    // its pale fill (the more colourful); an Open card none; painted (css); the details window's head a 4px bar (an
+    // Open one's none); the email's cards; the rule changed (a green fill, white text: the fill); a dark theme (the
+    // restyle) keeps the fill, not the white text that stands out more there
+    function edgeVar(el) { return el ? (el.style.getPropertyValue('--pnb-card-edge') || '').trim() : ''; }
+    function closedCards() { return cards().filter(function (x) { var p = q('.pnb-card-pill', x); return !!p && text(p) === 'Closed'; }); }
+    var all0 = cards(), eRed = closedCards(), eOpen = all0.filter(function (x) { return eRed.indexOf(x) < 0 && !!q('.pnb-card-pill', x); });
+    var want = closed.length ? closed[0][1].style.color : '', ri = eRed.length ? all0.indexOf(eRed[0]) : -1, oi = eOpen.length ? all0.indexOf(eOpen[0]) : -1;
+    R.chk.edgeRuled = eRed.length > 0 && !!want && eRed.every(function (c) { return edgeVar(c) === want; });
+    R.chk.edgePlain = eOpen.length > 0 && eOpen.every(function (c) { return !edgeVar(c) && getComputedStyle(c).backgroundImage === 'none'; });
+    R.chk.edgePainted = eRed.length > 0 && eRed.every(function (c) { var b = getComputedStyle(c).backgroundImage; return /linear-gradient/.test(b) && b.indexOf(want) >= 0; });
+    R.info.edge = { want: want, n: [eRed.length, eOpen.length], red: eRed.slice(0, 2).map(edgeVar), open: eOpen.slice(0, 2).map(function (c) { return c.getAttribute('style'); }), bg: eRed[0] ? getComputedStyle(eRed[0]).backgroundImage : null };
+    async function detHead(i) {
+      C().openDetails(cards()[i]); await until(function () { return !!q('#pnbCardDetails .pnb-cdet-card'); }, 3000); await sleep(100);
+      var dh = q('#pnbCardDetails .pnb-cdet-card'), dcs = dh ? getComputedStyle(dh) : null, o = dh ? { v: edgeVar(dh), w: dcs.borderLeftWidth, c: dcs.borderLeftColor } : null;
+      try { C().closeDetails(); } catch (e) { } await sleep(150);
+      return o;
+    }
+    var dR = ri >= 0 ? await detHead(ri) : null, dO = oi >= 0 ? await detHead(oi) : null;
+    R.chk.edgeDetail = !!dR && dR.v === want && dR.w === '4px' && dR.c === want && !!dO && !dO.v && dO.w === '0px';
+    R.info.edgeDet = [dR, dO];
+    var mc = mailCards(mailBox(C().emailHtml({ size: 'standard' }))), mEdge = mc.filter(function (d) { return /border-left:4px solid/.test(d.getAttribute('style') || ''); });
+    R.chk.edgeMail = mc.length === all0.length && mEdge.length === eRed.length && mEdge.length > 0 && mEdge.every(function (d) { return d.getAttribute('style').indexOf('border-left:4px solid ' + want + ';') >= 0; });
+    R.info.edgeMail = [mc.length, all0.length, mEdge.length, mEdge[0] && mEdge[0].getAttribute('style')];
+    // the rule changed in the column options: a green fill, white text
+    var green = 'rgb(46, 125, 50)';
+    window.Penumbra.setColOpt('V_STATUS', 'highlight', [{ id: 'g1', w: 'V_STATUS = //Closed//', css: 'background-color: #2e7d32; color: #ffffff' }]);
+    await until(function () { var c = closedCards(); return c.length > 0 && c.every(function (x) { return edgeVar(x) === green; }); }, 3000);
+    var gc = closedCards(), gcell = shownRows().map(function (tr) { return td(tr, 'V_STATUS'); }).filter(function (c) { return c && c.textContent.trim() === 'Closed'; })[0];
+    R.chk.edgeRule = gc.length > 0 && gc.every(function (x) { return edgeVar(x) === green; });
+    R.info.edgeRule = [gc.length, gc.slice(0, 2).map(edgeVar), gcell && gcell.getAttribute('style')];
+    // a dark theme: the cards restyled - the green fill kept (the white text stands out more there, but is no colour)
+    var dark = (window.__THEMES || []).filter(function (t) { return t.isDark; })[0], cls0 = document.body.className;
+    if (dark) { applyTheme(dark); await sleep(900); }
+    var tc = closedCards();
+    R.chk.edgeTheme = !!dark && tc.length > 0 && tc.every(function (x) { return edgeVar(x) === green; });
+    R.info.edgeTheme = [dark && dark.id, tc.length, tc.slice(0, 2).map(edgeVar)];
+    document.body.className = cls0; await sleep(600);
   };
   // (cfmt) a cell's highlight worn by its value on the card; changed in the column options while the cards show
   S.cfmt = async function () {
@@ -368,7 +505,22 @@
       && cards().some(function (c) { return /\(\d+ items\)/.test(text(q('.pnb-card-title', c))); });
     R.info.fold = [before, cards().length, shownNow.length];
     if (P.get('shot')) { if (tog) tog.click(); await sleep(400); if (P.get('theme')) { var th0 = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (th0) applyTheme(th0); } window.scrollTo(0, 0); await sleep(300); return; }   // the tiles, for the screenshot
-    // a value's click = its cell's click: the pivot's breakdown opens
+    // (pvtext, the user) a real click on a value's white space: the tile's details, never its breakdown; on its text: the breakdown
+    function realClick(el, x, y) { var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window, detail: 1, button: 0, clientX: x, clientY: y }); el.dispatchEvent(ev); return ev; }
+    var tdd = q('.pnb-card:not(.is-total) .pnb-card-pvfields dd[data-pvc]'), ttr = tdd ? textRect(tdd) : null, tbx = tdd ? tdd.getBoundingClientRect() : null;
+    var wideOk = !!ttr && tbx.right - 2 > ttr.right + 6;
+    if (wideOk) realClick(tdd, Math.min(tbx.right - 2, ttr.right + 24), (ttr.top + ttr.bottom) / 2);
+    var wOpen = await until(detOpen, 1500), wDrill = !!q('.infobox-overlay, .modal-prompt-overlay');
+    R.chk.drillWhiteCard = wideOk && wOpen && !wDrill;
+    if (detOpen()) { q('#pnbCardDetails .pnb-cdet-close').click(); await sleep(120); }
+    tdd = q('.pnb-card:not(.is-total) .pnb-card-pvfields dd[data-pvc]'); ttr = tdd ? textRect(tdd) : null;
+    if (ttr) realClick(tdd, (ttr.left + ttr.right) / 2, (ttr.top + ttr.bottom) / 2);
+    var tOpen = await until(function () { return !!q('.infobox-overlay, .modal-prompt-overlay'); }, 4000);
+    R.chk.drillTextReal = !!ttr && tOpen && !detOpen();
+    R.info.pvtext = { wide: wideOk, text: ttr, box: tbx ? [tbx.left, tbx.right] : null, wOpen: wOpen, wDrill: wDrill, tOpen: tOpen };
+    qa('.infobox-overlay .close-lightbox, .infobox-overlay button').forEach(function (b) { if (/close/i.test(b.textContent + ' ' + (b.getAttribute('aria-label') || '') + ' ' + b.className)) b.click(); });
+    await until(function () { return !q('.infobox-overlay, .modal-prompt-overlay'); }, 2000);
+    // a value's click = its cell's click: the pivot's breakdown opens (a script's click, no pointer: the whole value)
     var dd = q('.pnb-card:not(.is-total) .pnb-card-pvfields dd[data-pvc]');
     if (dd) dd.click();
     var opened = await until(function () { return !!q('.infobox-overlay, .modal-prompt-overlay'); }, 4000);
@@ -906,6 +1058,90 @@
     R.chk.windowWord = !!opt && opt.value === 'm0' && text(opt) === 'Total Value';
     var done = el ? qa('button', el).filter(function (b) { return text(b) === 'Done'; })[0] : null; if (done) done.click(); await sleep(150);
   };
+  // (pvgt, 2026-11-03, ?id=cprojects) the Grand Total tile (the first, is-total) names each value for its own measure. The
+  // tfoot's cells carry the drill's data-agg-idx alone (no data-pv-ai): read as 0, every value was named for the first
+  // measure, and the setup's picked measures let all or none of them through
+  function gtTile() { var c = cards()[0]; return (c && c.classList.contains('is-total')) ? c : null; }
+  function tileDts(c) { return c ? qa('.pnb-card-pvfields dt', c).map(text) : []; }
+  function leafPv() { return cards().filter(function (c) { return !c.classList.contains('is-total') && qa('.pnb-card-pvfields dt', c).length > 0; })[0] || null; }
+  function footRow() { var T = q('#pivotResultTable'); return (T && T.tFoot) ? T.tFoot.rows[0] : null; }
+  S.pvgt = async function () {   // no column field (cprojects' shape): Amt the big number, N and Mean the fields
+    await until(function () { return on() && cards().length > 1 && C().state() && C().state().pivot === true; }, 10000); await sleep(200);
+    var ft = footRow(), fc = ft ? qa('td[data-agg-idx]', ft) : [], gt = gtTile(), dds = gt ? qa('.pnb-card-pvfields dd[data-pvc]', gt) : [];
+    R.info.gt = { dts: tileDts(gt), dds: dds.map(text), big: gt ? text(q('.pnb-card-bigval', gt)) : null, leaf: tileDts(leafPv()),
+                  foot: fc.map(function (td) { return [td.getAttribute('data-agg-idx'), td.getAttribute('data-pv-ai'), td.getAttribute('data-col-key'), text(td)]; }) };
+    R.chk.gtLabels = !!gt && same(tileDts(gt), ['N', 'Mean']);
+    R.chk.leafLabels = same(tileDts(leafPv()), ['N', 'Mean']);   // (holds on live: the body's cells carry data-pv-ai)
+    R.chk.gtValues = !!gt && fc.length === 3 && text(q('.pnb-card-bigval', gt)) === text(fc[0]) && dds.length === 2
+      && dds.every(function (d, i) { return parseInt(d.getAttribute('data-pvc'), 10) === fc[i + 1].cellIndex && text(d) === text(fc[i + 1]); });   // (holds on live: the values were right)
+  };
+  S.pvgtB = async function () {   // V_STATUS across, the tiles' setup picking N alone; Find on a Mean total the tile leaves out
+    await until(function () { return on() && cards().length > 1 && C().state() && C().state().pivot === true && !!FD(); }, 10000); await sleep(200);
+    var ft = footRow(), tot = ft ? qa('td[data-col-key][data-agg-idx]', ft).filter(function (td) { return !td.classList.contains('pivot-grand-total'); }) : [];
+    var ns = tot.filter(function (td) { return td.getAttribute('data-agg-idx') === '1'; }), want = ns.map(function (td) { return td.getAttribute('data-col-key') + ' N'; });
+    var gt = gtTile(), dds = gt ? qa('.pnb-card-pvfields dd[data-pvc]', gt) : [], lf = tileDts(leafPv());
+    R.info.gt = { dts: tileDts(gt), want: want, at: dds.map(function (d) { return d.getAttribute('data-pvc'); }), ns: ns.map(function (td) { return td.cellIndex; }), tot: tot.length, leaf: lf };
+    R.chk.gtPicked = ns.length >= 2 && tot.length === ns.length * 3 && dds.length === ns.length
+      && dds.every(function (d, i) { return parseInt(d.getAttribute('data-pvc'), 10) === ns[i].cellIndex && text(d) === text(ns[i]); });
+    R.chk.gtLabelsCol = ns.length >= 2 && same(tileDts(gt), want);
+    R.chk.leafPicked = lf.length >= 2 && lf.every(function (t) { return / N$/.test(t); });   // (holds on live: the body's cells carry data-pv-ai)
+    // Find on a Mean total that no other cell holds: the tile leaves Mean out, so its line names it (the column, the measure)
+    var all = qa('#pivotResultTable td');
+    var mc = tot.filter(function (td) { var v = text(td) || ''; return td.getAttribute('data-agg-idx') === '2' && /\d/.test(v) && all.every(function (o) { return o === td || (o.textContent || '').indexOf(v) < 0; }); })[0] || null;
+    var v = mc ? text(mc) : null, wl = mc ? mc.getAttribute('data-col-key') + ' Mean' : null;
+    if (v) { FD().open(v); await findSettle(); await sleep(300); }
+    var ln = gtTile() ? q('.pnb-card-found.is-find', gtTile()) : null;
+    R.info.find = { v: v, want: wl, line: ln ? text(ln) : null, lines: foundLines('find').slice(0, 3).map(text) };
+    R.chk.gtFound = !!v && !!ln && text(ln).replace(/^Found in: /, '').split(', ').indexOf(wl) >= 0;
+    if (v) FD().close();
+  };
+  // (pvgt2, 2026-11-03) the gaps pvgt left: the big number's label with no row total; Find on a pivot with no column
+  // field (a value's key "" read as a label: the hit went to the title, and a hidden one was named '#3'); a Grand Total
+  // row's totals with no keys (no breakdown) left off the tile
+  function bigWord(c) { return c ? text(q('.pnb-card-big small', c)) : null; }
+  S.pvgtD = async function () {   // no column field (cprojects' shape), Find loaded
+    await until(function () { return on() && cards().length > 1 && C().state() && C().state().pivot === true && !!FD(); }, 10000); await sleep(200);
+    var gt = gtTile(), leaf = leafPv();
+    R.info.big = { gt: bigWord(gt), leaf: bigWord(leaf) };
+    R.chk.bigLabel = bigWord(gt) === 'Amt' && bigWord(leaf) === 'Amt';   // the big number is the first value (Amt): named for it
+    // Find a leaf's Mean value (a term no other cell holds): marked on its tile's value; at Compact (not drawn) named Mean
+    var title = leaf ? text(q('.pnb-card-title', leaf)) : null, dts = leaf ? qa('.pnb-card-pvfields dt', leaf) : [], md = null, all = qa('#pivotResultTable td');
+    dts.forEach(function (dt) { var dd = dt.nextElementSibling, v = dd ? text(dd) : ''; if (!md && text(dt) === 'Mean' && /\d/.test(v) && all.filter(function (o) { return (o.textContent || '').indexOf(v) >= 0; }).length === 1) md = dd; });
+    var v = md ? text(md) : null;
+    if (v) { FD().open(v); await findSettle(); await sleep(300); }
+    var hs = hl('pnb-find').concat(hl('pnb-find-cur')), tile = function () { return cards().filter(function (c) { return text(q('.pnb-card-title', c)) === title; })[0] || null; };
+    R.info.find = { v: v, title: title, n: hs.length, where: hs.slice(0, 3).map(function (r) { return rangeEl(r).className + '|' + rangeText(r); }) };
+    R.chk.findValue = !!v && hs.some(function (r) { var e = rangeEl(r); return !!e.closest('.pnb-card-pv [data-pvc]') && e.closest('.pnb-card') === tile(); });
+    C().setSize('compact'); await until(function () { return host().classList.contains('is-compact'); }, 4000); await sleep(400);
+    if (v) { await findType(v); await sleep(300); }
+    var ln = tile() ? q('.pnb-card-found.is-find', tile()) : null;
+    R.info.compact = { line: ln ? text(ln) : null, lines: foundLines('find').slice(0, 3).map(text) };
+    R.chk.findNamed = !!ln && text(ln).replace(/^Found in: /, '').split(', ').indexOf('Mean') >= 0 && !/#\d|@label/.test(text(ln));
+    if (v) FD().close(); C().setSize('standard'); await sleep(300);
+  };
+  S.pvgtC = async function () {   // no breakdown (V_STATUS across): the Grand Total row's totals carry no keys at all
+    await until(function () { return on() && cards().length > 1 && C().state() && C().state().pivot === true && !!FD(); }, 10000); await sleep(200);
+    var MS = ['Amt', 'N', 'Mean'], ft = footRow(), lr = q('#pivotResultTable tbody tr[data-pivot-row]');
+    var tot = ft ? qa('td', ft).filter(function (td) { return !td.hasAttribute('colspan') && !td.classList.contains('pivot-grand-total'); }) : [];
+    var vals = lr ? qa('td[data-pv-ai]', lr) : [], want = vals.map(function (td) { return td.getAttribute('data-pv-ck') + ' ' + MS[+td.getAttribute('data-pv-ai')]; });
+    var keyless = tot.length > 0 && tot.every(function (td) { return !td.hasAttribute('data-col-key') && !td.hasAttribute('data-agg-idx') && !td.hasAttribute('data-pv-ai'); });
+    var gt = gtTile(), bv = gt ? q('.pnb-card-bigval[data-pvc]', gt) : null, bi = bv ? tot.map(function (td) { return td.cellIndex; }).indexOf(+bv.getAttribute('data-pvc')) : -1;
+    var dds = gt ? qa('.pnb-card-pvfields dd[data-pvc]', gt) : [], got = dds.map(function (d) { return [text(d.previousElementSibling), +d.getAttribute('data-pvc'), text(d)]; });
+    var exp = tot.map(function (td, k) { return [want[k], td.cellIndex, text(td)]; }).filter(function (x, k) { return k !== bi; });
+    R.info.gt = { keyless: keyless, tot: tot.length, want: want, got: got.slice(0, 9), big: bv ? [bigWord(gt), text(bv), bi] : null, leaf: tileDts(leafPv()) };
+    R.chk.gtKeyless = keyless && tot.length === 9 && want.length === 9 && same(got, exp);
+    R.chk.bigKeyless = keyless && bi >= 0 && bigWord(gt) === want[bi] && text(bv) === text(tot[bi]);
+    var lf = tileDts(leafPv());
+    R.chk.bodyKeyless = lf.length >= 6 && lf.every(function (t) { return /^(Closed|Open|Pending) (Amt|N|Mean)$/.test(t); });   // (holds on live: the body's cells carry data-pv-ck + data-pv-ai)
+    // Find on a keyless total no other cell holds: marked on the Grand Total tile's value (the hit went to its title)
+    var all = qa('#pivotResultTable td'), mc = tot.filter(function (td, k) { var v = text(td) || ''; return k !== bi && /\d/.test(v) && all.every(function (o) { return o === td || (o.textContent || '').indexOf(v) < 0; }); })[0] || null;
+    var v = mc ? text(mc) : null;
+    if (v) { FD().open(v); await findSettle(); await sleep(300); }
+    var hs = hl('pnb-find').concat(hl('pnb-find-cur'));
+    R.info.find = { v: v, at: mc ? mc.cellIndex : null, n: hs.length, where: hs.slice(0, 3).map(function (r) { return rangeEl(r).className + '|' + (rangeEl(r).getAttribute('data-pvc') || '') + '|' + rangeText(r); }) };
+    R.chk.findKeyless = !!v && hs.some(function (r) { var e = rangeEl(r), d = e.closest('.pnb-card-pv [data-pvc]'); return !!d && d.closest('.pnb-card') === gtTile() && +d.getAttribute('data-pvc') === mc.cellIndex; });
+    if (v) FD().close();
+  };
   S.pvcfgB = async function () {
     await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true; }, 10000); await sleep(400);
     var lay = C().layout(); R.info.lay = lay; R.info.leaf = leafTile() ? leafTile().outerHTML.replace(/\s+/g, ' ').slice(0, 400) : null;
@@ -1361,7 +1597,7 @@
     // the grand total tile: the pivot's menu has no cell for the tfoot - the card's own items alone
     ev = rclick(q('.pnb-card-title', cs[0])); await sleep(80);
     a = acts(); R.info.pvTotalActs = a;
-    R.chk.totalTileMenu = ev.defaultPrevented && !!menu() && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0 && a.every(function (x) { return x === 'cardSize' || x === 'cardsTable' || x === 'cardOpen' || x === 'cardConfig'; });   // (round T: Configure cards greyed)   // (cdet: Open details joins the card's own items)
+    R.chk.totalTileMenu = ev.defaultPrevented && !!menu() && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0 && a[a.length - 1] === 'clearPrefs' && a.every(function (x) { return x === 'cardSize' || x === 'cardsTable' || x === 'cardOpen' || x === 'cardConfig' || x === 'clearPrefs'; });   // (menufix: Clear all last)   // (round T: Configure cards greyed)   // (cdet: Open details joins the card's own items)
     // (round O) a tile value's white space: the tile's own menu - its row label's (not the value cell's)
     var wdd = q('.pnb-card-pvfields dd[data-pvc]', leaf), wtr = wdd ? textRect(wdd) : null, wr2 = wdd ? wdd.getBoundingClientRect() : null;
     if (wdd && wtr) { rclick(wdd, { x: Math.min(wr2.right - 2, wtr.right + 24), y: (wtr.top + wtr.bottom) / 2 }); await sleep(80); }
@@ -2299,7 +2535,7 @@
     if (dd) { rclick(dd); await sleep(150); }
     var a1 = acts(), it1 = menu() ? q('.pnb-hm-item[data-act="tileSortAsc"]', menu()) : null;
     R.info.valMenu = { lab: lab, acts: a1, label: it1 ? text(it1) : null, title: it1 ? it1.getAttribute('title') : null, wordy: wordy() };
-    var okLabels = !!it1 && text(it1) === 'Sort ascending' && a1.indexOf('tileSortDesc') >= 0 && a1.indexOf('cardSize') > a1.indexOf('tileSortAsc') && wordy().length === 0;
+    var okLabels = !!it1 && text(it1) === 'Sort by ' + lab + ': ascending' && a1.indexOf('tileSortDesc') >= 0   // (menufix2: the column named) && a1.indexOf('cardSize') > a1.indexOf('tileSortAsc') && wordy().length === 0;
     if (it1) { it1.click(); await pvSettle(function () { return ariaOf(pvTh(lab)) === 'ascending'; }); }
     R.chk.valueMenuSorts = okLabels && ariaOf(pvTh(lab)) === 'ascending' && mono(tileVals(lab), 'asc') && sortSel().value === 'v:' + lab && !menu();
     // the same value again: its ascending ticked, Clear sort offered; Clear sort: nothing sorted, the pivot's own order
@@ -2313,12 +2549,21 @@
     var tt = q('.pnb-card-title', pvTiles()[0]); rclick(tt); await sleep(150);
     var it3 = menu() ? q('.pnb-hm-item[data-act="tileSortDesc"]', menu()) : null;
     R.info.titleMenu = { label: it3 ? text(it3) : null, acts: acts() };
-    var okT = !!it3 && text(it3) === 'Sort Z to A' && !!menu() && text(q('.pnb-hm-item[data-act="tileSortAsc"]', menu())) === 'Sort A to Z';
+    var okT = !!it3 && text(it3) === 'Sort by ' + fld[0].label + ': descending' && !!menu() && text(q('.pnb-hm-item[data-act="tileSortAsc"]', menu())) === 'Sort by ' + fld[0].label + ': ascending';   // (menufix2)
     if (it3) { it3.click(); await pvSettle(function () { return ariaOf(pvTh(fld[0].label)) === 'descending'; }); }
     R.chk.titleMenuSorts = okT && ariaOf(pvTh(fld[0].label)) === 'descending' && sortSel().value === 'f0' && tilesFollow();
     // the big number: the Total's heading; the grand total tile: no sorts
     rclick(q('.pnb-card-bigval', pvTiles()[0])); await sleep(150);
     var it4 = menu() ? q('.pnb-hm-item[data-act="tileSortAsc"]', menu()) : null, t4 = it4 ? it4.getAttribute('title') : '';
+    // (menufix2) the columns' order, where the pivot has a column field: offered on a tile, its pick the pivot's own toggle
+    var csi = q('#pivotResultTable .col-sort-icon'), cAsc = menu() ? q('.pnb-hm-item[data-act="tileColsAsc"]', menu()) : null, cDesc = menu() ? q('.pnb-hm-item[data-act="tileColsDesc"]', menu()) : null;
+    var cWas = csi ? csi.getAttribute('data-col-sort') : null;
+    R.info.cols = { csi: !!csi, was: cWas, asc: cAsc ? text(cAsc) + '|' + cAsc.getAttribute('aria-checked') : null, desc: cDesc ? text(cDesc) : null };
+    if (cDesc && cWas !== 'desc') { cDesc.click(); await sleep(600); }
+    var csi2 = q('#pivotResultTable .col-sort-icon');
+    R.chk.colsSort = csi ? (!!cAsc && !!cDesc && /^Sort fields by .+: ascending$/.test(text(q('.pnb-hm-label', cAsc))) && !!csi2 && csi2.getAttribute('data-col-sort') === 'desc') : (!cAsc && !cDesc);
+    if (csi2 && csi2.getAttribute('data-col-sort') === 'desc' && cWas !== 'desc') { csi2.click(); await sleep(600); }
+    if (!menu() && it4) { rclick(q('.pnb-card-bigval', pvTiles()[0])); await sleep(150); }
     if (menu()) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
     rclick(q('.pnb-card-bigval', cards()[0]) || q('.pnb-card-title', cards()[0])); await sleep(150);   // (its big number: a tfoot cell)
     var a5 = acts(); if (menu()) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
@@ -2839,6 +3084,9 @@
     rclick(q('.pnb-card-title', c0[0])); await sleep(100);
     var cm = acts(); R.info.cardActs = cm;
     R.chk.cardMenu = cm.indexOf('cardsStacked') >= 0 && cm.indexOf('cardsTable') < 0 && cm.indexOf('cardsBoard') < 0;
+    // (2026-11-03, menufix) ...in every card's words: Show as table (it read Switch to Stacked view)
+    var cst = menu() ? q('.pnb-hm-item[data-act="cardsStacked"] .pnb-hm-label', menu()) : null;
+    R.chk.cardTableWord = !!cst && cst.textContent === 'Show as table';
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
     // the keys: down the lane, across to the next lane (the same place), back, up
     c0 = laneCards(lanes()[0]);
@@ -2881,6 +3129,7 @@
     var laneLabs = qa('.pnb-hm-item', lm).map(function (x) { return text(x) || ''; });   // (bdlay3, the user: Switch to Stacked view twice)
     var laneOnce = la.filter(function (a) { return a === 'gStacked'; }).length === 1 && la.indexOf('cardsStacked') < 0 && laneLabs.filter(function (s) { return /^Switch to Stacked view/.test(s); }).length === 1;
     R.chk.laneMenu = !!lm && text(q('.pnb-hm-name', lm)) === laneName(lanes()[0]) && la.indexOf('gToggle') >= 0 && la.indexOf('gStacked') >= 0 && la.indexOf('gBoard') < 0;
+    R.chk.laneClear = la.length > 3 && la.indexOf('clearPrefs') === la.length - 1;   // (2026-11-03, menufix) Clear all last, as every menu
     // Switch to Stacked view: the grouping stays, the viewer's own pick comes back - the table (they chose none)
     var left = hmClick('gStacked'); await until(function () { return !C().board().on && !on(); }, 4000); await sleep(300);
     R.info.leave = { left: left, layout: layoutNow(), on: on(), grp: grpOn(), view: C().view(), tops: topGroups().length };
@@ -3301,7 +3550,7 @@
     // the card's own white space (its padding) is still the card's menu: no Clear all there (the row's items alone)
     rclickWhite(c0); await sleep(120);
     R.info.whiteMenu = menuInfo();
-    R.chk.whiteStillCard = !!menu() && text(q('.pnb-hm-name', menu())) !== thName('H_TEXT') && acts().indexOf('clearPrefs') < 0 && acts().indexOf('cardSize') >= 0;
+    R.chk.whiteStillCard = !!menu() && text(q('.pnb-hm-name', menu())) !== thName('H_TEXT') && acts().indexOf('clearPrefs') === acts().length - 1 && acts().indexOf('cardSize') >= 0;   // (menufix: Clear all last, as every menu)
     await escMenu();
     // a label: its heading's menu, Clear all last
     var lab = q('.pnb-card-fields dt[data-colhead="V_DATE"]', c0), lp = lab ? textPoint(lab) : null;
@@ -3341,6 +3590,119 @@
   // page turn in the window over the table selects no card
   function clickN(el, d) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: d, view: window })); }
   // (csw2, 2026-11-02, the user: a second card sweep) the details window, a card's own clicks and menus
+  // (cleft, 2026-11-03, the user: the second sweep's leftovers) a top-level group's own rows (never a cell's table's, a
+  // card's); the count sort (desc) in that order; a 60-row table put inside the smallest group's cell / card
+  function cl3Own(w) { return $(w).find('tbody tr:not(.search-hidden)').filter(function () { return !$(this).parents('td, .pnb-card').filter(function () { return $.contains(w, this); }).length; }).length; }
+  function cl3Tops() { return $('#groupedResultsContainer').children('.group-wrapper').get(); }
+  function cl3Sorted() { var t = cl3Tops(), n = t.map(cl3Own); for (var i = 1; i < n.length; i++) if (n[i - 1] < n[i]) return false; return t.length > 2; }
+  function cl3Pad(into) { var d = document.createElement('div'), h = ''; for (var i = 0; i < 60; i++) h += '<tr><td>pad ' + i + '</td></tr>'; d.className = 'nested-json-container cl3pad'; d.innerHTML = '<table><tbody>' + h + '</tbody></table>'; into.appendChild(d); return d; }
+  async function cl3Count(pick) {
+    var G = window.Penumbra.groupMenu; G.sort('count', 'desc'); await sleep(200);
+    var t = cl3Tops(), last = t[t.length - 1], into = last ? pick(last) : null, pad = into ? cl3Pad(into) : null;
+    G.sort('count', 'asc');   // read at once: the redraw a sort brings (the bands' cards) takes the planted table away
+    var first = cl3Tops()[0], info = { tops: t.length, into: !!into, own: cl3Tops().map(cl3Own).slice(0, 8), first: first === last };
+    var ok = !!pad && first === last;
+    if (pad && pad.parentNode) pad.parentNode.removeChild(pad);
+    await sleep(250);
+    return { ok: ok, info: info };
+  }
+  // two measures the builder names alike ("Sum", "Sum"): both on the tile, both in Sort by, the second worded Sum (2)
+  // (clay, 2026-11-03, the user: named card layouts) Configure cards' Layouts: save the cards by name and pick them
+  // back, a shared one (the list asked for when it opens), Escape closes the list first, Quick actions opens it
+  S.clay1 = async function () {
+    await until(function () { return on() && cards().length > 3; }, 8000); await sleep(200);
+    var P = window.PenumbraPresets, calls = 0;
+    if (!P) { R.info.noEngine = true; return; }
+    P.shared._setTransport(function (method, url, body, cb) { calls++; setTimeout(function () { cb(200, { status: 'success', data: [{ ns: 'cards', name: 'Finance view', data: { v: 1, setup: { own: 1, title: 'V_STATUS' }, size: 'compact' }, created_by: 'X', updated_at: '' }], can_write: true, can_manage: true, sharing: false, me: 'X' }); }, 0); });
+    C().openConfig(); await sleep(250);
+    var chip = q('#pnbCcfgPresetMount .pnb-preset-chip');
+    R.chk.chipThere = !!chip;
+    if (!chip) return;
+    function rowBy(name) { return qa('#pnbCcfgPresetMount .pnb-preset-pick').filter(function (b) { var n = q('.pnb-preset-rname', b); return !!n && text(n) === name; })[0] || null; }
+    function popOpen() { var p = q('#pnbCcfgPresetMount .pnb-preset-pop'); return !!p && !p.hidden; }
+    function t0of() { return text(q('.pnb-card-title', cards()[0])); }
+    var t0 = t0of(), p0 = window.prompt;
+    window.prompt = function () { return 'PI view'; };
+    try { chip.click(); await sleep(250); var sv = rowBy('Save these cards…'); if (sv) sv.click(); await sleep(250); } finally { window.prompt = p0; }
+    var saved = (P.list('cards') || []).map(function (e) { return e.name; });
+    // another setup and size, then the layout back
+    window.Penumbra.cardsHost.layoutSet({ own: 1, title: 'V_STATUS' }); C().setSize('large'); await sleep(300);
+    var t1 = t0of();
+    if (popOpen()) chip.click(); chip.click(); await sleep(250);
+    var pr = rowBy('PI view'); if (pr) pr.click(); await sleep(350);
+    var t2 = t0of();
+    R.info.apply = { t0: t0, t1: t1, t2: t2, size: C().size(), saved: saved, pr: !!pr };
+    R.chk.savedApplied = saved.indexOf('PI view') >= 0 && !!pr && t1 !== t0 && t2 === t0 && C().size() === 'standard' && C().configOpen();
+    // a shared one: the list asked for when it opens
+    if (popOpen()) chip.click(); chip.click();
+    await until(function () { return !!rowBy('Finance view'); }, 3000); await sleep(100);
+    var fr = rowBy('Finance view'); if (fr) fr.click(); await sleep(350);
+    R.info.shared = { calls: calls, fr: !!fr, size: C().size(), title: t0of() };
+    R.chk.sharedApplied = calls > 0 && !!fr && C().size() === 'compact' && t0of() !== t0;
+    // Escape with the list open: the list closes, the window stays
+    if (popOpen()) chip.click(); chip.click(); await sleep(200); var o1 = popOpen();
+    keyOn(chip, 'Escape'); await sleep(200);
+    R.info.esc = { o1: o1, pop: popOpen(), cfg: C().configOpen() };
+    R.chk.escList = o1 && !popOpen() && C().configOpen();
+    // Quick actions' Card layouts...: the window, its list open
+    if (popOpen()) chip.click();
+    C().closeConfig(); await sleep(200);
+    var ok = C().openLayouts(); await sleep(250);
+    R.info.ql = { ok: ok, cfg: C().configOpen(), pop: popOpen() };
+    R.chk.openLayouts = ok === true && C().configOpen() && popOpen();
+    if (popOpen()) chip.click();
+    C().closeConfig();
+  };
+  S.pw3dup = async function () {
+    await until(function () { return on() && C().state() && C().state().pivot === true && cards().length > 1; }, 15000); await sleep(300);
+    var t = cards()[1], labs = t ? qa('.pnb-card-pvfields dt', t).map(text) : [], uniq = labs.filter(function (l, i) { return labs.indexOf(l) === i; });
+    var sorts = ((C().pvSorts() || {}).list || []).map(function (e) { return e.label; });
+    R.info.dup = { labs: labs.slice(0, 8), sorts: sorts.slice(0, 12), subs: qa('#pivotResultTable th.pivot-sub-header').slice(0, 4).map(text) };
+    R.chk.dupFields = labs.length >= 2 && uniq.length === labs.length && labs.some(function (l) { return / Sum \(2\)$/.test(l); });
+    R.chk.dupSort = sorts.some(function (l) { return / Sum \(2\)$/.test(l); }) && sorts.some(function (l) { return / Sum$/.test(l); });
+  };
+  // (2026-11-03, bdj, the user) a % change tile's value opens its breakdown: the click goes to the pivot's derived cell
+  // (data-pv-drv, no drill keys of its own), whose breakdown is the cells it is computed from (brk)
+  S.pw4drv = async function () {
+    await until(function () { return on() && C().state() && C().state().pivot === true && cards().length > 1; }, 15000); await sleep(300);
+    var rows = pvShownRows(), tr = rows.filter(function (r) { return r.hasAttribute('data-pivot-row'); })[0], tile = tr ? cards()[rows.indexOf(tr) + 1] : null;
+    var dds = tile ? qa('.pnb-card-pvfields dd[data-pvc]', tile) : [];
+    var drv = dds.filter(function (x) { var td = tr.cells[parseInt(x.getAttribute('data-pvc'), 10)]; return !!td && td.hasAttribute('data-pv-drv') && !td.hasAttribute('data-col-key'); });
+    R.info.drv = { rows: rows.length, dds: dds.length, drv: drv.length };
+    var dd = drv.length ? drv[drv.length - 1] : null;   // the last column's: it compares with the one before it
+    if (dd) dd.click();
+    var opened = await until(function () { return !!q('.infobox-overlay .pnb-bd-note'); }, 4000);
+    var o = q('.infobox-overlay');
+    R.info.drv.title = o ? text(q('.pnb-dlg-title', o)) : null;
+    R.chk.drvTile = !!dd && opened && !detOpen() && /^Chg: /.test(R.info.drv.title || '');
+    qa('.infobox-overlay .close-lightbox').forEach(function (b) { b.click(); });
+    await until(function () { return !q('.infobox-overlay'); }, 2000);
+  };
+  // grouped cards with a group summary: the card email's headings carry it; the count sort never counts a card's table
+  S.gw3agg = async function () {
+    await until(function () { return on() && qa('#groupedResultsContainer .group-wrapper.group-leaf').length > 2; }, 8000); await sleep(500);
+    var lw = qa('#groupedResultsContainer .group-wrapper.group-leaf')[0], ga = lw ? q(':scope > .group-header > .group-agg-summary', lw) : null, gat = ga ? (q('.group-agg-label', ga).textContent + q('.group-agg-value', ga).textContent).replace(/\s+/g, ' ').trim() : '';
+    var b = mailBox(C().emailHtml({ size: 'standard' })), heads = qa('div[style*="border-radius:6px"]', b).map(text);
+    R.info.agg = { gat: gat, head0: heads[0], heads: heads.length };
+    R.chk.aggHead = !!gat && /^Sum of H_AMT: [\d,.$]+$/.test(gat) && heads.some(function (h) { return h.indexOf(gat) >= 0 && !/% of total/.test(h); });
+    var r = await cl3Count(function (w) { return q('.pnb-card', w); });
+    R.info.cntCard = r.info; R.chk.cntCard = r.ok;
+  };
+  // the grouped table (no cards): a nested table inside a cell is no group's rows
+  S.gw3cnt = async function () {
+    await until(function () { return qa('#groupedResultsContainer .group-wrapper.group-leaf').length > 2; }, 8000); await sleep(400);
+    var r = await cl3Count(function (w) { return $(w).find('tbody tr:not(.search-hidden) > td').get()[1] || null; });
+    R.info.cntCell = r.info; R.chk.cntCell = r.ok;
+  };
+  // a report without cards, the table shown: an editor's size from an earlier visit is no card setup to Save
+  S.ct3save = async function () {
+    await until(function () { return !!C() && shownRows().length > 0; }, 8000); await sleep(300);
+    var HH = window.Penumbra.cardsHost, sg0 = HH.sizeGet, au = 'unset';
+    HH.sizeGet = function () { return 'large'; };
+    try { au = C().authored(); } catch (e) { au = 'threw ' + e; } finally { HH.sizeGet = sg0; }
+    R.info.save = { au: au, on: on(), rep: C().report() };
+    R.chk.sizeNoWrite = !on() && !C().report() && (au === null || au === undefined);
+  };
   S.cw2det = async function () {
     await until(function () { return on() && cards().length > 5; }, 8000); await sleep(200);
     // a drag that selected a card's text: the selection stays, no window

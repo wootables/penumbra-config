@@ -181,6 +181,7 @@
 #       ctlrangeedit   the editor's range box is not saved (controls3.html)
 #       ctlrangeguard  a redraw runs over a pair being typed in (controls3.html)
 #       ctlrangeclean  a commit leaves its boxes looking typed, so a later redraw wipes the other box (controls3.html)
+#       ctlrangenote   a refused pair says nothing beside its boxes (controls3.html, 2026-11-03)
 #       ctlfocus     a redraw drops the keyboard focus
 #       ctlsave      the editor's Apply loses the chips
 #       ctlfollow    the chips stop following the box (Escape, typing)
@@ -370,6 +371,7 @@ $mutants = @{
   'ctlrangeedit'   = @('dash', 'bits.push(''range'');   // exclude and show N are chip options: a range takes neither', '/* mutant: range not saved */')
   'ctlrangeguard'  = @('dash', 'if (aeGrp && $.contains($tile[0], aeGrp) && $(aeGrp).find(''.pnb-fs-bound'').filter(function () { return this.value !== this.defaultValue; }).length) { return waiting; }', '/* mutant: redraw over typing */')
   'ctlrangeclean'  = @('dash', '$(grp).find(''.pnb-fs-bound'').each(function () { this.defaultValue = this.value; });   // written: no longer typing', '/* mutant: a commit leaves its boxes looking typed */')
+  'ctlrangenote'   = @('dash', 'T.strip.rangeMark(grp, why);', '/* mutant: no note */')
   'xfpairs'      = @('dash', 'if (mine) { if (d.pairs && d.pairs.length) { crossFilterPairs(d.pairs); } else { crossFilter(d.col, d.value); } }', 'if (mine) { crossFilter(d.col, d.value); }')
   'defoff'       = @('dash', 'if (URL_SEARCH_SET) { return; }', 'return;')
   'defaddr'      = @('dash', 'else if (!URL_SEARCH && def) { parts.push(''search=''); }', '/* mutant: a cleared address bare */')

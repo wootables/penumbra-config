@@ -363,7 +363,6 @@
             "id": "df_nested_max",
             "snippet": "date_format(max(DT), 'YYYY-MM-DD')"
         },
-
         {
             "id": "df_offset_days",
             "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD', '+30 days')"
@@ -408,7 +407,6 @@
             "id": "df_offset_unquoted_mix",
             "snippet": "date_format(01-JAN-24, MMMM D, YYYY, +1 day)"
         },
-
         {
             "id": "dd_days_default",
             "snippet": "date_diff(15-MAR-24, 01-JAN-24)"
@@ -694,7 +692,6 @@
             "id": "info_default",
             "snippet": "info()"
         },
-
         {
             "id": "mode_blank_majority",
             "snippet": "mode(MB)",
@@ -829,6 +826,26 @@
             "id": "cf_global",
             "snippet": "count(eacute)",
             "expect": "1"
+        },
+        {
+            "id": "hash_count_le",
+            "snippet": "count(# <= 3)",
+            "expect": "3"
+        },
+        {
+            "id": "hash_count_set",
+            "snippet": "count(# = /^(?:1|3)$/)",
+            "expect": "2"
+        },
+        {
+            "id": "hash_sum",
+            "snippet": "sum(AMOUNT, # <= 2)",
+            "expect": "1,500.75"
+        },
+        {
+            "id": "hash_lookup",
+            "snippet": "lookup(NAME, # = 2)",
+            "expect": "Beta"
         }
     ],
     "promptValues": [

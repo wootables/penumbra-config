@@ -134,6 +134,16 @@
     C().setSize('compact'); await idle();
     rec('C9 the viewer size list to Small: data(cardsize)=small with no switch involved', on() === true && txt('cz') === 'small', state());
     C().set('table'); await idle();
+    // (cleft) C10: cards|off|xl from Small cards: the table, the cards' size kept at Extra large; C11: a toggle on
+    // cards|off|xl reads on there, and off once the size is Small again (the table alone is not it)
+    C().set('cards'); await idle();
+    await click(link('TableXL'));
+    rec('C10 cards|off|xl from Small cards: the table, the card size kept at Extra large', on() === false && size() === 'xl', state());
+    function tg2() { var t = document.querySelectorAll('#reportSnippetOutput .pnb-toggle')[1]; return t ? t.getAttribute('data-ts-on') : 'NO TOGGLE'; }
+    var t2a = tg2();
+    C().setSize('compact'); await idle();
+    var t2b = tg2();
+    rec('C11 a toggle on cards|off|xl: on at the table at xl, off at the table at Small', t2a === '1' && t2b === '0', 'xl=' + t2a + ' small=' + t2b + ' ' + state());
 
     // D3 (last: the editor change schedules a live re-render that would land in a later check): a [PROMPT] named Region (no stored answer: its default), through the report body's own lookup - the tag put in
     // the snippet editor only for the call, so no run ever prompts for it

@@ -143,6 +143,43 @@ MUTANTS = {
 MUTANTS['b-nameafter'] = ([('menu', "            bcp.push(bdName);\n            bcp.push(rowCopyItem('bdCopyRow', function () { return bdRowLines(t); }));\n",
                             "            bcp.push(rowCopyItem('bdCopyRow', function () { return bdRowLines(t); }));\n            bcp.push(bdName);\n")], ['L-pmbreak-bdCopyList'], ['pmbreak'])
 
+# (2026-11-03, menufix) the Grand Total row, a row label's Collapse / Expand all, Clear all last and no leading separator;
+# the row field's sort words (sortAZ, now Sort ascending); a breakdown's '#' menu (bdNumNative -> bdNumMenu, bdNumRow) and
+# its heading's order (bdWidthItems)
+SCN = SCN + ['pmfix']
+CHK['pmfix'] = ['totalMenu', 'totalLabel', 'labelAll', 'labelCollapse', 'clearLast', 'noLeadSep', 'totalDrill']
+CHK['pmbreak'] = [c for c in CHK['pmbreak'] if c != 'bdNumNative'] + ['bdNumMenu', 'bdNumRow']
+NEW_MF = {'L-pmfix-' + c for c in CHK['pmfix']} | {'L-pmfield-sortAZ', 'L-pmbreak-bdNumMenu', 'L-pmbreak-bdNumRow', 'L-pmbreak-bdWidthItems'}
+NEW = NEW | NEW_MF
+# (2026-11-03, menufix2) a breakdown footer's summary menu: red on menufix's live build
+SCN = SCN + ['pmfix2']
+CHK['pmfix2'] = ['bdFootMenu', 'bdFootPick', 'bdFootLabel']
+NEW_MF2 = {'L-pmfix2-' + c for c in CHK['pmfix2']}
+NEW = NEW | NEW_MF2
+NEW = NEW - NEW_MF2   # (menufix2 is LIVE since f4cc45a, 2026-11-03: old checks now)
+MUTANTS.update({
+    'mf2-bdfoot': ([('menu', "        var td = target.closest('tfoot tr.total-row-data td, tfoot tr.total-row-link td, table.pnb-breakdown tfoot td');", "        var td = target.closest('tfoot tr.total-row-data td, tfoot tr.total-row-link td');")],
+                   ['L-pmfix2-bdFootMenu', 'L-pmfix2-bdFootPick', 'L-pmfix2-bdFootLabel'], ['pmfix2']),
+    'mf2-bdclear': ([('menu', "subs: [], bd: t.bd ? true : undefined };", "subs: [] };")], ['L-pmfix2-bdFootMenu'], ['pmfix2']),
+})
+NEW = NEW - NEW_MF   # (menufix is LIVE since 5b124ce, 2026-11-03: old checks now)
+MUTANTS.pop('b-native', None)   # its anchor went: the '#' column has a menu now (pf-bdnum)
+MUTANTS.update({
+    'pf-tfoot': ([('menu', "        if (cell.closest('tfoot')) {", "        if (false) {")], ['L-pmfix-totalMenu', 'L-pmfix-totalLabel', 'L-pmfix-totalDrill'], ['pmfix']),
+    'pf-tlabel': ([('menu', "            return { kind: 'totals', el: cell };", "            return null;")], ['L-pmfix-totalLabel'], ['pmfix']),
+    'pf-all': ([('menu', "            if (tg && P.collapsible() && s.rows.length > 1) {", "            if (false) {")], ['L-pmfix-labelAll', 'L-pmfix-labelCollapse'], ['pmfix']),
+    'pf-clear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-pmfix-clearLast', 'L-pmfix-totalLabel'], ['pmfix']),
+    'pf-tidy': ([('menu', "        out.forEach(function (it) { if (it !== '-' || (tidy.length && tidy[tidy.length - 1] !== '-')) { tidy.push(it); } });", "        out.forEach(function (it) { tidy.push(it); });")], ['L-pmfix-noLeadSep'], ['pmfix']),
+    'pf-sortword': ([('menu', "items.push({ act: 'pvSortAsc', label: 'Sort ascending', checked: dir === 'ascending'", "items.push({ act: 'pvSortAsc', label: t.kind === 'field' ? 'Sort A to Z' : 'Sort ascending', checked: dir === 'ascending'")], ['L-pmfield-sortAZ'], ['pmfield']),
+    'pf-bdnum': ([('menu', "        if (i === 0 || labelOf(th) === '#') { return { table: table, th: th, td: cell.closest('tbody') ? cell : null, i: i, num: true }; }", "        if (i === 0 || labelOf(th) === '#') { return null; }")],
+                 ['L-pmbreak-bdNumMenu', 'L-pmbreak-bdNumRow'], ['pmbreak']),
+    'pf-bdnumrow': ([('menu', "        if (t.td) { items.push(copyEntry('bdCopyMenu', [rowCopyItem('bdCopyRow', function () { return bdRowLines(t); })])); items.push('-'); }", "")], ['L-pmbreak-bdNumRow'], ['pmbreak']),
+    # Column stats back at the foot, after the sizes (where it was)
+    'pf-bdorder': ([('menu', "        items.push({ act: 'bdStats', label: 'Column stats', sub: true, items: function () { return statsItems(null, bdProfile(t)); } });\n        var look = [];", "        var look = [];"),
+                    ('menu', "        if (look.length) { items.push('-'); items = items.concat(look); }\n", "        if (look.length) { items.push('-'); items = items.concat(look); }\n        items.push({ act: 'bdStats', label: 'Column stats', sub: true, items: function () { return statsItems(null, bdProfile(t)); } });\n")],
+                   ['L-pmbreak-bdWidthItems'], ['pmbreak']),
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:

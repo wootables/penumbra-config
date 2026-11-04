@@ -16,6 +16,9 @@
   textContent. Only the XSS assertion catches it; every functional test still
   passes, because a name without markup in it renders identically either way.
 
+  CONTROL: __break=5 (Preset Sharing, 2026-10-22) gives a shared row its
+  rename/delete from can_write ALONE (the pre-sharing rule), so a reader is
+  offered other people's rows. Only the "reader:" row-rights checks fail.
   CONTROL: __break=4 makes create() fetch the SHARED list at mount - i.e. at
   report load. Only "mounting makes NO request" and "refresh() makes NO
   request" catch it (124/2): the open-time request is then deduplicated onto
@@ -82,6 +85,14 @@
         "mounted.push(api);\n        render();\n        return api;",
         "mounted.push(api);\n        render();\n        if (sharedOn) { sharedFetch(idOf(), true); }\n        return api;");
       if (b4 === code) { throw new Error('break-4 anchor missed'); }
+    }
+
+    if (window.__break === 5) {
+      var b5 = code;
+      code = code.replace(
+        "if (se && se.ts && !se.error) { return sharedMayEdit(idOf(), srow, op); }",
+        "if (se && se.ts && !se.error) { return !!se.canWrite; }");
+      if (b5 === code) { throw new Error('break-5 anchor missed'); }
     }
 
     new Function(code)();
@@ -436,7 +447,7 @@
     // rename for everyone = save new + delete old
     promptReply = 'Mine2';
     click(acts(shRow(sh.h, 'Mine'))[2]);
-    eq('rename saves under the new name first', last().body, { action: 'save', report_id: 'r1', ns: 'pivot', name: 'Mine2', data: { rows: ['FY'] } });
+    eq('rename saves under the new name first (naming the row it retires: replaces)', last().body, { action: 'save', report_id: 'r1', ns: 'pivot', name: 'Mine2', data: { rows: ['FY'] }, replaces: 'Mine' });
     answer(200, { status: 'success' });
     eq('then deletes the old one',              last().body, { action: 'delete', report_id: 'r1', ns: 'pivot', name: 'Mine' });
     answer(200, { status: 'success' });
@@ -513,6 +524,68 @@
     answer(200, { status: 'success', can_write: false, data: [] });
     eq('...and the server\'s answer overrides the hint',               !!q(hint.h, '.pnb-preset-share'), false);
     click(q(hint.h, '.pnb-preset-chip'));
+    P.shared._setTransport(function (method, url, body, cb) { calls.push({ method: method, url: url, body: body }); queue.push(cb); });
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Preset Sharing (2026-10-22): a READER on a report whose card is on gets
+    // can_write but not can_manage - rename/delete only the rows they shared.
+    sec('shared source - Preset Sharing reader (creator-only rows)');   // __break=5 lands here
+    // A control run (BREAK=5) desynchronises the request queue once a refusal is missed;
+    // the catch turns that into one more failure and a tally instead of HARNESS-ERROR.
+    try {
+    P.shared._reset(); calls = []; queue = [];
+    var rd = mk({ ns: 'pivot', shared: { canWrite: false } });
+    click(q(rd.h, '.pnb-preset-chip'));
+    answer(200, { status: 'success', can_write: true, can_manage: false, sharing: true, me: 'reader1', data: [
+      { ns: 'pivot', name: 'Author view', data: { rows: ['DEPT'] }, created_by: 'owner1' },
+      { ns: 'pivot', name: 'My view',     data: { rows: ['FY'] },   created_by: 'Reader1' },
+      { ns: 'pivot', name: 'Theirs',      data: { rows: ['PI'] },   created_by: 'reader2' }
+    ] });
+    eq('reader: the Share row appears (can_write)',                 !!q(rd.h, '.pnb-preset-share'), true);
+    eq('reader: another person\'s row = pin + copy only',           acts(shRow(rd.h, 'Theirs')).length, 2);
+    eq('reader: an author\'s row = pin + copy only',                acts(shRow(rd.h, 'Author view')).length, 2);
+    eq('reader: THEIR row = pin + copy + rename + delete (case-blind key)', acts(shRow(rd.h, 'My view')).length, 4);
+    eq('reader: state() carries the gate fields',
+       (function () { var st = P.shared.state('r1'); return [st.canWrite, st.canManage, st.sharing, st.me]; })(), [true, false, true, 'reader1']);
+    eq('reader: mayEdit() agrees - not theirs',  P.shared.mayEdit('r1', P.shared.find('r1', 'pivot', 'Theirs'), 'delete'), false);
+    eq('reader: mayEdit() agrees - theirs',      P.shared.mayEdit('r1', P.shared.find('r1', 'pivot', 'My view'), 'rename'), true);
+    // sharing over someone else's name is refused HERE, with nothing sent
+    errors = []; promptReply = 'Theirs'; confirmReply = true;
+    var before5 = calls.length;
+    click(q(rd.h, '.pnb-preset-share'));
+    eq('reader: sharing under another person\'s name sends nothing', calls.length, before5);
+    eq('reader: ...and says why', errors.length === 1 && errors[0].indexOf('Someone else already shared') !== -1, true);
+    // their own name: the usual overwrite confirm, then the POST
+    click(q(rd.h, '.pnb-preset-chip'));
+    promptReply = 'My view';
+    click(q(rd.h, '.pnb-preset-share'));
+    eq('reader: overwriting THEIR own shared preset POSTs', last().body && last().body.name, 'My view');
+    answer(200, { status: 'success' });
+    answer(200, { status: 'success', can_write: true, can_manage: false, sharing: true, me: 'reader1', data: [
+      { ns: 'pivot', name: 'My view', data: { rows: ['COLLEGE'] }, created_by: 'reader1' } ] });
+    click(q(rd.h, '.pnb-preset-chip'));
+    // the card switched off: a reader may still DELETE their own, not rename it
+    P.shared._reset();
+    var ro = mk({ ns: 'pivot', shared: { canWrite: false } });
+    click(q(ro.h, '.pnb-preset-chip'));
+    answer(200, { status: 'success', can_write: false, can_manage: false, sharing: false, me: 'reader1', data: [
+      { ns: 'pivot', name: 'My view', data: { rows: ['FY'] }, created_by: 'reader1' },
+      { ns: 'pivot', name: 'Theirs',  data: { rows: ['PI'] }, created_by: 'reader2' } ] });
+    eq('reader, card off: no Share row',                     !!q(ro.h, '.pnb-preset-share'), false);
+    eq('reader, card off: their row = pin + copy + delete',  acts(shRow(ro.h, 'My view')).length, 3);
+    eq('reader, card off: ...and that third one is delete',  acts(shRow(ro.h, 'My view'))[2].className.indexOf('is-danger') !== -1, true);
+    eq('reader, card off: another\'s row = pin + copy only', acts(shRow(ro.h, 'Theirs')).length, 2);
+    click(q(ro.h, '.pnb-preset-chip'));
+    // an AUTHOR (can_manage) still manages every row
+    P.shared._reset();
+    var am = mk({ ns: 'pivot', shared: true });
+    click(q(am.h, '.pnb-preset-chip'));
+    answer(200, { status: 'success', can_write: true, can_manage: true, sharing: true, me: 'owner1', data: [
+      { ns: 'pivot', name: 'Theirs', data: { rows: ['PI'] }, created_by: 'reader2' } ] });
+    eq('author: a reader\'s row = pin + copy + rename + delete', acts(shRow(am.h, 'Theirs')).length, 4);
+    click(q(am.h, '.pnb-preset-chip'));
+    } catch (e5) { eq('reader: the section ran to the end', String(e5), 'no error'); }
+    calls = []; queue = [];
     P.shared._setTransport(null);
 
     // ══════════════════════════════════════════════════════════════════════

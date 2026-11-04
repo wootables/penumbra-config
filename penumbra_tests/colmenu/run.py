@@ -585,7 +585,7 @@ MUTANTS = {
     # --- (round 12) the lists under one item
     'u-noshowall': ([('menu', "        body.push({ act: 'showAll', label: 'Show all columns', disabled: !hidden.length, why: 'Every column is shown', run: function () {\n            var l = copyLayout(api().layout());\n            l.cols.forEach(function (c) { c.visible = true; });\n            applyWithUndo(l, 'Showing all ' + l.cols.length + ' columns.', false);\n        } });\n", "")],
                     ['L-msubs-showList'], ['msubs']),
-    'u-clear': ([('menu', "run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } });", "run: function () { } });")], ['L-msubs-clearPanel'], ['msubs']),
+    'u-clear': ([('menu', "run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } };", "run: function () { } };")], ['L-msubs-clearPanel'], ['msubs']),
     'u-arrow': ([('menu', "((it.sub && it.act !== 'back') ? '<span class=\"pnb-hm-arrow\" aria-hidden=\"true\">&#8250;</span>' : '')", "''")], ['L-msubs-arrows'], ['msubs']),
     'u-copyname': ([('menu', "        if (!isNum) { use.push({ act: 'copyName', label: 'Copy column name', run: function () { copyName(col); } }); }\n", "")], ['L-msubs-topOrder'], ['msubs']),   # (re-anchored 2026-10-20: not on round 20's '#' menu)
     # --- (round 31) the item trusts the panel's checkbox
@@ -865,6 +865,66 @@ MUTANTS.update({
     'cs-set': ([('main', "        setClickSplit: function (col, on) { penumbraSetColOpt(col, 'split', !!on); return true; },", "        setClickSplit: function (col, on) { return true; },")],
                ['L-msplit-ticks'], ['msplit']),
     # (S-helpSplitMenu has no mutant here: this runner's mutants run browser scenarios only)
+})
+
+
+# (2026-11-03, menufix) Freeze greyed past the first five, the '#' heading's view link, the summary row's menu (flat and
+# grouped), Clear all on a group's band and its List row. All red on live (no sumPick there: mfix's summary checks fail
+# on it, as ggfix's band / List checks do: live has no Clear all there).
+SCN = SCN + ['mfix', 'ggfix']
+CHK['mfix'] = ['freezeGrey', 'numLink', 'sumMenu', 'sumTail', 'sumPick', 'sumBadges', 'sumNoBadge', 'sumLabel', 'sumKbd', 'sumNone', 'sumNoneTick', 'sumRestr']
+CHK['ggfix'] = ['bandClear', 'gSumMenu', 'listClear']
+NEW_MF = {'L-mfix-' + c for c in CHK['mfix']} | {'L-ggfix-' + c for c in CHK['ggfix']}
+NEW = NEW | NEW_MF
+NEW = NEW - NEW_MF   # (menufix is LIVE since 5b124ce, 2026-11-03: old checks now)
+# (2026-11-03, menufix2) the "View Last Page" row's menu: red on menufix's live build
+SCN = SCN + ['mfix2']
+CHK['mfix2'] = ['linkMenu', 'linkOnLink', 'linkLast', 'linkAll']
+NEW_MF2 = {'L-mfix2-' + c for c in CHK['mfix2']}
+NEW = NEW | NEW_MF2
+NEW = NEW - NEW_MF2   # (menufix2 is LIVE since f4cc45a, 2026-11-03: old checks now)
+# (2026-11-03, pgflt) Filter to this page: red on live (no item)
+SCN = SCN + ['mpage']
+CHK['mpage'] = ['pgCell', 'pgRun', 'pgOne', 'pgSorted', 'pgReplace', 'pgNumHead', 'pgLink', 'pgAll']
+NEW_PG = {'L-mpage-' + c for c in CHK['mpage']}
+NEW = NEW | NEW_PG
+NEW = NEW - NEW_PG   # (pgflt is LIVE since c0bb45e, 2026-11-03: old checks now)
+MUTANTS.update({
+    'pg-none': ([('menu', "            var pgi = grouped ? null : pageFilterItem(A);   // (pgflt) Filter to this page", "            var pgi = null;")],
+                ['L-mpage-pgCell', 'L-mpage-pgRun', 'L-mpage-pgOne', 'L-mpage-pgSorted', 'L-mpage-pgReplace', 'L-mpage-pgAll'], ['mpage']),
+    'pg-head': ([('menu', "        var pgh = (isNum && !cell && !grouped) ? pageFilterItem(A) : null;   // (pgflt) the '#' heading: Filter to this page", "        var pgh = null;")], ['L-mpage-pgNumHead'], ['mpage']),
+    'pg-link': ([('menu', "            var pgs = pageFilterItem(A);   // (pgflt) ...or this page's own summary", "            var pgs = null;")], ['L-mpage-pgLink'], ['mpage']),
+    'pg-range': ([('main', "        var run = nums.every(function (n, i) { return n === nums[0] + i; });", "        var run = false;")], ['L-mpage-pgRun'], ['mpage']),
+    'pg-set': ([('main', "        st2.sel['#'] = run ? [] : nums.map(String);", "        st2.sel['#'] = [];")], ['L-mpage-pgSorted'], ['mpage']),
+    'pg-keep': ([('main', "        st.range['#'] = run ? { min: String(nums[0]), max: String(nums[nums.length - 1]) } : { min: '', max: '' };",
+                  "        st.range['#'] = run ? { min: String(nums[0]), max: String(nums[nums.length - 1]) } : (st.range['#'] || { min: '', max: '' });")], ['L-mpage-pgReplace'], ['mpage']),
+    'pg-one': ([('main', "        if (pages <= 1) return { ok: false, why: 'There is only one page' };", "        if (false) return { ok: false, why: 'There is only one page' };")], ['L-mpage-pgOne'], ['mpage']),
+    'pg-all': ([('main', "        if (rpp === 'all') return { ok: false, why: 'Rows per page is All' };", "        if (false) return { ok: false, why: 'Rows per page is All' };")], ['L-mpage-pgAll'], ['mpage']),
+})
+MUTANTS.update({
+    'mf2-link': ([('menu', "        if (td.parentNode.classList.contains('total-row-link')) { return api() ? { td: td, link: true } : null; }", "        if (td.parentNode.classList.contains('total-row-link')) { return null; }")],
+                 ['L-mfix2-linkMenu', 'L-mfix2-linkOnLink', 'L-mfix2-linkLast', 'L-mfix2-linkAll'], ['mfix2']),
+    'mf2-linkctl': ([('menu', "        if (ctl && ctl.id !== 'viewLastPageLink') { return null; }", "        if (ctl) { return null; }")], ['L-mfix2-linkOnLink'], ['mfix2']),
+    'mf2-allrows': ([('menu', "                    rpp.value = 'all';", "                    rpp.value = rpp.value;")], ['L-mfix2-linkAll'], ['mfix2']),
+})
+MUTANTS.update({
+    # Freeze past five: nothing (as before); the view link alone never offered
+    'mf-freeze': ([('menu', "            else if (pos > A.frozenMax && pos < vis.length) {", "            else if (false) {")], ['L-mfix-freezeGrey'], ['mfix']),
+    'mf-numlink': ([('menu', "        else if (vlOk && isNum && !cell) {", "        else if (false) {")], ['L-mfix-numLink'], ['mfix']),
+    # the summary row: no menu; None never ticked; the label's own branch gone; the restricted viewer offered the types
+    'mf-nosum': ([('menu', "        var smt = sumTarget(e.target);", "        var smt = null;")],
+                 ['L-mfix-sumMenu', 'L-mfix-sumTail', 'L-mfix-sumPick', 'L-mfix-sumLabel', 'L-mfix-sumKbd', 'L-ggfix-gSumMenu'], ['mfix', 'ggfix']),
+    'mf-noneTick': ([('menu', "checked: !now, title: 'No summary for this column'", "checked: false, title: 'No summary for this column'")], ['L-mfix-sumNoneTick'], ['mfix']),
+    'mf-tick': ([('menu', "note: ty.badge, checked: now === ty.key,", "note: ty.badge, checked: false,")], ['L-mfix-sumMenu'], ['mfix']),
+    'mf-label': ([('menu', "if (td.classList.contains('pnb-sum-label')) { return { td: td, label: true }; }", "if (td.classList.contains('pnb-sum-label')) { return null; }")], ['L-mfix-sumLabel'], ['mfix']),
+    'mf-restr': ([('menu', "        if (info && !restricted) {\n            var keep", "        if (info) {\n            var keep")], ['L-mfix-sumRestr'], ['mfix']),
+    'mf-nocopy': ([('menu', "        if (v) { items.push('-'); items.push({ act: 'sumCopy',", "        if (false) { items.push('-'); items.push({ act: 'sumCopy',")], ['L-mfix-sumTail'], ['mfix']),
+    # main.js: a pick never made; the badges never switched; None not the badge's (no Undo)
+    'mf-pick': ([('main', "            else if (PENUMBRA_SUMMARY_TYPES[type] && type !== 'formula') { _spCommitBadgePick(col, type); }", "            else { }")], ['L-mfix-sumPick'], ['mfix']),
+    'mf-badges': ([('main', "        setSumBadges: function (on) { _spSetSummaryBadges(!!on); },", "        setSumBadges: function (on) { },")], ['L-mfix-sumBadges'], ['mfix']),
+    'mf-none': ([('main', "            if (type === 'none') { _spBadgePickNone(col); }", "            if (type === 'none') { _spCommitBadgePick(col, false); }")], ['L-mfix-sumNone'], ['mfix']),
+    # Clear all: only where buildItems put it (as before)
+    'mf-clear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-ggfix-bandClear', 'L-ggfix-listClear'], ['ggfix']),
 })
 
 args = sys.argv[1:]

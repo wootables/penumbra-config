@@ -363,7 +363,9 @@ try {
     $uiMuts = @(
       @{ n = 'ui_wrong_namespace'; rx = "(mountId: 'schedDropTplPresetMount',\s+ns: ')tpldownload(')"; to = '${1}tplcopy$2'; must = 'a preset saved under the DOWNLOAD namespace is listed here' },
       @{ n = 'ui_no_header_prefill'; rx = [regex]::Escape("`$('#schedDropCustomHeader').val(_dlDefaultHeader());"); to = ''; must = 'header prefilled with the column names' },
-      @{ n = 'ui_panel_never_shows'; rx = [regex]::Escape("`$('#schedDropCustomOptions').toggle(on);"); to = ''; must = 'ticking Custom shows the panel' }
+      @{ n = 'ui_panel_never_shows'; rx = [regex]::Escape("`$('#schedDropCustomOptions').toggle(on);"); to = ''; must = 'ticking Custom shows the panel' },
+      # (2026-11-03) the template card (fnpop 2's hover card) never attached to the File Drop trigger
+      @{ n = 'ui_no_tpl_card'; rx = [regex]::Escape('_pnbHoverCard.attach(document.getElementById(''schedDropTplStringHelp''),'); to = '(function () {})(document.getElementById(''schedDropTplStringHelp''),'; must = 'hover help carries the string()/regex reference' }
     )
     foreach ($um in $uiMuts) {
       $mutated = [regex]::Replace($mainTpl, $um.rx, $um.to)

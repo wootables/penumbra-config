@@ -121,8 +121,17 @@
       ok('double-click opens the suggestion menu (columns + string() ops)', menuItems.some(function (t) { return t.indexOf('{NAME}') !== -1; }) && menuItems.some(function (t) { return t.indexOf('string(regex_replace') !== -1; }), menuItems.slice(0, 6).join(' | '));
       try { $('#schedDropCustomTemplate').autocomplete('close'); } catch (e) {}
 
-      // hover help shares the Download dialog's text
-      ok('hover help carries the string()/regex reference', String($('#schedDropTplStringHelp').attr('title') || $('#schedDropTplStringHelp').data('ui-tooltip-title') || '').indexOf('regex_replace') !== -1);
+      // hover help shares the Download dialog's text. Since fnpop 2 (2fbe452, 2026-10-22) it is a hover
+      // card (#pnbHoverCard), no longer a title tooltip: hover the trigger, read the open card and its link
+      var shHelp = document.getElementById('schedDropTplStringHelp');
+      if (shHelp) shHelp.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+      await later(300);
+      var hCard = document.getElementById('pnbHoverCard');
+      ok('hover help carries the string()/regex reference',
+         !!hCard && hCard.classList.contains('open') && hCard.textContent.indexOf('regex_replace') !== -1 && !!hCard.querySelector('a[data-help-anchor="schedHelp-template"]'),
+         hCard ? hCard.className + ' | ' + hCard.textContent.slice(0, 120) : 'no #pnbHoverCard');
+      if (shHelp) shHelp.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+      await later(250);
 
       // ---- presets: ONE store with the Download dialog (ns tpldownload) ------
       var P = window.PenumbraPresets, rid = P.reportId();

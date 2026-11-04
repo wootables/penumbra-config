@@ -66,7 +66,7 @@ T_NOCV = tok({'v': 1, 'm': 'flat', 'o': 'none'})   # a link without the card vie
 T_XL = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'xl'})   # (cxl) a link to the cards at Extra large
 
 SCN = ['cgbar', 'cfmtbig', 'cfmt', 'cauto', 'cguess', 'cpage', 'cfull', 'chl', 'cbar', 'cesc', 'coff', 'cviewer', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'csize', 'cszvlA', 'cszvlB', 'cnarrowA', 'cnarrowT', 'cnarrowN', 'cauth', 'cauthB', 'cauthM', 'cvlA', 'cvlB', 'cvlT', 'ca11y', 'cphone', 'cperf', 'cmore',
-       'cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'ctclear', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'ctsel', 'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl1', 'curl2', 'curl3', 'curl4', 'cshare', 'cnote', 'cnotedet', 'ctmenu', 'ctrow', 'gtrow', 'cflink', 'ckword', 'cfind', 'gfind', 'cbarpick', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'ccolsview', 'pvhtml', 'cfields', 'cfieldsB', 'gboard', 'gboardvl', 'gboardfew', 'gboardbig', 'gbandbig', 'cboard', 'cboardload', 'cboardrx', 'cbarrank', 'cvlC', 'cvlD', 'pfsort', 'cvlE', 'cvlF', 'pvlA', 'pvlB', 'pvcfg', 'pvcfgB', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cchips', 'cmail', 'gmail', 'pmail', 'cdens', 'cdensph', 'gdens', 'cflt', 'csave', 'copen', 'cdpack']
+       'clay1', 'pw3dup', 'gw3agg', 'gw3cnt', 'ct3save', 'cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'ctclear', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'ctsel', 'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl1', 'curl2', 'curl3', 'curl4', 'cshare', 'cnote', 'cnotedet', 'ctmenu', 'ctrow', 'gtrow', 'cflink', 'ckword', 'cfind', 'gfind', 'cbarpick', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'ccolsview', 'pvhtml', 'cfields', 'cfieldsB', 'gboard', 'gboardvl', 'gboardfew', 'gboardbig', 'gbandbig', 'cboard', 'cboardload', 'cboardrx', 'cbarrank', 'cvlC', 'cvlD', 'pfsort', 'cvlE', 'cvlF', 'pvlA', 'pvlB', 'pvcfg', 'pvcfgB', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cchips', 'cmail', 'gmail', 'pmail', 'cdens', 'cdensph', 'gdens', 'cflt', 'csave', 'copen', 'cdpack']
 T_CV = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'compact'})   # (curl) a view link asking for compact cards
 CHK = {
     'cauto': ['switchShown', 'tableDefault', 'toCards', 'pagerWord', 'tableKeptForReaders', 'count', 'guessTitle', 'guessBig', 'guessFields', 'guessNoExtras', 'parity', 'linkKept', 'filtered', 'sorted', 'prefSaved',
@@ -78,7 +78,8 @@ CHK = {
     'cguess': ['moneyOverNumber', 'fieldsNext'],
     'cpage': ['pageSize', 'nextPage', 'lastPageFilled', 'rowsPerPageAll'],
     'cfull': ['bootsCards', 'slots', 'hiddenFilled', 'pillPlain', 'barFallback', 'subShown', 'fieldLabels', 'fieldValues'],
-    'chl': ['ruledPills', 'plainPills', 'pillMatchesCell'],
+    'chl': ['ruledPills', 'plainPills', 'pillMatchesCell',
+            'edgeRuled', 'edgePlain', 'edgePainted', 'edgeDetail', 'edgeMail', 'edgeRule', 'edgeTheme'],   # (cedge) the status edge
     # (cfmt) a cell's highlight on the title, a subtitle, the big number and a field; a plain one plain; a rule and a format
     # changed in the column options while the cards show; the details window's fields
     'cfmt': ['titleRuled', 'subRuled', 'subPlain', 'bigRuled', 'fieldRuled', 'fieldPlain', 'liveRule', 'liveFormat', 'detRuled',
@@ -92,7 +93,7 @@ CHK = {
     'cviewer': ['noForm', 'switchShown', 'cards', 'viewerWindow', 'viewerPick'],   # (round N) Configure cards for a viewer
     # (pvtiles) the pivot as tiles: the switch shows, one tile per shown pivot row + the grand total first, the label / parents /
     # row total / column values from the cells, a fold followed, a value's click drills, the exit back to flat cards, a re-entry
-    'pcoff': ['pivotShown', 'switchShownInPivot', 'tilesCount', 'totalTile', 'tileTitle', 'tileBig', 'tileFields', 'foldFollowed', 'drillForward', 'backAfterExit'],
+    'pcoff': ['pivotShown', 'switchShownInPivot', 'tilesCount', 'totalTile', 'tileTitle', 'tileBig', 'tileFields', 'foldFollowed', 'drillWhiteCard', 'drillTextReal', 'drillForward', 'backAfterExit'],
     'gcards': ['grouped', 'inBands', 'bandHeads', 'bandAggs', 'bandTableHidden', 'headSticky', 'bandGrows', 'bandCards', 'totalCards', 'staleGone', 'searched'],   # (cband) the cards in the grouped view's own bands
     # (gfold) the bands fold as the table's: a band click, Enter on a band, Collapse all / Expand all, the fold kept across Table <-> Cards, a nested branch
     'gcoll': ['bandsOpen', 'bandClick', 'bandAgain', 'bandKey', 'collapseAll', 'expandAll', 'keptAcrossViews', 'focusKept', 'tableHome'],   # (cband) the real bands; the table: the view home
@@ -130,6 +131,10 @@ CHK = {
     'cnest': ['nestHot', 'nestGapField', 'clearLastCard', 'whiteStillCard', 'clearLastLabel', 'nestGapDetails', 'clearLastDetails'],
     'ctclear': ['tableClearLast', 'clearRuns', 'headClearLast'],
     # (cnest sweep) the card sweep's fixes, one check each (S-cn*: the ones a page cannot reach here)
+    # (clay, 2026-11-03, the user: named card layouts) Configure cards' Layouts
+    'clay1': ['chipThere', 'savedApplied', 'sharedApplied', 'escList', 'openLayouts'],
+    # (cleft, 2026-11-03, the user: the second sweep's leftovers) one check per fix
+    'pw3dup': ['dupFields', 'dupSort'], 'gw3agg': ['aggHead', 'cntCard'], 'gw3cnt': ['cntCell'], 'ct3save': ['sizeNoWrite'],
     # (csw2, 2026-11-02, the user: a second card sweep) one check per fix
     'cw2det': ['selNoWin', 'dragKeeps', 'bodyTop', 'endFocus', 'escMenuFirst', 'noEngine', 'clipNoRepass', 'panelFocus', 'tableLinkSize'],
     'cw2nest': ['subFilter'], 'cw2more': ['rowNotDrawn', 'moreFocus'], 'cw2pdf': ['pdfShared'], 'gw2band': ['bandDown', 'regroupResets'],
@@ -518,6 +523,10 @@ NEW = ({'L-citem-%s' % c for c in CHK['citem']} | {'S-citem'}) - GUARDS
 NEW = set()   # (cfsplit 4 is LIVE since 81e2699, 2026-11-02: old checks now)
 NEW = ({'L-%s-%s' % (sc, c) for sc in ('cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next') for c in CHK[sc]}) - GUARDS   # (csw2: the second card sweep)
 NEW = set()   # (csw2 is LIVE since a7d63c3, 2026-11-02: old checks now)
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('pw3dup', 'gw3agg', 'gw3cnt', 'ct3save') for c in CHK[sc]}) - GUARDS   # (cleft: the second sweep's leftovers)
+NEW = set()   # (cleft is LIVE since 4300d47, 2026-11-03: old checks now)
+NEW = ({'L-clay1-%s' % c for c in CHK['clay1']} | {'S-clay'}) - GUARDS   # (clay: named card layouts)
+NEW = set()   # (clay is LIVE since 7bcb809, 2026-11-03: old checks now)
 MUTANTS = {
     # (cdpack) the packed grid's row-gap guard gone: the density rules' size gaps come back
     'pk-rowgap': ([('cardscss', '#pnbCardsHost.is-packed .pnb-cards-grid { row-gap: 0 !important; }\n', '')], ['L-cdpack-compactTight', 'L-cdpack-everyTight', 'S-cdpack'], ['cdpack']),
@@ -639,6 +648,12 @@ MUTANTS = {
     'w2-pvsel': ([('cards', "            sel = null; focusAt = 0; openCards = Object.create(null);\n", "")], ['L-pw2piv-selGone'], ['pw2piv']),
     'w2-pvdet': ([('cards', "            if (det.open && !det.tbl) closeDetails(false);\n", "")], ['L-pw2piv-detGone'], ['pw2piv']),
     'w2-pnext': ([('cards', "        if (det.open && hostApi() && H.inPivot()) {   // (csw2)", "        if (det.open && hostApi() && H.inPivot()) { return false;   // (csw2)")], ['L-pw2next-pivotNextOn'], ['pw2next']),
+    # --- (cleft) the second sweep's leftovers: one mutant per fix
+    'l3-dupn': ([('cards', "        if (n > 1 && ths.length >= n) {", "        if (false) {")], ['L-pw3dup-dupFields'], ['pw3dup']),
+    'l3-dupsort': ([('cards', "            if (e.label && out.byKey[e.key] && e.kind !== 'field') {", "            if (false) {")], ['L-pw3dup-dupSort'], ['pw3dup']),
+    'l3-agg': ([('cards', "var ga = w.querySelector(':scope > .group-header > .group-agg-summary');", "var ga = null;")], ['L-gw3agg-aggHead'], ['gw3agg']),
+    'l3-cnt': ([('main', "return !$(this).closest('td, .pnb-card', w).length; }).length; };", "return true; }).length; };")], ['L-gw3agg-cntCard', 'L-gw3cnt-cntCell'], ['gw3agg', 'gw3cnt']),
+    'l3-save': ([('cards', "        if (!v && (z === base || (!report && !on()))) return report;", "        if (!v && z === base) return report;")], ['L-ct3save-sizeNoWrite'], ['ct3save']),
     'cd-delall': ([('cardscss', "#pnbCardsHost .journal-rownote-inline .journal-rownote-act button.journal-rownote-del, #pnbCardsHost .pnb-sharednote-file .pnb-sharednote-filedel { display: none; }", ".journal-rownote-inline .journal-rownote-act button.journal-rownote-del, .pnb-sharednote-file .pnb-sharednote-filedel { display: none !important; }")], ['L-cnotedet-delInDetails'], ['cnotedet']),
     'cz-sent': ([('cards', "        sent.size = curSize();   // (csz, the user) the size the cards show: the scheduled email draws them at it\n", "")], ['L-csave-sentSize'], ['csave']),
     'cz-clean': ([('cards', "        if (SIZES.indexOf(x.size) >= 0) o.size = x.size;   // (csz)\n", "")], ['L-csave-sentSizeKept'], ['csave']),
@@ -1093,6 +1108,7 @@ MUTANTS = {
     'm-pivotoff': ([('cards', "    function allowed() { return !!(hostApi() && H.loaded() && !H.inComparison()); }", "    function allowed() { return !!(hostApi() && H.loaded() && !H.inPivot() && !H.inComparison()); }")],
                    ['L-pcoff-switchShownInPivot', 'L-pcoff-tilesCount'], ['pcoff']),
     'm-pvbigfirst': ([('cards', "            if (td.classList.contains('pivot-grand-total') && !td.hasAttribute('data-row-field') &&", "            if (false &&")], ['L-pcoff-tileBig', 'L-pcoff-totalTile'], ['pcoff']),
+    'm-pvtextoff': ([('cards', "        if (pvv && hostApi() && H.inPivot() && onText(pvv, clickPt(e))) {", "        if (pvv && hostApi() && H.inPivot()) {")], ['L-pcoff-drillWhiteCard'], ['pcoff']),   # (pvtext) the whole value drills again
     'm-pvnofollow': ([('cards', "                clearTimeout(pvTimer); pvTimer = setTimeout(function () { if (H.inPivot()) { sync(); if (on()) draw(); } }, 60);", "                clearTimeout(pvTimer); pvTimer = setTimeout(function () { }, 60);")], ['L-pcoff-foldFollowed'], ['pcoff']),   # (a sync() left in would still schedule the draw)
     # the viewer's pick never kept
     'm-noprefs': ([('cards', "        try { if (H.prefSet) H.prefSet(v); } catch (e) { }\n", "")], ['L-cauto-prefSaved'], ['cauto']),
@@ -1450,6 +1466,168 @@ MUTANTS.update({
                  ['L-citem-chipMenu'], ['citem']),
 })
 
+# (clay) the preset engine beside the cards; Quick actions' row, the help, the README
+RELS['presets'] = os.path.join('js', 'penumbra_presets.js'); RELS['presetscss'] = os.path.join('css', 'penumbra_presets.css')
+_static_checks_before_clay = static_checks
+def static_checks(t):
+    out = _static_checks_before_clay(t)
+    out.append(('S-clay', "{ id: 'cardlayouts', label: 'Card layouts...'," in t['pal'] and "run: function () { window.Penumbra.cards.openLayouts(); }" in t['pal']
+                and '<strong>Save these cards...</strong> names what the window shows' in t['ustopic']
+                and 'up to 16 fields; <strong>Layouts</strong> saves them by name.</li>' in t['tip'] and 'clay (2026-11-03, the user' in t['readme'],
+                'the palette row, the Your Settings topic, the tip, the README'))
+    return out
+MUTANTS.update({
+    # (clay) named card layouts: the chip never mounted; a layout's setup not applied; Escape closing the window under
+    # the list; Quick actions' row opening the window alone; the engine without the cards namespace
+    'ly-mount': ([('cards', "        lyMount();   // (clay)", "        // (clay)")], ['L-clay1-chipThere'], ['clay1']),
+    'ly-apply': ([('cards', "        try { H.layoutSet(layoutClean(data.setup)); } catch (e) { }   // the report's own rules", "        // the report's own rules")], ['L-clay1-savedApplied'], ['clay1']),
+    'ly-esc': ([('cards', "        if (cfgOpen && esc && !e.defaultPrevented && lyCtl && lyCtl.isOpen()) {", "        if (false) {")], ['L-clay1-escList'], ['clay1']),
+    'ly-open': ([('cards', "        if (c && !lyCtl.isOpen()) c.click();\n", "")], ['L-clay1-openLayouts'], ['clay1']),
+    'ly-ns': ([('presets', "        cards:       { pin: null,     legacy: null }\n", "")], ['L-clay1-chipThere'], ['clay1']),
+    'ly-pal': ([('pal', "run: function () { window.Penumbra.cards.openLayouts(); }", "run: function () { window.Penumbra.cards.openConfig(); }")], ['S-clay'], []),
+})
+
+# (2026-11-03, menufix) a Board card's Show as table, Clear all on a lane, the space between cards
+SCN = SCN + ['cgapm']
+CHK['cgapm'] = ['gapMenu', 'gapSizes', 'gapCardStill', 'gapTable']
+CHK['gboard'] = CHK['gboard'] + ['cardTableWord', 'laneClear']
+GUARDS -= {'L-cnest-whiteStillCard'}   # (menufix) a card's empty space ends with Clear all now: red on live
+NEW = ({'L-cgapm-%s' % c for c in CHK['cgapm']} | {'L-gboard-cardTableWord', 'L-gboard-laneClear', 'L-cnest-whiteStillCard', 'L-pmenu-totalTileMenu'}) - GUARDS - {'L-cgapm-gapCardStill'}
+NEW = set()   # (menufix is LIVE since 5b124ce, 2026-11-03: old checks now)
+# (2026-11-03, menufix2) the pill's menu, every card shown / trimmed, a tile's sorts naming their column, the column order
+SCN = SCN + ['cmore2']
+CHK['cmore2'] = ['pillMenu', 'allOffered', 'allOpens', 'trimOffered', 'allTrims']
+CHK['pfsort'] = CHK['pfsort'] + ['colsSort']
+NEW = ({'L-cmore2-%s' % c for c in CHK['cmore2']} - {'L-cmore2-allTrims'}) | {'L-pfsort-valueMenuSorts', 'L-pfsort-titleMenuSorts', 'L-pfsort-colsSort'}
+NEW = set()   # (menufix2 is LIVE since f4cc45a, 2026-11-03: old checks now)
+# (2026-11-03, menufix3) a card's Hide / Show only edit the card layout; its sorts named; the details window's Print
+SCN = SCN + ['cfld3']
+CHK['cfld3'] = ['sortNamed', 'hideCard', 'hideUndo', 'onlyCard', 'detPrint', 'detHideTable']
+NEW_MF3 = {'L-cfld3-%s' % c for c in CHK['cfld3']} - {'L-cfld3-hideUndo'}
+GUARDS |= {'L-cfld3-hideUndo'}   # the table hide's own Undo restores the field on live too
+MUTANTS.update({
+    'mf3-hide': ([('menu', "                    if (o.act === 'hide' && fcol) {", "                    if (false) {")], ['L-cfld3-hideCard'], ['cfld3']),   # (its Undo: the table hide's own Undo puts the field back too)
+    'mf3-only': ([('menu', "                    } else if (o.act === 'only' && fcol) {", "                    } else if (false) {")], ['L-cfld3-onlyCard'], ['cfld3']),
+    'mf3-details': ([('menu', "        if (fromCard && !fromCard.inDetails && !fromCard.pivot && CL && typeof CL.fieldHide === 'function') {", "        if (fromCard && !fromCard.pivot && CL && typeof CL.fieldHide === 'function') {")], ['L-cfld3-detHideTable'], ['cfld3']),
+    'mf3-sort': ([('menu', "                o.label = it.label.replace(/^(Then sort|Sort) /, function (m, w) { return w + ' by ' + title + ': '; });", "")], ['L-cfld3-sortNamed'], ['cfld3']),
+    'mf3-print': ([('cards', "        var pb = t.inDetails && det.open ? document.querySelector('#pnbCardDetails .pnb-cdet-print') : null;", "        var pb = null;")], ['L-cfld3-detPrint', 'L-cfld3-detHideTable'], ['cfld3']),
+})
+MUTANTS.update({
+    'mf2-pill': ([('cards', "        if (ctl && !ctl.classList.contains('pnb-card-more')) return null;", "        if (ctl) return null;")], ['L-cmore2-pillMenu'], ['cmore2']),
+    'mf2-allopen': ([('cards', "            if (open && c.classList.contains('is-clipped')) { c.classList.add('is-open'); openCards[k] = 1; }", "            if (false) { c.classList.add('is-open'); openCards[k] = 1; }")], ['L-cmore2-allOpens', 'L-cmore2-trimOffered'], ['cmore2']),
+    'mf2-alloffer': ([('cards', "            if (anyCards('is-clipped')) out.push({ act: 'cardsAllOpen',", "            if (false) out.push({ act: 'cardsAllOpen',")], ['L-cmore2-allOffered', 'L-cmore2-allOpens'], ['cmore2']),
+    'mf2-sortword': ([('cards', "label: 'Sort by ' + e.label + ': ascending',", "label: 'Sort ascending',")], ['L-pfsort-valueMenuSorts', 'L-pfsort-titleMenuSorts'], ['pfsort']),
+    'mf2-cols': ([('cards', "        if (csi && st && st.cols && st.cols.length) {", "        if (false) {")], ['L-pfsort-colsSort'], ['pfsort']),
+})
+MUTANTS.update({
+    'mf-gap': ([('cards', "        if (!t) { gapMenu(e); return; }", "        if (!t) return;")], ['L-cgapm-gapMenu', 'L-cgapm-gapSizes', 'L-cgapm-gapTable'], ['cgapm']),
+    'mf-gapitems': ([('cards', "        CM.openItems('Cards', menuExtras({ kind: 'gap', card: null, pivot: false }, false), e.clientX, e.clientY, { kbd: kbd });", "        CM.openItems('Cards', [], e.clientX, e.clientY, { kbd: kbd });")], ['L-cgapm-gapMenu', 'L-cgapm-gapSizes'], ['cgapm']),
+    'mf-boardword': ([('cards', "        if (bd) out.push({ act: 'cardsStacked', label: 'Show as table',", "        if (bd) out.push({ act: 'cardsStacked', label: 'Switch to Stacked view',")], ['L-gboard-cardTableWord'], ['gboard']),
+    'mf-laneclear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-gboard-laneClear', 'L-cgapm-gapMenu'], ['gboard', 'cgapm']),
+})
+
+# (2026-11-03, pvgt; found on ?id=cprojects, a pivot of eight labelled measures and no column field) the Grand Total tile
+# named every value for the FIRST measure: the tfoot's cells carry the drill's data-agg-idx alone (no data-pv-ai), read as
+# 0. pvgt: no column field (Amt the big number, N and Mean the fields); pvgtB: V_STATUS across and the tiles' setup picking
+# N alone (the total tile listed none of them), Find on a Mean total the tile leaves out (named "<status> Amt")
+SCN = SCN + ['pvgt', 'pvgtB']
+CHK['pvgt'] = ['gtLabels', 'leafLabels', 'gtValues']
+CHK['pvgtB'] = ['gtPicked', 'gtLabelsCol', 'leafPicked', 'gtFound']
+GUARDS |= {'L-pvgt-leafLabels', 'L-pvgt-gtValues', 'L-pvgtB-leafPicked'}   # (pvgt: hold on live - the body's cells carry data-pv-ai; the values were right)
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('pvgt', 'pvgtB') for c in CHK[sc]} | {'S-pvgt'}) - GUARDS   # (pvgt: the Grand Total tile's measures)
+NEW = set()   # (pvgt is LIVE since b5e6af8, 2026-11-03: old checks now)
+_static_checks_before_pvgt = static_checks
+def static_checks(t):
+    out = _static_checks_before_pvgt(t)
+    cards = t['cards']
+    out.append(('S-pvgt', "    function pvAi(td) { return parseInt(td.getAttribute('data-pv-ai') || td.getAttribute('data-agg-idx') || '0', 10); }" in cards
+                and cards.count('pvAi(kc)') == 3 and "getAttribute('data-pv-ai') || '0'" not in cards,   # (pvgt2) the key cell's three reads
+                'pvgt: one reader of a value cell\'s measure (data-pv-ai, else the drill\'s data-agg-idx), for the tile\'s fields and Find\'s label'))
+    return out
+MUTANTS.update({
+    # (pvgt) the fallback gone: every Grand Total value named for the first measure, the picked N lets none through, Find
+    # names a Mean total for the first measure; then each call site on its own (the tile's fields, Find's label)
+    'gt-fallback': ([('cards', "    function pvAi(td) { return parseInt(td.getAttribute('data-pv-ai') || td.getAttribute('data-agg-idx') || '0', 10); }",
+                      "    function pvAi(td) { return parseInt(td.getAttribute('data-pv-ai') || '0', 10); }")],
+                    ['L-pvgt-gtLabels', 'L-pvgtB-gtPicked', 'L-pvgtB-gtLabelsCol', 'L-pvgtB-gtFound', 'S-pvgt'], ['pvgt', 'pvgtB']),
+    'gt-tileai': ([('cards', "                var ai = pvAi(tc);   // (pvgt) the Grand Total row's cells: their data-agg-idx",
+                    "                var ai = parseInt(tc.getAttribute('data-pv-ai') || '0', 10);")],
+                  ['L-pvgt-gtLabels', 'L-pvgtB-gtPicked', 'L-pvgtB-gtLabelsCol', 'S-pvgt'], ['pvgt', 'pvgtB']),
+    'gt-findai': ([('cards', ", ai = pvAi(td);   // (pvgt) a Grand Total cell's own measure", ", ai = parseInt(td.getAttribute('data-pv-ai') || '0', 10);")],
+                  ['L-pvgtB-gtFound', 'S-pvgt'], ['pvgtB']),
+})
+
+# (2026-11-03, pvgt2; the user: "Yes, fix them here") the gaps pvgt left. pvgtD (no column field, Find loaded): the big
+# number named for its measure (it read blank), Find marking a value on its tile (a key of "" read as none: the hit went
+# to the title) and naming one a Compact tile leaves out by its measure (it read '#3'). pvgtC (no breakdown: the Grand
+# Total row's totals carry no keys): those totals listed on the total tile, its big number named, Find marking them
+SCN = SCN + ['pvgtD', 'pvgtC']
+CHK['pvgtD'] = ['bigLabel', 'findValue', 'findNamed']
+CHK['pvgtC'] = ['gtKeyless', 'bigKeyless', 'bodyKeyless', 'findKeyless']
+GUARDS |= {'L-pvgtC-bodyKeyless'}   # (pvgt2: holds on live - the body's cells carry data-pv-ck + data-pv-ai under no breakdown)
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('pvgtD', 'pvgtC') for c in CHK[sc]} | {'S-pvgt', 'S-pvgt2'}) - GUARDS   # (pvgt2; S-pvgt now counts the key cell's reads)
+NEW = set()   # (pvgt2 is LIVE since 149bf1b, 2026-11-03: old checks now)
+_static_checks_before_pvgt2 = static_checks
+def static_checks(t):
+    out = _static_checks_before_pvgt2(t)
+    cards = t['cards']
+    out.append(('S-pvgt2', 'function pvKeyCell(td) {' in cards and 'function pvFieldLabel(kc, measures)' in cards and '        if (!ck) return (ms.length > 1 && ms[ai]) || key;' in cards
+                and 'bigLabel = keyPath(' not in cards,
+                'pvgt2: the key cell (a keyless total by its heading), the big number named as a field is, Find naming the measure alone'))
+    return out
+MUTANTS.update({
+    # (pvgt2) the big number by its column alone; Find's old key test (a key of "" = a label); the hidden value by its place;
+    # the Grand Total row's keyless totals without their heading's body cell
+    'gt2-biglabel': ([('cards', "big = ci; bigLabel = pvFieldLabel(bk, measures); break;", "big = ci; bigLabel = keyPath(pvColKey(bk)); break;")],
+                     ['L-pvgtD-bigLabel', 'L-pvgtC-bigKeyless', 'S-pvgt2'], ['pvgtD', 'pvgtC']),
+    'gt2-findkey': ([('cards', "            var lab = td.hasAttribute('data-row-field') || !(pvKeyCell(td) || td.classList.contains('pivot-grand-total'));",
+                      "            var lab = td.hasAttribute('data-row-field') || !(td.getAttribute('data-col-key') || td.getAttribute('data-pv-ck') || td.classList.contains('pivot-grand-total'));")],
+                    ['L-pvgtD-findValue', 'L-pvgtD-findNamed', 'L-pvgtC-findKeyless'], ['pvgtD', 'pvgtC']),
+    'gt2-findname': ([('cards', "        if (!ck) return (ms.length > 1 && ms[ai]) || key;", "        if (!ck) return key;")], ['L-pvgtD-findNamed', 'S-pvgt2'], ['pvgtD']),
+    'gt2-footref': ([('cards', "        if (!T || td.hasAttribute('colspan') || td.hasAttribute('data-row-field-span-from')", "        if (true || td.hasAttribute('colspan') || td.hasAttribute('data-row-field-span-from')")],
+                    ['L-pvgtC-gtKeyless', 'L-pvgtC-bigKeyless', 'L-pvgtC-findKeyless'], ['pvgtC']),
+})
+# (pvgt2) pvgt's call-site mutants re-anchored on the key cell (kc)
+MUTANTS['gt-tileai'] = ([('cards', "                var ai = pvAi(kc);   // (pvgt) the Grand Total row's cells: their data-agg-idx", "                var ai = parseInt(kc.getAttribute('data-pv-ai') || '0', 10);")], MUTANTS['gt-tileai'][1], MUTANTS['gt-tileai'][2])
+MUTANTS['gt-findai'] = ([('cards', ", ai = pvAi(kc);   // (pvgt) a Grand Total cell's own measure", ", ai = parseInt(kc.getAttribute('data-pv-ai') || '0', 10);")], MUTANTS['gt-findai'][1], MUTANTS['gt-findai'][2])
+
+# (2026-11-03, bdj, the user) a % change tile's value opens its breakdown: the tile clicks the pivot's derived cell too
+# (data-pv-drv: no drill keys of its own), and the pivot's own drill (brk, b573316) opens the cells it is computed from
+SCN = SCN + ['pw4drv']
+CHK['pw4drv'] = ['drvTile']
+NEW = {'L-pw4drv-drvTile'}   # (bdj)
+NEW = set()   # (bdj is LIVE since 3b4c8be, 2026-11-03: old checks now)
+MUTANTS.update({
+    'bd-drvtile': ([('cards', " || ptd.hasAttribute('data-grand-total') || ptd.hasAttribute('data-pv-drv'))) {", " || ptd.hasAttribute('data-grand-total'))) {")],
+                   ['L-pw4drv-drvTile'], ['pw4drv']),
+})
+
+NEW = NEW | NEW_MF3   # (menufix3) after every later round's NEW line
+NEW = NEW - NEW_MF3   # (menufix3 is LIVE since c53d600, 2026-11-03: old checks now)
+
+# (cedge, 2026-11-03, the user: the cards list's item 4 - the status edge) a card's left edge in its pill's colour
+GUARDS |= {'L-chl-edgePlain'}   # (cedge: holds on live - no card has an edge there)
+NEW_CEDGE = {'L-chl-%s' % c for c in ('edgeRuled', 'edgePlain', 'edgePainted', 'edgeDetail', 'edgeMail', 'edgeRule', 'edgeTheme')} - GUARDS
+NEW = NEW | NEW_CEDGE   # (cedge) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_CEDGE   # (cedge is LIVE since ac211e9, 2026-11-03: old checks now)
+MUTANTS.update({
+    'ed-off': ([('cards', "    function edgeCss(c) { return c ? '--pnb-card-edge:' + c + ';' : ''; }", "    function edgeCss(c) { return ''; }")],
+               ['L-chl-edgeRuled', 'L-chl-edgePainted', 'L-chl-edgeDetail'], ['chl']),
+    'ed-card': ([('cards', "        if (r.pill) cs += edgeCss(edgeOf(cellOf(tr, r.pill)));   // (cedge) the status pill's colour down the left edge\n", "")],
+                ['L-chl-edgeRuled', 'L-chl-edgePainted'], ['chl']),
+    'ed-chroma': ([('cards', "            if (ch >= 24) { if (ch > bc) { bc = ch; best = v; } }\n            else if (k > gk) { gk = k; grey = v; }\n", "            if (k > gk) { gk = k; grey = v; }\n")],
+                  ['L-chl-edgeTheme'], ['chl']),
+    'ed-restyle': ([('cards', "            card.style.cssText = styleOf(tr, CARD_PROPS) + (r.pill ? edgeCss(edgeOf(cellOf(tr, r.pill))) : '');   // (cedge)", "            card.style.cssText = styleOf(tr, CARD_PROPS);   // (cedge)")],
+                   ['L-chl-edgeTheme'], ['chl']),
+    'ed-det': ([('cards', "        if (r.pill) cs += edgeCss(edgeOf(cellOf(tr, r.pill)));   // (cedge) the head's edge, as the card's\n", "")],
+               ['L-chl-edgeDetail'], ['chl']),
+    'ed-mail': ([('cards', "(eg ? 'border-left:4px solid ' + esc(eg) + ';' : '')", "''")], ['L-chl-edgeMail'], ['chl']),
+    'ed-css': ([('cardscss', ".pnb-card[style*=\"--pnb-card-edge\"] { background-image: linear-gradient(var(--pnb-card-edge), var(--pnb-card-edge)); background-size: 4px 100%; background-repeat: no-repeat; }\n", "")],
+               ['L-chl-edgePainted'], ['chl']),
+    'ed-detcss': ([('cardscss', ".pnb-cdet-card.pnb-card[style*=\"--pnb-card-edge\"] { background-image: none; border-left: 4px solid var(--pnb-card-edge); padding-left: 10px; }\n", "")],
+                  ['L-chl-edgeDetail'], ['chl']),
+})
+
 def mutate(texts, name):
     t = dict(texts)
     for f, old, new in MUTANTS[name][0]:
@@ -1542,6 +1720,7 @@ def write_stage(texts):
     w('main.css', texts['maincss'])
     w('penumbra_colmenu.js', texts['menu'])   # (cmenu) the engine under test (the LIBS copy above is live's)
     w('penumbra_find.js', texts['find'])   # (round K) Find under test (cfind / gfind load it)
+    w('penumbra_presets.js', texts['presets']); w('penumbra_presets.css', texts['presetscss'])   # (clay) the preset engine under test (clay1)
 
 def url_for(s, token=None):
     u = 'harness.html?scn=%s&id=lrfix' % s

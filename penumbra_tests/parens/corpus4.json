@@ -1,0 +1,461 @@
+{
+ "_about": "parens NAMES corpus (2026-11-03, parennames): a column or aggregate name that holds parentheses (the user's `Hit Ratio (Decided) > 10` on ?id=hitratio, red since 778acc9). Rule: a pair whose closer is followed straight by an operator is part of the name (a group is never compared), and the parens inside a brace name an opener cut open (`({HR (D)} > 50 or ...)`, the builder's grouped row) are the name's. expect = hand-worked row IDs; null = parity only. control = the build before the fix with its exact reds; mutants undo the mask per engine (namemask), its operator half (nameop) or its brace half (namebrace).",
+ "columns": [
+  "#",
+  "ID",
+  "A",
+  "B",
+  "HR (D)",
+  "AMT (USD)",
+  "S (NOT X)",
+  "SUBS"
+ ],
+ "rows": [
+  {
+   "#": "1",
+   "ID": "1",
+   "A": "yes",
+   "B": "yes",
+   "HR (D)": "66.7",
+   "AMT (USD)": "100",
+   "S (NOT X)": "yes",
+   "SUBS": "@@JSON[{\"K\":\"a\",\"V\":\"1\"},{\"K\":\"b\",\"V\":\"2\"}]"
+  },
+  {
+   "#": "2",
+   "ID": "2",
+   "A": "yes",
+   "B": "no",
+   "HR (D)": "0",
+   "AMT (USD)": "2500",
+   "S (NOT X)": "no",
+   "SUBS": "@@JSON[{\"K\":\"a\",\"V\":\"2\"},{\"K\":\"c\",\"V\":\"1\"}]"
+  },
+  {
+   "#": "3",
+   "ID": "3",
+   "A": "no",
+   "B": "yes",
+   "HR (D)": "20",
+   "AMT (USD)": "50",
+   "S (NOT X)": "yes",
+   "SUBS": ""
+  },
+  {
+   "#": "4",
+   "ID": "4",
+   "A": "no",
+   "B": "no",
+   "HR (D)": "100",
+   "AMT (USD)": "0",
+   "S (NOT X)": "no",
+   "SUBS": ""
+  },
+  {
+   "#": "5",
+   "ID": "5",
+   "A": "yes",
+   "B": "yes",
+   "HR (D)": "5",
+   "AMT (USD)": "900",
+   "S (NOT X)": "no",
+   "SUBS": ""
+  },
+  {
+   "#": "6",
+   "ID": "6",
+   "A": "no",
+   "B": "yes",
+   "HR (D)": "75",
+   "AMT (USD)": "10",
+   "S (NOT X)": "yes",
+   "SUBS": ""
+  },
+  {
+   "#": "7",
+   "ID": "7",
+   "A": "yes",
+   "B": "no",
+   "HR (D)": "40",
+   "AMT (USD)": "300",
+   "S (NOT X)": "yes",
+   "SUBS": ""
+  },
+  {
+   "#": "8",
+   "ID": "8",
+   "A": "no",
+   "B": "no",
+   "HR (D)": "10",
+   "AMT (USD)": "5000",
+   "S (NOT X)": "no",
+   "SUBS": ""
+  }
+ ],
+ "queries": [
+  {
+   "slug": "n-plain",
+   "q": "HR (D) > 50",
+   "expect": [
+    "1",
+    "4",
+    "6"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-lt",
+   "q": "HR (D) < 10",
+   "expect": [
+    "2",
+    "5"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-ge",
+   "q": "AMT (USD) >= 900",
+   "expect": [
+    "2",
+    "5",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-words",
+   "q": "S (NOT X) = yes",
+   "expect": [
+    "1",
+    "3",
+    "6",
+    "7"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-ne",
+   "q": "A = yes and S (NOT X) != no",
+   "expect": [
+    "1",
+    "7"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-lower",
+   "q": "hr (d) > 50",
+   "expect": [
+    "1",
+    "4",
+    "6"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-and",
+   "q": "HR (D) > 50 and A = no",
+   "expect": [
+    "4",
+    "6"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-or",
+   "q": "AMT (USD) > 1000 or S (NOT X) = yes",
+   "expect": [
+    "1",
+    "2",
+    "3",
+    "6",
+    "7",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-group",
+   "q": "(HR (D) > 50 or AMT (USD) > 1000) and A = yes",
+   "expect": [
+    "1",
+    "2"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-group-last",
+   "q": "A = yes and (B = no or HR (D) >= 40)",
+   "expect": [
+    "1",
+    "2",
+    "7"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-glued",
+   "q": "(A = yes and HR (D) > 50)",
+   "expect": [
+    "1"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-nested",
+   "q": "((HR (D) > 50 or B = no) and A = yes) or S (NOT X) = no",
+   "expect": [
+    "1",
+    "2",
+    "4",
+    "5",
+    "7",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-two-groups",
+   "q": "(HR (D) < 10) or (AMT (USD) >= 900 and B = no)",
+   "expect": [
+    "2",
+    "5",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-group-plain",
+   "q": "(A = yes or B = yes) and S (NOT X) = no",
+   "expect": [
+    "2",
+    "5"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-brace",
+   "q": "({HR (D)} > 50 or B = no) and A = yes",
+   "expect": [
+    "1",
+    "2",
+    "7"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "n-brace-words",
+   "q": "({S (NOT X)} = yes or B = yes) and A = no",
+   "expect": [
+    "3",
+    "6"
+   ]
+  },
+  {
+   "slug": "n-brace-closer",
+   "q": "(A = no and {HR (D)} > 50)",
+   "expect": [
+    "4",
+    "6"
+   ]
+  },
+  {
+   "slug": "n-braced",
+   "q": "{HR (D)} > 50",
+   "expect": [
+    "1",
+    "4",
+    "6"
+   ]
+  },
+  {
+   "slug": "n-plain-group",
+   "q": "(A = yes or B = yes) and B = no",
+   "expect": [
+    "2",
+    "7"
+   ]
+  },
+  {
+   "slug": "n-compared-group",
+   "q": "(HR (D)) > 50",
+   "expect": null
+  }
+ ],
+ "control": {
+  "rev": "5b20af4",
+  "red": [
+   "B-n-plain",
+   "B-n-lt",
+   "B-n-ge",
+   "B-n-words",
+   "B-n-ne",
+   "B-n-lower",
+   "B-n-and",
+   "B-n-or",
+   "B-n-group",
+   "B-n-group-last",
+   "B-n-glued",
+   "B-n-nested",
+   "B-n-two-groups",
+   "B-n-group-plain",
+   "B-n-brace",
+   "Q-n-plain",
+   "Q-n-lt",
+   "Q-n-ge",
+   "Q-n-words",
+   "Q-n-ne",
+   "Q-n-lower",
+   "Q-n-and",
+   "Q-n-or",
+   "Q-n-group",
+   "Q-n-group-last",
+   "Q-n-glued",
+   "Q-n-nested",
+   "Q-n-two-groups",
+   "Q-n-group-plain",
+   "Q-n-brace",
+   "F-n-plain",
+   "F-n-lt",
+   "F-n-ge",
+   "F-n-words",
+   "F-n-ne",
+   "F-n-lower",
+   "F-n-and",
+   "F-n-or",
+   "F-n-group",
+   "F-n-group-last",
+   "F-n-glued",
+   "F-n-nested",
+   "F-n-two-groups",
+   "F-n-group-plain",
+   "F-n-brace"
+  ]
+ },
+ "mutants": {
+  "js-namemask": [
+   "main",
+   "        var _pnMask = penumbraParenNameMask(tokens, operatorKeys);\n",
+   "        var _pnMask = null;\n",
+   [
+    "B-n-plain",
+    "B-n-lt",
+    "B-n-ge",
+    "B-n-words",
+    "B-n-ne",
+    "B-n-lower",
+    "B-n-and",
+    "B-n-or",
+    "B-n-group",
+    "B-n-group-last",
+    "B-n-glued",
+    "B-n-nested",
+    "B-n-two-groups",
+    "B-n-group-plain",
+    "B-n-brace"
+   ]
+  ],
+  "js-nameop": [
+   "main",
+   "                if (k === tok.length - 1 && t + 1 < tokens.length && operatorKeys.indexOf(tokens[t + 1]) !== -1) named.push([o, ev.length - 1]);\n",
+   "                if (false) named.push([o, ev.length - 1]);\n",
+   [
+    "B-n-plain",
+    "B-n-lt",
+    "B-n-ge",
+    "B-n-words",
+    "B-n-ne",
+    "B-n-lower",
+    "B-n-and",
+    "B-n-or",
+    "B-n-group",
+    "B-n-group-last",
+    "B-n-glued",
+    "B-n-nested",
+    "B-n-two-groups",
+    "B-n-group-plain"
+   ]
+  ],
+  "js-namebrace": [
+   "main",
+   "            if (s.charAt(lead) !== '{' || s.indexOf('}', lead) !== -1) continue;\n",
+   "            if (true) continue;\n",
+   [
+    "B-n-brace"
+   ]
+  ],
+  "php-namemask": [
+   "search",
+   "    $pnMask = _search_paren_name_mask($tokens, $operatorKeys);\n",
+   "    $pnMask = null;\n",
+   [
+    "Q-n-plain",
+    "Q-n-lt",
+    "Q-n-ge",
+    "Q-n-words",
+    "Q-n-ne",
+    "Q-n-lower",
+    "Q-n-and",
+    "Q-n-or",
+    "Q-n-group",
+    "Q-n-group-last",
+    "Q-n-glued",
+    "Q-n-nested",
+    "Q-n-two-groups",
+    "Q-n-group-plain",
+    "Q-n-brace"
+   ]
+  ],
+  "php-nameop": [
+   "search",
+   "            if ($k === $len - 1 && $t + 1 < $n && in_array($tokens[$t + 1], $operatorKeys, true)) $named[] = array($o, count($ev) - 1);\n",
+   "            if (false) $named[] = array($o, count($ev) - 1);\n",
+   [
+    "Q-n-plain",
+    "Q-n-lt",
+    "Q-n-ge",
+    "Q-n-words",
+    "Q-n-ne",
+    "Q-n-lower",
+    "Q-n-and",
+    "Q-n-or",
+    "Q-n-group",
+    "Q-n-group-last",
+    "Q-n-glued",
+    "Q-n-nested",
+    "Q-n-two-groups",
+    "Q-n-group-plain"
+   ]
+  ],
+  "cf-namemask": [
+   "runner",
+   "    $pnMask = _cf_paren_name_mask($tokens, $operatorKeys);\n",
+   "    $pnMask = null;\n",
+   [
+    "F-n-plain",
+    "F-n-lt",
+    "F-n-ge",
+    "F-n-words",
+    "F-n-ne",
+    "F-n-lower",
+    "F-n-and",
+    "F-n-or",
+    "F-n-group",
+    "F-n-group-last",
+    "F-n-glued",
+    "F-n-nested",
+    "F-n-two-groups",
+    "F-n-group-plain",
+    "F-n-brace"
+   ]
+  ],
+  "cf-namebrace": [
+   "runner",
+   "        if (substr($s, $lead, 1) !== '{' || strpos($s, '}', $lead) !== false) continue;\n",
+   "        if (true) continue;\n",
+   [
+    "F-n-brace"
+   ]
+  ]
+ }
+}

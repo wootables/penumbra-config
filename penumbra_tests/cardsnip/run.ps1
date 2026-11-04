@@ -50,9 +50,13 @@ $mutantDefs = [ordered]@{
   # (dname) engine A loses the name as written: ?Unit= / [PROMPT name=Region] answer 'undefined' again
   'noraw'     = @{ file = 'main';  edits = @(,@("penumbraDataLookup(dataType, colParam, args[2], (args[0] || '').replace(/^['`"]|['`"]`$/g, ''));", 'penumbraDataLookup(dataType, colParam, args[2]);')); red = @('D1') }
   'promptlow' = @{ file = 'main';  edits = @(,@('                            if (parsed.name === nameKey) {', '                            if (parsed.name === dataType) {')); red = @('D3') }
-  'nocardsC'  = @{ file = 'runner'; edits = @(,@("        if (`$lower === 'cards') return `$_cc ? 'true' : 'false';", "        if (`$lower === 'cards') return '';")); red = @('X1','X2') }
+  'nocardsC'  = @{ file = 'runner'; edits = @(,@("        if (`$lower === 'cards') return (`$_cc && (`$data === null || !empty(`$data))) ? 'true' : 'false';", "        if (`$lower === 'cards') return '';")); red = @('X1','X2') }   # (cleft) re-anchored
   'pivotC'    = @{ file = 'runner'; edits = @(,@("(`$viewMode !== 'pivot' && !empty(`$GLOBALS['penumbra_cards_email']))", "(!empty(`$GLOBALS['penumbra_cards_email']))")); red = @('X3') }
-  'noviewC'   = @{ file = 'runner'; edits = @(,@('            return _snippet_data($args, $promptValues, $reportMeta, $viewMode);', '            return _snippet_data($args, $promptValues, $reportMeta);')); red = @('X3') }
+  'noviewC'   = @{ file = 'runner'; edits = @(,@('            return _snippet_data($args, $promptValues, $reportMeta, $viewMode, $data);', '            return _snippet_data($args, $promptValues, $reportMeta);')); red = @('X3') }   # (cleft) re-anchored
+  # (cleft) the second card sweep's leftovers: off|xl keeps the size; the toggle's active test reads it; no rows = no cards
+  'offsize'   = @{ file = 'main';  edits = @(,@("                        if (!_cvWant && _cvO.size && _cvC.size() !== _cvO.size) _cvC.setSize(_cvO.size);", '')); red = @('C10') }
+  'offactive' = @{ file = 'main';  edits = @(,@("return !_pnbCardsOnNow() && (!o.size || (!!_pnbCardsApi() && _pnbCardsApi().size() === o.size));", 'return !_pnbCardsOnNow();')); red = @('C11') }
+  'emptyC'    = @{ file = 'runner'; edits = @(,@("return (`$_cc && (`$data === null || !empty(`$data))) ? 'true' : 'false';", "return `$_cc ? 'true' : 'false';")); red = @('X5') }
 }
 
 function Apply-Edits([string]$text, $edits, [string]$name) {
