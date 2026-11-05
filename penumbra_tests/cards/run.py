@@ -79,7 +79,8 @@ CHK = {
     'cpage': ['pageSize', 'nextPage', 'lastPageFilled', 'rowsPerPageAll'],
     'cfull': ['bootsCards', 'slots', 'hiddenFilled', 'pillPlain', 'barFallback', 'subShown', 'fieldLabels', 'fieldValues'],
     'chl': ['ruledPills', 'plainPills', 'pillMatchesCell',
-            'edgeRuled', 'edgePlain', 'edgePainted', 'edgeDetail', 'edgeMail', 'edgeRule', 'edgeTheme'],   # (cedge) the status edge
+            'edgeRuled', 'edgePlain', 'edgePainted', 'edgeDetail', 'edgeMail', 'edgeRule', 'edgeTheme',   # (cedge) the status edge
+            'edgeSwatch', 'edgeSwatchMail', 'edgeSwatchTheme', 'edgeGreyTheme'],   # (cedge2) a Highlight swatch's theme variable
     # (cfmt) a cell's highlight on the title, a subtitle, the big number and a field; a plain one plain; a rule and a format
     # changed in the column options while the cards show; the details window's fields
     'cfmt': ['titleRuled', 'subRuled', 'subPlain', 'bigRuled', 'fieldRuled', 'fieldPlain', 'liveRule', 'liveFormat', 'detRuled',
@@ -1610,6 +1611,10 @@ GUARDS |= {'L-chl-edgePlain'}   # (cedge: holds on live - no card has an edge th
 NEW_CEDGE = {'L-chl-%s' % c for c in ('edgeRuled', 'edgePlain', 'edgePainted', 'edgeDetail', 'edgeMail', 'edgeRule', 'edgeTheme')} - GUARDS
 NEW = NEW | NEW_CEDGE   # (cedge) after every later round's NEW line - add, never replace
 NEW = NEW - NEW_CEDGE   # (cedge is LIVE since ac211e9, 2026-11-03: old checks now)
+# (cedge2, 2026-11-04, the user: no edge from a Highlight swatch) a swatch's var() colour
+NEW_CEDGE2 = {'L-chl-edgeSwatch', 'L-chl-edgeSwatchMail', 'L-chl-edgeSwatchTheme', 'L-chl-edgeGreyTheme'}
+NEW = NEW | NEW_CEDGE2   # (cedge2) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_CEDGE2   # (cedge2 is LIVE since 190f407, 2026-11-04: old checks now)
 MUTANTS.update({
     'ed-off': ([('cards', "    function edgeCss(c) { return c ? '--pnb-card-edge:' + c + ';' : ''; }", "    function edgeCss(c) { return ''; }")],
                ['L-chl-edgeRuled', 'L-chl-edgePainted', 'L-chl-edgeDetail'], ['chl']),
@@ -1624,8 +1629,26 @@ MUTANTS.update({
     'ed-mail': ([('cards', "(eg ? 'border-left:4px solid ' + esc(eg) + ';' : '')", "''")], ['L-chl-edgeMail'], ['chl']),
     'ed-css': ([('cardscss', ".pnb-card[style*=\"--pnb-card-edge\"] { background-image: linear-gradient(var(--pnb-card-edge), var(--pnb-card-edge)); background-size: 4px 100%; background-repeat: no-repeat; }\n", "")],
                ['L-chl-edgePainted'], ['chl']),
+    'e2-var': ([('cards', "|[a-z]{3,30}|var\\(\\s*--[\\w-]{1,60}\\s*(?:,\\s*(?:#[0-9a-f]{3,8}|(?:rgb|hsl)a?\\([0-9.,%\\s\\/deg]+\\)|[a-z]{3,30})\\s*)?\\))$/i;", "|[a-z]{3,30})$/i;")],
+               ['L-chl-edgeSwatch', 'L-chl-edgeSwatchMail'], ['chl']),
+    'e2-mail': ([('cards', "        function st(td, props) { var s = unVar(styleOf(td, props || MAIL_PROPS), vm); return s ? esc(s) : ''; }", "        function st(td, props) { var s = styleOf(td, props || MAIL_PROPS); return s ? esc(s) : ''; }")],
+                ['L-chl-edgeSwatchMail'], ['chl']),
+    'e2-sig': ([('cards', "            if (sig !== edgeSig) { edgeSig = sig; edgeRgbs = Object.create(null); }", "            if (sig !== edgeSig) { edgeSig = sig; }")],
+               ['L-chl-edgeGreyTheme'], ['chl']),
     'ed-detcss': ([('cardscss', ".pnb-cdet-card.pnb-card[style*=\"--pnb-card-edge\"] { background-image: none; border-left: 4px solid var(--pnb-card-edge); padding-left: 10px; }\n", "")],
                   ['L-chl-edgeDetail'], ['chl']),
+})
+
+
+# (lanehd, 2026-11-04, the user: "When grouping by 'board' only the header text is clickable for the collapse/expand -- the
+# entire header band should be clickable like in the stacked layout") a lane's whole head folds it: its count, its empty end
+CHK['gboard'] = CHK['gboard'] + ['laneHeadFolds']
+NEW_LANEHD = {'L-gboard-laneHeadFolds'}
+NEW = NEW | NEW_LANEHD   # (lanehd) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_LANEHD   # (lanehd is LIVE since 3d61921, 2026-11-04: old checks now)
+MUTANTS.update({
+    'lh-click': ([('cards', "        var lh = e.target.closest('.pnb-cards-lanehead');\n", "        var lh = null;\n")], ['L-gboard-laneHeadFolds'], ['gboard']),
+    'lh-cursor': ([('cardscss', ".pnb-cards-lane > .pnb-cards-lanehead { cursor: pointer; border-radius: 7px 7px 0 0; }", ".pnb-cards-lane > .pnb-cards-lanehead { border-radius: 7px 7px 0 0; }")], ['L-gboard-laneHeadFolds'], ['gboard']),
 })
 
 def mutate(texts, name):

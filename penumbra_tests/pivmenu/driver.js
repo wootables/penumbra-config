@@ -42,6 +42,7 @@
   }
   // (colmenu round 33) an item in a list beside its parent: open the parent first
   var PSUBS = [['bdWidth', /^bd(Fit|FitAll|FitPage|ResetWidth|ResetWidths)$/], ['pvLayout', /^(pvRows-|pvCols-|pvStartExpanded$)/], ['pvFreeze', /^pvFreeze-/]];
+  PSUBS.push(['pvWidth', /^pvFit(All)?$/]);   // (2026-11-04, pvfit) the pivot's Column widths list
   // (2026-10-27, copymenu) a breakdown's copies are one list, Copy: This value, This row, Column name, Distinct values (its
   // delimiters and All values in row order in a list of its own) - reached through it, two levels deep
   PSUBS.push(['bdCopyMenu', /^(bdCopy|bdCopyRow|bdCopyName|bdCopyDistinct)$/], ['bdCopyDistinct', /^(bdCopy-[a-z]+|bdCopyCol)$/]);
@@ -683,6 +684,63 @@
       R.chk.noToolHead = a.indexOf('pvSortAsc') >= 0 && a.indexOf('pvShade') < 0 && a.indexOf('pvColExclude') >= 0;
       R.info.acts = a;
       closeMenu();
+    },
+    // (2026-11-04, pvfit) the pivot menu's Column widths list: Fit this column / Fit all column widths to
+    // contents, 'auto' filed under the column's keys (a row label; the value columns together; the Grand
+    // Total), with Undo; greyed while nothing is at a width of ours; reached from the cells too
+    pmfit: async function () {
+      var H = window.Penumbra.colWidthsHost, CW = window.Penumbra.colWidths;
+      var f0 = H.pivotRowFields()[0], vf = H.pivotValueField();
+      var kL = 'PIVOT:' + String(f0).toUpperCase(), kV = 'PIVOT:=' + String(vf).toUpperCase(), kT = 'PIVOT:TOTAL=' + String(vf).toUpperCase();
+      function user() { return H.state().user; }
+      function wOf(el) { return Math.round(el.getBoundingClientRect().width); }
+      async function set(k, v) { H.setUser(k, v); await sleep(300); }
+      function undoBtn() { var b = document.querySelectorAll('.zz-toast .pnb-colw-undo'); return b[b.length - 1] || null; }
+      var tb = document.getElementById('pivotResultTable');
+      R.info.fit = { f0: f0, vf: vf, marked: !!tb && tb.hasAttribute('data-pnb-colw-value') };
+      // the list on a row field's heading, both greyed with no width of ours
+      rclick(field(0));
+      R.chk.fitItems = acts().indexOf('pvWidth') >= 0;
+      var wl = reachP('pvFit'), wa = item('pvFitAll');
+      R.chk.fitItems = R.chk.fitItems && !!wl && !!wa && subActs().join(',') === 'pvFit,pvFitAll';
+      R.chk.fitFresh = !!wl && !!wa && wl.getAttribute('aria-disabled') === 'true' && wa.getAttribute('aria-disabled') === 'true';
+      R.info.fit.sub = subActs();
+      closeMenu();
+      // one row label: 'auto' under its key, back to its natural width; Undo puts the 320 back
+      var nat = wOf(field(0));
+      await set(kL, 320);
+      var held = wOf(field(0));
+      var ran = await choose(field(0), 'pvFit');
+      await sleep(300);
+      R.chk.fitOne = ran && held === 320 && H.widthFor(kL) === null && Math.abs(wOf(field(0)) - nat) <= 2 && /fitted to content/.test(lastToast());
+      R.info.fit.one = { nat: nat, held: held, now: wOf(field(0)), u: user()[kL], toast: lastToast().slice(0, 160) };
+      var ub = undoBtn();
+      if (ub) { ub.click(); await sleep(300); }
+      R.chk.fitUndo = !!ub && user()[kL] === 320 && wOf(field(0)) === 320;
+      // the value columns together, from a value heading; the row label kept
+      await set(kV, 200);
+      ran = await choose(head('Open'), 'pvFit');
+      await sleep(300);
+      R.chk.fitValue = ran && H.widthFor(kV) === null && user()[kL] === 320;
+      R.info.fit.value = { u: user()[kV], l: user()[kL] };
+      // every column, from a value cell's menu (a cell reaches its heading's list)
+      await set(kV, 200); await set(kT, 180);
+      var vc = cells()[0];
+      ran = await choose(vc, 'pvFitAll');
+      await sleep(300);
+      R.chk.fitAll = ran && H.widthFor(kL) === null && H.widthFor(kV) === null && H.widthFor(kT) === null && /Pivot column widths fitted to content/.test(lastToast());
+      R.info.fit.all = { l: user()[kL], v: user()[kV], t: user()[kT], toast: lastToast().slice(0, 160) };
+      ub = undoBtn();
+      if (ub) { ub.click(); await sleep(300); }
+      R.chk.fitAllUndo = !!ub && user()[kL] === 320 && user()[kV] === 200 && user()[kT] === 180;
+      // the cells: a row label reaches its row field's list, a value cell its heading's
+      var lab = document.querySelector('#pivotResultTable tbody td[data-row-field="0"]');
+      rclick(lab); var la = acts().indexOf('pvWidth') >= 0; closeMenu();
+      rclick(vc); var va = acts().indexOf('pvWidth') >= 0; closeMenu();
+      R.chk.fitCell = la && va;
+      // the API: no pivot fit for a flat-table heading; the flat fit still refuses a pivot heading
+      R.chk.fitApi = typeof CW.canFitPivot === 'function' && CW.canFitPivot(field(0)) === true && CW.canFit(field(0)) === false && CW.pivotSized(null) === true;
+      R.info.fit.cell = { la: la, va: va };
     }
   };
   (async function () {

@@ -324,6 +324,36 @@
     R.chk.edgeTheme = !!dark && tc.length > 0 && tc.every(function (x) { return edgeVar(x) === green; });
     R.info.edgeTheme = [dark && dark.id, tc.length, tc.slice(0, 2).map(edgeVar)];
     document.body.className = cls0; await sleep(600);
+    // (cedge2, the user: no edge from a Highlight swatch) the editor's swatches write theme variables (colfmt hlCss):
+    // the card's edge carries the variable (it follows the theme); the email's cards a colour mail reads - the edge and
+    // the pill, no var()
+    var sw = 'var(--accent-danger, #c62828)', swCss = window.PenumbraColFmt && window.PenumbraColFmt.hlCss ? window.PenumbraColFmt.hlCss({ tx: 'red', fl: 'red' }) : 'color: ' + sw + '; background-color: var(--pnb-hl-red, #fbd9d6)';
+    window.Penumbra.setColOpt('V_STATUS', 'highlight', [{ id: 's1', w: 'V_STATUS = //Closed//', css: swCss }]);
+    await until(function () { var c = closedCards(); return c.length > 0 && c.every(function (x) { return edgeVar(x) === sw; }); }, 3000);
+    var vc = closedCards(), vcell = shownRows().map(function (tr) { return td(tr, 'V_STATUS'); }).filter(function (c) { return c && c.textContent.trim() === 'Closed'; })[0];
+    R.chk.edgeSwatch = vc.length > 0 && vc.every(function (x) { return edgeVar(x) === sw && /linear-gradient/.test(getComputedStyle(x).backgroundImage); });
+    var mc2 = mailCards(mailBox(C().emailHtml({ size: 'standard' }))), mv = mc2.filter(function (d) { return /border-left:4px solid/.test(d.getAttribute('style') || ''); });
+    var mp = mv.map(function (d) { var s = d.querySelector('span[style*="border-radius:10px"]'); return s ? s.getAttribute('style') : ''; });
+    R.chk.edgeSwatchMail = mv.length > 0 && mv.length === vc.length && mv.every(function (d) { return /border-left:4px solid rgb\(/.test(d.getAttribute('style')) && d.getAttribute('style').indexOf('var(') < 0; })
+        && mp.every(function (s) { return !!s && s.indexOf('var(') < 0 && /background-color:\s*rgb\(/.test(s); });
+    R.info.edgeSwatch = [swCss, vc.length, vc.slice(0, 2).map(edgeVar), vcell && vcell.getAttribute('style'), mv.length, mv[0] && mv[0].getAttribute('style'), mp[0]];
+    // a dark theme: the email's edge the variable as the dark theme computes it (the colours read again, not the light ones kept)
+    function computed(v) { var p = document.createElement('i'); p.style.color = v; document.body.appendChild(p); var c = getComputedStyle(p).color; p.remove(); return c; }
+    var light = computed(sw), dk = dark, cls1 = document.body.className;
+    if (dk) { applyTheme(dk); await sleep(900); }
+    var darkC = computed(sw), mc3 = mailCards(mailBox(C().emailHtml({ size: 'standard' }))), mv3 = mc3.filter(function (d) { return /border-left:4px solid/.test(d.getAttribute('style') || ''); });
+    R.chk.edgeSwatchTheme = !!dk && darkC !== light && mv3.length > 0 && mv3.every(function (d) { return d.getAttribute('style').indexOf('border-left:4px solid ' + darkC + ';') >= 0; });
+    R.info.edgeSwatchTheme = [dk && dk.id, light, darkC, mv3.length, mv3[0] && mv3[0].getAttribute('style')];
+    document.body.className = cls1; await sleep(600);
+    var gTx = 'var(--text-muted, #666666)', gFl = 'var(--bg-surface-alt, #f8f9fa)';
+    window.Penumbra.setColOpt('V_STATUS', 'highlight', [{ id: 'g2', w: 'V_STATUS = //Closed//', css: 'color: ' + gTx + '; background-color: ' + gFl }]);
+    await until(function () { var c = closedCards(); return c.length > 0 && c.every(function (x) { return edgeVar(x) === gTx; }); }, 3000);
+    var gl = closedCards().slice(0, 3).map(edgeVar), cls2 = document.body.className;
+    if (dk) { applyTheme(dk); await sleep(900); }
+    var gd = closedCards();
+    R.chk.edgeGreyTheme = !!dk && gl.length > 0 && gl.every(function (v) { return v === gTx; }) && gd.length > 0 && gd.every(function (x) { return edgeVar(x) === gTx; });
+    R.info.edgeGreyTheme = [dk && dk.id, gl, gd.slice(0, 3).map(edgeVar), computed(gTx), computed(gFl)];
+    document.body.className = cls2; await sleep(600);
   };
   // (cfmt) a cell's highlight worn by its value on the card; changed in the column options while the cards show
   S.cfmt = async function () {
@@ -3114,6 +3144,19 @@
     var sx2 = q('.pnb-cards-board').scrollLeft;
     R.info.scroll = { sx0: sx0, sx1: sx1, sx2: sx2 };
     R.chk.keepsScroll = sx0 >= 60 && Math.abs(sx1 - sx0) < 2 && Math.abs(sx2 - sx0) < 2;
+    // (lanehd, the user) the lane's WHOLE head folds it, as a stacked band's header: its count, then the head's empty right end
+    var lhA = q('.pnb-cards-lanehead', lanes()[0]), lhCnt = q('.pnb-cards-lanecount', lhA);
+    if (lhCnt) lhCnt.click();
+    var lhF1 = !!lhCnt && await until(function () { var l = lanes()[0]; return !!l && l.classList.contains('is-closed'); }, 2000); await sleep(150);
+    if (lhF1) q('.pnb-cards-grptoggle', lanes()[0]).click();
+    var lhO1 = lhF1 && await until(function () { var l = lanes()[0]; return !!l && !l.classList.contains('is-closed'); }, 2000); await sleep(150);
+    var lhB = q('.pnb-cards-lanehead', lanes()[0]), lhR = lhB.getBoundingClientRect(), lhEnd = document.elementFromPoint(lhR.right - 3, lhR.top + lhR.height / 2);
+    if (lhEnd === lhB) lhB.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: lhR.right - 3, clientY: lhR.top + lhR.height / 2 }));
+    var lhF2 = lhEnd === lhB && await until(function () { var l = lanes()[0]; return !!l && l.classList.contains('is-closed'); }, 2000); await sleep(150);
+    if (lhF2) q('.pnb-cards-grptoggle', lanes()[0]).click();
+    await until(function () { var l = lanes()[0]; return !!l && !l.classList.contains('is-closed'); }, 2000); await sleep(150);
+    R.info = Object.assign({ laneHead: { cnt: !!lhCnt, f1: lhF1, o1: lhO1, endIsHead: lhEnd === lhB, f2: lhF2, cursor: getComputedStyle(q('.pnb-cards-lanehead', lanes()[0])).cursor } }, R.info);   // (first: a failure shows it inside the 900-character info)
+    R.chk.laneHeadFolds = lhF1 && lhO1 && lhF2 && getComputedStyle(q('.pnb-cards-lanehead', lanes()[0])).cursor === 'pointer' && laneCards(lanes()[0]).length === c0.length;
     // (bdlay2, the user) Sort groups (the group menu's, the grouping chip's: the wrappers moved in place): the lanes follow,
     // the board where it was scrolled
     var before = lanes().map(laneName), bd2 = q('.pnb-cards-board'); bd2.scrollLeft = 60; await sleep(60);

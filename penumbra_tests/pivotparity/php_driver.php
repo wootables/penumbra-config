@@ -196,6 +196,12 @@ function call_fn($fn, $a) {
             return norm_collect(pivot_process_data($a[0], $c['rows'], $c['cols'], $c['val'],
                                                    $c['extra'], $c['filters'], $c['aggs']));
         }
+        case 'collectNum': {
+            // (pvhash) the rows' numbers ride as the collector's 8th argument (an older collector ignores it)
+            $c = $a[1];
+            return norm_collect(pivot_process_data($a[0], $c['rows'], $c['cols'], $c['val'],
+                                                   $c['extra'], $c['filters'], $c['aggs'], $c['nums']));
+        }
         case 'isDerivedAgg':        return pivot_is_derived_agg($a[0]);
         case 'isRoll':              return pivot_is_roll($a[0]);
         case 'indexBaseLabel':      return pivot_index_base_label($a[0]);

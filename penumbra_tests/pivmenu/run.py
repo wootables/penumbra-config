@@ -180,6 +180,24 @@ MUTANTS.update({
                    ['L-pmbreak-bdWidthItems'], ['pmbreak']),
 })
 
+# (2026-11-04, pvfit) the pivot menu's Column widths list: Fit this column / Fit all column widths to contents
+SCN = SCN + ['pmfit']
+CHK['pmfit'] = ['fitItems', 'fitFresh', 'fitOne', 'fitUndo', 'fitValue', 'fitAll', 'fitAllUndo', 'fitCell', 'fitApi']
+NEW_PF = {'L-pmfit-' + c for c in CHK['pmfit']}
+NEW = NEW | NEW_PF
+NEW = NEW - NEW_PF   # (pvfit is LIVE since ddc2e47, 2026-11-04: old checks now)
+MUTANTS.update({
+    'pf-nolist': ([('menu', "        if (wth) { items.push('-'); items.push({ act: 'pvWidth', label: 'Column widths', sub: true, items: function () { return pvWidthItems(wth); } }); }\n", "")],
+                  ['L-pmfit-fitItems', 'L-pmfit-fitOne', 'L-pmfit-fitAll', 'L-pmfit-fitCell'], ['pmfit']),
+    'pf-shown': ([('colw', "            if (!c || c.th !== ths[i] || c.view !== 'pivot') { continue; }", "            if (!c || c.th !== ths[i] || c.view !== 'pivot' || c.value) { continue; }")], ['L-pmfit-fitAll'], ['pmfit']),
+    'pf-undo': ([('colw', "            Object.keys(before).forEach(function (k) { host.setUser(k, before[k]); });\n            apply();\n        });\n        return true;\n    }\n    function fitPivotOne(c) {",
+                  "            apply();\n        });\n        return true;\n    }\n    function fitPivotOne(c) {")], ['L-pmfit-fitUndo', 'L-pmfit-fitAllUndo'], ['pmfit']),
+    'pf-grey': ([('menu', "disabled: !W.pivotSized(th), why: 'It already fits its content',", "disabled: false, why: 'It already fits its content',")], ['L-pmfit-fitFresh'], ['pmfit']),
+    'pf-cellth': ([('menu', "        } else if (t.kind === 'value') { th = pvCellHead(el); }", "        }")], ['L-pmfit-fitCell'], ['pmfit']),
+    'pf-keys': ([('colw', "    function pivotKeysOf(c) { return c.keys ? c.keys.slice() : [c.key]; }", "    function pivotKeysOf(c) { return [c.key]; }"),
+                 ('colw', "            pivotKeysOf(c).forEach(function (k) { if (!seen[k]) { seen[k] = true; out.push(k); } });", "            if (!c.value) { pivotKeysOf(c).forEach(function (k) { if (!seen[k]) { seen[k] = true; out.push(k); } }); }")], ['L-pmfit-fitAll'], ['pmfit']),
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:

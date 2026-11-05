@@ -1,6 +1,6 @@
 {
     "generated": "gen_fixtures.php",
-    "count": 1863,
+    "count": 1870,
     "cases": [
         {
             "id": "001-extractAgg",
@@ -27752,7 +27752,603 @@
             "note": "case7 sum"
         },
         {
-            "id": "1836-minOfRange",
+            "id": "1836-collectNum",
+            "fn": "collectNum",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "# <= 3"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ],
+                    "nums": null
+                }
+            ],
+            "note": "num0 # <= 3"
+        },
+        {
+            "id": "1837-collectNum",
+            "fn": "collectNum",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "# = /^(?:2|5|7)$/"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ],
+                    "nums": null
+                }
+            ],
+            "note": "num1 # = /^(?:2|5|7)$/"
+        },
+        {
+            "id": "1838-collectNum",
+            "fn": "collectNum",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "# >= 3 AND AMT > 5"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ],
+                    "nums": null
+                }
+            ],
+            "note": "num2 # >= 3 AND AMT > 5"
+        },
+        {
+            "id": "1839-collectNum",
+            "fn": "collectNum",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "# > 9"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ],
+                    "nums": [
+                        2,
+                        4,
+                        5,
+                        9,
+                        10,
+                        11,
+                        12,
+                        15
+                    ]
+                }
+            ],
+            "note": "num3 # > 9 nums"
+        },
+        {
+            "id": "1840-collectNum",
+            "fn": "collectNum",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "# = 9"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ],
+                    "nums": [
+                        2,
+                        4,
+                        5,
+                        9,
+                        10,
+                        11,
+                        12,
+                        15
+                    ]
+                }
+            ],
+            "note": "num4 # = 9 nums"
+        },
+        {
+            "id": "1841-collectNum",
+            "fn": "collectNum",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "# <= 2"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ],
+                    "nums": [
+                        7,
+                        8,
+                        9
+                    ]
+                }
+            ],
+            "note": "num5 # <= 2 nums"
+        },
+        {
+            "id": "1842-collectNum",
+            "fn": "collectNum",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "'#' <= 3"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ],
+                    "nums": null
+                }
+            ],
+            "note": "num6 '#' <= 3"
+        },
+        {
+            "id": "1843-minOfRange",
             "fn": "minOfRange",
             "args": [
                 1000
@@ -27760,7 +28356,7 @@
             "note": "n=1000"
         },
         {
-            "id": "1837-maxOfRange",
+            "id": "1844-maxOfRange",
             "fn": "maxOfRange",
             "args": [
                 1000
@@ -27768,7 +28364,7 @@
             "note": "n=1000"
         },
         {
-            "id": "1838-minOfRange",
+            "id": "1845-minOfRange",
             "fn": "minOfRange",
             "args": [
                 100000
@@ -27776,7 +28372,7 @@
             "note": "n=100000"
         },
         {
-            "id": "1839-maxOfRange",
+            "id": "1846-maxOfRange",
             "fn": "maxOfRange",
             "args": [
                 100000
@@ -27784,7 +28380,7 @@
             "note": "n=100000"
         },
         {
-            "id": "1840-minOfRange",
+            "id": "1847-minOfRange",
             "fn": "minOfRange",
             "args": [
                 130000
@@ -27792,7 +28388,7 @@
             "note": "n=130000"
         },
         {
-            "id": "1841-maxOfRange",
+            "id": "1848-maxOfRange",
             "fn": "maxOfRange",
             "args": [
                 130000
@@ -27800,7 +28396,7 @@
             "note": "n=130000"
         },
         {
-            "id": "1842-aggLabel",
+            "id": "1849-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "count"
@@ -27808,7 +28404,7 @@
             "note": "count"
         },
         {
-            "id": "1843-aggLabel",
+            "id": "1850-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "sum"
@@ -27816,7 +28412,7 @@
             "note": "sum"
         },
         {
-            "id": "1844-aggLabel",
+            "id": "1851-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "avg"
@@ -27824,7 +28420,7 @@
             "note": "avg"
         },
         {
-            "id": "1845-aggLabel",
+            "id": "1852-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "median"
@@ -27832,7 +28428,7 @@
             "note": "median"
         },
         {
-            "id": "1846-aggLabel",
+            "id": "1853-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "min"
@@ -27840,7 +28436,7 @@
             "note": "min"
         },
         {
-            "id": "1847-aggLabel",
+            "id": "1854-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "max"
@@ -27848,7 +28444,7 @@
             "note": "max"
         },
         {
-            "id": "1848-aggLabel",
+            "id": "1855-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "distinct"
@@ -27856,7 +28452,7 @@
             "note": "distinct"
         },
         {
-            "id": "1849-aggLabel",
+            "id": "1856-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "mode"
@@ -27864,7 +28460,7 @@
             "note": "mode"
         },
         {
-            "id": "1850-aggLabel",
+            "id": "1857-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "stddev"
@@ -27872,7 +28468,7 @@
             "note": "stddev"
         },
         {
-            "id": "1851-aggLabel",
+            "id": "1858-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "range"
@@ -27880,7 +28476,7 @@
             "note": "range"
         },
         {
-            "id": "1852-aggLabel",
+            "id": "1859-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "count_filled"
@@ -27888,7 +28484,7 @@
             "note": "count_filled"
         },
         {
-            "id": "1853-aggLabel",
+            "id": "1860-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "count_blank"
@@ -27896,7 +28492,7 @@
             "note": "count_blank"
         },
         {
-            "id": "1854-aggLabel",
+            "id": "1861-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "antimode"
@@ -27904,7 +28500,7 @@
             "note": "antimode"
         },
         {
-            "id": "1855-aggLabel",
+            "id": "1862-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "p10"
@@ -27912,7 +28508,7 @@
             "note": "p10"
         },
         {
-            "id": "1856-aggLabel",
+            "id": "1863-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "p25"
@@ -27920,7 +28516,7 @@
             "note": "p25"
         },
         {
-            "id": "1857-aggLabel",
+            "id": "1864-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "p50"
@@ -27928,7 +28524,7 @@
             "note": "p50"
         },
         {
-            "id": "1858-aggLabel",
+            "id": "1865-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "p75"
@@ -27936,7 +28532,7 @@
             "note": "p75"
         },
         {
-            "id": "1859-aggLabel",
+            "id": "1866-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "p90"
@@ -27944,7 +28540,7 @@
             "note": "p90"
         },
         {
-            "id": "1860-aggLabel",
+            "id": "1867-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "p99"
@@ -27952,7 +28548,7 @@
             "note": "p99"
         },
         {
-            "id": "1861-aggLabel",
+            "id": "1868-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "wavg@WT"
@@ -27960,7 +28556,7 @@
             "note": "wavg@WT"
         },
         {
-            "id": "1862-aggLabel",
+            "id": "1869-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "formula"
@@ -27968,7 +28564,7 @@
             "note": "formula"
         },
         {
-            "id": "1863-aggLabel",
+            "id": "1870-aggLabel",
             "fn": "aggLabel",
             "args": [
                 "bogus_agg"

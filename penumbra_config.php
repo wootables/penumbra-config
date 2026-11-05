@@ -20,10 +20,10 @@ $dec = function ($v) use ($__pnb_key) {
 return [
 
     //db creds
-//    'ieprd_user' => $dec('enc:v1:LVtr8q0u3HEyCCJjSNo2BFGAFFKpve6NdvxA4qjJfn2gET90'),
-//    'ieprd_pass' => $dec('enc:v1:nulEVaVcb4XjL93kj/8YCrobkiaYbgxR5GqbinnLobQP1cBgmPQ='),
-	'ieprd_user'  => $dec('enc:v1:DNYwdhRflKO2xrvM4WcbpupMf8HpB9C0ejvYAk47xr34pSuiOj0zhQ=='),
-    'ieprd_pass'  => $dec('enc:v1:qrECD418eIqA3zDSPTI6NsQabh7clm68ZGdnX0RLCnnldn/CaFg2AX5N1go='),
+    'ieprd_user' => $dec('enc:v1:LVtr8q0u3HEyCCJjSNo2BFGAFFKpve6NdvxA4qjJfn2gET90'),
+    'ieprd_pass' => $dec('enc:v1:m8US3lFfxguaFd+O84WxL6aUTbAGg5DdLjTUu9E8JBtGxxCklmw='),
+	//'ieprd_user'  => $dec('enc:v1:DNYwdhRflKO2xrvM4WcbpupMf8HpB9C0ejvYAk47xr34pSuiOj0zhQ=='),
+    //'ieprd_pass'  => $dec('enc:v1:qrECD418eIqA3zDSPTI6NsQabh7clm68ZGdnX0RLCnnldn/CaFg2AX5N1go='),
     'pins_user'   => $dec('enc:v1:+06z9B9Qf1udZzwUs5MmJeNtLWarsbqsmNstZ8Yttxb6qyw='),
     'pins_pass'   => $dec('enc:v1:a8Yki29COPAzEfY2ibsHm4xkwosgSjJp8AvPzHUzZRHEwBLJkWFadg=='),
     'infoed_user' => $dec('enc:v1:ftEPsDOlPMR9k3pzfGBUuA8bQrD84qmZCgWaOzcKdrN1M842LJQ='),
@@ -67,7 +67,7 @@ return [
 				"RPT_LA_SPECIESDETAIL","RPT_LA_L_ANIMALS_VW", "RPT_PROJTASKS", "LA_TABLE_U", "WFASSIGNMENT", "NCSTATEUNI_LA_45"
 			],
 			'hr'     => [
-                "PS_COMPENSATION","PS_DEPT_TBL","PS_JOB","PS_NC_ASGN_EMP_VW1", "PS_NC_ALLOUC_ENGVW",
+                "PS_COMPENSATION","PS_DEPT_TBL","PS_JOB","PS_NC_ASGN_EMP_VW1",
 				"PS_NC_ASSGN_EMP_VW","PS_NC_BUILDING","PS_NC_FACILITY_EXT","PS_NC_NIFA_BWK_VW",
 				"PS_NC_NIFA_MTH_VW","PS_NC_NSF_VIEW","PS_NC_OPRDEFN_VW","PS_NC_SALRY_DISTR",
 				"PS_PERSONAL_DATA",

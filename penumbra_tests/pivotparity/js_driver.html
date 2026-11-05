@@ -209,6 +209,18 @@
           var c = a[1];
           return normCollect(P.collect(src, c.rows, c.cols, c.val, c.aggs, c.extra, c.filters));
         }
+        case 'collectNum': {
+          // (pvhash) the page's rows carry # (main.js numbers masterRowData): the given numbers, else 1, 2, ...
+          var cn = a[1];
+          var okN = Array.isArray(cn.nums) && cn.nums.length === a[0].length;
+          var srcN = a[0].map(function (r, ri) {
+            var m = new Map();
+            for (var k in r) { if (Object.prototype.hasOwnProperty.call(r, k)) m.set(k, r[k]); }
+            m.set('#', String(okN ? cn.nums[ri] : ri + 1));
+            return m;
+          });
+          return normCollect(P.collect(srcN, cn.rows, cn.cols, cn.val, cn.aggs, cn.extra, cn.filters));
+        }
         case 'isDerivedAgg':       return P.isDerived(a[0]);
         case 'isRoll':             return P.isRoll(a[0]);
         case 'indexBaseLabel':     return P.indexBase(a[0]);

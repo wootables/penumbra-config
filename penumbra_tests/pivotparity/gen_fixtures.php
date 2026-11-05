@@ -288,6 +288,23 @@ $collCases = array(
 foreach ($collCases as $k => $cc) {
     add($cases, $id, 'collect', array($collRows, $cc), 'case' . $k . ' ' . $cc['aggs'][0]);
 }
+// (2026-11-04, pvhash) A per-value filter on # - the row's number. The browser's rows carry it (main.js numbers
+// masterRowData); the email's collector gets the numbers ('nums': a saved search keeps the kept rows' own, null =
+// 1, 2, ...; a list of another length is ignored) and must give the filter the same #.
+$numCases = array(
+    array('f' => '# <= 3',                    'nums' => null),
+    array('f' => '# = /^(?:2|5|7)$/',         'nums' => null),
+    array('f' => '# >= 3 AND AMT > 5',        'nums' => null),
+    array('f' => '# > 9',                     'nums' => array(2, 4, 5, 9, 10, 11, 12, 15)),
+    array('f' => '# = 9',                     'nums' => array(2, 4, 5, 9, 10, 11, 12, 15)),
+    array('f' => '# <= 2',                    'nums' => array(7, 8, 9)),   // wrong length: 1, 2, ...
+    array('f' => "'#' <= 3",                  'nums' => null),             // quoted: the parser must know # as a column
+);
+foreach ($numCases as $k => $nc) {
+    $cc = array('rows'=>array('COLLEGE'), 'cols'=>array('FY'), 'val'=>'AMT', 'extra'=>null,
+                'filters'=>array($nc['f']), 'aggs'=>array('sum'), 'nums'=>$nc['nums']);
+    add($cases, $id, 'collectNum', array($collRows, $cc), 'num' . $k . ' ' . $nc['f'] . ($nc['nums'] ? ' nums' : ''));
+}
 
 // ------------------------------------------- large-array min/max (no apply) --
 // Math.min.apply(null, arr) throws RangeError in the six-figure range; PHP's
