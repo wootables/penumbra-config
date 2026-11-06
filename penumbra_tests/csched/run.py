@@ -34,6 +34,26 @@ NEW = {'P-groupAgg', 'S-aggWired'}   # (cleft: the group summary on the card ema
 NEW = set()   # (cleft is LIVE since 4300d47: the control expects every check green)
 NEW = {'P-edge', 'P-edgePick'}   # (cedge: the status edge on the scheduled email's cards)
 NEW = set()   # (cedge is LIVE since ac211e9: the control expects every check green)
+NEW_CPDF = {'P-pdfPages', 'P-pdfPill', 'P-pdfSafe', 'P-pdfBar', 'P-pdfGrouped', 'P-pdfCap', 'P-pdfNone', 'P-pdfFor', 'P-pdfNotes', 'P-pdfRender', 'S-pdfWired',
+            'S-pdfChange', 'P-pdfFormat', 'P-pdfArray'}   # (cpdf: the scheduled PDF's cards; the sweep's three)
+NEW = NEW | NEW_CPDF   # (cpdf) add, never replace
+NEW = NEW - NEW_CPDF   # (cpdf is LIVE since 3c9c516: the control expects every check green)
+NEW_CSWEEP3 = {'P-arrayCells', 'P-noWarnings'}   # (csweep3: array cells in the email's and the PDF's cards; P-noWarnings reads live's warning on them)
+NEW = NEW | NEW_CSWEEP3   # (csweep3) add, never replace
+NEW = NEW - NEW_CSWEEP3   # (csweep3 is LIVE since fb50302: the control expects every check green)
+NEW_MAILHID = {'P-hidBlank'}   # (mailhid: a value hidden by its highlight mails blank)
+NEW = NEW | NEW_MAILHID   # (mailhid) add, never replace
+NEW = NEW - NEW_MAILHID   # (mailhid is LIVE since c4cc721: the control expects every check green)
+NEW_PVSCHED = {'P-pvCapture', 'P-pvCaptureHl', 'P-pvTiles', 'P-pvSetup', 'P-pvParent', 'P-pvEmail', 'P-pvEmailHl', 'P-pvEmailSize', 'P-pvEmailCut',
+               'P-pvPdfPages', 'P-pvPdfCap', 'P-pvPdfFor', 'P-pvPdfRender', 'P-pvCfg', 'S-pvWired', 'S-pvSaved', 'P-pvEmailHid'}   # (pvsched: a pivot saved showing its tiles; P-pvSame holds on live - no recorder there)
+NEW = NEW | NEW_PVSCHED   # (pvsched) add, never replace
+NEW = NEW - NEW_PVSCHED   # (pvsched is LIVE since 6636ed1: the control expects every check green)
+NEW_HIDFIX = {'P-hidImp', 'P-hidImpFlat', 'P-pvEmailHidImp'}   # (hidfix: a fill ruled "!important" still hides its own colour's text)
+NEW = NEW | NEW_HIDFIX   # (hidfix) add, never replace
+NEW = NEW - NEW_HIDFIX   # (hidfix is LIVE since 12d2785: the control expects every check green)
+NEW_TILEGAP = {'P-pvBlankCol', 'P-pvPdfBlankCol'}   # (tilegap: a blank column keeps its line, as the tile on screen; P-pvBlankColNoLabels holds on live)
+NEW = NEW | NEW_TILEGAP   # (tilegap) add, never replace
+NEW = NEW - NEW_TILEGAP   # (tilegap is LIVE since 31fc7e8: the control expects every check green)
 EITHER = {'P-budget'}
 MUTANTS = {
     'm-open': ([('inc', "    if (!$c || empty($c['open']) || !isset($c['sent']) || !is_array($c['sent'])) return null;", "    if (!$c || !isset($c['sent']) || !is_array($c['sent'])) return null;")], ['P-cfgNoOpen']),
@@ -75,7 +95,61 @@ MUTANTS = {
     'm-pdf': ([('run', "($isEmail && $viewMode !== 'pivot' && !empty($data)", "($viewMode !== 'pivot' && !empty($data)")], ['S-bodyOnly']),
     'm-guard': ([('run', "function_exists('penumbra_cards_email_cfg') ? penumbra_cards_email_cfg($state) : null;", "penumbra_cards_email_cfg($state);")], ['S-globalGuarded']),
     'm-cell': ([('run', "'html' => penumbra_notes_cell_html(formatCellContent($cellValue), $colName),", "'html' => formatCellContent($cellValue),")], ['S-sameCell']),
+    # (cpdf) the cap ignored / its note page gone / the pill or the list left off / a pivot as cards / the plugin's cards
+    # mode off / its pages landscape / a site not asking
+    'pd-cap': ([('inc', "            if ($shown >= $max) break 2;", "            if (false) break 2;")], ['P-pdfCap']),
+    'pd-note': ([('inc', "    if ($cut) {\n        $left = $total - $shown;", "    if (false) {\n        $left = $total - $shown;")], ['P-pdfCap']),
+    'pd-pill': ([('inc', "($pw ? '<td width=\"' . $pw . '%\" align=\"center\"", "(false ? '<td width=\"' . $pw . '%\" align=\"center\"")], ['P-pdfPill']),
+    'pd-list': ([('inc', "                if ($notes !== '' && strtoupper((string)$col) === $notes) continue;", "                continue;")], ['P-pdfPages']),
+    'pd-pivot': ([('inc', "    if ($viewMode === 'pivot') return penumbra_cards_pdf_tiles_for($data, $reportTitle);", "    if (false) return penumbra_cards_pdf_tiles_for($data, $reportTitle);")], ['P-pdfFor', 'P-pvPdfFor']),   # (pvsched: re-aimed at the pivot's route)
+    'pd-mode': ([('pdf', "        if (!empty($cardPages)) {", "        if (false) {")], ['P-pdfRender']),
+    'pd-land': ([('pdf', "                $pdf->AddPage('P');", "                $pdf->AddPage();")], ['P-pdfRender']),
+    'pd-site': ([('run', "                                            'card_pages' => (function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for($prData, $prViewMode, $reportTitle) : null)   // (cpdf)\n", "")], ['S-pdfWired']),
+    # (cpdf sweep) a recipient's change analysis as cards / the column format skipped / an array cell warning again
+    'pd-change': ([('run', "                                        $GLOBALS['penumbra_cards_email'] = null;   // (cpdf sweep) this recipient's was/now tables, never cards (as the broadcast's)\n", "")], ['S-pdfChange']),
+    'pd-format': ([('inc', "        if (function_exists('penumbra_email_cell_format')) $raw = penumbra_email_cell_format(strtoupper((string)$col), $raw);", "        //")], ['P-pdfFormat']),
+    'pd-array': ([('inc', "    $s = is_array($raw) ? (string)json_encode($raw) : (string)$raw;", "    $s = (string)$raw;")], ['P-noWarnings']),
+    # (csweep3) an empty array read as a value again / the email card's value cast on an array again
+    'w3-emptyarr': ([('inc', "    if (is_array($raw) && !$raw) return '';", "    if (false) return '';")], ['P-arrayCells']),
+    'w3-valarr': ([('inc', "                if (is_array($c['raw'])) return '<span style=\"' . $st . '\">' . $c['html'] . '</span>';", "                if (false) return '';")], ['P-arrayCells', 'P-noWarnings']),
+    # (pvsched) the record off / no value recorded / no highlight / no Grand Total / the HTML touched while recording
+    'ps-cap': ([('run', "    $_pcap = (isset($GLOBALS['penumbra_pivot_capture']) && is_array($GLOBALS['penumbra_pivot_capture']))", "    $_pcap = (false && is_array($GLOBALS['penumbra_pivot_capture']))")], ['P-pvCapture', 'P-pvTiles']),
+    'ps-cell': ([('run', "if ($_pcap !== null) { $_pcb = \"{$tdDataCss} background-color: {$bg};\"; $_pcap['rows'][$rowIndex]['cells'][] = array(", "if (false) { $_pcb = \"{$tdDataCss} background-color: {$bg};\"; $_pcap['rows'][$rowIndex]['cells'][] = array(")], ['P-pvCapture', 'P-pvTiles']),
+    'ps-hl': ([('run', "'hl' => (strpos($cellStyle, $_pcb) === 0) ? substr($cellStyle, strlen($_pcb)) : ''); }", "'hl' => ''); }")], ['P-pvCaptureHl', 'P-pvEmailHl']),
+    'ps-foot': ([('run', "if ($_pcap !== null) { if (!empty($_actG['noFooter'])) $_pcap['foot'] = null; $GLOBALS['penumbra_pivot_capture'] = $_pcap; }", "if ($_pcap !== null) { $_pcap['foot'] = null; $GLOBALS['penumbra_pivot_capture'] = $_pcap; }")], ['P-pvCapture', 'P-pvTiles']),
+    'ps-same': ([('run', "        if ($_pcap !== null) $_pcap['foot']['label'] = $colTotalLabel;", "        if ($_pcap !== null) $html .= ' ';")], ['P-pvSame']),
+    # the setup's big number / bar scale / parent pill / measures picked; no Grand Total tile
+    'ps-big': ([('inc', "        if ($bm >= 0) { $bc = _pnb_pv_total($r, $bm);", "        if (false) { $bc = _pnb_pv_total($r, $bm);")], ['P-pvSetup']),
+    'ps-bar': ([('inc', "    sort($scale);\n", "    $scale = array();\n")], ['P-pvSetup']),
+    'ps-parent': ([('inc', "        if ($cfg['pill'] === 'parent' && $sub !== '') {", "        if (false) {")], ['P-pvParent']),
+    'ps-fields': ([('inc', "            if ($only !== null && !in_array((int)$c['agg'], $only, true)) continue;\n", "")], ['P-pvSetup']),
+    'ps-gtlast': ([('inc', "        $tiles[] = array('title' => $ft, 'sub' => '', 'pill' => null,", "        if (false) $tiles[] = array('title' => $ft, 'sub' => '', 'pill' => null,")], ['P-pvTiles']),
+    # the email: the size saved / the budget's cut; the PDF's cap; the saved setup: open, the tiles the saver saw
+    'ps-size': ([('inc', "    $sz = (is_array($cfg) && isset($GLOBALS['PENUMBRA_CARDS_MAIL_SIZE'][$cfg['size']])) ? $cfg['size'] : 'standard';", "    $sz = 'standard';")], ['P-pvEmailSize']),
+    'ps-hid': ([('inc', "(_pnb_cm_hid(_pnb_pv_cssarr($fd['css'])) ? '&nbsp;' :", "(false ? '&nbsp;' :")], ['P-pvEmailHid']),   # (pvsched) mailhid's rule off on the tiles
+    'ps-cut': ([('inc', "        if ($budget > 0 && $bytes + strlen($one) > $budget) { $cut = true; continue; }\n", "")], ['P-pvEmailCut']),
+    'ps-pdfcap': ([('inc', "        if ($n === $lim) break;", "        if (false) break;")], ['P-pvPdfCap']),
+    'ps-open': ([('inc', "    if (!$c || empty($c['open'])) return null;\n    $saw =", "    if (!$c) return null;\n    $saw =")], ['P-pvCfg']),
+    'ps-saw': ([('inc', "    $src = $saw ? $saw :", "    $src = false ? $saw :")], ['P-pvCfg']),
+    # the runner's wiring: the body / the task's context / its reset / the saved setup per task; the browser's Save
+    'ps-body': ([('run', "        $_tilesHere = penumbra_cards_pivot_tiles($data, $pivotSettings, $themeName, $formatRules, $rewriteRules);", "        $_tilesHere = null;")], ['S-pvWired']),
+    'ps-ctx': ([('run', "                $GLOBALS['penumbra_cards_tiles_ctx'] = array('settings' =>", "                $GLOBALS['penumbra_cards_tiles_ctxX'] = array('settings' =>")], ['S-pvWired']),
+    'ps-reset': ([('run', "            $GLOBALS['penumbra_cards_tiles_ctx'] = null;   // (pvsched) this task's pivot context", "            // (pvsched) this task's pivot context")], ['S-pvWired']),
+    'ps-cfgline': ([('run', "    $GLOBALS['penumbra_cards_tiles'] = function_exists('penumbra_cards_tiles_cfg') ? penumbra_cards_tiles_cfg($state) : null;", "    $GLOBALS['penumbra_cards_tiles'] = null;")], ['S-pvWired']),
+    'ps-saved': ([('cjs', "return { open: 1, tiles: tv }; }", "return { open: 1 }; }")], ['S-pvSaved']),
 }
+
+MUTANTS.update({
+    # (mailhid) a hidden value drawn as before (the square) / every two-colour value blanked
+    'm-hid': ([('inc', "                if (_pnb_cm_hid($c['css'])) return '&nbsp;';", "                if (false) return '&nbsp;';")], ['P-hidBlank']),
+    'm-hideq': ([('inc', "return $c !== '' && $c === strtolower(", "return $c !== '' && '' !== strtolower(")], ['P-hidKept']),
+    # (hidfix) the priority kept on the fill: it never equals its text
+    'hf-imp': ([('inc', "    $css = array('color' => preg_replace(", "    $cssOff = array('color' => preg_replace(")], ['P-hidImp', 'P-hidImpFlat', 'P-pvEmailHidImp']),
+    # (tilegap) the email skips a blank column again / lists it with no labels too / the PDF skips it
+    'tg-mail': ([('inc', "            if ($fv === '' && $nol) continue;", "            if ($fv === '') continue;")], ['P-pvBlankCol']),
+    'tg-nol': ([('inc', "            if ($fv === '' && $nol) continue;", "            if (false && $nol) continue;")], ['P-pvBlankColNoLabels']),
+    'tg-pdf': ([('inc', "            // (tilegap) a column with no value keeps its row, blank,", "            if ($fv === '') continue; // (tilegap) a column with no value keeps its row, blank,")], ['P-pvPdfBlankCol']),
+})
 
 args = sys.argv[1:]
 def opt(name, default=None):
@@ -94,16 +168,42 @@ def pick(rel):
     p = os.path.join(root, rel)
     return p if os.path.exists(p) else os.path.join(APP, rel)
 cand = {'inc': pick('penumbra_cards_email.php'), 'run': pick('schedule_runner.php'), 'cjs': pick(os.path.join('js', 'penumbra_cards.js'))}
+cand['pdf'] = pick(os.path.join('plugins', 'pdf_generator.php'))   # (cpdf) the PDF plugin under test (its cards mode)
+TCPDF = os.path.join(APP, 'plugins', 'lib', 'tcpdf', 'tcpdf.php')   # (cpdf) live's TCPDF behind it
 THM = os.path.join(APP, 'themes_config.php'); SRCH = os.path.join(APP, 'penumbra_search.php')
 
 def run_test(paths):
-    out = subprocess.run([PHP, '-n', os.path.join(HERE, 'test_csched.php'), paths['inc'], paths['run'], THM, SRCH, paths['cjs']], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    # (cpdf) TCPDF on PHP 8 reads curl's constants: the extension loaded for the render (production's php82 has it)
+    out = subprocess.run([PHP, '-n', '-d', 'extension_dir=' + os.path.dirname(PHP).replace(chr(92), '/') + '/ext', '-d', 'extension=curl', os.path.join(HERE, 'test_csched.php'), paths['inc'], paths['run'], THM, SRCH, paths['cjs'], paths['pdf'], TCPDF], capture_output=True, text=True, encoding='utf-8', errors='replace')
     res = []
     for line in (out.stdout or '').splitlines():
         m = re.match(r'\s+(PASS|FAIL)\s+(\S+)\s*(.*)', line)
         if m: res.append((m.group(2), m.group(1) == 'PASS', m.group(3)))
     if not res: res.append(('F-run', False, ((out.stdout or '') + (out.stderr or ''))[-600:]))
+    res += run_pvtiles(paths)   # (pvsched) a pivot's tiles: the candidate runner's mirror + the include
     return res
+
+# (pvsched) test_pvtiles.php over a MIRROR of the candidate runner (its functions alone: pivotparity's extractor, never the
+# runner itself - Oracle, mail), in its own PHP (its stand-ins are not test_csched.php's)
+EXTRACT = os.path.join(os.path.dirname(HERE), 'pivotparity', 'extract_mirror.php')
+if not os.path.exists(EXTRACT): EXTRACT = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotparity\extract_mirror.php'   # (a kit's copy of the suite)
+def run_pvtiles(paths):
+    d = tempfile.mkdtemp(prefix='pnb_pvt_')
+    try:
+        os.makedirs(os.path.join(d, 'log'), exist_ok=True)   # the mirror's log_scheduler writes beside itself
+        mir = os.path.join(d, 'mirror.php')
+        e = subprocess.run([PHP, '-n', EXTRACT, paths['run'], mir], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        if not os.path.exists(mir): return [('F-pvmirror', False, ((e.stdout or '') + (e.stderr or ''))[-400:])]
+        out = subprocess.run([PHP, '-n', '-d', 'extension_dir=' + os.path.dirname(PHP).replace(chr(92), '/') + '/ext', '-d', 'extension=curl', os.path.join(HERE, 'test_pvtiles.php'),
+                              mir, paths['inc'], THM, SRCH, paths['run'], paths['pdf'], TCPDF, paths['cjs']], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        res = []
+        for line in (out.stdout or '').splitlines():
+            m = re.match(r'\s+(PASS|FAIL)\s+(\S+)\s*(.*)', line)
+            if m: res.append((m.group(2), m.group(1) == 'PASS', m.group(3)))
+        if not res: res.append(('F-pvrun', False, ((out.stdout or '') + (out.stderr or ''))[-600:]))
+        return res
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 def mutated(name):
     d = tempfile.mkdtemp(prefix='pnb_csched_')

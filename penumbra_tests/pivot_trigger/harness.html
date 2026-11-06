@@ -243,7 +243,7 @@
         assert('datesplit bucket ym', M6.bucket('ym', '2025-03-14') === 'Mar 2025', M6.bucket('ym', '2025-03-14'));
         assert('datesplit bucket monthnum', M6.bucket('monthnum', '2025-03-14') === '03', M6.bucket('monthnum', '2025-03-14'));
         assert('datesplit bucket dow', M6.bucket('dow', '2025-03-14') === 'Fri', M6.bucket('dow', '2025-03-14'));
-        assert('datesplit bucket hour date-only', M6.bucket('hour', '2025-03-14') === '00:00', M6.bucket('hour', '2025-03-14'));
+        assert('datesplit bucket hour date-only', M6.bucket('hour', '2025-03-14') === '2025-03-14', M6.bucket('hour', '2025-03-14'));   // (2026-11-05, bdbucket older issues) Hour needs a time: a date keeps its text
         assert('datesplit bucket hour timestamp', M6.bucket('hour', '2025-03-14 15:42:07') === '15:00', M6.bucket('hour', '2025-03-14 15:42:07'));
         assert('datesplit bucket unparsable keeps raw', M6.bucket('fy', 'not a date') === 'not a date', M6.bucket('fy', 'not a date'));
         assert('datesplit bucket blank stays blank', M6.bucket('fy', '') === '', JSON.stringify(M6.bucket('fy', '')));

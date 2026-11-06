@@ -3580,13 +3580,14 @@
       R.chk.fmGroupsNum = !!nl && bl.length > 1 && lows.every(function (v, i) { return isFinite(v) && (i === 0 || v > lows[i - 1]); })
         && bl.join('|') === (R.info.bins.want || []).join('|');
       closeMenu();
-      // a text column has none; nor where the report hides Clipboard
+      // a text column has none; (2026-11-05, the user's 10-27 rule: the Clipboard option hides only the Copy button) where
+      // the report hides Clipboard, a date column's ARE offered - they copy straight to the clipboard, no Copy dialog
       closeMenu(); rclick(fth('V_STATUS'));
       var noTxt = allItems().every(function (e) { return e.getAttribute('data-act') !== 'copyGroups'; }); reach('copyName'); noTxt = noTxt && !item('copyGroups'); closeMenu();
       document.body.classList.add('restrict-clipboard');
-      var noClip = false;
-      try { closeMenu(); rclick(fth('V_DATE')); reach('copyName'); noClip = !!menu() && !item('copyGroups'); closeMenu(); } finally { document.body.classList.remove('restrict-clipboard'); }
-      R.chk.fmGroupsNone = noTxt && noClip;
+      var clipKeeps = false;
+      try { closeMenu(); rclick(fth('V_DATE')); reach('copyName'); clipKeeps = !!menu() && !!item('copyGroups'); closeMenu(); } finally { document.body.classList.remove('restrict-clipboard'); }
+      R.chk.fmGroupsNone = noTxt && clipKeeps;
       // a nested table's sub-cell: Filter (Filter to, Click to filter), Copy with This nested table after This entire row
       var lay = A().layout(); lay.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = true; }); A().applyLayout(lay); await sleep(600);
       var FX = window.__rowsFixture, jid = fth('H_JSON').getAttribute('data-column'), jtd = null;
@@ -4038,6 +4039,86 @@
       closeMenu();
       rpp.value = rpp0; $(rpp).trigger('change'); await sleep(700);
       PG_HIDE = true;
+    },
+    // (dtpick, 2026-11-05) a date column's Chart by list: last in the column's tools (Clear all after it), As is first,
+    // then every grouping its dates are precise enough for (no Hour on dates without a time), the span's pick named
+    // (suggested); each runs Chart this column with its grouping; none on text or number columns, none where the
+    // chart builder's button is not shown
+    mchart: async function () {
+      var P = window.Penumbra, H = A(), keepC = H.chartColumn, calls = [];
+      // the harness page keeps the toolbar hidden: show the chart builder's button, as a report with results does
+      var vb0 = document.getElementById('visualizeBtn');
+      R.info.visBefore = vb0 ? jQuery('#visualizeBtn').is(':visible') : 'absent';
+      var vbMade = !vb0;
+      if (!vb0) { vb0 = document.createElement('span'); vb0.id = 'visualizeBtn'; document.body.appendChild(vb0); }   // (this harness page has no toolbar)
+      if (!jQuery('#visualizeBtn').is(':visible')) { document.body.appendChild(vb0); vb0.style.display = 'inline-block'; vb0.style.width = '20px'; vb0.style.height = '20px'; }
+      R.info.vis = jQuery('#visualizeBtn').is(':visible');
+      closeMenu(); rclick(fth('V_DATE')); await sleep(50);
+      var a = acts(), ci = a.indexOf('chartByList'), gi = Math.max(a.indexOf('groupBy'), a.indexOf('groupByList')), li = a.indexOf('clearPrefs');
+      R.info.acts = a;
+      R.chk.chItem = ci >= 0 && ci > gi && li === a.length - 1 && ci === li - 1;
+      var it = item('chartByList');
+      if (it) { it.click(); await sleep(100); }
+      var sa = it ? subActs() : [], sl = it ? subLabels() : [];
+      R.info.sub = { acts: sa, labels: sl };
+      var want = ['chartAs-raw', 'chartAs-year', 'chartAs-fy', 'chartAs-yq', 'chartAs-fyq', 'chartAs-ym', 'chartAs-quarter', 'chartAs-fquarter', 'chartAs-month', 'chartAs-monthnum', 'chartAs-dow'];
+      R.chk.chList = sa.join() === want.join() && /^As is/.test(sl[0] || '') && sl.indexOf('Fiscal Year') >= 0 && sl.some(function (l) { return /^Fiscal Year . Quarter/.test(l); });
+      R.chk.chNoHour = sa.length > 0 && sa.indexOf('chartAs-hour') < 0;
+      // 300 rows of many dates: a period is the suggestion, never As is; exactly one
+      var sug = sl.filter(function (l) { return / \(suggested\)$/.test(l); });
+      R.chk.chSuggest = sug.length === 1 && !/^As is/.test(sug[0]);
+      R.info.suggested = sug;
+      // each runs Chart this column with its grouping
+      H.chartColumn = function (c, s) { calls.push([c, s]); return true; };
+      try {
+        var fy = item('chartAs-fy'); if (fy) { fy.click(); await sleep(50); }
+        closeMenu(); rclick(fth('V_DATE')); await sleep(50); if (sub('chartByList')) { await sleep(100); var raw = item('chartAs-raw'); if (raw) { raw.click(); await sleep(50); } }
+      } finally { H.chartColumn = keepC; }
+      R.info.calls = calls;
+      R.chk.chRuns = JSON.stringify(calls) === JSON.stringify([['V_DATE', 'fy'], ['V_DATE', 'raw']]);
+      closeMenu();
+      // not on a text or a number column
+      rclick(fth('V_NAME')); await sleep(50); var an = acts(); closeMenu();
+      rclick(fth('V_AMOUNT')); await sleep(50); var am = acts(); closeMenu();
+      R.chk.chText = an.indexOf('chartByList') < 0 && am.indexOf('chartByList') < 0 && an.length > 0 && am.length > 0;
+      // not where the chart builder's button is hidden
+      var vb = document.getElementById('visualizeBtn'), vd = vb ? vb.style.display : '';
+      if (vb) vb.style.display = 'none';
+      try { rclick(fth('V_DATE')); await sleep(50); var ah = acts(); closeMenu(); R.chk.chHidden = !!vb && ah.length > 0 && ah.indexOf('chartByList') < 0; }
+      finally { if (vb) vb.style.display = vd; }
+      if (vbMade && vb0.parentNode) vb0.parentNode.removeChild(vb0);
+    },
+    // (dtpick B, 2026-11-05) the start/end pair's Chart active by list (main.js headerMenu.activeVariants; stubbed here:
+    // this fixture has one date column - chartinv section B drives the real pair): after Chart by, Clear all after it,
+    // each period an entry, the span's pick named (suggested), each running Chart active by with its grouping; none
+    // where activeVariants offers none
+    mactive: async function () {
+      var H = A(), keepV = H.activeVariants, keepC = H.chartActive, calls = [];
+      var vb0 = document.getElementById('visualizeBtn'), vbMade = !vb0;
+      if (!vb0) { vb0 = document.createElement('span'); vb0.id = 'visualizeBtn'; vb0.style.display = 'inline-block'; vb0.style.width = '20px'; vb0.style.height = '20px'; document.body.appendChild(vb0); }
+      H.activeVariants = function (c) {
+        if (c !== 'V_DATE') return [];
+        return [{ id: 'year', label: 'Year', start: 'V_DATE', end: 'V_END' }, { id: 'fy', label: 'Fiscal Year', start: 'V_DATE', end: 'V_END', suggested: true }, { id: 'ym', label: 'Year › Month', start: 'V_DATE', end: 'V_END' }];
+      };
+      H.chartActive = function (c, id) { calls.push([c, id]); return true; };
+      try {
+        closeMenu(); rclick(fth('V_DATE')); await sleep(50);
+        var a = acts(), ai = a.indexOf('chartActiveList'), ci = a.indexOf('chartByList'), li = a.indexOf('clearPrefs');
+        R.info.acts = a;
+        R.chk.acItem = ai >= 0 && ci >= 0 && ai === ci + 1 && li === a.length - 1 && ai === li - 1;
+        var it = item('chartActiveList');
+        R.chk.acTitle = !!it && /every period from V_DATE to V_END \(a blank end runs to today\)/.test(it.getAttribute('title') || '');
+        if (it) { it.click(); await sleep(100); }
+        var sa = it ? subActs() : [], sl = it ? subLabels() : [];
+        R.info.sub = { acts: sa, labels: sl };
+        R.chk.acList = sa.join() === 'chartActive-year,chartActive-fy,chartActive-ym' && sl.join('|') === 'Year|Fiscal Year (suggested)|Year › Month';
+        var fy = item('chartActive-fy'); if (fy) { fy.click(); await sleep(50); }
+        R.info.calls = calls;
+        R.chk.acRuns = JSON.stringify(calls) === JSON.stringify([['V_DATE', 'fy']]);
+        closeMenu();
+        rclick(fth('V_NAME')); await sleep(50); var an = acts(); closeMenu();
+        R.chk.acNone = an.length > 0 && an.indexOf('chartActiveList') < 0;
+      } finally { H.activeVariants = keepV; H.chartActive = keepC; if (vbMade && vb0.parentNode) vb0.parentNode.removeChild(vb0); }
     },
     mexcl: async function () {
       var td = document.querySelector('#resultsTable tbody tr td a');

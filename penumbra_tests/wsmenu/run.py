@@ -373,7 +373,7 @@ def scenario(name, out):
             A('R-foot', m and m['foot'] == FOOT, m and m['foot'])
             notes = dict((i['act'], i['note']) for i in m['items']) if m else {}
             A('R-notes', notes.get('header') == 'F2' and notes.get('settings') == 'Ctrl+,' and notes.get('quick') == 'Ctrl+K' and notes.get('rerun') == 'F9'
-              and notes.get('history') == 'Ctrl+Shift+Y' and notes.get('rowHeight') == 'Ctrl+Shift+H' and notes.get('viewLink') == '', notes)
+              and notes.get('history') == 'Ctrl+Shift+Y' and notes.get('rowHeight') == 'Ctrl+Shift+H' and notes.get('viewLink') == 'Alt+Shift+L', notes)   # (cardlink, 2026-11-05) Alt+Shift+L
             # at the pointer; near the right edge, kept on screen
             vw = p.ev('window.innerWidth')
             cw = p.ev('document.documentElement.clientWidth')   # less the page's scrollbar: the harness page has one

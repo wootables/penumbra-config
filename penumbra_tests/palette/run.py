@@ -718,6 +718,47 @@ MUTANTS['pf-splitkw'] = ([('pal', "kw: 'format summary shading links filter spli
 MUTANTS['sl-palrows'] = ([('pal', "            if (['selFilter', 'selExclude', 'selCopy'].indexOf(it.act) >= 0 && !it.disabled) {", "            if (false) {")], ['L-prow-rowSel', 'L-prow-rowSelRuns'], ['prow'])
 MUTANTS['sl-palsub'] = ([('pal', "sub: 'the ' + nSel + ' selected cells',", "sub: where,")], ['L-prow-rowSel'], ['prow'])
 
+# (2026-11-05, dtpick) Chart COLUMN by... on a date column: red on live (no row); pcbText holds on live (a guard)
+SCN = SCN + ['pchartby']
+CHK['pchartby'] = ['pcbRow', 'pcbList', 'pcbRuns', 'pcbChartSub', 'pcbText']
+NEW_CB = {'L-pchartby-' + c for c in CHK['pchartby'] if c != 'pcbText'}
+NEW = NEW | NEW_CB
+NEW = NEW - NEW_CB   # (dtpick is LIVE since 6fdb836, 2026-11-05: old checks now)
+MUTANTS.update({
+    'cb-norow': ([('pal', "            if (cv.length) {\n                out.push({ id: 'combo:chartby:' + col,", "            if (false) {\n                out.push({ id: 'combo:chartby:' + col,")],
+                 ['L-pchartby-pcbRow', 'L-pchartby-pcbList', 'L-pchartby-pcbRuns'], ['pchartby']),
+    'cb-nopick': ([('pal', "        if (e.pick === 'chartby' && e.th && e.th.isConnected && ui) {", "        if (false) {")], ['L-pchartby-pcbList', 'L-pchartby-pcbRuns'], ['pchartby']),
+    'cb-nosub': ([('pal', "sub: cv.length ? 'opens the chart builder with it on the X axis, grouped by a period that suits its dates' : ", "sub: false ? '' : ")], ['L-pchartby-pcbChartSub'], ['pchartby']),
+    'cb-noexempt': ([('pal', "return was(act) || /^chartAs-[a-z0-9]+$/.test(String(act)); }; })();", "return was(act); }; })();")], ['L-pmain-coverage', 'L-pwidth-widthCoverage'], ['pmain', 'pwidth']),
+})
+
+# (2026-11-05, dtpick B) Chart active by...: red on live (no row); paNone holds on live (a guard). paRank: the Chart row's
+# sub dropped "by", so "chart x by" ranks Chart X by... first; pcbChartSub reshaped with it
+SCN = SCN + ['pactive']
+CHK['pactive'] = ['paRow', 'paList', 'paRuns', 'paNone', 'paRank', 'paCover']
+NEW_PA = {'L-pactive-' + c for c in CHK['pactive'] if c != 'paNone'} | {'L-pchartby-pcbChartSub'}
+NEW = NEW | NEW_PA
+NEW = NEW - NEW_PA   # (dtpick B is LIVE since 21b830a, 2026-11-05: old checks now)
+MUTANTS.update({
+    'pa-norow': ([('pal', "            if (av.length && av[0].start === col) {", "            if (false) {")], ['L-pactive-paRow', 'L-pactive-paList', 'L-pactive-paRuns'], ['pactive']),
+    'pa-query': ([('pal', "pick: 'chartby', query: 'Chart active by', th: th,", "pick: 'chartby', th: th,")], ['L-pactive-paList'], ['pactive']),   # (the whole column list still holds the entry: it runs)
+    'pa-rank': ([('pal', "            if (kind === 'chart' && /\\s(by|active)(\\s|\\.|$)/.test(t)) {", "            if (false) {")], ['L-pactive-paRank'], ['pactive']),
+    'pa-sub': ([('pal', "grouped into periods that suit its dates' : ", "grouped by a period that suits its dates' : ")], ['L-pchartby-pcbChartSub'], ['pchartby']),
+    'pa-noexempt': ([('pal', "return was(act) || /^chartActive-[a-z0-9]+$/.test(String(act)); }; })();", "return was(act); }; })();")], ['L-pactive-paCover'], ['pactive']),
+})
+
+# (2026-11-05, dtpick D2) Pivot active by...: red on live (no row); ppNone holds on live (a guard)
+SCN = SCN + ['ppvactive']
+CHK['ppvactive'] = ['ppRow', 'ppList', 'ppRuns', 'ppNone', 'ppRank', 'ppCover']
+NEW_PP = {'L-ppvactive-' + c for c in CHK['ppvactive'] if c != 'ppNone'}
+NEW = NEW | NEW_PP
+MUTANTS.update({
+    'pp-norow': ([('pal', "            if (pav.length) {", "            if (false) {")], ['L-ppvactive-ppRow', 'L-ppvactive-ppList', 'L-ppvactive-ppRuns', 'L-ppvactive-ppRank'], ['ppvactive']),
+    'pp-query': ([('pal', "pick: 'chartby', query: 'Pivot active by', th: th,", "pick: 'chartby', th: th,")], ['L-ppvactive-ppList'], ['ppvactive']),
+    'pp-rank': ([('pal', "            if (kind === 'pivot' && /\\sactive(\\s|\\.|$)/.test(t)) {", "            if (false) {")], ['L-ppvactive-ppRank'], ['ppvactive']),
+    'pp-noexempt': ([('pal', "return was(act) || /^pivotActive-[a-z0-9]+$/.test(String(act)); }; })();", "return was(act); }; })();")], ['L-ppvactive-ppCover'], ['ppvactive']),
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:

@@ -73,6 +73,12 @@ pivot_normalize_bin_edges
 pivot_bins_labels
 pivot_bins_bucket_label
 pivot_parse_field_token
+pivot_active_day
+pivot_active_period_labels
+pivot_active_range
+pivot_active_period_span
+pivot_active_expand_rows
+pivot_active_gate
 penumbra_group_delim_def
 penumbra_delim_decode_entities
 penumbra_group_delim_pieces
@@ -122,6 +128,7 @@ penumbra_state_column_formats
 penumbra_email_cell_format
 penumbra_email_footer_formats
 penumbra_num_text
+penumbra_sched_sort_rows
 apply_state_logic
 _cf_group_rows
 _cf_sort_groups
@@ -143,6 +150,7 @@ penumbra_group_agg_registry_type
 penumbra_sched_notes_col
 penumbra_notes_cell_html
 penumbra_sched_journal_screen_order
+penumbra_sched_journal_places
 penumbra_is_toggle_column
 penumbra_compute_summary
 penumbra_format_summary
@@ -261,6 +269,10 @@ parse_heatmap_rules
 parse_format_rules
 penumbra_resolve_css_vars
 parse_css_properties
+_cf_paren_name_mask
+_cf_paren_unmask
+_cf_split_paren_tokens
+_cf_trim_logicals
 parse_format_condition
 _cf_get_cell_value
 _cf_parse_num
@@ -357,6 +369,9 @@ _snippet_normalize_case
 _snippet_email_button_pattern
 _snippet_email_buttons_prestrip
 _snippet_style_email_buttons
+_sr_snippet_rownums
+_snippet_stamp_rownums
+_snippet_rownum_row
 execute_email_snippet
 evaluate_custom_condition
 _custcond_split_sides

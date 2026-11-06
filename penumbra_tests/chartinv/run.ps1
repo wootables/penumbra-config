@@ -96,7 +96,9 @@ $hooks = @(
   '  renderSnippet: renderReportSnippet, updatePanel: updateFilterPanelStatus, drillInPlace: _drillChartInPlace,',
   '  rowsByPath: _filterRowsByPath, panelExclusions: _applyChartPanelExclusions,',
   '  setMaster: function (r) { var was = masterRowData; masterRowData = r; return was; },',   # (gbar) the Timeline label counts the rows
-  '  setSnippet: function (t) { snippetEditor.setValue(t); } };',
+  '  setSnippet: function (t) { snippetEditor.setValue(t); },',
+  '  bucketRows: vizBucketRowsForAxis, parseTok: pivotParseFieldToken, activeSearch: (typeof penumbraActiveSearch === ''function'' ? penumbraActiveSearch : null), drillSearch: _chartDrillSearchPart, keep: _chartDrillKeep, bucketSearch: penumbraBucketSearch,',
+  '  pvProcess: processPivotData, pvGen: generatePivotTable, pvGate: (typeof _pivotActiveGate === ''function'' ? _pivotActiveGate : null), pvMatch: _pnbPvCellMatcher, pvSearch: _pnbPvDrillSearch, pvExists: penumbraPivotFieldExists };',   # (dtpick D) the pivot   # (dtpick B) active during
   '} catch (e) { window.__CI_ERR = String(e); }'
 ) -join ' '
 $i = $src.IndexOf($anchor)

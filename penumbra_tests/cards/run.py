@@ -11,7 +11,7 @@
 # palette rows, help topic + tip + manifest, README, main.js's hooks, no em-dash.
 # --control = live (no card view): every NEW check red, every other check green.
 # =============================================================================
-import base64, json, os, re, shutil, socket, subprocess, sys, tempfile, time, urllib.request, zlib
+import base64, json, os, re, shutil, socket, subprocess, sys, tempfile, time, urllib.request, urllib.parse, zlib
 import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -55,7 +55,9 @@ RELS = {'main': os.path.join('js', 'main.js'), 'index': 'index.php', 'pal': os.p
         'pftopic': os.path.join('help', 'topics', 'powerFeaturesHelpLightbox.php'), 'sptopic': os.path.join('help', 'topics', 'savePrefsHelpLightbox.php'),
         'vltopic': os.path.join('help', 'topics', 'viewLinkHelpLightbox.php'),   # (linkpos) the view-link help's scroll bullet
         'grptopic': os.path.join('help', 'topics', 'groupingHelpLightbox.php'), 'grptip': os.path.join('help', 'tips', 'pivot-tips-storage.php')}   # (bdlay) the grouping's Layout help
-RELS['emtopic'] = os.path.join('help', 'topics', 'emailHelpLightbox.php')   # (cmsize) the Email Report help's card sizes
+RELS['emtopic'] = os.path.join('help', 'topics', 'emailHelpLightbox.php')
+RELS['wsmenu'] = os.path.join('js', 'penumbra_wsmenu.js')
+RELS['calc'] = os.path.join('js', 'penumbra_calc.js')   # (viewstrict) the calculated columns under test (a visit's are the link's)   # (cardlink) Alt+Shift+L lives in the page menu   # (cmsize) the Email Report help's card sizes
 def read_b(p):
     if not os.path.exists(p): return ''
     return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
@@ -528,7 +530,71 @@ NEW = ({'L-%s-%s' % (sc, c) for sc in ('pw3dup', 'gw3agg', 'gw3cnt', 'ct3save') 
 NEW = set()   # (cleft is LIVE since 4300d47, 2026-11-03: old checks now)
 NEW = ({'L-clay1-%s' % c for c in CHK['clay1']} | {'S-clay'}) - GUARDS   # (clay: named card layouts)
 NEW = set()   # (clay is LIVE since 7bcb809, 2026-11-03: old checks now)
+# (cardlink, 2026-11-05, the user) a card's link by its RECORD (ck) not its place (cd); Copy link to this card (the window's
+# icon and menu, a card's menu); Alt+Shift+L (the page menu's module). cvlE's carriesDetails / described now read ck.
+SCN = SCN + ['cklA', 'cklB', 'cklC', 'cklD', 'cklT', 'cklTB', 'gklA', 'gklB', 'gklT', 'gklTB', 'pklP', 'pklB', 'gklC', 'gklD', 'gklE']
+CHK['cklA'] = ['carriesRecord', 'sameAsRow', 'noValues', 'included', 'described', 'iconShown', 'iconCopies', 'toastWords', 'menuInWindow', 'menuCopies',
+               'hotkeyCard', 'hotkeyView', 'hotkeyInField', 'hotkeyNoClash', 'cardMenu', 'cardMenuCopies', 'pageMenuNote', 'carriesScroll']
+CHK['cklB'] = ['bootsCards', 'detailsOpen', 'sameRecord', 'otherPlace', 'pageTurned', 'scrolledAsSent']
+CHK['cklC'] = ['noWindow', 'saysGone']
+CHK['cklD'] = ['noWindow', 'saysFiltered', 'offersClear', 'clearOpens']
+CHK['cklT'] = ['tableWindow', 'carriesRecord', 'iconShown']
+CHK['cklTB'] = ['tableStays', 'sameRecord']
+CHK['gklA'] = ['carriesRecord']
+CHK['gklB'] = ['groupedOpens']
+CHK['gklT'] = ['carriesRecord']
+CHK['gklTB'] = ['groupedRow']
+CHK['pklP'] = ['iconShown', 'menuItem', 'carriesTile', 'hotkeyCard']   # (cardlink 2) a pivot tile links to itself
+CHK['pklB'] = ['tileOpens']
+CHK['gklC'] = ['carriesGroups']   # (cardlink 2, the user: "didnt work in a group") a link that keeps a folded group
+CHK['gklD'] = ['opensWithFolds', 'foldKept']
+CHK['gklE'] = ['opensFolded', 'groupOpened']
+GUARDS |= {'L-cklC-noWindow', 'L-cklD-noWindow', 'L-gklC-carriesGroups'}   # (hold on live: no window from a link that names no card; the open groups were always carried)
+# (hold on live too: Ctrl+Shift+L is still Configure cards; 'open card' was listed for cd; the link boots cards and opens A
+# window - on live the card at the old PLACE, which sameRecord catches; the table's own window opens, the table stays)
+GUARDS |= {'L-cklA-hotkeyNoClash', 'L-cklA-included', 'L-cklB-bootsCards', 'L-cklB-detailsOpen', 'L-cklT-tableWindow', 'L-cklTB-tableStays'}
+NEW_CARDLINK = ({'L-%s-%s' % (sc, c) for sc in ('cklA', 'cklB', 'cklC', 'cklD', 'cklT', 'cklTB', 'gklA', 'gklB', 'gklT', 'gklTB', 'pklP', 'pklB', 'gklC', 'gklD', 'gklE') for c in CHK[sc]}
+       | {'L-cvlE-carriesDetails', 'L-cvlE-described', 'S-cardlink'}) - GUARDS   # added after every later round's NEW line (below)
+# (viewstrict, 2026-11-05, the user: "a fresh report and only the customizations from the link, not a mix and match")
+SCN = SCN + ['vstA', 'vstB', 'vstC']
+CHK['vstA'] = ['carriesRowHeight']
+CHK['vstB'] = ['noteButtons', 'linkLayout', 'calcStrict', 'rowFromLink', 'ownDensity', 'clearIsLeave', 'menuKeepLeave', 'pageMenu', 'visitNoWrite',
+               'keptLayout', 'keptCalc', 'keptRow', 'keptOwnDensity', 'keptToast', 'leaveUrl', 'clearAllLeaves', 'oneLine']
+CHK['vstC'] = ['linkDensity', 'keptDensity']   # (density: the harness loads the theme ids after main.js, so a link's theme is dropped there)
+NEW_VST = {'L-%s-%s' % (sc, c) for sc in ('vstA', 'vstB', 'vstC') for c in CHK[sc]} | {'S-viewstrict'}
+CKL = {'vstB': ('vstA', 'token'), 'vstC': ('vstA', 'token'), 'cklB': ('cklA', 'token'), 'cklC': ('cklA', 'tokenGone'), 'cklD': ('cklA', 'tokenFiltered'), 'cklTB': ('cklT', 'token'), 'gklB': ('gklA', 'token'), 'gklTB': ('gklT', 'token'), 'pklB': ('pklP', 'token'), 'gklD': ('gklC', 'token'), 'gklE': ('gklC', 'tokenFolded', 'want2')}
 MUTANTS = {
+    # (viewstrict) one per behaviour
+    'vs-calc': ([('calc', "        if (!key || linkVisit()) return sessionDefs.slice();", "        if (!key) return sessionDefs.slice();")], ['L-vstB-calcStrict'], ['vstA', 'vstB']),
+    'vs-own': ([('main', "if (!u.has('density') && v.dn && !_pnbVlOwnPref('penumbra_pref_density', 'penumbra_user_density', u.get('id'))) {", "if (!u.has('density') && v.dn) {")], ['L-vstB-ownDensity'], ['vstA', 'vstB']),
+    'vs-rh': ([('main', "if (!u.has('rowheight') && (v.rh === 0 || v.rh === 1)) _penumbraUrlOverrides.rowheight", "if (false) _penumbraUrlOverrides.rowheight")], ['L-vstB-rowFromLink'], ['vstA', 'vstB']),
+    'vs-rhw': ([('main', "if (!_pnbViewLink) localStorage.setItem('penumbra_pref_rowExpand', JSON.stringify(_rep2));", "localStorage.setItem('penumbra_pref_rowExpand', JSON.stringify(_rep2));")], ['L-vstB-visitNoWrite'], ['vstA', 'vstB']),
+    'vs-clear': ([('main', "        if (_pnbViewLink) { _pnbViewLinkLeave(); return; }", "")], ['L-vstB-clearAllLeaves'], ['vstA', 'vstB']),
+    'vs-keepcol': ([('main', "            localStorage.setItem('penumbra_column_prefs', JSON.stringify(disk));\n        } catch (e6) { }", "        } catch (e6) { }")], ['L-vstB-keptLayout'], ['vstA', 'vstB']),
+    'vs-keepcalc': ([('main', "try { window.PenumbraCalc.keepVisit(); } catch (e7) { }", "")], ['L-vstB-keptCalc'], ['vstA', 'vstB']),
+    'vs-menu': ([('menu', "        if (c && visiting() && window.PenumbraViewLink.keep) {", "        if (false) {")], ['L-vstB-menuKeepLeave'], ['vstA', 'vstB']),
+    'vs-leave': ([('main', "var u = window.location.pathname + '?id=' + encodeURIComponent(id);", "var u = window.location.pathname + window.location.search;")], ['L-vstB-leaveUrl'], ['vstA', 'vstB']),
+    'vs-rhcap': ([('main', "        v.rh = isRowExpandActive ? 1 : 0;", "")], ['L-vstA-carriesRowHeight'], ['vstA']),
+    # (cardlink) one per behaviour
+    'ck-cap': ([('main', "if (ckNow && (v.m === 'pivot') === !!ckNow.p) {", "if (false) {")], ['L-cklA-carriesRecord', 'L-cvlE-carriesDetails'], ['cklA', 'cvlE']),
+    'ck-idlike': ([('main', "            var cand = names.filter(function (n) { return _PNB_VL_IDLIKE.test(n); }).concat(", "            var cand = [].concat(")], ['L-cklA-carriesRecord'], ['cklA']),
+    'ck-turn': ([('main', "turned = FH.showRow(rec.tr);   // another page", "turned = false;   // another page")], ['L-cklB-sameRecord', 'L-cklB-pageTurned'], ['cklA', 'cklB']),
+    'ck-wait': ([('cards', "&& cards().length && !raf) linkApply(); }", "&& cards().length) linkApply(); }")], ['L-cklB-sameRecord'], ['cklA', 'cklB']),
+    'ck-miss': ([('main', "        if (!rec.tr) { _pnbViewLinkRecordMiss(rec.why, vlk); return false; }", "        if (!rec.tr) { return false; }")], ['L-cklC-saysGone', 'L-cklD-saysFiltered'], ['cklA', 'cklC', 'cklD']),
+    'ck-retry': ([('main', "            if (rec.tr) { _pnbViewLinkOpenRecord({ ck: vlk.ck, cv: vlk.cv, m: vlk.m }); return; }", "            if (rec.tr) { return; }")], ['L-cklD-clearOpens'], ['cklA', 'cklD']),
+    'ck-menu': ([('cards', "        if (lnk) prt.push(lnk);\n", "")], ['L-cklA-menuInWindow', 'L-cklA-menuCopies'], ['cklA']),
+    'ck-cardmenu': ([('cards', "            if (clk) out.push(clk);\n", "")], ['L-cklA-cardMenu', 'L-cklA-cardMenuCopies'], ['cklA']),
+    'ck-btn': ([('cards', "        if (e.target.closest('.pnb-cdet-link')) { e.preventDefault(); linkCopy(); return; }", "")], ['L-cklA-iconCopies'], ['cklA']),
+    'ck-pvkey': ([('main', "if (tr.closest('#pivotResultTable')) { var ph = _pnbViewLinkPivotSig(tr); return ph ? { p: 1, h: ph } : null; }", "if (tr.closest('#pivotResultTable')) { return null; }")], ['L-pklP-carriesTile'], ['pklP']),
+    'ck-pvapply': ([('cards', "            if (pc) { focusAt = cardIndex(pc); roving(); openDetails(pc); detScrollTo(w.ds); }", "            if (false) { }")], ['L-pklB-tileOpens'], ['pklP', 'pklB']),
+    'ck-gpoll': ([('main', "                if (vlg.ck && vlg.m === 'group') setTimeout(", "                if (false) setTimeout(")], ['L-gklD-opensWithFolds'], ['gklC', 'gklD']),
+    'ck-gopen': ([('main', "        var opened = rec.grouped ? _pnbViewLinkOpenGroups(rec.tr) : false;", "        var opened = false;")], ['L-gklE-opensFolded'], ['gklC', 'gklE']),
+    'ck-dscap': ([('main', "                if (dsNow > 0) v.ds = dsNow;\n", "")], ['L-cklA-carriesScroll'], ['cklA']),
+    'ck-ds': ([('cards', "selectOnly(dc); openDetails(dc); detScrollTo(w.ds); }", "selectOnly(dc); openDetails(dc); }")], ['L-cklB-scrolledAsSent'], ['cklA', 'cklB']),
+    'ck-hotcard': ([('wsmenu', "V.cardOpen() && typeof V.copyCard === 'function')", "false && typeof V.copyCard === 'function')")], ['L-cklA-hotkeyCard', 'L-pklP-hotkeyCard'], ['cklA', 'pklP']),
+    'ck-hotkey': ([('wsmenu', "        if (!linkKey(e) || e.repeat) { return; }", "        if (true || !linkKey(e) || e.repeat) { return; }")], ['L-cklA-hotkeyCard', 'L-cklA-hotkeyView', 'L-cklA-hotkeyInField', 'L-pklP-hotkeyCard'], ['cklA', 'pklP']),
+    'ck-group': ([('main', "        var grouped = $('#groupedResultsContainer').is(':visible');\n        var trs = document", "        var grouped = false;\n        var trs = document")], ['L-gklTB-groupedRow'], ['gklT', 'gklTB']),   # (the grouped cards also find the flat table's row: equivalent there)
+    'ck-table': ([('main', "        if (typeof CD.openRow === 'function' && CD.openRow(rec.tr)) { if (typeof CD.detScrollTo", "        if (false) { if (typeof CD.detScrollTo")], ['L-cklTB-sameRecord'], ['cklT', 'cklTB']),
     # (cdpack) the packed grid's row-gap guard gone: the density rules' size gaps come back
     'pk-rowgap': ([('cardscss', '#pnbCardsHost.is-packed .pnb-cards-grid { row-gap: 0 !important; }\n', '')], ['L-cdpack-compactTight', 'L-cdpack-everyTight', 'S-cdpack'], ['cdpack']),
     # (cflt) no mark; the details window's click gone; a link's value marked; the report's flip not redrawn; no pointer; the column's
@@ -866,11 +932,11 @@ MUTANTS = {
     # (linkpos) the card at the top not read from the cards, the open card not captured, a pivot's row not captured, the
     # module's apply gone, the pivot's restore gone, the open card not described, the Show all focus rule gone
     'lp-nocards': ([('main', "        if (!wr || !host || host.hidden || !(wr.scrollTop > 0)) return out;", "        if (true) return out;")], ['L-cvlE-carriesTop'], ['cvlE']),
-    'lp-nocd': ([('main', "if (cdNow !== null) v.cd = cdNow; }", "if (false) v.cd = cdNow; }")], ['L-cvlE-carriesDetails'], ['cvlE']),
+    'lp-nocd': ([('main', "if (ckNow && (v.m === 'pivot') === !!ckNow.p) {", "if (false) {")], ['L-cvlE-carriesDetails'], ['cvlE']),   # (cardlink) the open card by its record now
     'lp-nopt': ([('main', "if (pp.pt) v.pt = pp.pt; if (pp.pl) v.pl = pp.pl; }", "if (pp.pl) v.pl = pp.pl; }")], ['L-pvlA-carriesRow'], ['pvlA']),
     'lp-noapply': ([('cards', "        var w = linkWanted; linkWanted = null;\n", "        var w = null; linkWanted = null;\n")], ['L-cvlF-topCard', 'L-cvlF-detailsOpen'], ['cvlE', 'cvlF']),
     'lp-nopivotto': ([('main', "                if (vlk.m === 'pivot') _pnbViewLinkPivotTo(vlk);   // (linkpos) the pivot's scroll\n", "")], ['L-pvlB-rowAtTop'], ['pvlA', 'pvlB']),
-    'lp-nodesc': ([('main', "        if (v.cd !== undefined) out.push('card ' + (v.cd + 1) + ' open');\n", "")], ['L-cvlE-described'], ['cvlE']),
+    'lp-nodesc': ([('main', "        if (v.ck) out.push(v.ck.p ? 'the open tile' : 'the open card (found again by ' + (v.ck.k ? v.ck.k.join(', ') : 'its values') + ')');   // (cardlink)\n", "")], ['L-cvlE-described'], ['cvlE']),   # (cardlink)
     'lp-focus': ([('cards', "        if (e.target.closest && e.target.closest('.pnb-card-more')) return;   // (linkpos, the user) Show all: its click toggles; opened on focus, the card grew and the click fell on it (the details opened)\n", "")], ['L-cnote-focusKeepsClipped'], ['cnote']),
     # (pvcfg) the tiles' setup not kept, no pill, no bar, every value listed, the row total alone, the window barred over a
     # pivot, the link's cl without it, the pick not stored, Make default without it
@@ -1353,8 +1419,8 @@ def static_checks(t):
                 'the card setup in the view link; the rank-scaled bar; help, tip, README'))
     # (linkpos) the cards' top card, the open details card and the pivot's scroll in the link: cleaned, captured, dropped
     # early, listed, described, restored; the module's hook; the Show all focus rule; the help
-    out.append(('S-linkpos', 'function _pnbViewLinkCardsNow(' in main and 'function _pnbViewLinkDetailsNow(' in main and 'function _pnbViewLinkPivotNow(' in main and 'function _pnbViewLinkPivotTo(' in main
-                and "['cd', 'open card'], ['cl', 'card setup']" in dtx and "['pt pl', 'scroll position'], ['gb gt gr gc tr lc', 'scroll position']" in dtx
+    out.append(('S-linkpos', 'function _pnbViewLinkCardsNow(' in main and 'function _pnbViewLinkPivotNow(' in main and 'function _pnbViewLinkPivotTo(' in main
+                and ("['cd', 'open card'], ['cl', 'card setup']" in dtx or "['cd', 'open card'], ['ck', 'open card'], ['cl', 'card setup']" in dtx or "['cd', 'open card'], ['ds', 'scroll position'], ['ck', 'open card'], ['cl', 'card setup']" in dtx) and "['pt pl', 'scroll position'], ['gb gt gr gc tr lc', 'scroll position']" in dtx
                 and "inc.push('open card')" in main and "out.push('pivot row ' + (v.pt + 1) + ' at the top')" in main and 'CD.linkWant({ top:' in main
                 and 'function linkWant(' in cards and 'linkWant: linkWant' in cards and "e.target.closest('.pnb-card-more')) return;" in cards
                 and 'the card at the top and a card whose details window is open' in t['vltopic'] and 'the card at the top and an open details window' in t['ustopic'] and 'linkpos (2026-10-31' in t['readme'],
@@ -1646,9 +1712,214 @@ CHK['gboard'] = CHK['gboard'] + ['laneHeadFolds']
 NEW_LANEHD = {'L-gboard-laneHeadFolds'}
 NEW = NEW | NEW_LANEHD   # (lanehd) after every later round's NEW line - add, never replace
 NEW = NEW - NEW_LANEHD   # (lanehd is LIVE since 3d61921, 2026-11-04: old checks now)
+NEW = NEW | NEW_CARDLINK   # (cardlink) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_CARDLINK   # (cardlink + cardlink 2 are LIVE since 39bfe1c / 7c0a335, 2026-11-05: old checks now)
+GUARDS |= {'L-vstB-linkLayout', 'L-vstB-visitNoWrite', 'L-vstC-linkDensity'}   # (viewstrict: hold on live - the link's layout and density applied there already; no write visible there: its mutant vs-rhw decides)
+NEW = NEW | (NEW_VST - GUARDS)   # (viewstrict) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_VST   # (viewstrict is LIVE since 387063b, 2026-11-05: old checks now)
+NEW = NEW | {'L-vstB-oneLine'}   # (viewstrict 2: the two Settings buttons on one line)
+NEW = NEW - {'L-vstB-oneLine'}   # (viewstrict 2 is LIVE, 2026-11-05: old checks now)
 MUTANTS.update({
     'lh-click': ([('cards', "        var lh = e.target.closest('.pnb-cards-lanehead');\n", "        var lh = null;\n")], ['L-gboard-laneHeadFolds'], ['gboard']),
     'lh-cursor': ([('cardscss', ".pnb-cards-lane > .pnb-cards-lanehead { cursor: pointer; border-radius: 7px 7px 0 0; }", ".pnb-cards-lane > .pnb-cards-lanehead { border-radius: 7px 7px 0 0; }")], ['L-gboard-laneHeadFolds'], ['gboard']),
+})
+
+# (ccopy, 2026-11-05, the user: "copy table as-is still copies table format" in cards mode) Copy As-Is while cards show
+# copies the cards (the email's layout over every row the search keeps) and the Copy dialog's As-Is option says so; the
+# table showing and a pivot's tiles copy the table (guards: they hold on live)
+SCN = SCN + ['ccopy', 'gcopy', 'pcopy']
+CHK['ccopy'] = ['noteCards', 'htmlOnly', 'copiedCards', 'allPages', 'inOrder', 'offPageFilled', 'offPageRuled', 'sizeShown', 'toastCards', 'screenSame',
+                'cutWords', 'searchKept', 'emptyNotice', 'tableWords', 'tableStill']
+CHK['gcopy'] = ['noteCards', 'grpHeads', 'grpCards', 'grpToast', 'allFolded']
+CHK['pcopy'] = ['pivotWords', 'pivotTable', 'pivotToast']
+RELS['cptopic'] = os.path.join('help', 'topics', 'copyHelpLightbox.php')   # (ccopy) the Copy help
+GUARDS |= {'L-ccopy-htmlOnly', 'L-ccopy-screenSame', 'L-ccopy-tableWords', 'L-ccopy-tableStill'} | {'L-pcopy-%s' % c for c in CHK['pcopy']}   # (ccopy: hold on live - the table's copy, its words; the pivot's)
+NEW_CCOPY = ({'L-%s-%s' % (sc, c) for sc in ('ccopy', 'gcopy', 'pcopy') for c in CHK[sc]} | {'S-ccopy'}) - GUARDS
+NEW = NEW | NEW_CCOPY   # (ccopy) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_CCOPY   # (ccopy is LIVE since 7290299, 2026-11-05: old checks now)
+_static_checks_before_ccopy = static_checks
+def static_checks(t):
+    out = _static_checks_before_ccopy(t)
+    m, cd, ix = t['main'], t['cards'], t['index']
+    note = re.search(r'<small id="copyHtmlCardsNote"[^>]*>([^<]*)</small>', ix)
+    ok = (m.count('if (_pnbCopyCards()) break;') == 1 and m.count('_pnbCopyCardsNote();') == 1
+          and m.count("const exportData = getExportData('html', { allPages: true, budget: PENUMBRA_COPY_HTML_MAX_BYTES, notice: 'copy' });") == 1
+          and 'function copyHtml(opts)' in cd and 'copyHtml: copyHtml,' in cd and 'id="copyHtmlTableNote"' in ix and 'id="copyHtmlLabel"' in ix
+          and bool(note) and '\u2014' not in note.group(1) and 'Copy Cards As-Is' in t.get('cptopic', '') and 'Copy As-Is copies them' in t['ustopic']
+          and 'ccopy (2026-11-05' in t['readme'])
+    out.append(('S-ccopy', bool(ok), 'ccopy: main.js hook ahead of the unchanged table copy line + the note call, cards.js copyHtml, index.php label / notes (no em-dash), help (Copy, Your Settings > Cards), README'))
+    return out
+MUTANTS.update({
+    # (ccopy) the page alone; the table copied anyway; the dialog's words left; the table's words not put back; the email's cut
+    # words; the table's toast; no headings counted; nothing-to-copy unsaid
+    'cc-all': ([('cards', "all = flatRows(!!opts.all);", "all = flatRows(false);")], ['L-ccopy-allPages', 'L-ccopy-inOrder', 'L-ccopy-toastCards'], ['ccopy']),
+    'cc-hook': ([('main', "if (_pnbCopyCards()) break;", "if (false) break;")], ['L-ccopy-copiedCards', 'L-ccopy-allPages', 'L-ccopy-toastCards', 'L-gcopy-grpHeads'], ['ccopy', 'gcopy']),
+    'cc-note': ([('main', "        _pnbCopyCardsNote();   // (ccopy) the As-Is option's words while cards show", "        void 0;   // (ccopy) the As-Is option's words while cards show")], ['L-ccopy-noteCards', 'L-gcopy-noteCards'], ['ccopy', 'gcopy']),
+    'cc-noteback': ([('main', "$('#copyHtmlLabel').text(cards ? 'Copy Cards As-Is (HTML)' : 'Copy Table As-Is (HTML)');", "if (cards) $('#copyHtmlLabel').text('Copy Cards As-Is (HTML)');")], ['L-ccopy-tableWords'], ['ccopy']),
+    'cc-words': ([('cards', "(opts.copy ? (left === 1 ? ' was' : ' were')", "(false ? (left === 1 ? ' was' : ' were')")], ['L-ccopy-cutWords'], ['ccopy']),
+    'cc-toast': ([('main', "Copied ${n.toLocaleString()} card${n === 1 ? '' : 's'} to the clipboard.", "Copied table to clipboard.")], ['L-ccopy-toastCards', 'L-gcopy-grpToast'], ['ccopy', 'gcopy']),
+    'cc-heads': ([('cards', "                heads++;\n", "")], ['L-gcopy-allFolded'], ['gcopy']),
+    'cc-empty': ([('main', "if (!m.total && !m.heads) {", "if (false) {")], ['L-ccopy-emptyNotice'], ['ccopy']),
+    'cc-fill': ([('cards', "        try { H.fillRows(all); } catch (e) { }", "        void 0;")], ['L-ccopy-offPageFilled'], ['ccopy']),
+})
+
+# (gtlast, 2026-11-05, the user: "In cards mode for pivots, why is the grand total always first?") the Grand Total tile
+# LAST, after every row's tile, as the pivot table has it: pcoff's total-first checks re-aimed at the last tile
+CHK['pcoff'] = CHK['pcoff'] + ['totalLast', 'totalFollows']
+CHK['pw2next'] = CHK['pw2next'] + ['gtFirstStep']
+NEW_GTLAST = {'L-pcoff-totalLast', 'L-pcoff-totalFollows', 'L-pcoff-totalTile', 'L-pcoff-tileTitle', 'L-pvcfg-noBarOnTotal', 'L-pfsort-bigAndTotal', 'L-pw4drv-drvTile',
+              'L-pw2next-gtFirstStep', 'L-pw2next-pivotNextOn', 'S-gtlast',
+              # read through the re-aimed helpers (the last tile, no row offset): red on a live that draws the total first
+              'L-pcoff-tileBig', 'L-pcoff-tileFields', 'L-pvgt-gtLabels', 'L-pvgt-gtValues', 'L-pvgtB-gtFound', 'L-pvgtB-gtLabelsCol', 'L-pvgtB-gtPicked',
+              'L-pvgtC-bigKeyless', 'L-pvgtC-findKeyless', 'L-pvgtC-gtKeyless', 'L-pvgtD-bigLabel'}
+NEW = NEW | NEW_GTLAST   # (gtlast) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_GTLAST   # (gtlast is LIVE since 1a5706d, 2026-11-05: old checks now)
+_static_checks_before_gtlast = static_checks
+def static_checks(t):
+    out = _static_checks_before_gtlast(t)
+    cd = t['cards']
+    i_loop = cd.find('            out += pvTile(tr, idx, measures, compact, false, ps0); count++;')
+    i_foot = cd.find('        if (foot) { var gi = pvRows.length; pvRows.push({ tr: foot }); out += pvTile(foot, gi, measures, compact, true, ps0); count++; }')
+    ok = (i_loop > 0 and i_foot > i_loop and 'out += pvTile(foot, 0, measures' not in cd and 'The grand total is the last tile. A click on a value' in t['ustopic']
+          and 'gtlast (2026-11-05' in t['readme'])
+    out.append(('S-gtlast', bool(ok), 'gtlast: the foot drawn after the body tiles (once none waits behind Show more), help + README'))
+    return out
+MUTANTS.update({
+    # (gtlast) the total first again / drawn while tiles wait behind Show more
+    'gt-first': ([('cards', "        var trs = T.tBodies.length ? T.tBodies[0].rows : [];\n        for (i = 0; i < trs.length; i++) {\n            var tr = trs[i];\n            if (tr.style.display === 'none') continue;",
+                   "        if (foot) { pvRows.push({ tr: foot }); out += pvTile(foot, 0, measures, compact, true, ps0); count++; foot = null; }\n        var trs = T.tBodies.length ? T.tBodies[0].rows : [];\n        for (i = 0; i < trs.length; i++) {\n            var tr = trs[i];\n            if (tr.style.display === 'none') continue;")],
+                 ['L-pcoff-totalLast', 'L-pcoff-totalTile', 'L-pcoff-tileTitle'], ['pcoff']),
+    # (the sweep) the total's details window left at the old index / Next from the total stepping past the first new row
+    'gt-follow': ([('cards', "        if (was.det) det.at = gi;\n", "")], ['L-pcoff-totalFollows'], ['pcoff']),
+    'gt-next': ([('cards', "            if (gtFrom >= 0 && det.open && gtFrom < detCount()) { det.at = gtFrom - 1; return detGo(1); }\n", "")], ['L-pw2next-pivotNextOn'], ['pw2next']),
+    'gt-held': ([('cards', "        if (foot) { var gi = pvRows.length; pvRows.push({ tr: foot });", "        if (foot && !drawn.more) { var gi = pvRows.length; pvRows.push({ tr: foot });")], ['L-pw2next-gtFirstStep'], ['pw2next']),
+})
+
+# (csweep3, 2026-11-05, the bug sweep) the copy's and email's cards: the notes only when sent, a nested Board's lanes,
+# the List layout's picked group; the copy without a wait; the note's words
+SCN = SCN + ['gbcopy', 'ggcopy', 'pw5more']
+CHK['gbcopy'] = ['laneCards', 'laneHeads', 'laneToast']
+CHK['ggcopy'] = ['listOnly']
+CHK['pw5more'] = ['moreFocusRow']
+CHK['cnote'] = CHK['cnote'] + ['mailNotesOff']
+NEW_CSWEEP3 = ({'L-%s-%s' % (sc, c) for sc in ('gbcopy', 'ggcopy', 'pw5more') for c in CHK[sc]} | {'L-cnote-mailNotesOff', 'L-ccopy-noteCards', 'S-csweep3'})
+NEW = NEW | NEW_CSWEEP3   # (csweep3) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_CSWEEP3   # (csweep3 is LIVE since fb50302, 2026-11-05: old checks now)
+# (pvcopy, 2026-11-05, the user: "the cards arent copied as cards when in a pivot view") a pivot's tiles copy as cards:
+# pcopy's checks are the tiles' now (the table's guards retired); pcopymore copies past Show more
+SCN = SCN + ['pcopymore']
+GUARDS -= {'L-pcopy-pivotWords', 'L-pcopy-pivotTable', 'L-pcopy-pivotToast'}
+CHK['pcopy'] = ['tilesWords', 'tilesCards', 'tilesTotalLast', 'tilesParts', 'tilesMailSafe', 'tilesHtmlOnly', 'tilesToast']
+CHK['pcopymore'] = ['allTiles', 'totalLast']
+GUARDS |= {'L-pcopy-tilesHtmlOnly'}   # (pvcopy: the table's copy is text/html alone too - holds on live)
+NEW_PVCOPY = ({'L-%s-%s' % (sc, c) for sc in ('pcopy', 'pcopymore') for c in CHK[sc]} | {'S-pvcopy'}) - GUARDS
+NEW = NEW | NEW_PVCOPY   # (pvcopy) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_PVCOPY   # (pvcopy is LIVE since 74f7ced, 2026-11-05: old checks now)
+# (pvmail, 2026-11-05, the user: "Yes, email tiles too") the Email Report's body over a pivot's tiles: the tiles as cards
+SCN = SCN + ['pmailt']
+CHK['pmailt'] = ['tilesMailable', 'tilesBody', 'tilesAsEmail', 'tilesSize', 'tilesEmailWords']
+NEW_PVMAIL = ({'L-pmailt-%s' % c for c in CHK['pmailt']} | {'S-pvmail'}) - GUARDS
+NEW = NEW | NEW_PVMAIL   # (pvmail) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_PVMAIL   # (pvmail is LIVE since 31a5970, 2026-11-05: old checks now)
+_static_checks_before_pvmail = static_checks
+def static_checks(t):
+    out = _static_checks_before_pvmail(t)
+    cd, m = t['cards'], t['main']
+    ok = ('if (tilesCopyable() && !opts.copy) return pivotMailHtml({' in cd and 'mailable: copyable,' in cd and 'copy: !opts.email, tiles: true' in cd
+          and 'window.Penumbra.cards.mailable && window.Penumbra.cards.mailable()) _emailAudit.bodyCards = true;' in m
+          and '(_cdM.mailable ? _cdM.mailable() : (_cdM.emailable && _cdM.emailable()))' in m
+          and "A pivot's tiles go as cards as well, the Grand Total last." in t['emtopic'] and 'A pivot sends its table.' not in t['emtopic']
+          and 'pvmail (2026-11-05' in t['readme'])
+    out.append(('S-pvmail', bool(ok), 'pvmail: emailHtml routes tiles, the API mailable, main.js gates the email body and its audit on it, the email help, README'))
+    return out
+MUTANTS.update({
+    # (pvmail) the email's body over tiles the table's again / the copy's cut words / counted as a copy / the API's mailable
+    # the table's / main.js's audit or body gate without tiles
+    'pm-route': ([('cards', "        if (tilesCopyable() && !opts.copy) return pivotMailHtml({", "        if (false) return pivotMailHtml({")], ['L-pmailt-tilesBody', 'L-pmailt-tilesAsEmail'], ['pmailt']),
+    'pm-words': ([('cards', "(opts.email ? (left === 1 ? '' : 's') + ' omitted", "(false ? (left === 1 ? '' : 's') + ' omitted")], ['L-pmailt-tilesEmailWords'], ['pmailt']),
+    'pm-asmail': ([('cards', "copy: !opts.email, tiles: true", "copy: true, tiles: true")], ['L-pmailt-tilesAsEmail'], ['pmailt']),
+    'pm-api': ([('cards', "        mailable: copyable,", "        mailable: emailable,")], ['L-pmailt-tilesMailable', 'S-pvmail'], ['pmailt']),
+    'pm-audit': ([('main', "window.Penumbra.cards.mailable && window.Penumbra.cards.mailable()) _emailAudit.bodyCards = true;", "window.Penumbra.cards.mailable && false) _emailAudit.bodyCards = true;")], ['S-pvmail'], ['pmailt']),
+    'pm-gate': ([('main', "(_cdM.mailable ? _cdM.mailable() : (_cdM.emailable && _cdM.emailable()))", "(_cdM.emailable && _cdM.emailable())")], ['S-pvmail'], ['pmailt']),
+})
+# (pvsched, 2026-11-05, the user: "Email + PDF tiles") over a pivot's tiles the Save records the tiles drawn (their size
+# and setup) for the scheduled email; ptpar / ptpar2 dump the tiles with their rows and pivot (the kit's parity check)
+SCN = SCN + ['pvsave', 'ptpar', 'ptpar2']
+CHK['pvsave'] = ['tilesSaved']
+CHK['ptpar'] = ['dumped']
+CHK['ptpar2'] = ['dumped']
+GUARDS |= {'L-ptpar-dumped', 'L-ptpar2-dumped'}   # (pvsched: a dump of the tiles, as on live)
+NEW_PVSCHED = {'L-pvsave-tilesSaved'}
+NEW = NEW | NEW_PVSCHED   # (pvsched) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_PVSCHED   # (pvsched is LIVE since 6636ed1, 2026-11-05: old checks now)
+MUTANTS.update({
+    'ps-saved': ([('cards', "return { open: 1, tiles: tv }; }", "return { open: 1 }; }")], ['L-pvsave-tilesSaved'], ['pvsave']),   # (pvsched) the Save's tiles gone
+})
+_static_checks_before_csweep3 = static_checks
+def static_checks(t):
+    out = _static_checks_before_csweep3(t)
+    cd, m, ix = t['cards'], t['main'], t['index']
+    ok = ('function notesOutOk() { return !!(P.journalNotesOut && P.journalNotesOut()); }' in cd and '(notesOn && !compact && notesOutOk())' in cd
+          and 'if (H.inGroup() && boardOn()) {' in cd and "a.style.display === 'none' || a.classList.contains('pnb-gl-off')" in cd
+          and '_prepC' not in m and m.count('if (_pnbCopyCards()) break;') == 1
+          and "querySelectorAll('.pnb-card:not(.is-total)')" in cd and 'laid out as an emailed report shows them' in ix and 'csweep3 (2026-11-05' in t['readme'])
+    out.append(('S-csweep3', bool(ok), 'csweep3: the notes gate, the Board lanes, the List off groups, no wait before the copy, the note, README'))
+    return out
+MUTANTS.update({
+    # (csweep3) the notes always / a Board as its leaf groups again / the List's hidden groups copied
+    'w3-notes': ([('cards', "(notesOn && !compact && notesOutOk())", "(notesOn && !compact)")], ['L-cnote-mailNotesOff', 'S-csweep3'], ['cnote']),
+    'w3-board': ([('cards', "        if (H.inGroup() && boardOn()) {", "        if (false) {")], ['L-gbcopy-laneCards', 'L-gbcopy-laneToast', 'S-csweep3'], ['gbcopy']),
+    'w3-more': ([('cards', "mc = mw ? mw.querySelectorAll('.pnb-card:not(.is-total)') : []", "mc = mw ? mw.querySelectorAll('.pnb-card') : []")], ['L-pw5more-moreFocusRow'], ['pw5more']),
+    'w3-list': ([('cards', " || a.classList.contains('pnb-gl-off')) { gone = true; break; }", ") { gone = true; break; }")], ['L-ggcopy-listOnly', 'S-csweep3'], ['ggcopy']),
+})
+_static_checks_before_pvcopy = static_checks
+def static_checks(t):
+    out = _static_checks_before_pvcopy(t)
+    cd, m, ix = t['cards'], t['main'], t['index']
+    ok = ('function pivotMailHtml(opts) {' in cd and 'function tilesCopyable() {' in cd
+          and 'if (tilesCopyable()) return pivotMailHtml({ budget: opts.budget > 0 ? opts.budget : 0 });' in cd
+          and 'copyable: copyable, inTiles: tilesCopyable,' in cd
+          and "if (C && typeof C.copyable === 'function' && typeof C.copyHtml === 'function') return !!C.copyable();" in m
+          and "$('#copyHtmlTilesNote').css('display', tiles ? 'block' : 'none');" in m
+          and 'id="copyHtmlTilesNote"' in ix and 'Tiles show, so this copies the tiles as cards' in ix and 'pvcopy (2026-11-05' in t['readme']
+          and "a pivot's tiles too, the Grand Total last" in t.get('cptopic', '') and 'Pivot tiles copy as the pivot table' not in t.get('cptopic', '')
+          and '—' not in (re.search(r'<small id="copyHtmlTilesNote"[^>]*>([^<]*)</small>', ix) or [None, '—'])[1])
+    out.append(('S-pvcopy', bool(ok), 'pvcopy: the tiles copy (pivotMailHtml, its gate, the API), main.js asks copyable, the tiles note, README'))
+    return out
+MUTANTS.update({
+    # (pvcopy) the table copied over tiles again / the gate without tiles / the tiles' note beside the cards' / no Grand
+    # Total / only the drawn tiles / the field labels dropped
+    'pv-branch': ([('cards', "        if (tilesCopyable()) return pivotMailHtml({ budget: opts.budget > 0 ? opts.budget : 0 });", "        if (false) return null;")], ['L-pcopy-tilesCards', 'L-pcopy-tilesToast'], ['pcopy']),
+    'pv-gate': ([('cards', "function copyable() { return !!(on() && (emailable() || tilesCopyable())); }", "function copyable() { return !!(on() && emailable()); }")], ['L-pcopy-tilesWords', 'L-pcopy-tilesCards'], ['pcopy']),
+    'pv-note': ([('main', "        if (tiles) $('#copyHtmlCardsNote').css('display', 'none');", "        void 0;")], ['L-pcopy-tilesWords'], ['pcopy']),
+    'pv-total': ([('cards', "            if (foot) html += pvTile(foot, -1, measures, compact, true, ps0);", "            void 0;")], ['L-pcopy-tilesCards', 'L-pcopy-tilesTotalLast', 'L-pcopymore-totalLast'], ['pcopy', 'pcopymore']),
+    'pv-drawn': ([('cards', "            for (i = 0; i < trs.length; i++) if (trs[i].style.display !== 'none') html += pvTile(trs[i], -1, measures, compact, false, ps0);", "            for (i = 0; i < trs.length && i < drawn.limit; i++) if (trs[i].style.display !== 'none') html += pvTile(trs[i], -1, measures, compact, false, ps0);")], ['L-pcopymore-allTiles'], ['pcopymore']),
+    'pv-labels': ([('cards', "fh += '<tr>' + (nl ? '' :", "fh += '<tr>' + (true ? '' :")], ['L-pcopy-tilesParts'], ['pcopy']),
+})
+
+# (mailhid, 2026-11-05, the user's emailed pivot cards) a value its highlight paints in its own fill mails blank, its line
+# kept: the flat cards' (chid) and a pivot's tiles' (pmhid) email; a value ruled in two colours keeps them (hidKept holds on live)
+SCN = SCN + ['chid', 'pmhid']
+CHK['chid'] = ['hidBlank', 'hidLine', 'hidKept']
+CHK['pmhid'] = ['hidBlank', 'hidLine', 'hidKept']
+NEW_MAILHID = {'L-chid-hidBlank', 'L-pmhid-hidBlank'}
+NEW = NEW | NEW_MAILHID   # (mailhid) add, never replace
+NEW = NEW - NEW_MAILHID   # (mailhid is LIVE since c4cc721, 2026-11-05: old checks now)
+MUTANTS.update({
+    # (mailhid) the flat cards' value / the tiles' value drawn as before (the square) / every two-colour value blanked
+    'mh-val': ([('cards', "                if (mailHid(st(td))) return '&nbsp;';", "                if (false) return '&nbsp;';")], ['L-chid-hidBlank'], ['chid']),
+    'mh-tile': ([('cards', "(mailHid(css(dds[k])) ? '&nbsp;' :", "(false ? '&nbsp;' :")], ['L-pmhid-hidBlank'], ['pmhid']),
+    'mh-eq': ([('cards', r"c[1].replace(/\s+/g, '').toLowerCase() === b[1].replace(/\s+/g, '').toLowerCase()","c[1] !== '' && b[1] !== ''")], ['L-chid-hidKept', 'L-pmhid-hidKept'], ['chid', 'pmhid']),
+})
+# (tilegap, 2026-11-06) the tiles email (pivotMailHtml) keeps a blank column's line, as the tile on screen lists it
+SCN = SCN + ['pvgap']
+CHK['pvgap'] = ['gapLine', 'gapSame']
+NEW_TILEGAP = {'L-pvgap-gapLine', 'L-pvgap-gapSame'}
+NEW = NEW | NEW_TILEGAP   # (tilegap) add, never replace
+NEW = NEW - NEW_TILEGAP   # (tilegap is LIVE since 31fc7e8, 2026-11-06: old checks now)
+MUTANTS.update({
+    # (tilegap) a blank column skipped again
+    'tg-js': ([('cards', "                if (!fv && nl) continue;", "                if (!fv) continue;")], ['L-pvgap-gapLine', 'L-pvgap-gapSame'], ['pvgap']),
 })
 
 def mutate(texts, name):
@@ -1721,6 +1992,9 @@ def run_page(path, metrics=None, shot=None):
                     info = {'pages': len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', raw)), 'w': float(mb.group(3)) - float(mb.group(1)) if mb else 0, 'h': float(mb.group(4)) - float(mb.group(2)) if mb else 0, 'bytes': len(raw)}
                     call('Runtime.evaluate', {'expression': 'window.__WANTPDF = 0; window.__PDFINFO = %s;' % json.dumps(info)})
             if v:
+                if os.environ.get('PNB_DUMP'):   # (pvsched) a scenario's whole result, for the kit's parity check
+                    _dm = re.search(r'scn=(\w+)', path)
+                    open(os.path.join(os.environ['PNB_DUMP'], (_dm.group(1) if _dm else 'scn') + '.json'), 'w', encoding='utf-8').write(v)
                 if shot:
                     time.sleep(0.4)
                     data = call('Page.captureScreenshot', {'format': 'png', 'captureBeyondViewport': False}).get('data')
@@ -1734,9 +2008,32 @@ def run_page(path, metrics=None, shot=None):
         try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
         except Exception: pass
 
+_static_before_viewstrict = None
+_static_before_cardlink = static_checks
+def static_checks(t):   # (cardlink) the shortcut sheet, Quick actions, the page menu, the help, the README
+    out = _static_before_cardlink(t)
+    main, pal, wsm = t['main'], t['pal'], t.get('wsmenu', '')
+    out.append(('S-cardlink', "row(['Alt+Shift+L'], 'Copy a link to this view" in main and "id: 'cardlink'" in pal and "keys: ['Alt', 'Shift', 'L'], icon: { pal: 'link' }" in pal
+                and 'function linkKey(e)' in wsm and "note: 'Alt+Shift+L'" in wsm and 'id="vl-card"' in t['vltopic']
+                and '<strong>Copy link to this view</strong> (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>)' in t['ustopic'] and 'cardlink (2026-11-05' in t['readme']
+                and '\u2014' not in t['vltopic'], 'the sheet row, the palette rows, the hotkey, the help, the README'))
+    return out
+
+_static_before_viewstrict = static_checks
+def static_checks(t):   # (viewstrict) the help, Quick actions, the page menu, the README
+    out = _static_before_viewstrict(t)
+    out.append(('S-viewstrict', "id: 'viewkeep'" in t['pal'] and "id: 'viewleave'" in t['pal'] and "function visitItem(which)" in t.get('wsmenu', '')
+                and '<strong>Keep this as my view</strong>' in t['vltopic'] and '<strong>Leave the shared view</strong>' in t['vltopic'] and 'viewstrict (2026-11-05' in t['readme']
+                and 'function linkVisit()' in t.get('calc', '') and '—' not in t['vltopic'], 'Quick actions, the page menu, the help, the README, calc'))
+    return out
+
 def write_stage(texts):
     def w(name, s): open(os.path.join(stage, name), 'wb').write(s.encode('utf-8', 'surrogateescape'))
-    w('harness.html', mk_harness.build(texts['index']))
+    hh = mk_harness.build(texts['index'])   # (cardlink) the page menu's module for the ckl / gkl / pkl scenarios (Alt+Shift+L)
+    hh = hh.replace('<script src="driver.js"></script>', '<script>if (/^(ckl|gkl|pkl|vst)/.test(new URLSearchParams(location.search).get("scn") || "")) document.write(\'<script src="penumbra_wsmenu.js"></scr\' + \'ipt>\');</script>\n<script src="driver.js"></script>', 1)
+    w('harness.html', hh)
+    w('penumbra_wsmenu.js', texts['wsmenu'])
+    w('penumbra_calc.js', texts['calc'])   # (viewstrict) over the LIBS copy (live's)
     w('main_hc.js', hook(texts['main']))
     w('penumbra_cards.js', texts['cards'] or '// (control: no card view)\n')
     w('penumbra_cards.css', texts['cardscss'])
@@ -1769,7 +2066,11 @@ def run_browser(scns):
         if s in ('cvlB', 'cszvlB', 'cvlD', 'cvlF', 'pvlB', 'pvcfgB', 'gboardvl'):
             token = ((res.get({'cvlB': 'cvlA', 'cszvlB': 'cszvlA', 'cvlD': 'cvlC', 'cvlF': 'cvlE', 'pvlB': 'pvlA', 'pvcfgB': 'pvcfg', 'gboardvl': 'gboard'}[s]) or {}).get('info') or {}).get('token') or 'none'
         shot = os.path.join(shots_dir, s + '.png') if shots_dir else None
-        r = run_page(url_for(s, token), PHONE if s in ('cphone', 'cnarrowA', 'cnarrowT', 'cnarrowN', 'cdetph', 'cxl2ph', 'cdensph') else None, shot); res[s] = r
+        uu = url_for(s, token)
+        if s in CKL:   # (cardlink) the link its maker built, and the record it names (its V_ID)
+            inf = ((res.get(CKL[s][0]) or {}).get('info') or {})
+            uu += '&view=' + (inf.get(CKL[s][1]) or 'none') + '&want=' + urllib.parse.quote(str(inf.get(CKL[s][2] if len(CKL[s]) > 2 else 'want') or ''))
+        r = run_page(uu, PHONE if s in ('cphone', 'cnarrowA', 'cnarrowT', 'cnarrowN', 'cdetph', 'cxl2ph', 'cdensph') else None, shot); res[s] = r
         if shots_dir and s in ('cauto', 'gcards', 'gcoll', 'ggcards', 'csize', 'pcoff', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cdet', 'pdet', 'cnote'):   # the same page under a dark theme (csize: compact)
             run_page(url_for(s) + '&theme=theme-dark-blue&shot=1', None, os.path.join(shots_dir, s + '_dark.png'))
         if shots_dir and s in ('pcoff', 'cxl', 'cxl2', 'ccolsview', 'gboard', 'gcards', 'cmenu', 'gmenu', 'pmenu', 'cdet', 'pdet', 'cmword', 'curl1', 'cnote'):   # the light picture too, posed by the scenario's shot branch (the full run moves on past it)

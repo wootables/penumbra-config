@@ -94,7 +94,29 @@ PREF_CARDS = PREF_CARDS + ['pvgtD', 'pvgtC']   # (pvgt2)
 CFG.update({'pvgtD': {}, 'pvgtC': {}})   # (pvgt2) no setup: the guesses
 PREF_CARDS = PREF_CARDS + ['pw4drv']   # (bdj)
 CFG.update({'pvgt': {}, 'pvgtB': {'pivot': {'fields': ['N']}}})   # (pvgt) the Grand Total tile: no setup; N picked alone
-PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu', 'ctrow', 'gtrow', 'ctclear', 'ctsel']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
+# (ccopy) Copy As-Is while cards show: a flat report 25 a page with a hidden big number and a ruled pill; grouped; a pivot
+CFG.update({'ccopy': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'fields': ['V_DATE', 'H_TEXT']}, 'gcopy': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'pcopy': {}})
+PREF_CARDS = PREF_CARDS + ['ccopy', 'gcopy', 'pcopy']   # (ccopy)
+CFG.update({'gbcopy': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'ggcopy': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}})   # (csweep3) a nested Board, the List layout
+PREF_CARDS = PREF_CARDS + ['gbcopy', 'ggcopy']   # (csweep3)
+CFG.update({'pw5more': {}}); PREF_CARDS = PREF_CARDS + ['pw5more']   # (csweep3) the tiles' Show more by keyboard
+# (cardlink, 2026-11-05) a card's link by its record: cklA makes the links (flat cards), cklB / C / D open them (sorted
+# the other way: page 2; a record no row has; one the filter hides), cklT / cklTB the table's own window, gklA / gklB the
+# grouped cards, pklP a pivot tile (no link of its own)
+CFG.update({'cklA': {}, 'cklB': {}, 'cklC': {}, 'cklD': {}, 'cklT': {}, 'cklTB': {}, 'gklA': {}, 'gklB': {}, 'gklT': {}, 'gklTB': {}, 'pklP': {},
+            'gklC': {}, 'gklD': {}, 'gklE': {}, 'pklB': {}})   # (cardlink 2) a link with a folded group; a pivot tile's link
+PREF_CARDS = PREF_CARDS + ['cklA', 'gklA', 'pklP', 'gklC']
+CFG.update({'pcopymore': {}}); PREF_CARDS = PREF_CARDS + ['pcopymore']   # (pvcopy) every tile copied, past Show more
+CFG.update({'pmailt': {}}); PREF_CARDS = PREF_CARDS + ['pmailt']   # (pvmail) the Email Report's body over a pivot's tiles
+CFG.update({'chid': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'pmhid': {}}); PREF_CARDS = PREF_CARDS + ['chid', 'pmhid']   # (mailhid) a value hidden by its highlight mails blank
+CFG.update({'pvsave': {'pivot': {'big': 'N', 'pill': 'parent', 'bar': 'Amt', 'fields': ['Amt', 'Mean'], 'nolabels': 1}},
+            'ptpar': {'pivot': {'big': 'N', 'pill': 'parent', 'bar': 'Amt', 'fields': ['Amt', 'Mean'], 'nolabels': 1}}, 'ptpar2': {}})
+CFG.update({'pvgap': {}}); PREF_CARDS = PREF_CARDS + ['pvgap']   # (tilegap) a tile email's blank column, as on screen
+PREF_CARDS = PREF_CARDS + ['pvsave', 'ptpar', 'ptpar2']   # (pvsched) the Save's tiles; the parity dumps (pvcfg's three measures + its setup; the plain pivot)
+# (viewstrict, 2026-11-05) a strict link visit: vstA makes the link (a column hidden, a calculated column, theme, row
+# height), vstB opens it as a reader with their own calculated column / row height / theme, vstC as one with none
+CFG.update({'vstA': {}, 'vstB': {}, 'vstC': {}})
+PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu', 'ctrow', 'gtrow', 'ctclear', 'ctsel', 'cklT', 'gklT']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
 
 
 def _lift(index_src, rx, what):
@@ -180,7 +202,7 @@ def build(index_src):
         '<button id="nextPageBtn">&gt;</button><button id="lastPageBtn">&gt;|</button>')
     # cperf / cmore: a big report (?rows=N, default 1000), the usual six columns shown
     rep('(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : 300)',
-        '(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : (/^(cperf|cmore|cfmtbig|gboardbig|gbandbig|gw2band)$/.test(window.__SCN) ? (+P.get("rows") || 1000) : (/^(cdetmore|cfindgo|cw2more|pw2next)$/.test(window.__SCN) ? 1003 : 300)))')   # (round O) cdetmore: past the 1,000 drawn
+        '(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : (/^(cperf|cmore|cfmtbig|gboardbig|gbandbig|gw2band)$/.test(window.__SCN) ? (+P.get("rows") || 1000) : (/^(cdetmore|cfindgo|cw2more|pw2next|pw5more|pcopymore)$/.test(window.__SCN) ? 1003 : 300)))')   # (round O) cdetmore: past the 1,000 drawn
     # cesc: a value the server escaped (an image tag as text) in the title column
     rep('    window.__rowsFixture = rows;\n',
         '    if (window.__SCN === "cxl2" || window.__SCN === "cxl2ph") { rows[2].V_NAME = "Long status row"; rows[2].V_STATUS = "Waiting on the sponsor for the final signed agreement"; }\n'   # (round P) the one card that keeps one column
@@ -204,9 +226,9 @@ def build(index_src):
         '    if (S === "cguess") { st.visibleColumns = ["#", 0, 1, 7, 2, 3, 4, 5]; st.columnOrder = [0, 1, 7, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; }\n'
         '    if (S === "cfindgo") st.rowsPerPage = "all";   // (cnest sweep) past the 1,000 drawn\n'
         '    if (S === "ctsel") st.rowsPerPage = "25";\n'
-        '    if (S === "cw2more" || S === "pw2next") st.rowsPerPage = "all";   // (csw2) past the 1,000 drawn\n'
+        '    if (S === "cw2more" || S === "pw2next" || S === "pw5more" || S === "pcopymore") st.rowsPerPage = "all";   // (csw2) past the 1,000 drawn\n'
         '    if (S === "cw2pdf") st.rowsPerPage = "25";   // (csw2) a PDF of 25 cards\n'
-        '    if (S === "pw2piv" || S === "pw2next") st.pivot.rows = ["V_ID"];   // (csw2) a tile per row\n'
+        '    if (S === "pw2piv" || S === "pw2next" || S === "pw5more" || S === "pcopymore") st.pivot.rows = ["V_ID"];   // (csw2) a tile per row\n'
         '    if (S === "pw3dup") { st.pivot.agg = ["sum", "sum"]; st.pivot.aggLabels = null; st.pivot.aggColOverrides = ["H_AMT", "H_AMT"]; }   // (cleft) two Sums the builder names alike\n'
         '    if (S === "gw3agg") st.groupAgg = { column: "H_AMT", type: "sum" };   // (cleft) the group summary on the headings\n'
         '    if (S === "cpct") st.columnFormats = { V_AMOUNT: "percent" };\n'
@@ -224,7 +246,7 @@ def build(index_src):
         '    if (S === "gboardfew") { st.groupBy = "V_STATUS"; st.groupLayout = "board"; }   // (bdlay2) three lanes: every one fits\n'
         '    if (S === "gdens") st.groupLayout = "board";   // (cdens) the board at each density\n'
         '    if (S === "pvlA" || S === "pvlB") { st.pivot.rows = ["V_ID"]; st.pivot.cols = ["H_GROUP", "V_STATUS"]; }   // (linkpos) a pivot tall and wide enough to scroll\n'
-        '    if (S === "pvcfg" || S === "pvcfgB") { st.pivot.agg = ["sum", "count", "avg"]; st.pivot.aggLabels = ["Amt", "N", "Mean"]; st.pivot.aggColOverrides = ["H_AMT", "H_AMT", "H_AMT"]; }   // (pvcfg) three measures\n'
+        '    if (S === "pvcfg" || S === "pvcfgB" || S === "pvsave" || S === "ptpar") { st.pivot.agg = ["sum", "count", "avg"]; st.pivot.aggLabels = ["Amt", "N", "Mean"]; st.pivot.aggColOverrides = ["H_AMT", "H_AMT", "H_AMT"]; }   // (pvcfg) three measures\n'
         '    if (S === "plab") st.pivot.aggLabels = null;   // (pvlab) the one measure has no label (no sub-header: pvMeasureLabels finds none)\n'
         '    if (S === "pvgt") st.pivot.cols = [];   // (pvgt) no column field, as ?id=cprojects: the Grand Total row keyed ""\n'
         '    if (S === "pvgtD") st.pivot.cols = [];   // (pvgt2) no column field, Find loaded\n'
@@ -244,10 +266,29 @@ def build(index_src):
     "    if (cs === 'clayoutB') pref = Object.assign(pref || {}, { cards: { title: 'V_STATUS', fields: ['V_ID', 'V_AMOUNT'] } });   // (round L) the viewer's own layout\n"
         "    if (cs === 'cboardload') pref = Object.assign(pref || {}, { view: 'board', board: 'H_GROUP' });   // (round S) a kept board, a flat report; (bdlay) it reads as cards\n"
         "    if (cs === 'cfieldsB') pref = Object.assign(pref || {}, { cards: { own: 1, title: 'V_NAME', fields: ['V_ID', 'V_AMOUNT', 'V_DATE'], nolabels: 1 } });   // (round R) a kept labels-off setup\n"
-        "    if (/^pvl/.test(cs)) { var pst = document.createElement('style'); pst.textContent = '#results-wrapper { max-width: 700px; }'; document.head.appendChild(pst); }   // (linkpos) a wrapper the pivot overflows sideways\n"
+        "    if (/^ckl[AB]$/.test(cs)) { var kst = document.createElement('style'); kst.textContent = '#pnbCardDetails .pnb-cdet-body { max-height: 70px !important; overflow: auto !important; }'; document.head.appendChild(kst); }   // (cardlink 2) a details window that scrolls\n"
+    "    if (cs === 'vstB') { localStorage.setItem('penumbra_calc_columns', JSON.stringify({ lrfix: [{ name: 'MYCALC', formula: '{H_NUM} * 2' }] })); localStorage.setItem('penumbra_pref_rowExpand', JSON.stringify({ lrfix: true })); localStorage.setItem('penumbra_pref_density', JSON.stringify({ lrfix: 'standard' })); }   // (viewstrict) the reader's own\n"
+    "    if (/^pvl/.test(cs)) { var pst = document.createElement('style'); pst.textContent = '#results-wrapper { max-width: 700px; }'; document.head.appendChild(pst); }   // (linkpos) a wrapper the pivot overflows sideways\n"
         "    if (pref) localStorage.setItem('penumbra_column_prefs', JSON.stringify({ lrfix: pref }));\n"
         "    if (cs === 'cviewer') { var vt = document.getElementById('view-options-tab'); if (vt) vt.parentNode.removeChild(vt); }   // a viewer has no View Options form\n"
         "  } catch (e) {} })();\n")
+    # (ccopy) the Copy dialog and its button for the copy scenarios: the dialog lifted from the index.php under test
+    # (live's on the control; its PHP tags dropped) IN PLACE of the colmenu harness's bare stub (its radios and
+    # button, which the other scenarios' quick copies use: kept there; removed here as soon as it is parsed, before
+    # main.js binds), so Copy As-Is runs through main.js's own handlers on the real markup
+    cpd = _lift(index_src, r'<div id="copyActionsLightbox" class="help-lightbox">.*?\n</div>\n', 'the Copy dialog')
+    cpd = re.sub(r'<\?php.*?\?>', '', cpd, flags=re.S).replace('<div id="copyActionsLightbox" class="help-lightbox">', '<div id="copyActionsLightbox" class="help-lightbox" style="display:none">', 1)
+    cpon = '/^(ccopy|gcopy|pcopy|gbcopy|ggcopy|pcopymore)$/.test(new URLSearchParams(location.search).get("scn") || "")'
+    rep('<div id="copyActionsLightbox" style="display:none">\n',
+        '<script>if (' + cpon + ') document.write(' + _js('<button id="copyActionsBtn" type="button">Copy</button>' + cpd).replace('</', '<\\/') + ');</script>\n'
+        '<div id="copyActionsLightbox" style="display:none">\n')
+    rep('  <button id="confirmCopyBtn">Copy</button>\n</div>\n',
+        '  <button id="confirmCopyBtn">Copy</button>\n</div>\n<script>if (' + cpon + ') { var _cs = document.currentScript.previousElementSibling; if (_cs && _cs.id === "copyActionsLightbox" && !_cs.classList.contains("help-lightbox")) _cs.parentNode.removeChild(_cs); }</script>\n')
+    rep('    window.__STORED = st;\n',
+        '    if (S === "gbcopy") { st.groupBy = "H_GROUP,H_GROUP2"; st.groupLayout = "board"; }   // (csweep3) a nested Board\n'
+        '    if (S === "ggcopy") st.groupLayout = "list";   // (csweep3) the List layout\n'
+        '    if (S === "ccopy") { st.rowsPerPage = "25"; st.columnHighlights = { V_STATUS: [{ id: "r1", w: "V_STATUS = //Closed//", css: "background-color: #ffebee; color: #c62828; font-weight: bold" }] }; }   // (ccopy) 300 rows 25 a page; a ruled pill\n'
+        '    window.__STORED = st;\n')
     return src
 
 

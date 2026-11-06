@@ -748,7 +748,7 @@
 <script src="main_patched.js"></script>
 <script>
 (function () {
-  var ONLY = 'K';
+  var ONLY = '';
   function report(txt) { document.getElementById('out').textContent = txt; }
   var results = [];
   function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
@@ -1312,6 +1312,263 @@
     });
   }
 
+  // ---- B (dtpick B, 2026-11-05): "active during" - START:<period>@END counts a row in every period it runs ----------
+  // The token's shape; the fan-out (a blank end to today, an end before its start, a start that is no date, the Jun 30 /
+  // Jul 1 boundary, the 600-period cap); Started / Continuing from the same fan-out whichever is bucketed first; Split by
+  // days (shares add back up); the chart (bars count row-periods; pie refused; phase only beside its own X); drill keeps
+  // each row once; the View in table search (and the table's own search engine agrees); the builder's lists, note, Split
+  // by days box; Chart active by from the header API.
+  function runB() {
+    section('B', function () {
+      var F = window.__CI, HM = window.Penumbra && window.Penumbra.headerMenu;
+      var T = 'START_DATE:fy@END_DATE', TP = T + ':phase', K = T.toUpperCase(), KP = TP.toUpperCase();
+      function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+      var now = new Date(), fyNow = 'FY' + String(now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear()).slice(-2);
+      var BR = [
+        M({ AWARD_ID: 'A1', START_DATE: '2023-07-01', END_DATE: '2025-06-30', AMOUNT: '731' }),   // FY24 + FY25, 366 + 365 days (2024 is a leap year)
+        M({ AWARD_ID: 'A2', START_DATE: '2024-06-30', END_DATE: '2024-07-01', AMOUNT: '10' }),    // the boundary: FY24 + FY25
+        M({ AWARD_ID: 'A3', START_DATE: '2025-03-01', END_DATE: '', AMOUNT: '100' }),             // open: FY25 .. today
+        M({ AWARD_ID: 'A4', START_DATE: '2025-05-01', END_DATE: '2024-01-01', AMOUNT: '5' }),     // ends before it starts: FY25 only
+        M({ AWARD_ID: 'A5', START_DATE: '', END_DATE: '2025-01-01', AMOUNT: '1' })                // no start: Unknown
+      ];
+      var ps = F.parseTok(T);
+      eq('B the token: START, a period, END', [ps.base, ps.split, ps.end, ps.phase, ps.prorate], ['START_DATE', 'fy', 'END_DATE', false, false]);
+      eq('B ...:phase and :prorate ride along', [F.parseTok(TP).phase, F.parseTok(T + ':prorate').prorate], [true, true]);
+      assert('B a plain split token gains no active keys', !('end' in F.parseTok('START_DATE:fy')) && !('phase' in F.parseTok('START_DATE:fy')));
+      eq('B a cycle is no active grouping (the whole text is a column)', F.parseTok('START_DATE:month@END_DATE').base, 'START_DATE:month@END_DATE');
+      eq('B ...nor an empty END', F.parseTok('START_DATE:fy@').base, 'START_DATE:fy@');
+      var fan = F.bucketRows(BR, T), per = {};
+      fan.forEach(function (m) { (per[m.get('AWARD_ID')] = per[m.get('AWARD_ID')] || []).push(m.get(K)); });
+      var fys = []; for (var y = 25; ; y++) { var l = 'FY' + y; fys.push(l); if (l === fyNow || y > 60) break; }
+      eq('B a two-year award: both fiscal years', per.A1, ['FY24', 'FY25']);
+      eq('B Jun 30 to Jul 1: two fiscal years', per.A2, ['FY24', 'FY25']);
+      eq('B a blank end runs to today', per.A3, fys);
+      eq('B an end before its start: the start\'s period only', per.A4, ['FY25']);
+      var far = F.bucketRows([M({ AWARD_ID: 'P', START_DATE: '2025-03-01', END_DATE: '2100-01-01' })], T).map(function (m) { return m.get(K); });
+      eq('C a placeholder end (01/01/2100, 25 years on or more) runs to today, as a blank one (dtpick C)', far, fys);
+      eq('B a start that is no date: one row, the chart\'s Unknown', per.A5, ['']);
+      assert('B the report\'s own rows are never touched', !BR[0].has(K) && BR.length === 5);
+      var ph = fan.filter(function (m) { return m.get('AWARD_ID') === 'A1'; }).map(function (m) { return m.get(KP); });
+      eq('B Started in its first period, Continuing after', ph, ['Started', 'Continuing']);
+      var a = F.bucketRows(F.bucketRows(BR, TP), T), b = F.bucketRows(F.bucketRows(BR, T), TP);
+      var sig = function (rs) { return rs.map(function (m) { return m.get('AWARD_ID') + '|' + m.get(K) + '|' + m.get(KP); }).join(); };
+      assert('B the series bucketed first: one fan-out all the same (no second one)', a.length === fan.length && sig(a) === sig(b) && a.every(function (m) { return m.get(K) !== undefined && m.get(KP) !== undefined; }), a.length + ' vs ' + fan.length);
+      var a2 = F.bucketRows(F.bucketRows(BR, TP), T + ':prorate');
+      assert('B ...a second token with its own suffix (:prorate) reads the same fan-out', a2.length === fan.length && a2.every(function (m) { return m.get((T + ':prorate').toUpperCase()) === m.get(K); }), a2.length + ' vs ' + fan.length);
+      var pr = F.bucketRows(BR, T + ':prorate', { y: 'AMOUNT', prorate: true }).filter(function (m) { return m.get('AWARD_ID') === 'A1'; }).map(function (m) { return Number(m.get('AMOUNT')); });
+      eq('B Split by days: 366 + 365 of 731', pr, [366, 365]);
+      var cap = F.bucketRows([M({ AWARD_ID: 'Z', START_DATE: '1950-01-01', END_DATE: '2099-12-31' })], 'START_DATE:ym@END_DATE');
+      eq('B at most 600 periods a row', cap.length, 600);
+      // the chart
+      var cd = F.chartData(BR, T, 'START_DATE', 'none', 'count', 9999, 'bar', 'label', 'asc');
+      var at = function (d, lbl, ds) { var i = d.labels.indexOf(lbl); return i < 0 ? null : d.datasets[ds || 0].data[i]; };
+      eq('B bars count row-periods', [at(cd, 'FY24'), at(cd, 'FY25')], [2, 4]);
+      var cs = F.chartData(BR, T, 'START_DATE', TP, 'count', 9999, 'bar', 'label', 'asc');
+      var dsn = cs.datasets.map(function (d) { return d.label; });
+      eq('B Started / Continuing, Started first (the row with no start: Unknown, last)', dsn, ['Started', 'Continuing', 'Unknown']);
+      eq('B FY25: 2 started (A3, A4), 2 continuing (A1, A2)', [at(cs, 'FY25', 0), at(cs, 'FY25', 1)], [2, 2]);
+      var sumOf = function (d) { return d.datasets[0].data.reduce(function (s, v) { return s + (Number(v) || 0); }, 0); };
+      var full = F.chartData(BR, T, 'AMOUNT', 'none', 'sum', 9999, 'bar', 'label', 'asc'), shr = F.chartData(BR, T + ':prorate', 'AMOUNT', 'none', 'sum', 9999, 'bar', 'label', 'asc');
+      assert('B Split by days: the bars add back up to the amounts', Math.abs(sumOf(shr) - 847) < 1e-6 && sumOf(full) > 847, sumOf(shr) + ' / ' + sumOf(full));
+      assert('B a pie is refused, saying why', /needs bars or lines/.test(F.chartData(BR, T, 'START_DATE', 'none', 'count', 9999, 'pie', 'label', 'asc')._noData || ''));
+      assert('B Started / continuing on the X axis is refused', /is a series/.test(F.chartData(BR, TP, 'START_DATE', 'none', 'count', 9999, 'bar', 'label', 'asc')._noData || ''));
+      assert('B ...and as the series of another X axis', /same START to END grouping/.test(F.chartData(BR, 'AWARD_ID', 'START_DATE', TP, 'count', 9999, 'bar', 'label', 'asc')._noData || ''));
+      // drill + View in table
+      var kept = F.keep(BR, [T], function (p) { return p.get(K) === 'FY25'; });
+      eq('B a FY25 bar\'s rows: each once', kept.map(function (m) { return m.get('AWARD_ID'); }), ['A1', 'A2', 'A3', 'A4']);
+      var q = F.drillSearch(T, 'FY25');
+      eq('B View in table: started by its last day, ended on or after its first or not at all', q, '{START_DATE} <= 2025-06-30 AND ({END_DATE} >= 2024-07-01 OR {END_DATE} = empty)');
+      var pq = F.parseFilter(q, ['START_DATE', 'END_DATE']);
+      var hit = pq && pq.ast ? BR.filter(function (m) { return F.evalFilter(m, pq.ast, ['START_DATE', 'END_DATE']); }).map(function (m) { return m.get('AWARD_ID'); }) : null;
+      eq('B ...and the table\'s own search finds the same rows', hit, ['A1', 'A2', 'A3']);   // (A4 "ends" before FY25: the search reads its END as written)
+      eq('B Started / continuing has no search of its own', F.drillSearch(TP, 'Started'), null);
+      eq('B a plain period search is unchanged', F.bucketSearch('START_DATE', 'fy', 'FY25'), '{START_DATE} >= 2024-07-01 AND {START_DATE} <= 2025-06-30');
+      // the builder
+      if (!HM) return;
+      var $rt = $('#resultsTable'), cp0 = $rt.data('columnProperties'), cni0 = $rt.data('columnNameToOriginalIndex');
+      var QC = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'], qcp = {}, qcni = {};
+      QC.forEach(function (c, i) { qcni[c] = i; qcp[i] = { isDate: c === 'START_DATE' || c === 'END_DATE', isCurrency: c === 'AMOUNT', isNumeric: c === 'N', isBoolean: false }; });
+      $rt.data('columnProperties', qcp); $rt.data('columnNameToOriginalIndex', qcni);
+      var keepM = F.setMaster ? F.setMaster(FIX) : null;
+      var vb = document.getElementById('visualizeBtn'), vbMade = !vb;
+      if (!vb) { vb = document.createElement('span'); vb.id = 'visualizeBtn'; document.body.appendChild(vb); }
+      var vbShown = $(vb).is(':visible'), vbSt = vb.getAttribute('style');
+      if (!vbShown) { vb.style.display = 'inline-block'; $(vb).parents().filter(function () { return $(this).css('display') === 'none'; }).addClass('zzb-shown').css('display', 'block'); }
+      var $lb = $('#visualizationLightbox'), shown0 = $lb.css('display');
+      try {
+        openBuilder();
+        var xo = $('#vizXAxis option').map(function () { return this.value; }).get();
+        eq('B the X list: every active period under the START column', ['year', 'fy', 'yq', 'fyq', 'ym'].map(function (i) { return xo.indexOf('START_DATE:' + i + '@END_DATE') >= 0; }), [true, true, true, true, true]);
+        var _si = xo.indexOf('START_DATE'), _nx = -1;
+        for (var _q = _si + 1; _q < xo.length; _q++) { if (String(xo[_q]).indexOf('START_DATE:') !== 0) { _nx = _q; break; } }
+        var _ai = xo.indexOf(T);
+        assert('B ...listed under the START column itself (after its own groupings)', _si >= 0 && _ai > _si && (_nx < 0 || _ai < _nx), [_si, _ai, _nx].join());
+        assert('B ...none under the END column, no cycles', !xo.some(function (v) { return /^END_DATE:.*@/.test(v) || /^START_DATE:(month|quarter|dow|hour|fquarter|monthnum)@/.test(v); }));
+        setv('#vizXAxis', T);
+        assert('B the note says a row counts in every period', /a row counts once in every period from its start to its end/.test($('#vizSplitNote').text()) && $('#vizSplitNote').is(':visible'), $('#vizSplitNote').text());
+        assert('B the series list offers Started / continuing for it', $('#vizGroupBy option').filter(function () { return this.value === TP; }).length === 1);
+        setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'count');
+        assert('B Split by days: not for a count', !$('#vizActiveProrate').is(':visible'));
+        setv('#vizAggregation', 'sum');
+        assert('B ...offered for a Sum', $('#vizActiveProrate').is(':visible'));
+        $('#vizActiveProrate').prop('checked', true).trigger('change');
+        eq('B ...and ticked, the X axis splits by days', $('#vizXAxis').val(), T + ':prorate');
+        eq('B the Chart active by list (on either column): every period', [HM.activeVariants('START_DATE').map(function (v) { return v.id; }), HM.activeVariants('END_DATE').length], [['year', 'fy', 'yq', 'fyq', 'ym'], 5]);
+        eq('B ...not on another column', HM.activeVariants('DEPT'), []);
+        $lb.css('display', 'flex');
+        HM.chartActive('END_DATE', 'fy');
+        eq('B Chart active by Fiscal Year: the X axis, its Started / continuing series', [$('#vizXAxis').val(), $('#vizGroupBy').val()], [T, TP]);
+        eq('B ...stacked, Paired, in period order, every period', [$('#vizStacked').is(':checked'), $('#vizPalette').val(), $('#vizSortBy').val(), $('#vizSortDir').val(), $('#vizLimit').val()], [true, 'paired', 'label', 'asc', '9999']);
+        var code = window.vizBuildCodeFromForm();
+        assert('B ...and it saves as the tokens', code.indexOf("'" + T + "'") > 0 && code.indexOf("'" + TP + "'") > 0, code.slice(0, 120));
+      } finally {
+        $lb.css('display', shown0);
+        if (!vbShown) { if (vbSt === null) vb.removeAttribute('style'); else vb.setAttribute('style', vbSt); $('.zzb-shown').css('display', '').removeClass('zzb-shown'); }
+        if (vbMade && vb.parentNode) vb.parentNode.removeChild(vb);
+        if (F.setMaster) F.setMaster(keepM);
+        $rt.data('columnProperties', cp0); $rt.data('columnNameToOriginalIndex', cni0);
+      }
+    });
+  }
+
+  // ---- V (dtpick D, 2026-11-05): a pivot with an active field counts a row in every period it runs ------------
+  // The collector (each row in each period; a placeholder and a blank end to today; no start [Blank]; split by days
+  // adding back up); the totals gate (the Grand Total column off with the field in Columns, the footer off in Rows,
+  // refusals, a prorated Sum keeps both); the drill lists each row active in the period once, and View in table
+  // searches for them. The same fixture and answers as schedule_runner's php_pivot_test.php.
+  function runV() {
+    section('V', function () {
+      var F = window.__CI;
+      assert('V the pivot hooks are up', !!(F && F.pvProcess && F.pvGen && F.pvMatch));
+      if (!F || !F.pvProcess) return;
+      function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+      var T = 'START_DATE:fy@END_DATE', now = new Date();
+      var fyNow = 'FY' + String(now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear()).slice(-2);
+      var R = [
+        M({ AWARD_ID: 'A1', DEPT: 'X', START_DATE: '2023-07-01', END_DATE: '2025-06-30', AMT: '731' }),
+        M({ AWARD_ID: 'A2', DEPT: 'Y', START_DATE: '2024-06-30', END_DATE: '2024-07-01', AMT: '10' }),
+        M({ AWARD_ID: 'A3', DEPT: 'X', START_DATE: '2025-03-01', END_DATE: '', AMT: '100' }),
+        M({ AWARD_ID: 'A4', DEPT: 'Y', START_DATE: '2024-03-01', END_DATE: '2100-01-01', AMT: '5' }),
+        M({ AWARD_ID: 'A5', DEPT: 'X', START_DATE: '', END_DATE: '2025-01-01', AMT: '1' })
+      ];
+      var pd = F.pvProcess(R, ['DEPT'], [T], 'AMT', 'sum', [], null), d = pd.data;
+      var cnt = function (r, c) { return (d[r] && d[r][c]) ? d[r][c].count : null; }, sm = function (r, c) { return (d[r] && d[r][c]) ? d[r][c].sum : null; };
+      eq('V collect: X in FY24 (A1)', cnt('X', 'FY24'), 1);
+      eq('V collect: X in FY25 (A1, A3), the full amounts', [cnt('X', 'FY25'), sm('X', 'FY25')], [2, 831]);
+      eq('V collect: Y in FY24 and FY25 (A2, A4)', [cnt('Y', 'FY24'), cnt('Y', 'FY25')], [2, 2]);
+      eq('V collect: an open end and a placeholder end run to today', [cnt('X', fyNow), cnt('Y', fyNow)], [1, 1]);
+      assert('V collect: no period past today', !d.Y.FY99 && !d.Y.FY00, Object.keys(d.Y).join());
+      eq('V collect: no start date: [Blank]', cnt('X', '[Blank]'), 1);
+      assert('V collect: the report\'s own rows are untouched', !R[0].has(T.toUpperCase()) && R.length === 5);
+      var pp = F.pvProcess(R, ['DEPT'], [T + ':prorate'], 'AMT', 'sum', [], null).data, tx = 0;
+      Object.keys(pp.X).forEach(function (k) { tx += pp.X[k].sum; });
+      eq('V prorate: A1 is 366 days of FY24', pp.X.FY24.sum, 366);
+      assert('V prorate: the shares add back up to the amounts (X: 832)', Math.abs(tx - 832) < 1e-6, String(tx));
+      var pr = F.pvProcess(R, [T], ['DEPT'], 'AMT', 'count', [], null).data;
+      eq('V collect: the field in Rows works the same', pr.FY25 && pr.FY25.X ? pr.FY25.X.count : null, 2);
+      // the gate
+      if (F.pvGate) {
+        var g = F.pvGate(['DEPT'], [T], ['sum']);
+        eq('V gate: in Columns: the Grand Total column off, the footer kept', [g.refuse, g.noRowTotals, g.noFooter], ['', true, false]);
+        assert('V gate: ...and says so', /^Totals across the fiscal year periods are off/.test(g.note), g.note);
+        var g2 = F.pvGate([T], ['DEPT'], ['sum']);
+        eq('V gate: in Rows: the footer off', [g2.noRowTotals, g2.noFooter], [false, true]);
+        assert('V gate: another field beside it: refused', /alone in Columns/.test(F.pvGate(['DEPT'], [T, 'STATUS'], ['sum']).refuse));
+        assert('V gate: % of row total across the periods: refused', /pct row total/.test(F.pvGate(['DEPT'], [T], ['pct_row_total']).refuse));
+        eq('V gate: % of column total stays', F.pvGate(['DEPT'], [T], ['pct_col_total']).refuse, '');
+        var g3 = F.pvGate(['DEPT'], [T + ':prorate'], ['sum']);
+        eq('V gate: a Sum split by days keeps every total', [g3.note, g3.noRowTotals, g3.noFooter], ['', false, false]);
+      } else { assert('V gate: _pivotActiveGate exists', false); }
+      // the renderer
+      var gen = function (rows, cols, tok) {
+        var p = F.pvProcess(R, rows, cols, 'AMT', 'sum', [], null);
+        return F.pvGen(p, rows, cols, 'AMT', 'nested', 'nested', ['sum'], 'asc', null, false, null, null).html || '';
+      };
+      var hP = gen(['DEPT'], ['START_DATE:fy']), hC = gen(['DEPT'], [T]), hR = gen([T], ['DEPT']);
+      assert('V render: (a plain pivot has a Grand Total column and a footer)', hP.indexOf('pivot-grand-total') >= 0 && hP.indexOf('<tfoot') >= 0);
+      assert('V render: active in Columns: no Grand Total column or corner, the footer kept, the note', hC.indexOf('pivot-grand-total') < 0 && hC.indexOf('<tfoot') >= 0 && /pivot-active-note/.test(hC), hC.slice(-300));
+      assert('V render: active in Rows: no footer, the note', hR.indexOf('<tfoot') < 0 && /<\/table>/.test(hR) && /pivot-active-note/.test(hR));
+      var rf = F.pvGen(F.pvProcess(R, ['DEPT'], [T, 'AWARD_ID'], 'AMT', 'sum', [], null), ['DEPT'], [T, 'AWARD_ID'], 'AMT', 'nested', 'nested', ['sum'], 'asc', null, false, null, null);
+      assert('V render: refused: the reason, no table', /pivot-active-refusal/.test(rf.html) && /alone in Columns/.test(rf.html) && rf.html.indexOf('<table') < 0);
+      // drill + View in table
+      var st = { rows: ['DEPT'], cols: [T], vals: 'AMT', agg: ['sum'] };
+      var mt = F.pvMatch(st, R, 'X', 'FY25', null);
+      var ids = R.filter(function (m) { return mt.test(m); }).map(function (m) { return m.get('AWARD_ID'); });
+      eq('V drill: X in FY25 lists A1 and A3, each once', ids, ['A1', 'A3']);
+      var mb = F.pvMatch(st, R, 'X', '[Blank]', null);
+      eq('V drill: X [Blank]: the row with no start date', R.filter(function (m) { return mb.test(m); }).map(function (m) { return m.get('AWARD_ID'); }), ['A5']);
+      var sr = F.pvSearch(mt.criteria, null);
+      var srs = (sr && typeof sr === 'object') ? (sr.search || sr.searchString || JSON.stringify(sr)) : String(sr);
+      assert('V View in table: the rows active in FY25', String(srs).indexOf('{START_DATE} <= 2025-06-30 AND ({END_DATE} >= 2024-07-01 OR {END_DATE} = empty)') >= 0, String(srs));
+      var lk = new Set(['START_DATE', 'DEPT']);
+      eq('V a saved active field needs its END column too', [F.pvExists(T, lk), F.pvExists(T, new Set(['START_DATE', 'END_DATE'])), F.pvExists('DEPT', lk)], [false, true, true]);
+    });
+  }
+
+  // ---- Q (dtpick, 2026-11-05): a date column charts grouped, the grouping the reader's -------------------------
+  // The X / series lists offer every registry grouping its dates allow (Fiscal Year > Quarter, Fiscal Quarter, Month #
+  // were missing; no Hour on dates without a time); Chart this column takes the column menu's pick, else the span
+  // rule, and a grouped axis sorts by label, earliest first, not cut to a top N; the Palette list offers Paired.
+  function runQ() {
+    section('Q', function () {
+      var HM = window.Penumbra && window.Penumbra.headerMenu;
+      assert('Q the header API has chartVariants', !!HM && typeof HM.chartVariants === 'function');
+      if (!HM) return;
+      var hasCV = typeof HM.chartVariants === 'function';   // (live: none - every check below still runs, red)
+      // this page loads no column types: give the fixture's (dates, money, numbers) and its rows, as a loaded report has
+      var $rt = $('#resultsTable'), cp0 = $rt.data('columnProperties'), cni0 = $rt.data('columnNameToOriginalIndex');
+      var QC = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'], qcp = {}, qcni = {};
+      QC.forEach(function (c, i) { qcni[c] = i; qcp[i] = { isDate: c === 'START_DATE' || c === 'END_DATE', isCurrency: c === 'AMOUNT', isNumeric: c === 'N', isBoolean: false }; });
+      $rt.data('columnProperties', qcp); $rt.data('columnNameToOriginalIndex', qcni);
+      var keepQM = (window.__CI && window.__CI.setMaster) ? window.__CI.setMaster(FIX) : null;
+      try {
+      openBuilder();
+      var xo = $('#vizXAxis option').map(function () { return this.value; }).get(), go = $('#vizGroupBy option').map(function () { return this.value; }).get();
+      ['START_DATE:fyq', 'START_DATE:fquarter', 'START_DATE:monthnum'].forEach(function (tk) {
+        assert('Q the X list offers ' + tk, xo.indexOf(tk) >= 0, xo.filter(function (v) { return /^START_DATE/.test(v); }).join());
+        assert('Q the series list offers ' + tk, go.indexOf(tk) >= 0);
+      });
+      assert('Q no Hour for dates without a time', xo.indexOf('START_DATE:hour') < 0);
+      assert('Q the Palette list offers Paired', $('#vizPalette option[value="paired"]').length === 1 && $('#vizPalette option[value="paired"]').prev().val() === 'mono');
+      var vb = document.getElementById('visualizeBtn'), vbMade = !vb;
+      if (!vb) { vb = document.createElement('span'); vb.id = 'visualizeBtn'; document.body.appendChild(vb); }   // (this page has no toolbar)
+      var vbShown = $(vb).is(':visible'), vbSt = vb.getAttribute('style');
+      if (vb && !vbShown) { vb.style.display = 'inline-block'; $(vb).parents().filter(function () { return $(this).css('display') === 'none'; }).addClass('zzq-shown').css('display', 'block'); }
+      var $lb = $('#visualizationLightbox'), shown0 = $lb.css('display');
+      $lb.css('display', 'flex');
+      try {
+        var cv = hasCV ? HM.chartVariants('START_DATE') : [], ids = cv.map(function (v) { return v.id; });
+        assert('Q the Chart by list: every grouping the X list offers the date', ['year', 'fy', 'yq', 'fyq', 'ym', 'quarter', 'fquarter', 'month', 'monthnum', 'dow'].every(function (i) { return ids.indexOf(i) >= 0; }) && ids.indexOf('hour') < 0, ids.join());
+        eq('Q no Chart by list on a text column', hasCV ? HM.chartVariants('DEPT') : 'absent', []);
+        eq('Q ...nor a number column', hasCV ? HM.chartVariants('AMOUNT') : 'absent', []);
+        HM.chartColumn('START_DATE', 'fy');
+        eq('Q Chart by Fiscal Year: the X axis', $('#vizXAxis').val(), 'START_DATE:fy');
+        eq('Q ...counted', $('#vizAggregation').val(), 'count');
+        eq('Q ...in period order', [$('#vizSortBy').val(), $('#vizSortDir').val()], ['label', 'asc']);
+        eq('Q ...every period (no top N)', $('#vizLimit').val(), '9999');
+        var code = window.vizBuildCodeFromForm();
+        assert('Q ...and it saves as the token', code.indexOf("'START_DATE:fy'") > 0, code.slice(0, 90));
+        HM.chartColumn('START_DATE', 'fyq');
+        eq('Q Chart by Fiscal Year > Quarter', $('#vizXAxis').val(), 'START_DATE:fyq');
+        HM.chartColumn('START_DATE', 'raw');
+        eq('Q Chart by As is: each date', $('#vizXAxis').val(), 'START_DATE');
+        var sug = cv.filter(function (v) { return v.suggested; })[0];
+        HM.chartColumn('START_DATE');
+        eq('Q Chart this column: the span rule\'s grouping (the suggested one)', $('#vizXAxis').val(), sug ? 'START_DATE:' + sug.id : 'START_DATE');
+        HM.chartColumn('DEPT');
+        eq('Q Chart this column on a text column: as it is', $('#vizXAxis').val(), 'DEPT');
+      } finally {
+        $lb.css('display', shown0);
+        if (vb && !vbShown) { if (vbSt === null) vb.removeAttribute('style'); else vb.setAttribute('style', vbSt); $('.zzq-shown').css('display', '').removeClass('zzq-shown'); }
+        if (vbMade && vb.parentNode) vb.parentNode.removeChild(vb);
+      }
+      } finally {
+        if (window.__CI && window.__CI.setMaster) window.__CI.setMaster(keepQM);
+        $rt.data('columnProperties', cp0); $rt.data('columnNameToOriginalIndex', cni0);
+      }
+    });
+  }
+
   // ---- G (glong, 2026-11-02): a long Gantt grows to its bars, in the builder's preview and on the report ----------
   async function runG() {
     var F = window.__CI;
@@ -1581,6 +1838,9 @@
     if (!ONLY || ONLY === 'D') await runD();
     if (!ONLY || ONLY === 'K') await runK();
     if (!ONLY || ONLY === 'T') runT();   // (gtl)
+    if (!ONLY || ONLY === 'Q') runQ();   // (dtpick)
+    if (!ONLY || ONLY === 'B') runB();   // (dtpick B)
+    if (!ONLY || ONLY === 'V') runV();   // (dtpick D)
     if (!ONLY || ONLY === 'G') await runG();   // (glong)
     if (!ONLY || ONLY === 'S') await runS();   // (gsortcolor)
     if (!ONLY || ONLY === 'E') await runE();   // (gone)

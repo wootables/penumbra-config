@@ -331,6 +331,9 @@ try {
   eq('gwin: fy27 From = Jul 1 2026', gwMk('fy27','from'), '2026-07-01 00:00');
   eq('gwin: fy27 To = end of Jun 30 2027', gwMk('fy27','to'), '2027-06-30 23:59');
   eq('gwin: FY2027 four digits', gwMk('FY2027','from'), '2026-07-01 00:00');
+  // (2026-11-05, bdbucket final sweep) a two-digit fiscal year as the date parser reads one: 00-68 is 20xx, 69-99 is 19xx
+  eq('gwin: fy99 From = Jul 1 1998 (69-99 is 19xx)', gwMk('fy99','from'), '1998-07-01 00:00');
+  eq('gwin: fy68 To = end of Jun 30 2068 (00-68 is 20xx)', gwMk('fy68','to'), '2068-06-30 23:59');
   eq('gwin: fy 26 with a space', gwMk('fy 26','to'), '2026-06-30 23:59');
   eq('gwin: today+90d', gwMk('today+90d','from'), gwD(moment().startOf('day').add(90,'days').valueOf()));
   eq('gwin: today-6m', gwMk('today-6m','from'), gwD(moment().startOf('day').subtract(6,'months').valueOf()));

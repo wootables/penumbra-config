@@ -251,7 +251,7 @@
                     {
                         "name":  "datesplit bucket hour date-only",
                         "pass":  true,
-                        "detail":  "00:00"
+                        "detail":  "2025-03-14"
                     },
                     {
                         "name":  "datesplit bucket hour timestamp",

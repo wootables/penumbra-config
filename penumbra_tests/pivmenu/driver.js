@@ -374,7 +374,7 @@
       R.chk.bdHeadOpens = rclick(th) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === txt(th) && !menu().querySelector('.pnb-hm-stats');   // (round 28) the counts moved into Column stats
       // (2026-10-27, copymenu) the copies in one list, Copy: on a heading, Column name and Distinct values
       R.chk.bdHeadItems = has(['bdSortAsc', 'bdSortDesc', 'bdStats', 'bdCopyMenu']) && !item('bdCopyCol') && !item('bdCopy') && !item('bdThenAsc') && !item('bdSortClear')
-        && !item('bdCopyName') && !item('bdCopyDistinct') && (function () { item('bdCopyMenu').click(); return subActs().join() === 'bdCopyName,bdCopyDistinct'; })();
+        && !item('bdCopyName') && !item('bdCopyDistinct') && (function () { item('bdCopyMenu').click(); return /^bdCopyName,bdCopyDistinct(,bdCopyGroups)?$/.test(subActs().join()); })();   // (bdbucket) a date or number column's groups after
       R.info.bdActs = acts();
       closeMenu();
       await choose(th, 'bdSortAsc');
@@ -741,6 +741,277 @@
       // the API: no pivot fit for a flat-table heading; the flat fit still refuses a pivot heading
       R.chk.fitApi = typeof CW.canFitPivot === 'function' && CW.canFitPivot(field(0)) === true && CW.canFit(field(0)) === false && CW.pivotSized(null) === true;
       R.info.fit.cell = { la: la, va: va };
+    },
+    pmbucket: async function () {
+      // (2026-11-05, bdbucket) a breakdown column's buckets, as the report's Group by offers them: Copy > Distinct column
+      // groups and Column stats > Rows per group, over the breakdown's OWN rows (each row's source row, __pnbBdSrc)
+      var H = window.Penumbra.headerMenu;
+      function leaf() {
+        return Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody tr:not(.pivot-group-summary-row) td[data-row-key][data-col-key]'), function (td) {
+          return td.parentNode.style.display !== 'none' && td.getAttribute('data-row-key').indexOf('|||') > 0 && !td.classList.contains('pivot-grand-total') && /\d/.test(td.textContent);
+        })[0] || null;
+      }
+      function subLabels() { var p = subPanel(); return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-item .pnb-hm-label'), function (e) { return e.textContent; }) : []; }
+      function subHeads() { var p = subPanel(); return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-head'), function (e) { return e.textContent; }) : []; }
+      function subInfo() {   // (bdbucket sweep) an info line, or a Rows per group line to read (an item: its label and note)
+        var p = subPanel();
+        return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-info, .pnb-hm-item[data-act^="bdStatsRow-"], .pnb-hm-item[data-act="bdStatsMore"]'), function (d) {
+          if (d.classList.contains('pnb-hm-info')) return [d.querySelector('.pnb-hm-info-k').textContent, d.querySelector('.pnb-hm-info-v').textContent];
+          var nt = d.querySelector('.pnb-hm-note'); return [d.querySelector('.pnb-hm-label').textContent, nt ? nt.textContent : ''];
+        }) : [];
+      }
+      async function open(act) { var it = item(act); if (!it) return false; it.click(); await sleep(150); return true; }
+      function fn(f) { return typeof H[f] === 'function'; }
+      // a cell with many rows behind it, so the years repeat: the leaf with the largest sum (its rows' H_AMT add up)
+      function amt(td) { return parseFloat(td.textContent.replace(/[^0-9.\-]/g, '')) || 0; }
+      var leaves = Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody tr:not(.pivot-group-summary-row) td[data-row-key][data-col-key]'), function (td) {
+        return td.parentNode.style.display !== 'none' && td.getAttribute('data-row-key').indexOf('|||') > 0 && !td.classList.contains('pivot-grand-total') && /\d/.test(td.textContent);
+      });
+      var how = 'largest of ' + leaves.length;
+      await choose(leaves.slice().sort(function (a, b) { return amt(b) - amt(a); })[0] || leaf(), 'pvDrill');
+      await sleep(600);
+      var bt = document.querySelector('table.pnb-breakdown');
+      if (!bt) throw new Error('no breakdown table');
+      var ths = Array.prototype.slice.call(bt.tHead.rows[0].cells);
+      function hd(name) { return ths.filter(function (h) { return h.getAttribute('data-pnb-bd-col') === name; })[0] || null; }
+      var thD = hd('V_DATE'), thA = hd('V_AMOUNT'), thT = hd('V_ID');   // (bdbucket 2) V_NAME splits by space: V_ID is the plain text
+      if (!thD || !thA || !thT) throw new Error('breakdown headings missing: ' + ths.map(txt).join());
+      var tb = bt.tBodies[0], body = Array.prototype.slice.call(tb.rows), src = body.map(function (tr) { return tr.__pnbBdSrc; });
+      // the report's buckets for a column (its Group by list, a list's Split by too: bdbucket 2), as act ids
+      function variants(c) { return H.groupVariants(c) || []; }
+      function ids(c) { return variants(c).map(function (v) { return v.active ? 'active' + v.active : String(v.token).split(':').pop(); }); }
+      var dIds = ids('V_DATE'), aIds = ids('V_AMOUNT');
+      // the breakdown's dates from its own text (m/d/yyyy): its years, their rows, its months
+      function dt(s) { var m = /^(\d+)\/(\d+)\/(\d{4})/.exec(String(s || '')); return m ? { y: +m[3], m: +m[1] } : null; }
+      var iD = thD.cellIndex, dates = body.map(function (tr) { return dt(tr.cells[iD].textContent.trim()); });
+      var yrs = [], yc = {}, yms = {};
+      dates.forEach(function (d) { if (!d) return; if (yrs.indexOf(String(d.y)) < 0) yrs.push(String(d.y)); yc[d.y] = (yc[d.y] || 0) + 1; yms[d.y * 100 + d.m] = 1; });
+      yrs.sort();
+      R.info.bk = { how: how, rows: body.length, src: src.filter(function (m) { return m instanceof Map; }).length, dIds: dIds, aIds: aIds, yrs: yrs, txtV: (H.groupVariants('V_NAME') || []).map(function (v) { return v.token; }) };
+      // Copy on the date heading: Distinct column groups after Distinct column values, its buckets the report's
+      closeMenu(); rclick(thD);
+      await open('bdCopyMenu'); var l1 = subActs();
+      await open('bdCopyGroups'); var l2 = subActs(), lab2 = subLabels();
+      R.chk.bkCopyList = l1.join() === 'bdCopyName,bdCopyDistinct,bdCopyGroups' && dIds.length > 0 && l2.join() === dIds.map(function (x) { return 'bdCopyGroup-' + x; }).join()
+        && ['year', 'fy', 'ym'].every(function (x) { return dIds.indexOf(x) >= 0; }) && lab2.join('|') === variants('V_DATE').map(function (v) { return v.label; }).join('|');
+      R.info.bkList = { l1: l1, l2: l2, lab2: lab2 };
+      // By Year, comma: the breakdown's years, ascending
+      await open('bdCopyGroup-year'); var l3 = subActs();
+      if (item('bdCopyGroup-year-comma')) { item('bdCopyGroup-year-comma').click(); await sleep(300); }
+      R.chk.bkCopyYear = l3.indexOf('bdCopyGroup-year-newline') >= 0 && l3.indexOf('bdCopyGroup-year-comma') >= 0 && yrs.length >= 2 && lastClip() === yrs.join(',')
+        && /Copied \d+ distinct groups? \(By Year\)\./.test(lastToast());
+      R.info.bkYear = { clip: lastClip(), want: yrs.join(','), toast: lastToast().slice(0, 120), l3: l3 };
+      // By Year > Month, newline: the months of the breakdown's rows - not the report's
+      var all = (window.__rowsFixture || []).map(function (r) { var m = new Map(); Object.keys(r).forEach(function (k) { m.set(k, r[k]); }); return m; });
+      var own = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:ym', src) : null, rep = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:ym', all) : null;
+      closeMenu(); rclick(thD); await open('bdCopyMenu'); await open('bdCopyGroups'); await open('bdCopyGroup-ym');
+      if (item('bdCopyGroup-ym-newline')) { item('bdCopyGroup-ym-newline').click(); await sleep(300); }
+      R.chk.bkOwnRows = !!own && !!rep && own.length === Object.keys(yms).length && own.length < rep.length && own.every(function (x) { return rep.indexOf(x) >= 0; })
+        && lastClip() === own.join('\n');
+      R.info.bkOwn = { own: own, rep: rep ? rep.length : null, clip: String(lastClip()).slice(0, 120) };
+      // a number column: its ranges, over the breakdown's rows
+      var vA = variants('V_AMOUNT')[0] || null, ownA = (vA && fn('groupValues')) ? H.groupValues('V_AMOUNT', vA.token, src) : null;
+      closeMenu(); rclick(thA); await open('bdCopyMenu'); var la = subActs();
+      if (vA) { await open('bdCopyGroups'); await open('bdCopyGroup-' + aIds[0]); if (item('bdCopyGroup-' + aIds[0] + '-newline')) { item('bdCopyGroup-' + aIds[0] + '-newline').click(); await sleep(300); } }
+      R.chk.bkCopyNum = !!vA && la.join() === 'bdCopyName,bdCopyDistinct,bdCopyGroups' && !!ownA && ownA.length >= 1 && ownA.length <= body.length && lastClip() === ownA.join('\n');
+      R.info.bkNum = { la: la, tok: vA ? vA.token : null, own: ownA, clip: String(lastClip()).slice(0, 120) };
+      // a date cell's Copy list: This value, its name, This row, Distinct values, Distinct column groups
+      closeMenu(); rclick(body[0].cells[iD]); await open('bdCopyMenu'); var lc = subActs();
+      R.chk.bkCell = lc.join() === 'bdCopy,bdCopyName,bdCopyRow,bdCopyDistinct,bdCopyGroups';
+      R.info.bkCell = lc;
+      // a text column: no groups in Copy, no Rows per group in Column stats
+      closeMenu(); rclick(thT); await open('bdCopyMenu'); var lt = subActs();
+      closeMenu(); rclick(thT); await open('bdStats'); var ht = subHeads(), st = subActs();
+      R.chk.bkNoText = lt.join() === 'bdCopyName,bdCopyDistinct' && ht.indexOf('Rows per group') < 0 && !st.some(function (a) { return /^bdStatsGroup-/.test(a); });
+      R.info.bkText = { lt: lt, ht: ht, st: st };
+      // a row without its source row: no groups (they could not be read)
+      var keepS = body[1].__pnbBdSrc; delete body[1].__pnbBdSrc;
+      closeMenu(); rclick(thD); await open('bdCopyMenu'); var ln = subActs();
+      closeMenu(); rclick(thD); await open('bdStats'); var hn = subHeads();
+      body[1].__pnbBdSrc = keepS;
+      R.chk.bkNoSrc = ln.join() === 'bdCopyName,bdCopyDistinct' && hn.indexOf('Rows per group') < 0;
+      R.info.bkNoSrc = { ln: ln, hn: hn };
+      // Column stats on the date heading: Rows per group last, a list for each bucket
+      closeMenu(); rclick(thD); await open('bdStats'); var hs = subHeads(), sa = subActs();
+      R.chk.bkStatsList = hs.length > 0 && hs[hs.length - 1] === 'Rows per group' && dIds.length > 0 && sa.join() === dIds.map(function (x) { return 'bdStatsGroup-' + x; }).join();
+      R.info.bkStats = { hs: hs, sa: sa };
+      // By Year: each year with its rows, in order
+      await open('bdStatsGroup-year'); var iy = subInfo(), hy = subHeads();
+      var wantY = yrs.map(function (y) { return [y, String(yc[y])]; });
+      R.chk.bkStatsYear = JSON.stringify(iy) === JSON.stringify(wantY) && hy.join() === 'Rows in each group';
+      R.info.bkStatsYear = { got: iy, want: wantY, hy: hy };
+      // a blank date: (Blank) last, its row out of the years
+      var keepB = body[0].__pnbBdSrc, mb = new Map(keepB); mb.set('V_DATE', ''); body[0].__pnbBdSrc = mb;
+      var yc2 = {}; dates.forEach(function (d, k) { if (d && k > 0) yc2[d.y] = (yc2[d.y] || 0) + 1; });
+      var wantB = Object.keys(yc2).sort().map(function (y) { return [y, String(yc2[y])]; }).concat([['(Blank)', '1']]);
+      closeMenu(); rclick(thD); await open('bdStats'); await open('bdStatsGroup-year'); var ib = subInfo();
+      body[0].__pnbBdSrc = keepB;
+      R.chk.bkStatsBlank = JSON.stringify(ib) === JSON.stringify(wantB);
+      R.info.bkBlank = { got: ib, want: wantB };
+      // a long list: 60 more rows, a month each in 2001-2005 - By Year > Month stops at 50, its last line the rest
+      var extra = [];
+      for (var k = 0; k < 60; k++) {
+        var tr = body[0].cloneNode(true), mx = new Map(keepB);
+        mx.set('V_DATE', ((k % 12) + 1) + '/1/' + (2001 + Math.floor(k / 12)));
+        tr.__pnbBdSrc = mx; tb.appendChild(tr); extra.push(tr);
+      }
+      var totalYm = Object.keys(yms).length + 60;
+      closeMenu(); rclick(thD); await open('bdStats'); await open('bdStatsGroup-ym'); var ic = subInfo();
+      extra.forEach(function (tr) { tr.parentNode.removeChild(tr); });
+      var more = totalYm - 50;
+      R.chk.bkStatsCap = ic.length === 51 && JSON.stringify(ic[50]) === JSON.stringify([more + (more === 1 ? ' more group' : ' more groups'), '']) && ic.slice(0, 50).every(function (p) { return /^\d+$/.test(p[1]); });
+      R.info.bkCap = { n: ic.length, last: ic[ic.length - 1], total: totalYm };
+      closeMenu();
+      // an active level (a start/end pair's START: Active per Year), straight from the API, the rows out of order: every
+      // year a row runs in, ascending; counts per year, a row with no start last as ''; a split by a delimiter stays out
+      function mp(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+      var ra = [mp({ V_DATE: '6/1/2022', H_DATE: '8/1/2022', V_NAME: 'Alpha Bravo' }), mp({ V_DATE: '3/1/2021', H_DATE: '2/1/2023', V_NAME: 'Bravo Delta' }), mp({ V_DATE: '', H_DATE: '1/1/2024', V_NAME: 'Echo Golf' })];
+      var av = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:year@H_DATE', ra) : 'n/a', ac = fn('groupCounts') ? H.groupCounts('V_DATE', 'V_DATE:year@H_DATE', ra) : 'n/a';
+      var kept = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:year@H_DATE') : 'n/a', dl = fn('groupValues') ? H.groupValues('V_NAME', 'V_NAME:dspace', ra) : 'n/a';
+      R.chk.bkActive = JSON.stringify(av) === '["2021","2022","2023"]' && JSON.stringify(ac) === '[{"v":"2021","n":1},{"v":"2022","n":2},{"v":"2023","n":1},{"v":"","n":1}]'
+        && Array.isArray(kept);   // (bdbucket 2) a split names its values now: bkSplitApi
+      R.info.bkActive = { av: av, ac: ac, kept: Array.isArray(kept) ? kept.length : kept, dl: dl };
+      // (bdbucket 2; the user: "I dont see the bucketing by delimited strings ... for PI_LIST or DEPARTMENT_LIST") a list
+      // column - V_NAME's words, Split by space in the report's Group by - in both lists: each word once, alphabetical,
+      // and the rows listing each
+      var thN = hd('V_NAME'), iN = thN.cellIndex, nIds = ids('V_NAME'), words = {}, wc = {};
+      body.forEach(function (tr) {
+        var seen = {};
+        tr.cells[iN].textContent.trim().split(/ +/).forEach(function (w) { if (!w || seen[w]) return; seen[w] = 1; words[w] = 1; wc[w] = (wc[w] || 0) + 1; });
+      });
+      var wl = Object.keys(words).sort(function (a, b) { return a.localeCompare(b); });   // (bdbucket sweep) the grouped view's text order
+      closeMenu(); rclick(thN); await open('bdCopyMenu'); var sn1 = subActs();
+      await open('bdCopyGroups'); var sn2 = subActs(), snl = subLabels();
+      await open('bdCopyGroup-dspace'); if (item('bdCopyGroup-dspace-newline')) { item('bdCopyGroup-dspace-newline').click(); await sleep(300); }
+      R.chk.bkSplit = nIds.join() === 'dspace' && sn1.join() === 'bdCopyName,bdCopyDistinct,bdCopyGroups' && sn2.join() === 'bdCopyGroup-dspace' && snl.join() === 'Split by space'
+        && wl.length >= 2 && lastClip() === wl.join('\n') && /Copied \d+ distinct values? \(Split by space\)\./.test(lastToast());
+      R.info.bkSplit = { ids: nIds, sn1: sn1, sn2: sn2, snl: snl, want: wl, clip: String(lastClip()).slice(0, 200), toast: lastToast().slice(0, 120) };
+      closeMenu(); rclick(thN); await open('bdStats'); var hsN = subHeads(), saN = subActs();
+      await open('bdStatsGroup-dspace'); var isN = subInfo(), hhN = subHeads();
+      var wantN = wl.map(function (w) { return [w, String(wc[w])]; });
+      R.chk.bkSplitStats = hsN.length > 0 && hsN[hsN.length - 1] === 'Rows per group' && saN.join() === 'bdStatsGroup-dspace' && hhN.join() === 'Rows listing each value'
+        && JSON.stringify(isN) === JSON.stringify(wantN.slice(0, 50));
+      R.info.bkSplitStats = { hs: hsN, sa: saN, hh: hhN, got: isN.slice(0, 8), want: wantN.slice(0, 8) };
+      closeMenu();
+      // ...and straight from the API, over given rows: each value once, alphabetical; a row counted once per value it lists
+      var sv = fn('groupValues') ? H.groupValues('V_NAME', 'V_NAME:dspace', ra) : 'n/a', sc = fn('groupCounts') ? H.groupCounts('V_NAME', 'V_NAME:dspace', ra) : 'n/a';
+      R.chk.bkSplitApi = JSON.stringify(sv) === '["Alpha","Bravo","Delta","Echo","Golf"]'
+        && JSON.stringify(sc) === '[{"v":"Alpha","n":1},{"v":"Bravo","n":2},{"v":"Delta","n":1},{"v":"Echo","n":1},{"v":"Golf","n":1}]';
+      R.info.bkSplitApi = { sv: sv, sc: sc };
+      // (bdbucket sweep; the user: "Full bugsweep of this and lets close out this feature")
+      // a split's values in the grouped view's text order ("11-CALS" before "9-CVM"), not a number line's
+      var ss = fn('groupValues') ? H.groupValues('V_NAME', 'V_NAME:dspace', [mp({ V_NAME: '9-CVM 11-CALS' })]) : 'n/a';
+      R.chk.bkSplitSort = JSON.stringify(ss) === '["11-CALS","9-CVM"]';
+      // a bucket's text fallback decoded (the data is HTML-escaped), as the grouped view names its group
+      var en1 = fn('groupValues') ? H.groupValues('V_AMOUNT', 'V_AMOUNT:bin', [mp({ V_AMOUNT: 'TBD &amp; pending' })]) : 'n/a';
+      var en2 = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:year', [mp({ V_DATE: 'R&amp;D' })]) : 'n/a';
+      R.chk.bkEntity = JSON.stringify(en1) === '["TBD & pending"]' && JSON.stringify(en2) === '["R&D"]';
+      R.info.bkSweepApi = { ss: ss, en1: en1, en2: en2 };
+      // past 50 groups: (Blank) still shown, last, and not counted among the "more"
+      var keepC = body[0].__pnbBdSrc, extraC = [];
+      for (var kc = 0; kc < 60; kc++) {
+        var trc = body[0].cloneNode(true), mc = new Map(keepC);
+        mc.set('V_DATE', ((kc % 12) + 1) + '/1/' + (2001 + Math.floor(kc / 12)));
+        trc.__pnbBdSrc = mc; tb.appendChild(trc); extraC.push(trc);
+      }
+      var trb = body[0].cloneNode(true), mbk = new Map(keepC); mbk.set('V_DATE', ''); trb.__pnbBdSrc = mbk; tb.appendChild(trb); extraC.push(trb);
+      closeMenu(); rclick(thD); await open('bdStats'); await open('bdStatsGroup-ym'); var icb = subInfo();
+      extraC.forEach(function (tr) { tr.parentNode.removeChild(tr); });
+      var moreB = Object.keys(yms).length + 60 - 50;
+      R.chk.bkCapBlank = icb.length === 52 && JSON.stringify(icb[50]) === JSON.stringify([moreB + ' more groups', '']) && JSON.stringify(icb[51]) === '["(Blank)","1"]';
+      R.info.bkCapBlank = { n: icb.length, tail: icb.slice(-3), more: moreB };
+      closeMenu();
+      // the keyboard: Rows per group's lines are stops - ArrowRight enters a bucket's list (its line read out as
+      // "<group>, <n> rows"), Enter keeps the menu, ArrowLeft comes back to the bucket with Column stats still open
+      function key(k) { var a = document.activeElement; if (a) a.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+      closeMenu(); rclick(thD); await open('bdStats');
+      var bY = item('bdStatsGroup-year'); if (bY) bY.focus();
+      key('ArrowRight'); await sleep(150);
+      var a1 = document.activeElement, inRow = !!a1 && /^bdStatsRow-/.test(a1.getAttribute('data-act') || ''), nSubs1 = document.querySelectorAll('.pnb-hm-sub').length;
+      var ariaOk = !!a1 && /, \d+ rows?$/.test(a1.getAttribute('aria-label') || '');
+      key('Enter'); await sleep(150);
+      var stillOpen = !!menu() && document.querySelectorAll('.pnb-hm-sub').length === nSubs1;
+      key('ArrowLeft'); await sleep(150);
+      var a2 = document.activeElement, back = !!a2 && a2.getAttribute('data-act') === 'bdStatsGroup-year', nSubs2 = document.querySelectorAll('.pnb-hm-sub').length;
+      R.chk.bkKbd = inRow && ariaOk && stillOpen && back && nSubs2 === nSubs1 - 1 && nSubs2 >= 1;
+      R.info.bkKbd = { a1: a1 ? a1.getAttribute('data-act') : null, aria: a1 ? a1.getAttribute('aria-label') : null, subs: [nSubs1, nSubs2], a2: a2 ? a2.getAttribute('data-act') : null, stillOpen: stillOpen };
+      closeMenu();
+      // ...and a short window: Column stats taller than its room, its first stop (By Year, under the facts) in sight
+      var stS = document.createElement('style'); stS.textContent = '.pnb-hm-sub { max-height: 140px !important; }'; document.head.appendChild(stS);
+      closeMenu(); rclick(thD);
+      var bs = item('bdStats'); if (bs) bs.focus();
+      key('ArrowRight'); await sleep(200);
+      var a3 = document.activeElement, pnl = a3 && a3.closest ? a3.closest('.pnb-hm-sub') : null, rA = a3 ? a3.getBoundingClientRect() : null, rP = pnl ? pnl.getBoundingClientRect() : null;
+      var inSight = !!rA && !!rP && rA.top >= rP.top - 1 && rA.bottom <= rP.bottom + 1;
+      R.chk.bkKbdScroll = !!a3 && a3.getAttribute('data-act') === 'bdStatsGroup-year' && !!pnl && pnl.scrollHeight > pnl.clientHeight + 20 && inSight;
+      R.info.bkKbdScroll = { act: a3 ? a3.getAttribute('data-act') : null, a: rA ? [Math.round(rA.top), Math.round(rA.bottom)] : null, p: rP ? [Math.round(rP.top), Math.round(rP.bottom)] : null, sh: pnl ? [pnl.scrollHeight, pnl.clientHeight, pnl.scrollTop] : null };
+      stS.parentNode.removeChild(stS); closeMenu();
+      // a list column's Column stats: no number stats, its lengths instead (V_NAME - Split by space - holding numbers)
+      var iN2 = thN.cellIndex, keepT = body.map(function (tr) { return tr.cells[iN2].innerHTML; });
+      body.forEach(function (tr, k) { tr.cells[iN2].textContent = (500000 + k) + ' ' + (600000 + k); });
+      closeMenu(); rclick(thN); await open('bdStats'); var keysL = subInfo().map(function (p) { return p[0]; });
+      body.forEach(function (tr, k) { tr.cells[iN2].innerHTML = keepT[k]; });
+      R.chk.bkListStats = keysL.indexOf('Shortest') >= 0 && keysL.indexOf('Smallest') < 0 && keysL.indexOf('Total') < 0;
+      R.info.bkListStats = keysL.slice(0, 10);
+      closeMenu();
+      // a long group label: cut as Most common's, the whole of it the tooltip and the spoken name
+      var keepL = body[0].__pnbBdSrc, mL = new Map(keepL), longW = 'Supercalifragilisticexpialidocious-and-more';
+      mL.set('V_NAME', longW + ' Alpha'); body[0].__pnbBdSrc = mL;
+      closeMenu(); rclick(thN); await open('bdStats'); await open('bdStatsGroup-dspace');
+      var rowL = Array.prototype.filter.call((subPanel() || document).querySelectorAll('.pnb-hm-item'), function (e) { return (e.getAttribute('aria-label') || '').indexOf(longW) === 0; })[0] || null;
+      body[0].__pnbBdSrc = keepL;
+      var labL = rowL ? rowL.querySelector('.pnb-hm-label').textContent : null, titL = rowL ? (rowL.getAttribute('title') || (window.jQuery ? window.jQuery(rowL).data('ui-tooltip-title') : '')) : null;
+      R.chk.bkLongLabel = !!rowL && labL === longW.slice(0, 27) + '...' && titL === longW && rowL.getAttribute('aria-label') === longW + ', 1 row';
+      R.info.bkLongLabel = { lab: labL, tit: titL, aria: rowL ? rowL.getAttribute('aria-label') : null };
+      closeMenu();
+      // (2026-11-05, bdbucket older issues; the user: "fix the older issues") a two-digit fiscal year within a window:
+      // FY99 is 1999, so it sorts before FY00 (it read as 2099 and sorted last); the same for a fiscal quarter
+      var fyv = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:fy', [mp({ V_DATE: '3/1/2000' }), mp({ V_DATE: '3/1/1999' }), mp({ V_DATE: '8/1/2000' })]) : 'n/a';
+      var fqv = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:fyq', [mp({ V_DATE: '7/15/1999' }), mp({ V_DATE: '6/15/1999' })]) : 'n/a';
+      R.chk.bkFy99 = JSON.stringify(fyv) === '["FY99","FY00","FY01"]' && JSON.stringify(fqv) === '["FY99 Q4","FY00 Q1"]';
+      R.info.bkFy99 = { fy: fyv, fyq: fqv };
+      // ...and Hour needs a time: a date-only column offers no By Hour, a date-only value keeps its text, a time buckets
+      var hv1 = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:hour', [mp({ V_DATE: '3/1/2021' })]) : 'n/a';
+      var hv2 = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:hour', [mp({ V_DATE: '2021-03-01 14:22:00' })]) : 'n/a';
+      R.chk.bkNoHour = dIds.length > 0 && dIds.indexOf('hour') < 0 && JSON.stringify(hv1) === '["3/1/2021"]' && JSON.stringify(hv2) === '["14:00"]';
+      R.info.bkNoHour = { dIds: dIds, hv1: hv1, hv2: hv2 };
+      // (2026-11-05, bdbucket final sweep; the user: "...then full bugsweep on this and we can close this out") a two-digit
+      // fiscal year as the date parser reads a two-digit year - 00-68 is 20xx, 69-99 is 19xx (fixed, never sliding): FY69 is
+      // 1969, first; FY65 is 2065, after FY99 (a window of 30 years ahead read it as 1965); the same for a fiscal quarter
+      var f68 = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:fy', [mp({ V_DATE: '3/1/2065' }), mp({ V_DATE: '3/1/1999' }), mp({ V_DATE: '3/1/2068' }), mp({ V_DATE: '3/1/1969' })]) : 'n/a';
+      var q68 = fn('groupValues') ? H.groupValues('V_DATE', 'V_DATE:fyq', [mp({ V_DATE: '3/1/2065' }), mp({ V_DATE: '3/1/1999' })]) : 'n/a';
+      R.chk.bkFy68 = JSON.stringify(f68) === '["FY69","FY99","FY65","FY68"]' && JSON.stringify(q68) === '["FY99 Q3","FY65 Q3"]';
+      R.info.bkFy68 = { fy: f68, fyq: q68 };
+      // ...a value that is only a no-break space ('&nbsp;': the data is HTML-escaped) or only spaces joins no group - the
+      // grouped view's [Blank] - its rows counted as (Blank); a padded date buckets as its trimmed text does (the labelers
+      // trim their input)
+      var nb = fn('groupCounts') ? H.groupCounts('V_DATE', 'V_DATE:year', [mp({ V_DATE: '&nbsp;' }), mp({ V_DATE: '   ' }), mp({ V_DATE: ' 3/1/2021 ' })]) : 'n/a';
+      R.chk.bkNbsp = JSON.stringify(nb) === '[{"v":"2021","n":1},{"v":"","n":2}]';
+      R.info.bkNbsp = nb;
+      // ...Rows per group's lines are to read: no pointer and no hover fill (pnb-hm-ro), unlike the bucket lists beside them
+      closeMenu(); rclick(thD); await open('bdStats'); var opL = item('bdStatsGroup-year'); await open('bdStatsGroup-year');
+      var roL = (subPanel() || document).querySelector('.pnb-hm-item[data-act^="bdStatsRow-"]');
+      var roCur = roL ? getComputedStyle(roL).cursor : null, opCur = opL ? getComputedStyle(opL).cursor : null, hov = false;
+      Array.prototype.forEach.call(document.styleSheets, function (ss) {
+        try { Array.prototype.forEach.call(ss.cssRules || [], function (r) { if (/\.pnb-hm-ro:hover/.test(r.selectorText || '') && r.style && r.style.backgroundColor === 'transparent') hov = true; }); } catch (e) { }
+      });
+      R.chk.bkRoLine = !!roL && roL.classList.contains('pnb-hm-ro') && roCur === 'default' && !!opL && !opL.classList.contains('pnb-hm-ro') && opCur === 'pointer' && hov;
+      R.info.bkRoLine = { ro: roL ? roL.className : null, roCur: roCur, opCur: opCur, hov: hov };
+      closeMenu();
+      // ...and the column menu's Copy > Distinct column groups names an active level's items as Group by's does:
+      // copyGroup-active<period>, no '@<END>' in the act (the command palette reads the acts by a word pattern). This
+      // fixture has no start/end pair, so the API offers V_DATE one Active per Year variant (its shape, main.js's) here.
+      var thR = document.querySelector("#resultsTable thead th[data-colname='V_DATE']");
+      function pickAct(list, a) { return (list || []).filter(function (x) { return x && x.act === a; })[0] || null; }
+      var gvWas = H.groupVariants, cTop = [], cCopy = null, cGrp = null, cga = [];
+      H.groupVariants = function (c) { var l = gvWas.apply(H, arguments) || []; return String(c) === 'V_DATE' ? l.concat([{ token: 'V_DATE:year@H_DATE', label: 'Active per Year (to H_DATE)', delim: null, active: 'year' }]) : l; };
+      try {
+        cTop = (thR && window.Penumbra.colMenu && typeof window.Penumbra.colMenu.items === 'function') ? window.Penumbra.colMenu.items(thR) : [];
+        cCopy = pickAct(cTop, 'copyMenu'); cGrp = (cCopy && typeof cCopy.items === 'function') ? pickAct(cCopy.items(), 'copyGroups') : pickAct(cTop, 'copyGroups');
+        cga = (cGrp && typeof cGrp.items === 'function') ? cGrp.items().map(function (x) { return x.act; }) : [];
+      } finally { H.groupVariants = gvWas; }
+      R.chk.bkCopyActIds = cga.indexOf('copyGroup-activeyear') >= 0 && cga.indexOf('copyGroup-year') >= 0 && cga.every(function (a) { return /^copyGroup-[a-z0-9]+$/.test(a); });
+      R.info.bkCopyActIds = { th: !!thR, top: cTop.length, copy: !!cCopy, grp: !!cGrp, cga: cga };
     }
   };
   (async function () {

@@ -181,6 +181,150 @@
       && vd.some(function (v) { return v.token === 'AWARD_DATE:fy'; }) && !vd.some(function (v) { return v.delim; }), S(vp) + ' / ' + S(vd.map(function (v) { return v.token; })));
   }
 
+  // (dtpick C, 2026-11-05) Group by a start/end pair's active grouping: the dialog offers it beside the START column's
+  // periods; each row sits under EVERY fiscal year it runs in (a blank end, and the 2100 placeholder, to today); the
+  // grand total and the status bar count each row once; the column menu's Group by list names it groupAs-activefy
+  async function scnActive() {
+    var fyOf = function (iso) { var y = +iso.slice(0, 4), m = +iso.slice(5, 7); return 'FY' + String(m >= 7 ? y + 1 : y).slice(-2); };
+    var now = new Date(), todayIso = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+    var next = function (l) { return 'FY' + ('0' + ((+l.slice(2) + 1) % 100)).slice(-2); };
+    var want = Object.create(null);
+    FX.forEach(function (r) {
+      var e = (!r.END_DATE || r.END_DATE >= '2051') ? todayIso : r.END_DATE, l = fyOf(r.AWARD_DATE), last = fyOf(e), n = 0;
+      while (n++ < 50) { (want[l] = want[l] || []).push(r.V_ID); if (l === last) break; l = next(l); }
+    });
+    var opened = await openDialog(), offs = null;
+    try { pickCustom('groupingColumnSelector', 'AWARD_DATE'); offs = bucketOpts(1); } catch (e) { R.obs.aErr = String(e.message); }
+    R.obs.aOffers = offs;
+    rec('A-offer', opened && !!offs && offs.indexOf(':fy@end_date') > 0 && offs.indexOf(':ym@end_date') > 0 && offs.indexOf(':month@end_date') < 0, S(offs));
+    var hv = (window.Penumbra.headerMenu.groupVariants('AWARD_DATE') || []).filter(function (v) { return v.active; });
+    rec('A-label', hv.length === 5 && hv[1].token === 'AWARD_DATE:fy@END_DATE' && /^Active per Fiscal Year \(to END_DATE\)$/.test(hv[1].label), S(hv.slice(0, 2)));
+    var applied = false;
+    try { await withSummary(); pickBucket(1, ':fy@end_date'); applied = await apply('AWARD_DATE:fy@end_date'); } catch (e) { R.obs.aErr2 = String(e.message); }
+    var got = readBands(0), bad = bandsEqual(got, want);
+    R.obs.aBands = Object.keys(got);
+    rec('A-bands', applied && !bad.length, applied ? (bad.join(' | ') || Object.keys(got).length + ' bands') : 'not grouped (col0 ' + col0() + ') ' + (R.obs.aErr2 || ''));
+    var keys = bandsAt(0).map(function (w) { return w.getAttribute('data-group-key'); });
+    rec('A-order', keys.length > 1 && keys.every(function (k, i) { return i === 0 || +keys[i - 1].slice(2) < +k.slice(2); }) && keys.indexOf('FY00') < 0 && keys.indexOf('FY99') < 0, S(keys));
+    var bar = document.querySelector('#groupedResultsContainer > .group-grand-total');
+    var barN = bar ? bar.querySelector('.group-count').textContent.trim() : null, barV = bar ? bar.getAttribute('data-agg-value') : null;
+    var allIds = FX.map(function (r) { return r.V_ID; });
+    rec('A-total', barN === '60' && near(barV, sumAmt(allIds)), 'bar count ' + barN + ' value ' + barV + ' want 60 / ' + sumAmt(allIds));
+    var rc = $('#resultCount').text();
+    rec('A-status', rc.indexOf('60 total rows, in ' + Object.keys(want).length + ' groups') >= 0, rc);
+    // the column menu's Group by list: the active entry, named for the palette's coverage (no '@' in its act)
+    var th = document.querySelector('#tableHeader th[data-colname="AWARD_DATE"]'), its = [];
+    try { its = window.Penumbra.colMenu.items(th, null) || []; } catch (e) { its = []; }
+    var gl = its.filter(function (x) { return x && x.act === 'groupByList'; })[0], sub = gl ? (gl.items() || []) : [];
+    var acts = sub.map(function (x) { return x.act; });
+    rec('A-act', acts.indexOf('groupAs-activefy') >= 0 && acts.every(function (a) { return a.indexOf('@') < 0; }), S(acts));
+  }
+
+  // (dtpick D2, 2026-11-05) the pivot builder's Active per period: the START column's menu and the header API offer
+  // every period (on START only); Pivot active by puts the pill alone in Rows (the other Rows fields to Columns, said);
+  // the pill carries its END through Generate and a reopen (D1 dropped it); the caret's group, its split-by-days
+  // box, a plain pick dropping the END; Generate and Copy Snippet refuse a second field on its axis, the builder open.
+  async function scnPvActive() {
+    var hm = window.Penumbra.headerMenu, pm = window.Penumbra.pivotMenu;
+    var ids = function (l) { return (l || []).map(function (v) { return v.id; }); };
+    var pvS = (hm && typeof hm.pivotActiveVariants === 'function') ? hm.pivotActiveVariants('AWARD_DATE') : null;
+    var pvE = (hm && typeof hm.pivotActiveVariants === 'function') ? hm.pivotActiveVariants('END_DATE') : null;
+    var pvX = (hm && typeof hm.pivotActiveVariants === 'function') ? hm.pivotActiveVariants('STATUS') : null;
+    rec('Y-variants', S(ids(pvS)) === S(['year', 'fy', 'yq', 'fyq', 'ym']) && S(pvE) === '[]' && S(pvX) === '[]' && pvS[1].token === 'AWARD_DATE:fy@END_DATE',
+      S([ids(pvS), pvE, pvX]));
+    // the column menu: Pivot active by on START (each period, no '@' in an act), none on END
+    var acts = function (name) {
+      var its = []; try { its = window.Penumbra.colMenu.items(fth(name), null) || []; } catch (e) { its = []; }
+      var l = its.filter(function (x) { return x && x.act === 'pivotActiveList'; })[0];
+      return l ? (l.items() || []).map(function (x) { return x.act; }) : null;
+    };
+    var aS = acts('AWARD_DATE'), aE = acts('END_DATE');
+    rec('Y-colmenu', S(aS) === S(['pivotActive-year', 'pivotActive-fy', 'pivotActive-yq', 'pivotActive-fyq', 'pivotActive-ym']) && aE === null, S([aS, aE]));
+    // a SAVED active pivot (a snippet's settings) through the builder and Generate: still active (D1 rebuilt START:fy)
+    pm.rebuild({ rows: ['AWARD_DATE:fy@END_DATE:prorate'], cols: ['STATUS'], vals: 'AMT', agg: ['sum'] });
+    await sleep(300);
+    await until(function () { return pm.on() && !$('#pivotLightbox').is(':visible'); }, 15000);
+    var s0 = pm.settings() || {};
+    rec('Y-saved', S(s0.rows) === S(['AWARD_DATE:fy@END_DATE:prorate']), S(s0.rows));
+    // a plain pivot first (STATUS in Rows), then Pivot active by: AWARD_DATE alone in Rows, STATUS moved to Columns
+    var built = pm.rebuild({ rows: ['STATUS'], cols: [], vals: 'AMT', agg: ['sum'] });
+    await until(function () { return pm.on(); }, 15000);
+    var okOpen = false; try { okOpen = hm.pivotActive('AWARD_DATE', 'fy'); } catch (e) { R.obs.yOpenErr = String(e.message); }
+    await until(function () { return $('#pivotLightbox').is(':visible'); }, 5000);
+    var rp = $('#pivot-rows .pivot-column-item'), cp = $('#pivot-cols .pivot-column-item');
+    var pill = rp.first();
+    var cpf = cp.map(function () { return $(this).attr('data-field'); }).get();
+    rec('Y-open', built && okOpen && rp.length === 1 && pill.attr('data-field') === 'AWARD_DATE' && pill.attr('data-split') === 'fy' && pill.attr('data-end') === 'END_DATE'
+      && cpf.indexOf('STATUS') >= 0 && /Moved STATUS to Columns/.test($('#pivotErrorBox').text()),
+      S({ rows: rp.length, f: pill.attr('data-field'), sp: pill.attr('data-split'), end: pill.attr('data-end'), cols: cpf, box: $('#pivotErrorBox').text() }));
+    rec('Y-chip', $.trim(pill.children('.pivot-split-chip').text()) === 'FY to END_DATE', pill.children('.pivot-split-chip').text());
+    // Generate: the token through the pill (START:fy@END), the D1 pivot (no footer, the note)
+    $('#generatePivotBtn').trigger('click');
+    await until(function () { var s = pm.settings(); return pm.on() && s && s.rows && s.rows[0] === 'AWARD_DATE:fy@END_DATE'; }, 15000);
+    var s1 = pm.settings() || {};
+    var tbl = document.getElementById('pivotResultTable');
+    rec('Y-generate', S(s1.rows) === S(['AWARD_DATE:fy@END_DATE']) && !!tbl && !tbl.querySelector('tfoot') && !!document.querySelector('.pivot-active-note'),
+      S({ rows: s1.rows, cols: s1.cols, tfoot: !!(tbl && tbl.querySelector('tfoot')), note: !!document.querySelector('.pivot-active-note') }));
+    // reopen the builder (Edit pivot) and generate again: still active (the D1 gap)
+    pm.edit();
+    await until(function () { return $('#pivotLightbox').is(':visible') && $('#pivot-rows .pivot-column-item').length > 0; }, 5000);
+    var pill2 = $('#pivot-rows .pivot-column-item').first();
+    var reEnd = pill2.attr('data-end');
+    $('#generatePivotBtn').trigger('click');
+    await sleep(300);
+    await until(function () { return pm.on() && !$('#pivotLightbox').is(':visible'); }, 15000);
+    var s2 = pm.settings() || {};
+    rec('Y-reopen', reEnd === 'END_DATE' && S(s2.rows) === S(['AWARD_DATE:fy@END_DATE']), S({ end: reEnd, rows: s2.rows }));
+    // the caret menu: the Active per period group (every period, FY ticked, the plain FY not), the split-by-days box
+    pm.edit();
+    await until(function () { return $('#pivotLightbox').is(':visible') && $('#pivot-rows .pivot-column-item .pivot-split-caret').length > 0; }, 5000);
+    var caretOf = function () { return $('#pivot-rows .pivot-column-item').first().children('.pivot-split-caret')[0]; };
+    clickEl(caretOf());
+    await until(function () { return !!document.getElementById('pivotSplitMenu'); }, 3000);
+    var act = Array.prototype.map.call(document.querySelectorAll('#pivotSplitMenu [data-active-pick]'), function (b) { return b.getAttribute('data-active-pick') + (b.getAttribute('aria-checked') === 'true' ? '*' : ''); });
+    var plainFy = document.querySelector('#pivotSplitMenu [data-split-pick="fy"]');
+    var pro = document.getElementById('pivotSplitProrateCb'), fill = document.getElementById('pivotSplitFillCb');
+    rec('Y-caret', S(act) === S(['year', 'fy*', 'yq', 'fyq', 'ym']) && !!plainFy && plainFy.getAttribute('aria-checked') === 'false' && !!pro && !fill, S({ act: act, plain: plainFy && plainFy.getAttribute('aria-checked'), pro: !!pro, fill: !!fill }));
+    if (pro) { pro.checked = true; pro.dispatchEvent(new Event('change', { bubbles: true })); }
+    var p3 = $('#pivot-rows .pivot-column-item').first();
+    var chip3 = $.trim(p3.children('.pivot-split-chip').text());
+    $(document.body).trigger('mousedown'); await sleep(50);
+    if (document.getElementById('pivotSplitMenu')) $('#pivotSplitMenu').remove();
+    $('#generatePivotBtn').trigger('click');
+    await sleep(300);
+    await until(function () { var s = pm.settings(); return pm.on() && s && s.rows && /:prorate$/.test(s.rows[0] || ''); }, 15000);
+    var s3 = pm.settings() || {};
+    rec('Y-prorate', p3.attr('data-prorate') === '1' && chip3 === 'FY to END_DATE, by days' && S(s3.rows) === S(['AWARD_DATE:fy@END_DATE:prorate']), S({ pro: p3.attr('data-prorate'), chip: chip3, rows: s3.rows }));
+    // a plain pick drops the END; an active pick sets it again (another period)
+    pm.edit();
+    await until(function () { return $('#pivotLightbox').is(':visible') && !!caretOf(); }, 5000);
+    clickEl(caretOf());
+    await until(function () { return !!document.getElementById('pivotSplitMenu'); }, 3000);
+    var py = document.querySelector('#pivotSplitMenu [data-split-pick="year"]'); if (py) clickEl(py);
+    await sleep(100);
+    var p4 = $('#pivot-rows .pivot-column-item').first();
+    var plainOk = p4.attr('data-split') === 'year' && !p4.attr('data-end') && !p4.attr('data-prorate');
+    clickEl(caretOf());
+    await until(function () { return !!document.getElementById('pivotSplitMenu'); }, 3000);
+    var pq = document.querySelector('#pivotSplitMenu [data-active-pick="yq"]'); if (pq) clickEl(pq);
+    await sleep(100);
+    var p5 = $('#pivot-rows .pivot-column-item').first();
+    rec('Y-pick', plainOk && p5.attr('data-split') === 'yq' && p5.attr('data-end') === 'END_DATE' && !document.getElementById('pivotSplitMenu'),
+      S({ plainOk: plainOk, sp: p5.attr('data-split'), end: p5.attr('data-end') }));
+    // refused up front: STATUS beside it in Rows - Generate keeps the builder open with the reason; Copy Snippet too
+    var $st = $('#pivot-cols .pivot-column-item').filter(function () { return $(this).attr('data-field') === 'STATUS'; }).first();
+    if ($st.length) $st.detach().appendTo('#pivot-rows');
+    $('#pivotErrorBox').hide().empty();
+    $('#generatePivotBtn').trigger('click');
+    await sleep(400);
+    var box = $('#pivotErrorBox').text();
+    rec('Y-refuse', $('#pivotLightbox').is(':visible') && /alone in Rows/.test(box) && /AWARD_DATE to END_DATE/.test(box), S({ open: $('#pivotLightbox').is(':visible'), box: box }));
+    $('#pivotErrorBox').hide().empty();
+    $('#copyPivotSnippetBtn').trigger('click');
+    await sleep(200);
+    rec('Y-snippet', /alone in Rows/.test($('#pivotErrorBox').text()), $('#pivotErrorBox').text());
+  }
+
   async function scnRender() {
     // ---- the dialog's entries
     var opened = await openDialog();
@@ -904,6 +1048,8 @@
       else if (SCN === 'nested') await scnNested();
       else if (SCN === 'menu') await scnMenu();
       else if (SCN === 'snippet') await scnSnippet();
+      else if (SCN === 'active') await scnActive();   // (dtpick C)
+      else if (SCN === 'pvactive') await scnPvActive();   // (dtpick D2)
       else if (SCN === 'bucket') await scnBucket();
       else if (SCN === 'json') await scnJson();
       else if (SCN === 'detect') await scnDetect();

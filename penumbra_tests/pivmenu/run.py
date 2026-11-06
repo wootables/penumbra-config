@@ -198,6 +198,110 @@ MUTANTS.update({
                  ('colw', "            pivotKeysOf(c).forEach(function (k) { if (!seen[k]) { seen[k] = true; out.push(k); } });", "            if (!c.value) { pivotKeysOf(c).forEach(function (k) { if (!seen[k]) { seen[k] = true; out.push(k); } }); }")], ['L-pmfit-fitAll'], ['pmfit']),
 })
 
+# (2026-11-05, bdbucket) a breakdown column's buckets: Copy > Distinct column groups and Column stats > Rows per group, over
+# the breakdown's own rows; groupValues' rows / counts and an active level (dtpick C). bkNoText / bkNoSrc hold on live too.
+SCN = SCN + ['pmbucket']
+CHK['pmbucket'] = ['bkCopyList', 'bkCopyYear', 'bkOwnRows', 'bkCopyNum', 'bkCell', 'bkNoText', 'bkNoSrc', 'bkStatsList', 'bkStatsYear', 'bkStatsBlank', 'bkStatsCap', 'bkActive']
+NEW_BK = {'L-pmbucket-' + c for c in CHK['pmbucket'] if c not in ('bkNoText', 'bkNoSrc')}
+NEW = NEW | NEW_BK
+NEW = NEW - NEW_BK   # (bdbucket is LIVE since 23aee43, 2026-11-05: old checks now)
+MUTANTS.update({
+    'k-nocopy': ([('menu', "        if (bgv.length) {\n            bcp.push({ act: 'bdCopyGroups'", "        if (false) {\n            bcp.push({ act: 'bdCopyGroups'")],
+                 ['L-pmbucket-bkCopyList', 'L-pmbucket-bkCopyYear', 'L-pmbucket-bkOwnRows', 'L-pmbucket-bkCopyNum', 'L-pmbucket-bkCell'], ['pmbucket']),
+    'k-reportrows': ([('menu', "var vals = api().groupValues(col, v.token, bdSrcRows(t) || []);", "var vals = api().groupValues(col, v.token);")], ['L-pmbucket-bkOwnRows'], ['pmbucket']),
+    'k-nosrc': ([('menu', "            if (!rows[r].__pnbBdSrc) { return null; }\n", "            if (!rows[r].__pnbBdSrc) { continue; }\n")], ['L-pmbucket-bkNoSrc'], ['pmbucket']),
+    'k-nostats': ([('menu', "        if (!Array.isArray(t)) { p.groups = bdGroupStats(t); }\n", "")],
+                  ['L-pmbucket-bkStatsList', 'L-pmbucket-bkStatsYear', 'L-pmbucket-bkStatsBlank', 'L-pmbucket-bkStatsCap'], ['pmbucket']),
+    'k-render': ([('menu', "        if (given && given.groups && given.groups.length) {", "        if (false) {")], ['L-pmbucket-bkStatsList', 'L-pmbucket-bkStatsYear'], ['pmbucket']),
+    'k-cap': ([('menu', "list.slice(0, BD_GROUPS_MAX).forEach(", "list.forEach(")], ['L-pmbucket-bkStatsCap'], ['pmbucket']),
+    'k-count': ([('main', "                tally[k] = (tally[k] || 0) + 1;", "                tally[k] = (tally[k] || 0) + 2;")], ['L-pmbucket-bkStatsYear', 'L-pmbucket-bkActive'], ['pmbucket']),
+    'k-blank': ([('main', "        if (none) list.push({ v: '', n: none });", "")], ['L-pmbucket-bkStatsBlank', 'L-pmbucket-bkActive'], ['pmbucket']),
+    'k-active': ([('main', "        if (!spec || (spec.multi && !spec.active) || !masterRowData) return null;", "        if (!spec || spec.multi || !masterRowData) return null;")], ['L-pmbucket-bkActive'], ['pmbucket']),
+    'k-sort': ([('main', "        try { out.sort(pivotSplitComparator(spec.split, spec.base)); } catch (e) { }\n", "")], ['L-pmbucket-bkActive'], ['pmbucket']),
+})
+
+# (2026-11-05, bdbucket 2; the user: "I dont see the bucketing by delimited strings using your example on int-col-mat for
+# PI_LIST or DEPARTMENT_LIST") a list column's Split by in both breakdown lists; groupValues / groupCounts take a split.
+# k-active re-aimed (its guard line went): the END never read.
+CHK['pmbucket'] = CHK['pmbucket'] + ['bkSplit', 'bkSplitStats', 'bkSplitApi']
+NEW_BK2 = {'L-pmbucket-bkSplit', 'L-pmbucket-bkSplitStats', 'L-pmbucket-bkSplitApi'}
+NEW = NEW | NEW_BK2
+NEW = NEW - NEW_BK2   # (bdbucket 2 is LIVE since ed497b9, 2026-11-05: old checks now)
+MUTANTS.update({
+    'k-active': ([('main', "                var v = m.get(c);\n                if (v === undefined) v = m.get(String(c).toUpperCase());",
+                   "                var v = null;\n                if (v === undefined) v = m.get(String(c).toUpperCase());")], ['L-pmbucket-bkActive'], ['pmbucket']),
+    'k-nodelim': ([('menu', "        return A.groupVariants(col) || [];", "        return (A.groupVariants(col) || []).filter(function (v) { return !v.delim; });")],
+                  ['L-pmbucket-bkSplit', 'L-pmbucket-bkSplitStats'], ['pmbucket']),
+    'k-delimnull': ([('main', "        if (!spec || !masterRowData) return null;", "        if (!spec || (spec.multi && !spec.active) || !masterRowData) return null;")],
+                    ['L-pmbucket-bkSplit', 'L-pmbucket-bkSplitStats', 'L-pmbucket-bkSplitApi'], ['pmbucket']),
+    'k-splitone': ([('main', "            var ks = !spec.multi ? [spec.label(raw)] :", "            var ks = !spec.active ? [spec.label(raw)] :")],
+                   ['L-pmbucket-bkSplit', 'L-pmbucket-bkSplitApi'], ['pmbucket']),
+    'k-noun': ([('menu', "var noun = v.delim ? ' distinct value' : ' distinct group';", "var noun = ' distinct group';")], ['L-pmbucket-bkSplit'], ['pmbucket']),
+    'k-listhead': ([('menu', "(v.delim ? 'Rows listing each value' : 'Rows in each group')", "'Rows in each group'")], ['L-pmbucket-bkSplitStats'], ['pmbucket']),
+})
+
+# (2026-11-05, bdbucket sweep; the user: "Full bugsweep of this and lets close out this feature") the reviews' findings:
+# a split's text order, decoded labels, (Blank) past 50, Rows per group lines as keyboard stops (+ the first stop in sight),
+# no number stats on a list column, long labels cut with the whole as the tooltip
+CHK['pmbucket'] = CHK['pmbucket'] + ['bkSplitSort', 'bkEntity', 'bkCapBlank', 'bkKbd', 'bkKbdScroll', 'bkListStats', 'bkLongLabel']
+NEW_BK3 = {'L-pmbucket-' + c for c in ['bkSplitSort', 'bkEntity', 'bkCapBlank', 'bkKbd', 'bkKbdScroll', 'bkListStats', 'bkLongLabel']}
+NEW = NEW | NEW_BK3
+NEW = NEW - NEW_BK3   # (the bdbucket sweep is LIVE since 06ab0b7, 2026-11-05: old checks now)
+MUTANTS.update({
+    's-dsort': ([('main', "        if (spec.delim) { try { out.sort(getCustomSortComparator(String(token)) || function (a, b) { return String(a).localeCompare(String(b)); }); } catch (e) { } }\n", "")], ['L-pmbucket-bkSplitSort'], ['pmbucket']),
+    's-ent': ([('main', "                if (!spec.multi && k.indexOf('&') !== -1) k = decodeHtmlEntities(k);", "")], ['L-pmbucket-bkEntity'], ['pmbucket']),
+    's-blank': ([('menu', "var blank = list[list.length - 1].v === '' ? list.pop() : null,", "var blank = null,")], ['L-pmbucket-bkCapBlank'], ['pmbucket']),
+    's-ronly': ([('menu', "        if (it.readOnly) { return; }", "")], ['L-pmbucket-bkKbd'], ['pmbucket']),
+    's-info': ([('menu', "        return { act: 'bdStatsRow-' + k, label: shown, note: c, readOnly: true,", "        return { info: shown, value: c, act: 'bdStatsRow-' + k, readOnly: true,")], ['L-pmbucket-bkKbd', 'L-pmbucket-bkLongLabel'], ['pmbucket']),
+    's-scroll': ([('menu', "        if (i === 0 && sc && typeof it[i].scrollIntoView === 'function' && it[i].getBoundingClientRect().bottom > sc.getBoundingClientRect().bottom)", "        if (false)")], ['L-pmbucket-bkKbdScroll'], ['pmbucket']),
+    's-listnum': ([('menu', "        if (allNum && !Array.isArray(t) && bdGroupVariants(t).some(function (v) { return v.delim; })) { allNum = false; }\n", "")], ['L-pmbucket-bkListStats'], ['pmbucket']),
+    's-cut': ([('menu', "shown = full.length > 28 ? full.slice(0, 27) + '...' : full,", "shown = full,")], ['L-pmbucket-bkLongLabel'], ['pmbucket']),
+})
+
+# (2026-11-05, bdbucket older issues; the user: "fix the older issues, then full e2e then full bugsweep on this") FY99
+# before FY00 (a two-digit year's window), no By Hour on a date-only column
+CHK['pmbucket'] = CHK['pmbucket'] + ['bkFy99', 'bkNoHour']
+NEW_BK4 = {'L-pmbucket-bkFy99', 'L-pmbucket-bkNoHour'}
+NEW = NEW | NEW_BK4
+NEW = NEW - NEW_BK4   # (the bdbucket older issues are LIVE since c53b3e2, 2026-11-05: old checks now)
+MUTANTS.update({
+    'o-fy': ([('main', "sortVal: function (s) { var m = /^FY(\\d{2})$/i.exec(s); if (!m) return null; var y = 2000 + +m[1]; return y > new Date().getFullYear() + 30 ? y - 100 : y; },",
+               "sortVal: function (s) { var m = /^FY(\\d{2})$/i.exec(s); return m ? 2000 + +m[1] : null; },")], ['L-pmbucket-bkFy99'], ['pmbucket']),
+    'o-fyq': ([('main', "if (!m) return null; var y = 2000 + +m[1]; if (y > new Date().getFullYear() + 30) y -= 100; return y * 10 + (+m[2]); },",
+                "if (!m) return null; var y = 2000 + +m[1]; return y * 10 + (+m[2]); },")], ['L-pmbucket-bkFy99'], ['pmbucket']),
+    'o-hour': ([('main', "hour: { kind: 'cycle', label: 'Hour', chip: 'Hr', ex: '00–23', minGran: 3,", "hour: { kind: 'cycle', label: 'Hour', chip: 'Hr', ex: '00–23', minGran: 0,")],
+               ['L-pmbucket-bkNoHour'], ['pmbucket']),
+})
+
+# (2026-11-05, bdbucket final sweep; the user: "...then full bugsweep on this and we can close this out") a two-digit FY as
+# the date parser reads one (00-68 = 20xx, 69-99 = 19xx), '&nbsp;' / spaces join no group, Rows per group's lines read-only
+# to the eye, the column menu's active copy acts. The older mutants whose lines changed: the same breakage, the new text.
+CHK['pmbucket'] = CHK['pmbucket'] + ['bkFy68', 'bkNbsp', 'bkRoLine', 'bkCopyActIds']
+NEW_BK5 = {'L-pmbucket-bkFy68', 'L-pmbucket-bkNbsp', 'L-pmbucket-bkRoLine', 'L-pmbucket-bkCopyActIds'}
+NEW = NEW | NEW_BK5
+NEW = NEW - NEW_BK5   # (the bdbucket final sweep is LIVE since 8f1fae5, 2026-11-05: old checks now)
+MUTANTS.update({
+    's-ent': ([('main', "if (!spec.multi) { if (k.indexOf('&') !== -1) k = decodeHtmlEntities(k); k = k.trim(); if (k === '') return; }",
+                "if (!spec.multi) { k = k.trim(); if (k === '') return; }")], ['L-pmbucket-bkEntity'], ['pmbucket']),
+    'o-fy': ([('main', "sortVal: function (s) { var m = /^FY(\\d{2})$/i.exec(s); if (!m) return null; var y = +m[1]; return y + (y <= 68 ? 2000 : 1900); },",
+               "sortVal: function (s) { var m = /^FY(\\d{2})$/i.exec(s); return m ? 2000 + +m[1] : null; },")], ['L-pmbucket-bkFy99', 'L-pmbucket-bkFy68'], ['pmbucket']),
+    'o-fyq': ([('main', "if (!m) return null; var y = +m[1]; y += y <= 68 ? 2000 : 1900; return y * 10 + (+m[2]); },",
+                "if (!m) return null; var y = 2000 + +m[1]; return y * 10 + (+m[2]); },")], ['L-pmbucket-bkFy99', 'L-pmbucket-bkFy68'], ['pmbucket']),
+    'f-fywin': ([('main', "sortVal: function (s) { var m = /^FY(\\d{2})$/i.exec(s); if (!m) return null; var y = +m[1]; return y + (y <= 68 ? 2000 : 1900); },",
+                  "sortVal: function (s) { var m = /^FY(\\d{2})$/i.exec(s); if (!m) return null; var y = 2000 + +m[1]; return y > new Date().getFullYear() + 30 ? y - 100 : y; },")],
+                ['L-pmbucket-bkFy68'], ['pmbucket']),
+    'f-fyqwin': ([('main', "if (!m) return null; var y = +m[1]; y += y <= 68 ? 2000 : 1900; return y * 10 + (+m[2]); },",
+                   "if (!m) return null; var y = 2000 + +m[1]; if (y > new Date().getFullYear() + 30) y -= 100; return y * 10 + (+m[2]); },")],
+                 ['L-pmbucket-bkFy68'], ['pmbucket']),
+    'f-trim': ([('main', "if (!spec.multi) { if (k.indexOf('&') !== -1) k = decodeHtmlEntities(k); k = k.trim(); if (k === '') return; }",
+                 "if (!spec.multi) { if (k.indexOf('&') !== -1) k = decodeHtmlEntities(k); }")], ['L-pmbucket-bkNbsp'], ['pmbucket']),
+    'f-roclass': ([('menu', "(it.readOnly ? ' pnb-hm-ro' : '')", "''")], ['L-pmbucket-bkRoLine'], ['pmbucket']),
+    'f-rocur': ([('mcss', ".pnb-hm-item.pnb-hm-ro { cursor: default; }\n", "")], ['L-pmbucket-bkRoLine'], ['pmbucket']),
+    'f-rohov': ([('mcss', ".pnb-hm-item.pnb-hm-ro:hover:not(:focus-visible) { background: transparent; color: inherit; }\n", "")], ['L-pmbucket-bkRoLine'], ['pmbucket']),
+    'f-actid': ([('menu', "var id = v.active ? 'active' + v.active : String(v.token).split(':').pop();", "var id = String(v.token).split(':').pop();")],
+                ['L-pmbucket-bkCopyActIds'], ['pmbucket']),
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:

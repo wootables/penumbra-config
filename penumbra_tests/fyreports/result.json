@@ -361,7 +361,7 @@
                     {
                         "name":  "A5 under palette mono the auto series take mono\u0027s slots",
                         "pass":  true,
-                        "detail":  "expected [\"#336699\",\"#b3eaff\"] got [\"#336699\",\"#b3eaff\"]"
+                        "detail":  "expected [\"#336699\",\"#c7e2ff\"] got [\"#336699\",\"#c7e2ff\"]"
                     },
                     {
                         "name":  "A6 auto series with no filter get a slot each",
@@ -396,7 +396,7 @@
                     {
                         "name":  "A12 a Palette change re-colours every auto swatch",
                         "pass":  true,
-                        "detail":  "expected [\"#336699\",\"#336699\",\"#b3eaff\"] got [\"#336699\",\"#336699\",\"#b3eaff\"]"
+                        "detail":  "expected [\"#336699\",\"#336699\",\"#c7e2ff\"] got [\"#336699\",\"#336699\",\"#c7e2ff\"]"
                     },
                     {
                         "name":  "A13 picking a colour by hand fixes that row only",
@@ -456,7 +456,7 @@
                     {
                         "name":  "J2 every writer re-applies format(header) rules",
                         "pass":  true,
-                        "detail":  "[{\"line\":38476,\"reapplies\":true},{\"line\":45031,\"reapplies\":true},{\"line\":69361,\"reapplies\":true}]"
+                        "detail":  "[{\"line\":45766,\"reapplies\":true},{\"line\":52865,\"reapplies\":true},{\"line\":78688,\"reapplies\":true}]"
                     },
                     {
                         "name":  "Q1 while a pivot is on screen the bridge lists its columns",

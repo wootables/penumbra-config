@@ -321,7 +321,7 @@
                     {
                         "name":  "variants: a date column offers period buckets",
                         "pass":  true,
-                        "detail":  "11"
+                        "detail":  "10"
                     },
                     {
                         "name":  "variants: fiscal year is among them",
@@ -766,7 +766,7 @@
                     {
                         "name":  "picker: level 2 offers bucket variants",
                         "pass":  true,
-                        "detail":  "dropdown |:year|:fy|:yq|:fyq|:ym|:quarter|:fquarter|:month|:monthnum|:dow|:hour / list |#|DEPT|AWARD_DATE|AMOUNT|ACTIVE"
+                        "detail":  "dropdown |:year|:fy|:yq|:fyq|:ym|:quarter|:fquarter|:month|:monthnum|:dow / list |#|DEPT|AWARD_DATE|AMOUNT|ACTIVE"
                     },
                     {
                         "name":  "picker: one level reports one level",

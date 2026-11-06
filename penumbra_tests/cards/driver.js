@@ -514,10 +514,12 @@
     R.chk.switchShownInPivot = vis(sw()) && on() && C().state() && C().state().pivot === true;
     var rows = pvShownRows(), cs = cards(), foot = q('#pivotResultTable tfoot tr');
     R.chk.tilesCount = cs.length === rows.length + 1 && cs.length > 5;
-    var t0 = cs[0];
+    var t0 = cs[cs.length - 1];   // (gtlast, 2026-11-05) the Grand Total the last tile, as the pivot table has it
+    R.chk.totalLast = !!t0 && t0.classList.contains('is-total') && !cs[0].classList.contains('is-total') && qa('#pnbCardsHost .pnb-card.is-total').length === 1
+      && cs.slice(0, -1).every(function (c, i) { return c.getAttribute('data-row') === String(i); }) && t0.getAttribute('data-row') === String(cs.length - 1);
     R.chk.totalTile = t0.classList.contains('is-total') && /Grand Total/.test(text(q('.pnb-card-title', t0))) && text(q('.pnb-card-bigval', t0)) === pvCellText(q('td[data-grand-total]', foot)) && qa('.pnb-card-pvfields dd', t0).length === qa('td[data-col-key]', foot).length;
     // the first leaf row: its own label cell (the leaf level) is the title, the row key's parents the subtitle
-    var tr = rows.filter(function (r) { return r.hasAttribute('data-pivot-row'); })[0], ti = rows.indexOf(tr) + 1, tile = cs[ti];
+    var tr = rows.filter(function (r) { return r.hasAttribute('data-pivot-row'); })[0], ti = rows.indexOf(tr), tile = cs[ti];   // (gtlast) no total ahead of it
     var labels = qa('td[data-row-field]', tr).map(pvCellText).filter(Boolean), parts = tr.getAttribute('data-pivot-row').split('|||');
     R.chk.tileTitle = !!tile && text(q('.pnb-card-title', tile)) === labels[labels.length - 1] && text(q('.pnb-card-sub', tile)) === parts.slice(0, -1).join(' > ') && parts.length === 2;
     var tot = q('td.pivot-grand-total[data-row-key]', tr);
@@ -534,6 +536,16 @@
     R.chk.foldFollowed = !!tog && cards().length === shownNow.length + 1 && cards().length < before && shownNow.some(function (r) { return r.classList.contains('pivot-group-summary-row'); })
       && cards().some(function (c) { return /\(\d+ items\)/.test(text(q('.pnb-card-title', c))); });
     R.info.fold = [before, cards().length, shownNow.length];
+    var gtc0 = cards()[cards().length - 1];
+    if (gtc0) { C().openDetails(gtc0); await until(detOpen, 3000); await sleep(150); }
+    var at0 = C().details().at, tog2 = q('#pivotResultTable tbody .pivot-collapse-toggle');
+    if (tog2) tog2.click();
+    await until(function () { return cards().length !== shownNow.length + 1; }, 4000); await sleep(400);
+    R.info.follow = [at0, C().details().at, cards().length, detTitle()];
+    R.chk.totalFollows = !!gtc0 && !!tog2 && detOpen() && /Grand Total/.test(detTitle() || '') && C().details().at === cards().length - 1 && C().details().at > at0;
+    if (detOpen()) { q('#pnbCardDetails .pnb-cdet-close').click(); await sleep(150); }
+    var tog3 = q('#pivotResultTable tbody .pivot-collapse-toggle');
+    if (tog3) { tog3.click(); await until(function () { return cards().length === shownNow.length + 1; }, 4000); await sleep(250); }   // folded again for the steps after
     if (P.get('shot')) { if (tog) tog.click(); await sleep(400); if (P.get('theme')) { var th0 = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (th0) applyTheme(th0); } window.scrollTo(0, 0); await sleep(300); return; }   // the tiles, for the screenshot
     // (pvtext, the user) a real click on a value's white space: the tile's details, never its breakdown; on its text: the breakdown
     function realClick(el, x, y) { var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window, detail: 1, button: 0, clientX: x, clientY: y }); el.dispatchEvent(ev); return ev; }
@@ -993,10 +1005,10 @@
     R.info.d = { tr: d && d.tr, cd: d && d.cd, lc: d && d.lc, st: wr.scrollTop, top: cs[30].getBoundingClientRect().top - wr.getBoundingClientRect().top };
     R.chk.carriesTop = !!d && d.tr === 30;
     R.chk.noLc = !!d && d.lc === undefined;
-    R.chk.carriesDetails = !!d && d.cd === 35;
+    R.chk.carriesDetails = !!d && d.cd === undefined && !!d.ck && same(d.ck, window.PenumbraViewLink.record(C().details().tr));   // (cardlink) by its record
     R.chk.included = (b.included || []).indexOf('scroll position') >= 0 && (b.included || []).indexOf('open card') >= 0;
     var desc = window.PenumbraViewLink.describe(b) || []; R.info.desc = desc;
-    R.chk.described = desc.some(function (x) { return x === 'card 31 at the top'; }) && desc.some(function (x) { return x === 'card 36 open'; });
+    R.chk.described = desc.some(function (x) { return x === 'card 31 at the top'; }) && desc.some(function (x) { return x === 'the open card (found again by V_ID)'; });   // (cardlink)
     C().closeDetails();
   };
   S.cvlF = async function () {
@@ -1050,7 +1062,8 @@
     R.chk.barRanked = ws.length > 2 && Math.max.apply(null, ws) === 100 && ws.filter(function (w, i, a) { return a.indexOf(w) === i; }).length > 1; R.info.ws = ws.slice(0, 8);
     R.chk.fieldsPicked = dts.length > 0 && dts.every(function (t) { return /Amt|Mean/.test(t); }) && !dts.some(function (t) { return / N$/.test(t); }); R.info.dts = dts.slice(0, 6);
     R.chk.labelsOff = !!leaf && !!q('.pnb-card-pvfields.is-nolabels', leaf);
-    R.chk.noBarOnTotal = cs[0].classList.contains('is-total') && !q('.pnb-card-meter', cs[0]) && !q('.pnb-card-pill', cs[0]);
+    var gtc = cs[cs.length - 1];   // (gtlast) the last tile
+    R.chk.noBarOnTotal = !!gtc && gtc.classList.contains('is-total') && !q('.pnb-card-meter', gtc) && !q('.pnb-card-pill', gtc);
     // the window over the tiles: the pivot rows shown, the flat rows hidden, the picks as the report's
     R.chk.canConfig = !!C().canConfig && C().canConfig() && (!C().configWhyNot || !C().configWhyNot());
     C().openConfig(); await sleep(250);
@@ -1091,7 +1104,7 @@
   // (pvgt, 2026-11-03, ?id=cprojects) the Grand Total tile (the first, is-total) names each value for its own measure. The
   // tfoot's cells carry the drill's data-agg-idx alone (no data-pv-ai): read as 0, every value was named for the first
   // measure, and the setup's picked measures let all or none of them through
-  function gtTile() { var c = cards()[0]; return (c && c.classList.contains('is-total')) ? c : null; }
+  function gtTile() { var cs = cards(), c = cs[cs.length - 1]; return (c && c.classList.contains('is-total')) ? c : null; }   // (gtlast) the last tile
   function tileDts(c) { return c ? qa('.pnb-card-pvfields dt', c).map(text) : []; }
   function leafPv() { return cards().filter(function (c) { return !c.classList.contains('is-total') && qa('.pnb-card-pvfields dt', c).length > 0; })[0] || null; }
   function footRow() { var T = q('#pivotResultTable'); return (T && T.tFoot) ? T.tFoot.rows[0] : null; }
@@ -1625,9 +1638,10 @@
     R.chk.tileLabelMenu = ev.defaultPrevented && !!menu() && !!marked && marked.hasAttribute('data-row-field') && a.indexOf('cardSize') >= 0 && leaf.isConnected && cards()[0] === cs[0];
     R.chk.tileSortOffered = (R.info.pvActs || []).indexOf('tileSortAsc') >= 0 && (R.info.pvActs || []).indexOf('tileSortDesc') >= 0 && a.indexOf('tileSortAsc') >= 0 && a.indexOf('tileSortDesc') >= 0;   // (round U) a nested pivot's value and title
     // the grand total tile: the pivot's menu has no cell for the tfoot - the card's own items alone
-    ev = rclick(q('.pnb-card-title', cs[0])); await sleep(80);
+    var gtT = qa('#pnbCardsHost .pnb-card.is-total')[0] || cs[0];   // (gtlast) the total by its class: the last tile now
+    ev = rclick(q('.pnb-card-title', gtT)); await sleep(80);
     a = acts(); R.info.pvTotalActs = a;
-    R.chk.totalTileMenu = ev.defaultPrevented && !!menu() && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0 && a[a.length - 1] === 'clearPrefs' && a.every(function (x) { return x === 'cardSize' || x === 'cardsTable' || x === 'cardOpen' || x === 'cardConfig' || x === 'clearPrefs'; });   // (menufix: Clear all last)   // (round T: Configure cards greyed)   // (cdet: Open details joins the card's own items)
+    R.chk.totalTileMenu = ev.defaultPrevented && !!menu() && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0 && a[a.length - 1] === 'clearPrefs' && a.every(function (x) { return x === 'cardSize' || x === 'cardsTable' || x === 'cardOpen' || x === 'cardLink' || x === 'cardConfig' || x === 'clearPrefs'; });   // (menufix: Clear all last)   // (round T: Configure cards greyed)   // (cdet: Open details joins the card's own items)
     // (round O) a tile value's white space: the tile's own menu - its row label's (not the value cell's)
     var wdd = q('.pnb-card-pvfields dd[data-pvc]', leaf), wtr = wdd ? textRect(wdd) : null, wr2 = wdd ? wdd.getBoundingClientRect() : null;
     if (wdd && wtr) { rclick(wdd, { x: Math.min(wr2.right - 2, wtr.right + 24), y: (wtr.top + wtr.bottom) / 2 }); await sleep(80); }
@@ -1635,7 +1649,7 @@
     R.info.pvWhite = { dd: !!wdd, text: wtr, box: wr2 ? [wr2.left, wr2.right] : null, marked: wmk ? wmk.outerHTML.slice(0, 80) : null };
     R.chk.tileWhiteLabel = !!wdd && !!wtr && wr2.right - 2 > wtr.right + 6 && !!menu() && !!wmk && wmk.hasAttribute('data-row-field');
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(60);
-    rclick(q('.pnb-card-title', cs[0])); await sleep(80);   // the total tile's menu again, for the steps after
+    rclick(q('.pnb-card-title', gtT)); await sleep(80);   // the total tile's menu again, for the steps after
     // (round N) no Configure cards over pivot tiles: the pivot draws them (menus, Quick actions, Settings > Cards)
     R.info.cfgOff = cfgOff;
     R.chk.tileConfigOn = !!cfgIt && cfgOff.dis !== 'true' && !why && !!C().canConfig && C().canConfig() && (!lay() || lay().hidden);   // (pvcfg) offered over the tiles
@@ -1729,7 +1743,12 @@
     R.info.refresh = { k1: k1, c1: !!c1, conn: !!c1 && c1.isConnected, n1: items(p1).length, n2: items(p2).length };
     // (cfb8, the user: card settings not honoured in the email) the emailed cards carry each row's notes, as the card shows
     // them (the table's email cell: author and text), under the column's name; a Small card none (it shows none)
+    var nx0 = window._penumbraJournalNotesExport; window._penumbraJournalNotesExport = true;   // (csweep3) the report sends its notes
     var mtx = mailBox(C().emailHtml({})).textContent, mtc = mailBox(C().emailHtml({ size: 'compact' })).textContent;
+    window._penumbraJournalNotesExport = false;
+    var mtoff = mailBox(C().emailHtml({})).textContent;
+    window._penumbraJournalNotesExport = nx0;
+    R.chk.mailNotesOff = mtoff.indexOf(LONG.slice(0, 30)) < 0 && mtx.indexOf(LONG.slice(0, 30)) >= 0;   // (csweep3) not sent: none on the emailed cards
     R.info.mailNotes = { has: mtx.indexOf(LONG.slice(0, 30)) >= 0, lbl: mtx.indexOf(thName('__JOURNAL_NOTES')) >= 0, small: mtc.indexOf(LONG.slice(0, 30)) >= 0 };
     R.chk.mailNotes = mtx.indexOf(LONG.slice(0, 30)) >= 0 && mtx.indexOf(thName('__JOURNAL_NOTES')) >= 0 && mtc.indexOf(LONG.slice(0, 30)) < 0;
     // every note in full: no cut text, no scroll box of its own
@@ -2595,10 +2614,11 @@
     if (csi2 && csi2.getAttribute('data-col-sort') === 'desc' && cWas !== 'desc') { csi2.click(); await sleep(600); }
     if (!menu() && it4) { rclick(q('.pnb-card-bigval', pvTiles()[0])); await sleep(150); }
     if (menu()) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
-    rclick(q('.pnb-card-bigval', cards()[0]) || q('.pnb-card-title', cards()[0])); await sleep(150);   // (its big number: a tfoot cell)
+    var lastT = cards()[cards().length - 1];   // (gtlast) the Grand Total the last tile, a sort or not
+    rclick(q('.pnb-card-bigval', lastT) || q('.pnb-card-title', lastT)); await sleep(150);   // (its big number: a tfoot cell)
     var a5 = acts(); if (menu()) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
     R.info.bigMenu = { title: t4, totalActs: a5 };
-    R.chk.bigAndTotal = /of Total,/.test(t4 || '') && cards()[0].classList.contains('is-total') && a5.length > 0 && a5.every(function (x) { return x.indexOf('tileSort') !== 0; });
+    R.chk.bigAndTotal = /of Total,/.test(t4 || '') && lastT.classList.contains('is-total') && !cards()[0].classList.contains('is-total') && a5.length > 0 && a5.every(function (x) { return x.indexOf('tileSort') !== 0; });
     // Sort: none: every level off, the tiles in the pivot's own order
     setSort(''); await pvSettle(function () { return !anySorted(); });
     R.chk.noneClears = !anySorted() && same(tileTitles(), start) && sortSel().value === '' && !vis(sortArrow()) && !!C().pvSorts && C().pvSorts().now === null;
@@ -3708,7 +3728,7 @@
   // (data-pv-drv, no drill keys of its own), whose breakdown is the cells it is computed from (brk)
   S.pw4drv = async function () {
     await until(function () { return on() && C().state() && C().state().pivot === true && cards().length > 1; }, 15000); await sleep(300);
-    var rows = pvShownRows(), tr = rows.filter(function (r) { return r.hasAttribute('data-pivot-row'); })[0], tile = tr ? cards()[rows.indexOf(tr) + 1] : null;
+    var rows = pvShownRows(), tr = rows.filter(function (r) { return r.hasAttribute('data-pivot-row'); })[0], tile = tr ? cards()[rows.indexOf(tr)] : null;   // (gtlast) no total ahead of it
     var dds = tile ? qa('.pnb-card-pvfields dd[data-pvc]', tile) : [];
     var drv = dds.filter(function (x) { var td = tr.cells[parseInt(x.getAttribute('data-pvc'), 10)]; return !!td && td.hasAttribute('data-pv-drv') && !td.hasAttribute('data-col-key'); });
     R.info.drv = { rows: rows.length, dds: dds.length, drv: drv.length };
@@ -3913,11 +3933,14 @@
   S.pw2next = async function () {
     await until(function () { return on() && C().state() && C().state().pivot === true && cards().length >= 1000; }, 30000); await sleep(400);
     var cs = cards(), n0 = cs.length;
+    R.chk.gtFirstStep = n0 === 1001 && cs[n0 - 1].classList.contains('is-total') && !cs[n0 - 2].classList.contains('is-total') && !!q('#pnbCardsHost .pnb-cards-morebtn');   // (gtlast) the total after the 1,000 drawn
     C().openDetails(cs[n0 - 1]); await until(function () { return detOpen(); }, 3000); await sleep(150);
     var nb = q('#pnbCardDetails .pnb-cdet-next'), en = !!nb && !nb.disabled;
     if (nb) nb.click(); await sleep(600);
-    R.info.pn = { n0: n0, n1: cards().length, at: C().details().at, en: en, st: C().state() && C().state().more };
-    R.chk.pivotNextOn = en && cards().length > n0 && C().details().at === n0;
+    var cs1 = cards(), at1 = C().details().at;
+    R.info.pn = { n0: n0, n1: cs1.length, at: at1, en: en, st: C().state() && C().state().more, title: detTitle() };
+    R.chk.pivotNextOn = en && cs1.length > n0 && at1 === n0 - 1 && !!cs1[at1] && !cs1[at1].classList.contains('is-total') && detTitle() === text(q('.pnb-card-title', cs1[at1]))
+      && cs1[cs1.length - 1].classList.contains('is-total');   // (gtlast) from the total: the first new row, the total last again
   };
   S.csweep = async function () {
     await until(function () { return on() && cards().length > 3; }, 8000); await sleep(150);
@@ -4697,6 +4720,564 @@
     R.chk.compactTight = tight(P['compact/compact']);   // the user's case
     R.chk.everyTight = Object.keys(P).every(function (z) { return tight(P[z]); });
     densBack();
+  };
+  // ---- (ccopy, 2026-11-05, the user: Copy Table As-Is "still copies table format" in cards mode) ----
+  // Copy As-Is while cards show copies the cards, through the Copy dialog's own button: the option's label and note say
+  // so; the clipboard gets text/html alone (as the table's copy), the email's card layout over EVERY row the search
+  // keeps (25 a page here: 300 cards), in the table's order, the other pages' lazy cells filled and their rules worn,
+  // three a row at the size shown; the toast counts them; the screen is left as it was; a search's rows; the cut in the
+  // copy's words; nothing to copy said so; the table showing copies the table with its own words (guards: as on live)
+  function ccStub() {
+    window.__ccClip = []; window.__ccTypes = [];
+    try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: function (t) { window.__ccClip.push({ text: String(t) }); return Promise.resolve(); },
+      write: function (items) {
+        var it = items && items[0];
+        window.__ccTypes.push(it && it.types ? Array.prototype.slice.call(it.types) : null);
+        return it.getType('text/html').then(function (b) { return b.text(); }).then(function (t) { window.__ccClip.push({ html: t }); });
+      } } }); } catch (e) { R.info.stubErr = String(e); }
+  }
+  function ccWords() {   // the As-Is option's label and the note shown, read by place (live's markup has no ids)
+    var r = q('input[name="copyFormat"][value="html"]'), lab = r ? r.closest('label') : null;
+    return { label: lab ? text(q('strong', lab)) : null, notes: lab ? qa('small', lab).filter(vis).map(text) : [] };
+  }
+  function ccSaid(rx) { return rx.test(document.body.innerText || ''); }
+  async function ccCopy() {
+    var n0 = window.__ccClip.length;
+    q('#copyActionsBtn').click();
+    await until(function () { var d = q('#copyActionsLightbox'); return !!d && d.style.display !== 'none' && vis(q('#confirmCopyBtn')); }, 4000); await sleep(200);
+    var o = ccWords(), r = q('input[name="copyFormat"][value="html"]');
+    if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+    q('#confirmCopyBtn').click();
+    await until(function () { return window.__ccClip.length > n0 || ccSaid(/no visible (cards|rows) to copy/); }, 8000); await sleep(300);
+    o.html = window.__ccClip.length > n0 ? (window.__ccClip[window.__ccClip.length - 1].html || null) : null;
+    o.types = window.__ccClip.length > n0 ? window.__ccTypes[window.__ccTypes.length - 1] : null;
+    await until(function () { var d = q('#copyActionsLightbox'); return !d || d.style.display === 'none'; }, 3000); await sleep(100);
+    return o;
+  }
+  function ccKept() { return qa('#resultsTable > tbody > tr').filter(function (tr) { return !tr.classList.contains('search-hidden'); }); }
+  function ccTitle(c) { return c && c.firstElementChild ? c.firstElementChild.textContent.replace(/\s+/g, ' ').trim() : null; }
+  function ccBig(c) { var s = c ? c.querySelector('span[style*="font-size:19px"]') : null; return s ? s.textContent.trim() : ''; }
+  S.ccopy = async function () {
+    await until(function () { return on() && cards().length === 25; }, 8000); await sleep(400);
+    ccStub();
+    var kept = ccKept(), lazy0 = kept.slice(25).filter(function (tr) { return !!tr.querySelector('td[data-pnb-lazy]'); }).length;
+    var pi0 = text(q('#pageInfo')), h0 = host().innerHTML.length;
+    var o1 = await ccCopy(), b1 = mailBox(o1.html), cs1 = mailCards(b1);
+    kept = ccKept();
+    R.info.c1 = { label: o1.label, notes: o1.notes, types: o1.types, n: [cs1.length, kept.length, cards().length], lazy0: lazy0, head: (o1.html || '').slice(0, 300) };
+    R.chk.noteCards = o1.label === 'Copy Cards As-Is (HTML)' && o1.notes.length === 1 && /^Cards show, so this copies the cards: every page, at the card size shown, laid out as an emailed report shows them\. Best for pasting into email and documents\. For Excel, use Copy Table as TSV\.$/.test(o1.notes[0]);
+    R.chk.htmlOnly = same(o1.types, ['text/html']);
+    R.chk.copiedCards = cs1.length > 0 && !b1.querySelector('thead, th, #resultsTable') && !/<button|<svg|<script|<input/i.test(o1.html || '');
+    R.chk.allPages = kept.length === 300 && cs1.length === 300 && cards().length === 25;
+    R.chk.inOrder = cs1.length === kept.length && cs1.every(function (c, i) { return ccTitle(c) === text(td(kept[i], 'V_NAME')); });
+    var bigs = cs1.map(ccBig), want = kept.map(function (tr) { return text(td(tr, 'H_AMT')) || ''; });
+    R.info.big = { off: bigs.slice(25).filter(Boolean).length, want: want.slice(25).filter(Boolean).length, first: bigs.slice(24, 28), wantFirst: want.slice(24, 28) };
+    R.chk.offPageFilled = cs1.length === kept.length && same(bigs, want) && bigs.slice(25).filter(Boolean).length > 200
+      && cs1.slice(25).every(function (c, k) { var t = ccTitle(c); return !!t && t !== '(blank)' && t === text(td(kept[25 + k], 'V_NAME')); });   // the other pages' titles too (lazy cells)
+    var kc = -1; kept.forEach(function (tr, i) { if (kc < 0 && i >= 25 && text(td(tr, 'V_STATUS')) === 'Closed') kc = i; });
+    var pill = kc >= 0 && cs1[kc] ? cs1[kc].querySelector('span[style*="border-radius:10px"]') : null;
+    R.info.pill = [kc, pill ? pill.getAttribute('style') : null];
+    R.chk.offPageRuled = !!pill && text(pill) === 'Closed' && pill.style.backgroundColor === 'rgb(255, 235, 238)' && pill.style.color === 'rgb(198, 40, 40)';
+    R.chk.sizeShown = cs1.length > 0 && cs1.every(function (c) { return c.parentNode.parentNode.children.length === 3; });
+    R.chk.toastCards = ccSaid(/SUCCESS: Copied 300 cards to the clipboard\./);
+    R.chk.screenSame = cards().length === 25 && text(q('#pageInfo')) === pi0 && host().innerHTML.length === h0 && !!o1.html;
+    // the cut, in the copy's words (the email keeps its own)
+    var hc = (C().copyHtml ? C().copyHtml({ budget: 6000 }) : null) || '', mc = C().mail ? C().mail() : null;
+    R.info.cut = [mc && mc.shown, mc && mc.total, hc.slice(-300)];
+    R.chk.cutWords = !!mc && mc.truncated && mc.copy === true && mc.total === 300 && /Showing \d+ of 300 cards - [\d,]+ cards were left out to keep this copy under the size limit\./.test(hc) && hc.indexOf('this email') < 0;
+    // a search's rows: every one it keeps, on every page
+    await runSearch('Closed'); await until(function () { return on() && cards().length > 0; }, 4000); await sleep(300);
+    var kept2 = ccKept(), o2 = await ccCopy(), cs2 = mailCards(mailBox(o2.html));
+    R.info.c2 = [kept2.length, cs2.length];
+    R.chk.searchKept = kept2.length > 25 && kept2.length < 300 && cs2.length === kept2.length && cs2.every(function (c, i) { return ccTitle(c) === text(td(kept2[i], 'V_NAME')); })
+      && ccSaid(new RegExp('SUCCESS: Copied ' + kept2.length + ' cards to the clipboard\\.'));
+    // nothing kept: said so, nothing written
+    await runSearch('zzqx-no-such-row'); await sleep(300);
+    var o3 = await ccCopy();
+    R.info.c3 = [ccKept().length, on(), !!o3.html];
+    R.chk.emptyNotice = ccKept().length === 0 && !o3.html && ccSaid(/NOTICE: There are no visible cards to copy\./);
+    await runSearch(''); await until(function () { return on() && cards().length === 25; }, 4000); await sleep(300);
+    // the table showing: its own words and its own copy (guards: as on live)
+    await pickView('table');
+    var o4 = await ccCopy(), b4 = mailBox(o4.html);
+    R.info.c4 = { label: o4.label, notes: o4.notes, head: (o4.html || '').slice(0, 200) };
+    R.chk.tableWords = o4.label === 'Copy Table As-Is (HTML)' && o4.notes.length === 1 && /^WYSIWYG copy\./.test(o4.notes[0]);
+    R.chk.tableStill = /<table/i.test(o4.html || '') && !!b4.querySelector('th') && mailCards(b4).length === 0 && ccSaid(/SUCCESS: Copied table to clipboard\./);
+  };
+  // grouped: every group's heading (a collapsed one's alone), the open groups' cards under theirs; every group collapsed:
+  // the headings, said so
+  S.gcopy = async function () {
+    await until(function () { return on() && qa('#groupedResultsContainer .group-wrapper.group-leaf').length > 2; }, 8000); await sleep(500);
+    ccStub();
+    function leaves() { return qa('#groupedResultsContainer .group-wrapper.group-leaf').filter(function (w) { return !w.classList.contains('search-hidden') && w.style.display !== 'none'; }); }
+    function rowsOf(w) { return qa(':scope > .group-content > table > tbody > tr', w).filter(function (tr) { return !tr.classList.contains('search-hidden'); }); }
+    async function foldTo(openN) {
+      var L = leaves();
+      for (var k = 0; k < L.length; k++) { var want = k < openN, hd = L[k].querySelector(':scope > .group-header'); if (L[k].classList.contains('open') !== want && hd) { hd.click(); await sleep(250); } }
+      await sleep(400);
+    }
+    await foldTo(2);
+    var L = leaves(), openRows = 0;
+    L.forEach(function (w) { if (w.classList.contains('open')) openRows += rowsOf(w).length; });
+    var o = await ccCopy(), b = mailBox(o.html), heads = qa('div[style*="border-radius:6px"]', b), cs = mailCards(b);
+    function nm(w) { var g = w.querySelector(':scope > .group-header .group-name'); return g ? g.textContent.replace(/\s+/g, ' ').trim() : ''; }
+    R.info.g = { label: o.label, n: [L.length, heads.length, openRows, cs.length], h0: heads[0] ? heads[0].textContent : null, l0: L[0] ? nm(L[0]) : null };
+    R.chk.noteCards = o.label === 'Copy Cards As-Is (HTML)' && o.notes.length === 1 && /^Cards show, so this copies the cards/.test(o.notes[0]);
+    R.chk.grpHeads = L.length > 2 && heads.length === L.length && !!L[0] && heads[0].textContent.indexOf(nm(L[0])) >= 0;
+    R.chk.grpCards = openRows > 0 && cs.length === openRows;
+    R.chk.grpToast = ccSaid(new RegExp('SUCCESS: Copied ' + openRows + ' cards? to the clipboard\\.'));
+    await foldTo(0);
+    var o2 = await ccCopy(), b2 = mailBox(o2.html), heads2 = qa('div[style*="border-radius:6px"]', b2);
+    R.info.g2 = [leaves().length, heads2.length, mailCards(b2).length];
+    R.chk.allFolded = heads2.length === leaves().length && mailCards(b2).length === 0 && ccSaid(/SUCCESS: Copied the group headings to the clipboard \(every group is collapsed\)\./);
+  };
+  // (pvcopy, 2026-11-05, the user: "the cards arent copied as cards when in a pivot view") a pivot's tiles copy as cards:
+  // the As-Is option says so (the tiles' own note), text/html alone, a mail card per tile drawn in the tiles' order (the
+  // Grand Total last), a tile's big number and field labels carried, mail-safe (no class, no var(), no definition list,
+  // no data- attribute), the toast counts them
+  S.pcopy = async function () {
+    await until(function () { return on() && cards().length > 1; }, 8000); await sleep(400);
+    ccStub();
+    var tiles = cards(), titles = tiles.map(function (c) { return text(q('.pnb-card-title', c)); });
+    var o = await ccCopy(), b = mailBox(o.html), cs = mailCards(b), t0 = tiles[0], c0 = cs[0];
+    var dts = qa('.pnb-card-pvfields dt', t0), dds = qa('.pnb-card-pvfields dd', t0), tl = [];
+    for (var i = 0; i < dds.length; i++) if (text(dds[i])) tl.push(dts[i] ? text(dts[i]) : '');
+    var ml = c0 ? qa('td[style*="white-space:nowrap"]', c0).map(text) : [];
+    R.info.p = { label: o.label, notes: o.notes, tiles: tiles.length, cards: cs.length, first: [titles[0], ccTitle(c0)], last: [titles[titles.length - 1], cs.length ? ccTitle(cs[cs.length - 1]) : null],
+                 big: [t0 ? text(q('.pnb-card-bigval', t0)) : null, ccBig(c0)], labels: [tl, ml], head: (o.html || '').slice(0, 160) };
+    R.chk.tilesWords = o.label === 'Copy Cards As-Is (HTML)' && o.notes.length === 1 && /^Tiles show, so this copies the tiles as cards: every tile, at the card size shown, the Grand Total last\./.test(o.notes[0]);
+    R.chk.tilesCards = tiles.length > 2 && cs.length === tiles.length && cs.every(function (c, k) { return ccTitle(c) === titles[k]; });
+    R.chk.tilesTotalLast = tiles.length > 0 && tiles[tiles.length - 1].classList.contains('is-total') && /Grand Total/.test(cs.length ? ccTitle(cs[cs.length - 1]) : '');
+    R.chk.tilesParts = !!c0 && ccBig(c0) !== '' && ccBig(c0) === text(q('.pnb-card-bigval', t0)) && tl.length > 0 && JSON.stringify(tl) === JSON.stringify(ml);
+    R.chk.tilesMailSafe = cs.length > 0 && !/\sclass=/.test(o.html) && o.html.indexOf('var(--') < 0 && !/<dl[\s>]/i.test(o.html) && !/\sdata-/.test(o.html);
+    R.chk.tilesHtmlOnly = JSON.stringify(o.types) === JSON.stringify(['text/html']);
+    R.chk.tilesToast = cs.length > 0 && ccSaid(new RegExp('SUCCESS: Copied ' + cs.length + ' cards to the clipboard\\.'));
+  };
+  // (pvsched, 2026-11-05, the user: "Email + PDF tiles") over a pivot's tiles the Save records the tiles drawn - their
+  // size and the setup (here the report's: N the big number, the parent pill, Amt's bar, Amt and Mean, no labels) - for
+  // the scheduled email; never the cards' slots (sent)
+  S.pvsave = async function () {
+    await until(function () { return on() && cards().length > 2; }, 8000); await sleep(400);
+    var C = window.Penumbra.cards, v = C.savedView ? C.savedView() : null, t = v && v.tiles;
+    R.info.v = v;
+    R.chk.tilesSaved = !!v && v.open === 1 && !v.sent && !!t && t.size === 'standard' && t.big === 'N' && t.pill === 'parent' && t.bar === 'Amt'
+      && same(t.fields, ['Amt', 'Mean']) && t.nolabels === 1;
+  };
+  // (pvsched) the tiles on screen with the rows and the pivot they came from: the kit's parity check (PNB_DUMP) runs the
+  // server's tiles (penumbra_cards_email.php over generate_pivot_html) on the same and compares them part by part
+  function ptDump() {
+    var st = window.__STORED || {}, pv = st.pivot || null, F = window.__rowsFixture || [], keep = {};
+    if (pv) [].concat(pv.rows || [], pv.cols || [], [pv.vals], pv.aggColOverrides || []).forEach(function (f) { if (f) keep[f] = 1; });
+    var rows = F.map(function (r) { var o = {}; Object.keys(keep).forEach(function (k) { o[k] = r[k] == null ? '' : String(r[k]); }); return o; });
+    function tx(el) { return el ? (text(el) || '') : ''; }
+    var tiles = cards().map(function (c) {
+      var dl = q('.pnb-card-pvfields', c), dts = dl ? qa('dt', dl) : [], dds = dl ? qa('dd', dl) : [], mt = q('.pnb-card-meter > i', c);
+      return { title: tx(q('.pnb-card-title', c)), sub: tx(q('.pnb-card-sub', c)), pill: tx(q('.pnb-card-pill', c)), big: tx(q('.pnb-card-bigval', c)), label: tx(q('.pnb-card-big > small', c)),
+               bar: mt ? Math.round(parseFloat(mt.style.width) || 0) : null, fields: dds.map(function (d, k) { return (dts[k] ? tx(dts[k]) : '') + '=' + tx(d); }), total: c.classList.contains('is-total') };
+    });
+    var vo = (st.viewOptions && st.viewOptions.cards) || {};
+    return { pivot: pv, setup: vo.pivot || null, rows: rows, tiles: tiles };
+  }
+  S.ptpar = async function () {
+    await until(function () { return on() && cards().length > 2; }, 8000); await sleep(400);
+    var d = ptDump(); R.info.par = d;
+    R.chk.dumped = d.tiles.length > 2 && d.rows.length > 0 && !!d.pivot;
+  };
+  S.ptpar2 = S.ptpar;
+  // (pvmail, 2026-11-05, the user: "Yes, email tiles too") the Email Report's body over a pivot's tiles: the cards
+  // (mailable; emailable stays false - the saved view and a pivot's scheduled email are the table's), every tile in order
+  // with the Grand Total last, counted as an email (not a copy), the size asked, the email's own cut words
+  S.pmailt = async function () {
+    await until(function () { return on() && cards().length > 2; }, 8000); await sleep(400);
+    var C = window.Penumbra.cards, tiles = cards(), titles = tiles.map(function (c) { return text(q('.pnb-card-title', c)); });
+    var html = C.emailHtml ? C.emailHtml({}) : null, m = C.mail ? C.mail() : null, b = mailBox(html), cs = mailCards(b);
+    var big = C.emailHtml({ size: 'large' }), bl = mailCards(mailBox(big));
+    var cutH = C.emailHtml({ budget: 1500 }), cm = C.mail ? C.mail() : null;
+    R.info.pm = { mailable: C.mailable ? C.mailable() : null, emailable: C.emailable(), tiles: tiles.length, cards: cs.length, last: cs.length ? ccTitle(cs[cs.length - 1]) : null,
+                  m: m ? { shown: m.shown, total: m.total, copy: m.copy, tiles: m.tiles } : null, cut: cm ? { shown: cm.shown, total: cm.total, truncated: cm.truncated } : null,
+                  cutTail: (cutH || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(-170) };
+    R.chk.tilesMailable = typeof C.mailable === 'function' && C.mailable() === true && C.emailable() === false;
+    R.chk.tilesBody = tiles.length > 2 && cs.length === tiles.length && cs.every(function (c, k) { return ccTitle(c) === titles[k]; }) && /Grand Total/.test(cs.length ? ccTitle(cs[cs.length - 1]) : '');
+    R.chk.tilesAsEmail = !!m && m.copy === false && m.tiles === true && m.shown === tiles.length;
+    R.chk.tilesSize = bl.length === tiles.length && /width="50%"/.test(big || '');
+    R.chk.tilesEmailWords = !!cm && cm.truncated === true && /omitted to keep this email under the size limit\. Open the report for the full data, or attach it instead\./.test((cutH || '').replace(/\s+/g, ' ')) && !/left out to keep this copy/.test(cutH || '');
+  };
+  // (mailhid, 2026-11-05, the user's emailed pivot cards: a solid square where a diagonal's value was) a value its
+  // highlight paints in its own fill (text colour = background colour) mails blank: its line kept (label, a blank value),
+  // no span wearing the hidden pair; a value ruled in two colours keeps its span and colours. chid: the flat cards
+  // (emailHtml's val), pmhid: a pivot's tiles (pivotMailHtml)
+  var MH_HID = 'rgb(0, 128, 64)', MH_TX = 'rgb(198, 40, 40)', MH_BG = 'rgb(255, 235, 238)';
+  function mhRows(c) { return c ? qa('table[style*="margin-top:6px"] tr', c) : []; }
+  function mhPaint(el, color, bg) { el.style.setProperty('color', color); el.style.setProperty('background-color', bg); }
+  function mhPair(b) { return qa('span', b).filter(function (s) { return !!s.style.color && s.style.color === s.style.backgroundColor; }).length; }
+  S.chid = async function () {
+    await until(function () { return on() && cards().length > 1; }, 8000); await sleep(400);
+    var C = window.Penumbra.cards, rows = pageRows(), d0 = td(rows[0], 'V_DATE'), d1 = td(rows[1], 'V_DATE');
+    var want = [text(d0), text(d1)], n0 = mhRows(mailCards(mailBox(C.emailHtml({ size: 'standard' })))[0]).length;
+    mhPaint(d0, MH_HID, MH_HID); mhPaint(d1, MH_TX, MH_BG);
+    var b = mailBox(C.emailHtml({ size: 'standard' })), cs = mailCards(b), f0 = mhRows(cs[0]), f1 = mhRows(cs[1]);
+    var v0 = f0[0] ? f0[0].cells[f0[0].cells.length - 1] : null, v1 = f1[0] ? f1[0].cells[f1[0].cells.length - 1] : null, s1 = v1 ? v1.querySelector('span') : null;
+    R.info.mh = { want: want, n0: n0, n: [f0.length, f1.length], v0: v0 ? v0.innerHTML.slice(0, 160) : null, v1: v1 ? v1.innerHTML.slice(0, 160) : null, pair: mhPair(b) };
+    R.chk.hidBlank = !!want[0] && !!v0 && v0.textContent === '\u00a0' && !v0.querySelector('span') && mhPair(b) === 0;
+    R.chk.hidLine = n0 > 1 && f0.length === n0 && f1.length === n0 && f0[0].cells.length === 2 && !!text(f0[0].cells[0]);
+    R.chk.hidKept = !!s1 && text(s1) === want[1] && s1.style.color === MH_TX && s1.style.backgroundColor === MH_BG;
+  };
+  S.pmhid = async function () {
+    await until(function () { return on() && cards().length > 2; }, 8000); await sleep(400);
+    var C = window.Penumbra.cards, tr = qa('#pivotResultTable > tbody > tr').filter(function (r) { return r.style.display !== 'none'; })[0];
+    var keyed = tr ? Array.prototype.filter.call(tr.cells, function (c) { return (c.hasAttribute('data-col-key') || c.hasAttribute('data-pv-ck')) && !c.classList.contains('pivot-grand-total') && !!c.textContent.trim(); }) : [];
+    var hc = keyed[keyed.length - 1], kc = keyed[keyed.length - 2], want = [text(hc), text(kc)];
+    var n0 = mhRows(mailCards(mailBox(C.emailHtml({})))[0]).length;
+    if (hc) mhPaint(hc, MH_HID, MH_HID); if (kc) mhPaint(kc, MH_TX, MH_BG);
+    var b = mailBox(C.emailHtml({})), f0 = mhRows(mailCards(b)[0]);
+    var blank = f0.filter(function (r) { return r.cells[r.cells.length - 1].textContent === '\u00a0'; });
+    var kept = f0.map(function (r) { return r.cells[r.cells.length - 1].querySelector('span'); }).filter(function (s) { return !!s && s.style.color === MH_TX && s.style.backgroundColor === MH_BG; });
+    R.info.mh = { keyed: keyed.length, want: want, n0: n0, n: f0.length, blank: blank.length, kept: kept.length, pair: mhPair(b), b0: blank[0] ? blank[0].innerHTML.slice(0, 220) : null };
+    R.chk.hidBlank = keyed.length > 2 && blank.length === 1 && !blank[0].cells[blank[0].cells.length - 1].querySelector('span') && mhPair(b) === 0;
+    R.chk.hidLine = n0 > 2 && f0.length === n0 && f0.every(function (r) { return r.cells.length === 2 && !!text(r.cells[0]); });
+    R.chk.hidKept = kept.length === 1 && text(kept[0]) === want[1];
+  };
+  // (tilegap, 2026-11-06, the user: "the boxes are not consistent sizes if the columns had no value so it looks different
+  // from the browser") a column with no value keeps its line in the mailed tile, blank, as the tile on screen lists it:
+  // a value emptied in the pivot table stays a line (its label, no value); every mailed tile as many lines as on screen
+  S.pvgap = async function () {
+    await until(function () { return on() && cards().length > 2; }, 8000); await sleep(400);
+    var C = window.Penumbra.cards, tr = qa('#pivotResultTable > tbody > tr').filter(function (r) { return r.style.display !== 'none'; })[0];
+    var keyed = tr ? Array.prototype.filter.call(tr.cells, function (c) { return (c.hasAttribute('data-col-key') || c.hasAttribute('data-pv-ck')) && !c.classList.contains('pivot-grand-total') && !!c.textContent.trim(); }) : [];
+    function blanks(rs) { return rs.filter(function (r) { return !text(r.cells[r.cells.length - 1]); }).length; }
+    var f0 = mhRows(mailCards(mailBox(C.emailHtml({})))[0]), b0 = blanks(f0);
+    var gc = keyed[keyed.length - 1], lab = gc ? gc.getAttribute('data-col-key') || gc.getAttribute('data-pv-ck') : null;
+    if (gc) gc.innerHTML = '';
+    var b = mailBox(C.emailHtml({})), cs = mailCards(b), f1 = mhRows(cs[0]), b1 = blanks(f1);
+    var screen = cards().map(function (c) { return qa('.pnb-card-pvfields dd', c).length; });
+    var mailed = cs.map(function (c) { return mhRows(c).length; });
+    var bl = f1.filter(function (r) { return !text(r.cells[r.cells.length - 1]); });
+    R.info.gap = { keyed: keyed.length, col: lab, n0: f0.length, n1: f1.length, b0: b0, b1: b1, screen: screen.slice(0, 8), mailed: mailed.slice(0, 8), tiles: [screen.length, cs.length] };
+    R.chk.gapLine = keyed.length > 2 && f0.length > 2 && f1.length === f0.length && b1 === b0 + 1 && bl.every(function (r) { return r.cells.length === 2 && !!text(r.cells[0]); });
+    R.chk.gapSame = screen.length > 2 && cs.length === screen.length && mailed.every(function (m, i) { return m === screen[i]; });
+  };
+  // (pvcopy) every tile the pivot shows, past Show more (1,003 rows, 1,000 drawn): 1,004 cards, the Grand Total last
+  S.pcopymore = async function () {
+    await until(function () { return on() && cards().length > 1000; }, 20000); await sleep(400);
+    ccStub();
+    var rows = qa('#pivotResultTable > tbody > tr').filter(function (tr) { return tr.style.display !== 'none'; }).length, drawnN = cards().length;
+    var o = await ccCopy(), b = mailBox(o.html), cs = mailCards(b);
+    R.info.pm = { rows: rows, drawn: drawnN, cards: cs.length, bytes: (o.html || '').length, last: cs.length ? ccTitle(cs[cs.length - 1]) : null };
+    R.chk.allTiles = rows > 1000 && drawnN < rows + 1 && cs.length === rows + 1;
+    R.chk.totalLast = cs.length > 0 && /Grand Total/.test(ccTitle(cs[cs.length - 1]) || '');
+  };
+  // (csweep3) a nested Board (H_GROUP, then H_GROUP2) copies its lanes as the board draws them: an open lane's every
+  // row under it, whatever its inner groups' folds - it copied empty headings and said every group was collapsed
+  S.gbcopy = async function () {
+    await until(function () { return on() && document.body.classList.contains('pnb-board-on') && qa('#pnbCardsHost .pnb-cards-lane').length > 1; }, 10000); await sleep(500);
+    ccStub();
+    var lanes = qa('#groupedResultsContainer > .group-wrapper').filter(function (w) { return !w.classList.contains('group-grand-total') && w.style.display !== 'none' && !w.classList.contains('search-hidden'); });
+    var lane0 = lanes[0], head0 = q('#pnbCardsHost .pnb-cards-lane .pnb-cards-lanehead');
+    if (lane0 && !lane0.classList.contains('open') && head0) { head0.click(); await until(function () { return lane0.classList.contains('open'); }, 3000); await sleep(500); }
+    lanes.forEach(function (w) { qa('.group-wrapper', w).forEach(function (g) { g.classList.remove('open'); var gc = q(':scope > .group-content', g); if (gc) gc.style.display = 'none'; }); });   // inner groups folded
+    await sleep(800);
+    var want = lanes.reduce(function (n, w) { return n + (w.classList.contains('open') ? qa('.group-wrapper.group-leaf', w).reduce(function (m, l) { return m + qa(':scope > .group-content > table > tbody > tr', l).filter(function (tr) { return !tr.classList.contains('search-hidden'); }).length; }, 0) : 0); }, 0);
+    var drawnN = qa('#pnbCardsHost .pnb-cards-lane .pnb-card').length;
+    var o = await ccCopy(), b = mailBox(o.html), heads = qa('div[style*="border-radius:6px"]', b), cs = mailCards(b);
+    R.info.gb = { lanes: lanes.length, open: lanes.map(function (w) { return w.classList.contains('open'); }), want: want, drawn: drawnN, heads: heads.length, cards: cs.length, h0: heads[0] ? heads[0].textContent.slice(0, 60) : null };
+    R.chk.laneCards = want > 0 && cs.length === want;
+    R.chk.laneHeads = heads.length === lanes.length && !!lane0 && heads[0].textContent.indexOf(text(q(':scope > .group-header .group-name', lane0))) >= 0;
+    R.chk.laneToast = ccSaid(new RegExp('SUCCESS: Copied ' + want + ' cards? to the clipboard\\.')) && !ccSaid(/every group is collapsed/);
+  };
+  // (csweep3, the second look) the keyboard's Show more over tiles: the focus lands on the first tile it drew, a row's -
+  // never the Grand Total (the last tile drawn before) nor the row after the first new one
+  S.pw5more = async function () {
+    await until(function () { return on() && C().state() && C().state().pivot === true && cards().length >= 1000 && !!q('#pnbCardsHost .pnb-cards-morebtn'); }, 30000); await sleep(400);
+    var n0 = cards().length, mb = q('#pnbCardsHost .pnb-cards-morebtn');
+    mb.focus(); mb.click(); await until(function () { return cards().length > n0; }, 5000); await sleep(300);
+    var ae = document.activeElement, cs = cards(), ai = cs.indexOf(ae);
+    R.info.more = { n0: n0, n1: cs.length, ai: ai, total: !!(ae && ae.classList && ae.classList.contains('is-total')) };
+    R.chk.moreFocusRow = n0 === 1001 && ai === n0 - 1 && !ae.classList.contains('is-total') && cs[cs.length - 1].classList.contains('is-total');
+  };
+  // (csweep3) the List layout: the picked group's cards alone - the groups it does not show (.pnb-gl-off) are left out
+  S.ggcopy = async function () {
+    await until(function () { return on() && document.body.classList.contains('pnb-gl-on') && !!q('#groupedResultsContainer .group-wrapper.pnb-gl-sel') && !!q('#groupedResultsContainer .group-wrapper.pnb-gl-off'); }, 10000); await sleep(600);
+    ccStub();
+    // the other groups open too (opened in Stacked, kept open while the List hides them): the copy must still leave them out
+    qa('#groupedResultsContainer .group-wrapper.group-leaf.pnb-gl-off').forEach(function (w) { w.classList.add('open'); });
+    await sleep(300);
+    var shown = qa('#groupedResultsContainer .group-wrapper.group-leaf').filter(function (w) { return !w.classList.contains('pnb-gl-off') && !w.closest('.pnb-gl-off'); });
+    var want = shown.reduce(function (n, w) { return n + (w.classList.contains('open') ? qa(':scope > .group-content > table > tbody > tr', w).filter(function (tr) { return !tr.classList.contains('search-hidden'); }).length : 0); }, 0);
+    var o = await ccCopy(), b = mailBox(o.html), heads = qa('div[style*="border-radius:6px"]', b), cs = mailCards(b);
+    R.info.gl = { shown: shown.length, want: want, heads: heads.length, cards: cs.length };
+    R.chk.listOnly = shown.length >= 1 && want > 0 && heads.length === shown.length && cs.length === want;
+  };
+  // ---- (cardlink, 2026-11-05) a card's link by its RECORD; Copy link to this card; Alt+Shift+L ----
+  function clipStub() { window.__clip = null; window._pnbClipboard = function () { return { writeText: function (t) { window.__clip = String(t); return Promise.resolve(); } }; }; }
+  function toastsText() { return qa('.pnb-toast-msg').map(text).join(' | '); }
+  function tokOf(url) { var m = /[?&]view=([^&]+)/.exec(url || ''); return m ? m[1] : null; }
+  function VLk() { return window.PenumbraViewLink; }
+  function clipView() { var t = tokOf(window.__clip); return t ? VLk().decode(t) : null; }
+  function vidOf(tr) { var m = tr ? window.Penumbra.findHost.rows()[rowIdx(tr)] : null; return m ? String(m.get('V_ID')) : null; }
+  function detVid() { var d = C().details(); return (d && d.tr) ? vidOf(d.tr) : null; }
+  function trOfCard(card) { var i = parseInt(card.getAttribute('data-row'), 10), rs = qa('#resultsTable > tbody > tr'); for (var k = 0; k < rs.length; k++) if (rowIdx(rs[k]) === i) return rs[k]; return null; }
+  function altL(el, ctrl) { var ev = new KeyboardEvent('keydown', { key: 'L', code: 'KeyL', altKey: !ctrl, ctrlKey: !!ctrl, shiftKey: true, bubbles: true, cancelable: true }); (el || document.body).dispatchEvent(ev); return ev; }
+  function escMenu() { var m = menu(); if (m) keyOn(m, 'Escape'); }
+  S.cklA = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    clipStub();
+    var VL = VLk(), c35 = cards()[35], tr = trOfCard(c35), want = vidOf(tr); R.info.want = want;
+    C().openDetails(c35); await sleep(200);
+    var b = VL.build(), d = VL.decode(b.token); R.info.d = d;
+    R.chk.carriesRecord = !!d && !!d.ck && d.cd === undefined && same(d.ck.k, ['V_ID']) && typeof d.ck.h === 'string';
+    R.chk.sameAsRow = !!d && !!d.ck && same(d.ck, VL.record(tr));
+    R.chk.noValues = !!d && !!d.ck && same(Object.keys(d.ck).sort(), ['h', 'k']);   // the names and a signature: never the values
+    R.chk.included = (b.included || []).indexOf('open card') >= 0;
+    R.chk.described = (VL.describe(b) || []).indexOf('the open card (found again by V_ID)') >= 0;
+    var btn = q('#pnbCardDetails .pnb-cdet-link');
+    R.chk.iconShown = !!btn && vis(btn) && /Alt\+Shift\+L/.test(btn.title) && btn.getAttribute('aria-label') === 'Copy link to this card';
+    if (btn) btn.click();
+    await sleep(300);
+    var d1 = clipView();
+    R.chk.iconCopies = !!d1 && !!d1.ck && same(d1.ck, d.ck) && d1.cv === 1 && detOpen();
+    R.info.toast = toastsText();
+    R.chk.toastWords = qa('.pnb-toast-msg').some(function (m) { return text(m) === 'Link to this card copied.'; });   // (cardlink 2, the user: short)
+    rclick(q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_DATE"]')); await sleep(150);
+    var ma = acts(), li = menu() ? q('.pnb-hm-item[data-act="cardLink"]', menu()) : null; R.info.detActs = ma;
+    R.chk.menuInWindow = !!li && text(q('.pnb-hm-label', li)) === 'Copy link to this card' && text(q('.pnb-hm-note', li)) === 'Alt+Shift+L' && ma.indexOf('cardLink') === ma.indexOf('cardPrint') + 1;
+    window.__clip = null;
+    if (li) li.click(); else escMenu();
+    await sleep(300);
+    var d2 = clipView();
+    R.chk.menuCopies = !!d2 && !!d2.ck && same(d2.ck, d.ck);
+    // Alt+Shift+L: the open card's link (copyCard), else the view's; in a field too; Ctrl+Shift+L still Configure cards
+    var cc0 = VL.copyCard, ncc = 0;
+    if (cc0) VL.copyCard = function () { ncc++; return cc0.apply(VL, arguments); };
+    window.__clip = null;
+    var k1 = altL(q('#pnbCardDetails .pnb-cdet-box')); await sleep(300);
+    var d3 = clipView();
+    R.chk.hotkeyCard = k1.defaultPrevented && ncc === 1 && !!d3 && !!d3.ck && same(d3.ck, d.ck);
+    C().closeDetails(); await sleep(200);
+    window.__clip = null;
+    var k2 = altL(document.body); await sleep(300);
+    var d4 = clipView();
+    R.chk.hotkeyView = k2.defaultPrevented && ncc === 1 && !!d4 && !d4.ck && d4.cv === 1;
+    var box = q('#tableSearch'); box.focus(); window.__clip = null;
+    var k3 = altL(box); await sleep(300);
+    R.chk.hotkeyInField = k3.defaultPrevented && !!clipView() && box.value === '';
+    box.blur();
+    if (cc0) VL.copyCard = cc0;
+    altL(document.body, true); await sleep(250);
+    R.chk.hotkeyNoClash = C().configOpen() === true;
+    C().closeConfig(); await sleep(150);
+    // a card's own menu (its white space): Copy link to this card, for THAT card, no window opened
+    var c40 = cards()[40], tr40 = trOfCard(c40);
+    rclickWhite(c40); await sleep(150);
+    var ca = acts(), cl = menu() ? q('.pnb-hm-item[data-act="cardLink"]', menu()) : null; R.info.cardActs = ca;
+    R.chk.cardMenu = !!cl && ca.indexOf('cardLink') === ca.indexOf('cardOpen') + 1 && !q('.pnb-hm-note', cl);
+    window.__clip = null;
+    if (cl) cl.click(); else escMenu();
+    await sleep(300);
+    var d5 = clipView();
+    R.chk.cardMenuCopies = !!d5 && !!d5.ck && same(d5.ck, VL.record(tr40)) && !same(d5.ck, d.ck) && !detOpen();
+    var pm = window.PenumbraPageMenu ? window.PenumbraPageMenu.items() : [], vi = pm.filter(function (x) { return x && x.act === 'viewLink'; })[0];
+    R.chk.pageMenuNote = !!vi && vi.note === 'Alt+Shift+L';
+    // (cardlink 2) the window scrolled half way: the link carries it as a share (ds)
+    C().openDetails(c35); await sleep(250);
+    var sc = q('#pnbCardDetails .pnb-cdet-body'); sc.scrollTop = Math.round((sc.scrollHeight - sc.clientHeight) / 2); await sleep(100);
+    var d6 = VL.decode(VL.build().token); R.info.ds = { ds: d6 && d6.ds, sh: sc.scrollHeight, ch: sc.clientHeight };
+    R.chk.carriesScroll = !!d6 && d6.ds >= 0.35 && d6.ds <= 0.65 && same(d6.ck, d.ck);
+    C().closeDetails(); await sleep(150);
+    // the links cklB / C / D open: sorted the other way (the record on page 2, at another place); a record no row has; one the filter hides
+    var dt = JSON.parse(JSON.stringify(d6 || d)); dt.o = 'V_ID|desc'; delete dt.tr; R.info.token = tok(dt);
+    var dg = JSON.parse(JSON.stringify(d)); dg.ck.h = '1.2.3'; R.info.tokenGone = tok(dg);
+    var df = JSON.parse(JSON.stringify(d)); df.s = 'zzqqzzqq'; R.info.tokenFiltered = tok(df);
+  };
+  S.cklB = async function () {
+    await until(function () { return on() && cards().length > 0 && detOpen(); }, 10000); await sleep(300);
+    var want = P.get('want'), dd = C().details();
+    R.info.b = { want: want, got: detVid(), at: dd.at, page: text(q('#pageInfo')), pos: detPos() };
+    R.chk.bootsCards = on() && VLk().active();
+    R.chk.detailsOpen = detOpen();
+    R.chk.sameRecord = detOpen() && !!want && detVid() === want;
+    R.chk.otherPlace = detOpen() && dd.at !== 35;
+    R.chk.pageTurned = /Page 2/.test(text(q('#pageInfo')) || '') && detOpen() && vis(cards()[dd.at]);
+    var sent = VLk().decode(P.get('view')), sb = q('#pnbCardDetails .pnb-cdet-body'), got = sb ? sb.scrollTop / Math.max(1, sb.scrollHeight - sb.clientHeight) : 0;
+    R.info.scroll = { sent: sent && sent.ds, got: got };
+    R.chk.scrolledAsSent = !!sent && sent.ds > 0 && Math.abs(got - sent.ds) < 0.1;
+  };
+  S.cklC = async function () {
+    await until(function () { return on() && cards().length > 0; }, 10000); await sleep(1800);
+    R.info.toast = toastsText();
+    R.chk.noWindow = !detOpen();
+    R.chk.saysGone = /That card is no longer in this report\./.test(toastsText());
+  };
+  S.cklD = async function () {
+    await until(function () { return !!q('.pnb-vl-recshow'); }, 10000);
+    R.info.toast = toastsText();
+    R.chk.noWindow = !detOpen();
+    R.chk.saysFiltered = /That card is hidden by the filter\./.test(toastsText());
+    var b = q('.pnb-vl-recshow'); R.chk.offersClear = !!b && vis(b) && text(b) === 'Show it';
+    if (b) b.click();
+    await until(function () { return detOpen(); }, 8000); await sleep(250);
+    R.info.d = { got: detVid(), want: P.get('want'), box: q('#tableSearch').value };
+    R.chk.clearOpens = detOpen() && detVid() === P.get('want') && !String(q('#tableSearch').value || '').trim();
+  };
+  S.cklT = async function () {
+    await until(function () { return !!sw() && !on() && shownRows().length > 0; }, 8000);
+    clipStub();
+    var r7 = shownRows()[7], ok = C().openRow(r7); R.info.want = vidOf(r7);
+    await sleep(200);
+    var b = VLk().build(), d = VLk().decode(b.token);
+    R.chk.tableWindow = !!ok && detOpen() && C().details().tr === r7 && !on();
+    R.chk.carriesRecord = !!d && !!d.ck && d.cv === undefined && same(d.ck, VLk().record(r7));
+    var btn = q('#pnbCardDetails .pnb-cdet-link'); R.chk.iconShown = !!btn && vis(btn);
+    var dt = JSON.parse(JSON.stringify(d || {})); dt.o = 'V_ID|desc'; delete dt.tr; R.info.token = tok(dt);
+  };
+  S.cklTB = async function () {
+    await until(function () { return detOpen(); }, 10000); await sleep(300);
+    var dd = C().details(); R.info.b = { got: detVid(), want: P.get('want'), page: text(q('#pageInfo')) };
+    R.chk.tableStays = !on() && vis(q('#resultsTable'));
+    R.chk.sameRecord = detOpen() && detVid() === P.get('want') && !!dd.tr && dd.tr.style.display !== 'none';
+  };
+  S.gklA = async function () {
+    await until(function () { return on() && cards().length > 12; }, 10000); await sleep(300);
+    clipStub();
+    C().openDetails(cards()[12]); await sleep(200);
+    var tr = C().details().tr; R.info.want = vidOf(tr);
+    var b = VLk().build(), d = VLk().decode(b.token); R.info.d = d;
+    R.chk.carriesRecord = !!d && d.m === 'group' && !!d.ck && same(d.ck, VLk().record(tr));
+    R.info.token = tok(JSON.parse(JSON.stringify(d || {})));
+  };
+  S.gklB = async function () {
+    await until(function () { return detOpen(); }, 12000); await sleep(300);
+    R.info.b = { got: detVid(), want: P.get('want') };
+    R.chk.groupedOpens = on() && !!q('#groupedResultsContainer .pnb-card, #pnbCardsHost .pnb-card') && detOpen() && detVid() === P.get('want');
+  };
+  // the grouped table's own window (This row as a card over the bands): the record found among the bands' rows
+  S.gklT = async function () {
+    await until(function () { return !on() && qa('#groupedResultsContainer .group-leaf > .group-content > table > tbody > tr').length > 6; }, 10000); await sleep(300);
+    var tr = qa('#groupedResultsContainer .group-leaf > .group-content > table > tbody > tr')[5], ok = C().openRow(tr); R.info.want = vidOf(tr);
+    await sleep(200);
+    var b = VLk().build(), d = VLk().decode(b.token);
+    R.chk.carriesRecord = !!ok && detOpen() && !!d && d.m === 'group' && !d.cv && !!d.ck && same(d.ck, VLk().record(tr));
+    R.info.token = tok(JSON.parse(JSON.stringify(d || {})));
+  };
+  S.gklTB = async function () {
+    await until(function () { return detOpen(); }, 12000); await sleep(300);
+    var dd = C().details(); R.info.b = { got: detVid(), want: P.get('want') };
+    R.chk.groupedRow = !on() && detOpen() && detVid() === P.get('want') && !!dd.tr && !!dd.tr.closest('#groupedResultsContainer');
+  };
+  // (cardlink 2, the user: "didnt work in a pivot") a pivot tile's own link: its icon, its menu item, its key; the page it opens
+  S.pklP = async function () {
+    await until(function () { return on() && cards().length > 3; }, 10000); await sleep(300);
+    clipStub();
+    C().openDetails(cards()[3]); await sleep(200);
+    R.info.want = detTitle();
+    var btn = q('#pnbCardDetails .pnb-cdet-link');
+    R.chk.iconShown = detOpen() && !!btn && vis(btn);
+    var val = q('#pnbCardDetails [data-pvc]');
+    if (val) rclick(val);
+    await sleep(150);
+    R.info.acts = acts();
+    R.chk.menuItem = !!menu() && acts().indexOf('cardLink') >= 0;
+    escMenu(); await sleep(100);
+    var b = VLk().build(), d0 = VLk().decode(b.token); R.info.d = d0;
+    R.chk.carriesTile = !!d0 && d0.m === 'pivot' && !!d0.ck && d0.ck.p === 1 && typeof d0.ck.h === 'string' && d0.ck.k === undefined;
+    window.__clip = null;
+    var k = altL(q('#pnbCardDetails .pnb-cdet-box')); await sleep(300);
+    var d = clipView();
+    R.chk.hotkeyCard = k.defaultPrevented && !!d && !!d.ck && !!d0 && same(d.ck, d0.ck) && qa('.pnb-toast-msg').some(function (m) { return text(m) === 'Link to this card copied.'; });
+    R.info.token = tok(JSON.parse(JSON.stringify(d0 || {})));
+  };
+  S.pklB = async function () {
+    await until(function () { return on() && detOpen(); }, 12000); await sleep(300);
+    R.info.b = { got: detTitle(), want: P.get('want') };
+    R.chk.tileOpens = detOpen() && !!P.get('want') && detTitle() === P.get('want');
+  };
+  // (cardlink 2, the user: "didnt work in a group") a link from grouped cards with a band folded: the record opens AFTER the link's
+  // open groups are set (they redrew the cards and closed its window); a record in the folded band: its band opened
+  S.gklC = async function () {
+    await until(function () { return on() && grps().length > 2 && cards().length > 20; }, 10000); await sleep(300);
+    var ws = wrappers();
+    tog(0).click(); await until(function () { return shut(grps()[0]); }, 4000); await sleep(200);
+    var c = cards()[3]; C().openDetails(c); await sleep(200);
+    var tr = C().details().tr; R.info.want = vidOf(tr);
+    var b = VLk().build(), d = VLk().decode(b.token); R.info.d = d && { go: d.go, ga: d.ga, ck: d.ck };
+    R.chk.carriesGroups = !!d && d.m === 'group' && (!!d.go || !!d.gb || !!d.gt);
+    R.info.token = tok(JSON.parse(JSON.stringify(d || {})));
+    var tr0 = q('.group-content > table > tbody > tr', ws[0]); R.info.want2 = vidOf(tr0);
+    var df = JSON.parse(JSON.stringify(d || {})); df.ck = VLk().record(tr0); delete df.ds; R.info.tokenFolded = tok(df);
+  };
+  S.gklD = async function () {
+    await until(function () { return on() && detOpen(); }, 12000); await sleep(800);
+    R.info.b = { got: detVid(), want: P.get('want'), w0: wrappers()[0] && wrappers()[0].className };
+    R.chk.opensWithFolds = detOpen() && detVid() === P.get('want');
+    R.chk.foldKept = !!wrappers()[0] && !wrappers()[0].classList.contains('open');
+  };
+  S.gklE = async function () {
+    await until(function () { return on() && detOpen(); }, 12000); await sleep(800);
+    R.info.b = { got: detVid(), want: P.get('want'), w0: wrappers()[0] && wrappers()[0].className };
+    R.chk.opensFolded = detOpen() && detVid() === P.get('want');
+    R.chk.groupOpened = !!wrappers()[0] && wrappers()[0].classList.contains('open');
+  };
+  // ---- (viewstrict, 2026-11-05) a strict link visit; Keep this as my view; Leave the shared view ----
+  function calcNames() { var A = window.PenumbraCalc && window.PenumbraCalc.active ? window.PenumbraCalc.active() : []; return A.map(function (d) { return d.name; }); }
+  function lsMap(k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } }
+  function shownCols2() { return qa('#tableHeader th[data-colname]').filter(function (t) { return t.style.display !== 'none'; }).map(function (t) { return t.getAttribute('data-colname'); }); }
+  function ctrlShiftH() { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'H', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })); }
+  S.vstA = async function () {
+    await until(function () { return shownRows().length > 0; }, 8000); await sleep(300);
+    var b = window.PenumbraViewLink.build(), d = window.PenumbraViewLink.decode(b.token);
+    R.chk.carriesRowHeight = !!d && (d.rh === 0 || d.rh === 1);
+    var dl = JSON.parse(JSON.stringify(d || {}));
+    if (dl.c && Array.isArray(dl.c.v)) dl.c.v = dl.c.v.filter(function (n) { return n !== 'V_LINK'; });
+    dl.th = 'theme-dark-blue'; dl.dn = 'compact'; dl.rh = 0; dl.cc = [{ name: 'LINKCALC', formula: '{H_NUM} + 1' }];
+    R.info.token = tok(dl); R.info.want = 'x';
+  };
+  S.vstB = async function () {
+    await until(function () { return shownRows().length > 0 && window.PenumbraViewLink.active(); }, 10000); await sleep(1200);
+    var keepB = q('.pnb-vl-keep'), leaveB = q('.pnb-vl-leave');
+    R.info.toast = qa('.pnb-toast-msg').map(text);
+    R.chk.noteButtons = qa('.pnb-toast-msg').some(function (m) { return text(m) === 'Opened a shared view.'; }) && !!keepB && !!leaveB && text(keepB) === 'Keep as my view' && text(leaveB) === 'Leave';
+    R.chk.linkLayout = shownCols2().indexOf('V_LINK') < 0 && shownCols2().indexOf('V_NAME') >= 0;
+    R.info.calc = calcNames();
+    R.chk.calcStrict = calcNames().indexOf('LINKCALC') >= 0 && calcNames().indexOf('MYCALC') < 0;
+    R.chk.rowFromLink = document.body.classList.contains('disable-auto-expand');   // the link's rh 0; the reader's own true
+    R.chk.ownDensity = !document.body.classList.contains('density-compact');   // the reader chose Standard for this report
+    var cb = q('#spClearStorage'), kb = q('#spKeepView');
+    R.chk.clearIsLeave = !!cb && text(cb) === 'Leave the shared view' && !!kb && text(kb) === 'Keep this as my view';
+    R.chk.oneLine = !!cb && !!kb && kb.parentNode === cb.parentNode && getComputedStyle(kb.parentNode).display === 'flex' && kb.nextElementSibling === cb && getComputedStyle(cb).flexGrow === '1' && getComputedStyle(kb).flexGrow === '1';   // (viewstrict 2)
+    rclick(fth('V_NAME')); await sleep(150);
+    var a = acts(), last = menu() ? qa('.pnb-hm-item', menu()).slice(-1)[0] : null; R.info.acts = a;
+    R.chk.menuKeepLeave = a.indexOf('viewKeep') >= 0 && a[a.length - 1] === 'clearPrefs' && !!last && text(q('.pnb-hm-label', last)) === 'Leave the shared view' && a.indexOf('viewKeep') === a.length - 2;
+    if (menu()) keyOn(menu(), 'Escape');
+    await sleep(100);
+    var pm = window.PenumbraPageMenu ? window.PenumbraPageMenu.items().map(function (x) { return x && x.act; }) : [];
+    R.chk.pageMenu = pm.indexOf('viewKeep') >= 0 && pm.indexOf('viewLeave') >= 0;
+    ctrlShiftH(); await sleep(80); ctrlShiftH(); await sleep(150);   // twice: false again, which would differ from the reader's true if written
+    R.chk.visitNoWrite = lsMap('penumbra_pref_rowExpand').lrfix === true && lsMap('penumbra_calc_columns').lrfix && lsMap('penumbra_calc_columns').lrfix[0].name === 'MYCALC';
+    // Keep this as my view
+    if (keepB && keepB.isConnected) keepB.click(); else window.PenumbraViewLink.keep();
+    await sleep(400);
+    var cp = lsMap('penumbra_column_prefs').lrfix, calc = lsMap('penumbra_calc_columns').lrfix;
+    R.info.kept = { cp: cp && { visible: cp.visible }, calc: calc, rx: lsMap('penumbra_pref_rowExpand').lrfix, dn: lsMap('penumbra_pref_density').lrfix };
+    R.chk.keptLayout = !!cp && Array.isArray(cp.visible) && cp.visible.indexOf('V_LINK') < 0 && same(cp.visible, shownCols2());
+    R.chk.keptCalc = Array.isArray(calc) && same(calc.map(function (d) { return d.name; }), ['LINKCALC']);
+    R.chk.keptRow = lsMap('penumbra_pref_rowExpand').lrfix === false;
+    R.chk.keptOwnDensity = lsMap('penumbra_pref_density').lrfix === 'standard';
+    R.chk.keptToast = qa('.pnb-toast-msg').some(function (m) { return /^Saved as your view\./.test(text(m)); });
+    // Leave the shared view (the note's button), and Clear all customizations during the visit
+    window.__nav = null; window.__pnbVlNav = function (u) { window.__nav = u; };
+    var lb = q('.pnb-vl-leave'); if (lb) lb.click(); else window.PenumbraViewLink.leave();
+    await sleep(100);
+    R.chk.leaveUrl = window.__nav === location.pathname + '?id=lrfix';
+    window.__nav = null;
+    if (cb) cb.click();
+    await sleep(100);
+    R.chk.clearAllLeaves = window.__nav === location.pathname + '?id=lrfix';
+  };
+  S.vstC = async function () {
+    await until(function () { return shownRows().length > 0 && window.PenumbraViewLink.active(); }, 10000); await sleep(800);
+    R.chk.linkDensity = document.body.classList.contains('density-compact');   // no density of the reader's own: the link's
+    window.PenumbraViewLink.keep(); await sleep(300);
+    R.chk.keptDensity = lsMap('penumbra_pref_density').lrfix === 'compact';
   };
   try { await boot(); if (S[SCN]) await S[SCN](); else throw new Error('no scenario ' + SCN); }
     catch (e) { R.fail = String(e && e.stack || e); }

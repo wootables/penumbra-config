@@ -193,5 +193,122 @@ $big = range(0, 19999); $t0 = microtime(true); for ($j = 0; $j < 20000; $j++) _p
 ok('P-rankFast', $dt < 1.5, sprintf('%.2fs for 20,000 ranks over 20,000 values', $dt));
 // a change analysis (the was/now groups) mails tables, never cards
 ok('S-changeNoCards', strpos($run, "                    \$viewMode = 'grouped';\r\n                    \$GLOBALS['penumbra_cards_email'] = null;") !== false);
+// ---- (cpdf, 2026-11-05, the user: "card per page if the report was saved in cards mode") the scheduled PDF's cards --------
+list(, , , , , , $PDFP, $TCPDF) = $argv + array_fill(0, 8, '');
+$pcfg = array('title' => 'NAME', 'sub' => array('ID'), 'big' => 'AMT', 'pill' => 'STATUS', 'bar' => 'NUM', 'fields' => array('PEOPLE'), 'nolabels' => false, 'lists' => array(), 'size' => 'standard');
+$pCell = function ($raw, $col) { $s = (string)$raw; if (substr($s, 0, 6) === '@@HTML') $s = strip_tags(substr($s, 6)); return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); };
+$havePdf = function_exists('penumbra_cards_pdf_pages');
+$pp = $havePdf ? penumbra_cards_pdf_pages($rows, false, $pcfg, 'Card <Report>', $pCell) : null;
+$pg = ($pp && isset($pp['pages'])) ? $pp['pages'] : array();
+$labelsOn = function ($h) { foreach (array('ID', 'NAME', 'STATUS', 'AMT', 'NUM', 'PEOPLE', 'PCT', 'NOTE') as $c) if (strpos($h, '>' . $c . '</td>') === false) return false; return true; };
+ok('P-pdfPages', count($pg) === 5 && $pp['shown'] === 5 && $pp['total'] === 5 && !$pp['truncated']
+    && strpos($pg[0], 'Card 1 of 5') !== false && strpos($pg[0], 'Card &lt;Report&gt;') !== false && strpos($pg[0], '>Ann</td>') !== false && strpos($pg[4], 'Card 5 of 5') !== false
+    && strpos($pg[1], '>Closed</td>') !== false && strpos($pg[1], '$2,000.00</span>') !== false && strpos($pg[1], '>AMT</span>') !== false && strpos($pg[1], '>ID-2</div>') !== false
+    && strpos($pg[3], '(blank)') !== false && $labelsOn($pg[0]) && $labelsOn($pg[3]),
+    $pg ? substr($pg[1], 0, 900) : json_encode($pp));
+ok('P-pdfPill', count($pg) === 5 && preg_match('#<td width="16%" align="center" style="font-size:8pt;font-weight:bold;color:[^;]+;border:0\.5px solid [^;]+;">Closed</td>#', $pg[1])
+    && strpos($pg[3], 'align="center" style="font-size:8pt;font-weight:bold;') === false && strpos($pg[0], '<td width="13%" align="center"') !== false, $pg ? substr($pg[1], 0, 700) : '');   // Closed: 8 + 1.3 x 6; Open: 13%; a blank status: none
+ok('P-pdfSafe', count($pg) === 5 && !array_filter($pg, function ($h) { return strpos($h, 'border-radius') !== false || strpos($h, 'class=') !== false || strpos($h, 'var(--') !== false || stripos($h, '<script') !== false; }));
+$brand = penumbra_cards_email_theme('theme-default')['brand'];
+ok('P-pdfBar', count($pg) === 5 && strpos($pg[4], 'bgcolor="' . $brand . '"') !== false && strpos($pg[3], 'bgcolor="' . $brand . '"') === false, $brand);   // NUM 50 the largest; 0: none
+$gp = $havePdf ? penumbra_cards_pdf_pages(array('G1' . (defined('PENUMBRA_GROUP_PATH_SEP') ? PENUMBRA_GROUP_PATH_SEP : ' > ') . 'A' => array($rows[0], $rows[1]), 'G2' => array($rows[2]), 'G3' => array()), true, $pcfg, 'R', $pCell) : null;
+$gpp = ($gp && isset($gp['pages'])) ? $gp['pages'] : array();
+ok('P-pdfGrouped', count($gpp) === 3 && strpos($gpp[0], '>G1 / A</div>') !== false && strpos($gpp[1], '>G1 / A</div>') !== false && strpos($gpp[2], '>G2</div>') !== false && strpos($gpp[2], 'Card 3 of 3') !== false,
+    $gpp ? substr($gpp[0], 0, 600) : json_encode($gp));
+$cp = $havePdf ? penumbra_cards_pdf_pages($rows, false, $pcfg, 'R', $pCell, 2) : null;
+$cpp = ($cp && isset($cp['pages'])) ? $cp['pages'] : array();
+ok('P-pdfCap', count($cpp) === 3 && $cp['shown'] === 2 && $cp['total'] === 5 && $cp['truncated'] && strpos($cpp[1], 'Card 2 of 5') !== false
+    && strpos($cpp[2], 'Showing 2 of 5 cards - 3 cards were left out to keep this PDF a workable size. Open the report for the full data.') !== false, json_encode($cp ? array($cp['shown'], $cp['total'], end($cpp)) : null));
+ok('P-pdfNone', $havePdf && penumbra_cards_pdf_pages(array(), false, $pcfg, 'R', $pCell) === null && penumbra_cards_pdf_pages(array('G' => array()), true, $pcfg, 'R', $pCell) === null);
+// the runner's ask: the saved cards (the email body's own global), never a pivot; the table without them
+$keepG = isset($GLOBALS['penumbra_cards_email']) ? $GLOBALS['penumbra_cards_email'] : null;
+$GLOBALS['penumbra_cards_email'] = $pcfg;
+$f1 = function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for($rows, 'standard', 'R') : null;
+$f2 = function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for($rows, 'pivot', 'R') : 'x';
+$f3 = function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for(array('G1' => array($rows[0])), 'grouped', 'R') : null;
+$GLOBALS['penumbra_cards_email'] = null;
+$f4 = function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for($rows, 'standard', 'R') : 'x';
+$GLOBALS['penumbra_cards_email'] = $keepG;
+ok('P-pdfFor', is_array($f1) && count($f1) === 5 && $f2 === null && is_array($f3) && count($f3) === 1 && strpos($f3[0], '>G1</div>') !== false && $f4 === null, json_encode(array(is_array($f1) ? count($f1) : $f1, $f2, $f4)));
+// the notes: the runner's Notes column on a block of its own, not in the list
+if (function_exists('penumbra_sched_notes_col')) penumbra_sched_notes_col('NOTE');
+$np = $havePdf ? penumbra_cards_pdf_pages($rows, false, $pcfg, 'R', $pCell) : null;
+if (function_exists('penumbra_sched_notes_col')) penumbra_sched_notes_col('');
+$npp = ($np && isset($np['pages'])) ? $np['pages'] : array();
+ok('P-pdfNotes', function_exists('penumbra_sched_notes_col') && count($npp) === 5 && strpos($npp[0], '>NOTE</td>') === false && strpos($npp[0], '>NOTE</div><div style="font-size:9pt;') !== false
+    && strpos($npp[1], '>NOTE</div>') === false, $npp ? substr($npp[0], -400) : '');
+// rendered: the staged plugin (live's TCPDF behind it) - the cover landscape, then a portrait page per card; no
+// card_pages: the cover and the table, as before
+$pdfInfo = function ($bin) {
+    preg_match_all('#/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]#', (string)$bin, $m, PREG_SET_ORDER);
+    return array_map(function ($x) { return ((float)$x[3] - (float)$x[1]) > ((float)$x[4] - (float)$x[2]) ? 'L' : 'P'; }, $m);
+};
+$rendered = null; $tableOnly = null;
+if (is_file($PDFP) && is_file($TCPDF)) {
+    $src = file_get_contents($PDFP);
+    $src = str_replace("__DIR__ . '/lib/tcpdf/tcpdf.php'", var_export($TCPDF, true), $src);
+    $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_cpdf_' . getmypid() . '.php'; file_put_contents($tmp, $src);
+    require_once $tmp;
+    if (function_exists('penumbra_generate_pdf')) {
+        $o = array('orientation' => 'landscape', 'paper_size' => 'letter', 'timestamp' => 'November 5, 2026, 2:30 pm', 'row_text' => 'Rows: 5');
+        $rendered = penumbra_generate_pdf('<table><tr><td>the table</td></tr></table>', 'Card Report', $o + array('card_pages' => $pg));
+        $tableOnly = penumbra_generate_pdf('<table><tr><td>the table</td></tr></table>', 'Card Report', $o + array('card_pages' => null));
+        if (getenv('PNB_CPDF_OUT') && $rendered) file_put_contents(getenv('PNB_CPDF_OUT'), $rendered);   // a look at it
+    }
+    @unlink($tmp);
+}
+$ri = $rendered ? $pdfInfo($rendered) : array(); $ti = $tableOnly ? $pdfInfo($tableOnly) : array();
+ok('P-pdfRender', $ri === array('L', 'P', 'P', 'P', 'P', 'P'), json_encode(array($ri, $rendered ? strlen($rendered) : 0)));
+ok('P-pdfTableKept', $ti === array('L', 'L'), json_encode($ti));
+// the runner's four PDF sites ask for the cards (function_exists-guarded): the send, a recipient's rows, a recipient's
+// filtered rows, a file drop
+$W = "'card_pages' => (function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for(";
+ok('S-pdfWired', substr_count($run, $W) === 3 && substr_count($run, "'card_pages'  => (function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for(\$processedData, \$viewMode, \$reportTitle) : null)") === 1
+    && substr_count($run, $W . "\$processedData, \$viewMode, \$reportTitle) : null)") === 1 && substr_count($run, $W . "\$prData, \$prViewMode, \$reportTitle) : null)") === 1
+    && substr_count($run, $W . "\$prFilteredData, \$prfViewMode, \$reportTitle) : null)") === 1);
+// (cpdf sweep) a per-recipient change analysis (its own rows' and its filtered rows') sends the was/now tables, never cards
+ok('S-pdfChange', substr_count($run, "\$GLOBALS['penumbra_cards_email'] = null;   // (cpdf sweep) this recipient's was/now tables, never cards") === 2
+    && strpos($run, "\$prViewMode = 'grouped';\r\n                                    \$GLOBALS['penumbra_cards_email'] = null;") !== false
+    && strpos($run, "\$prfViewMode = 'grouped';\r\n                                        \$GLOBALS['penumbra_cards_email'] = null;") !== false);
+// (cpdf sweep) each value in its column's report format first, as the email's cards (the runner's penumbra_email_cell_format:
+// a stand-in here, as the runner is never required)
+if (!function_exists('penumbra_email_cell_format')) { function penumbra_email_cell_format($c, $v) { return $c === 'AMT' ? 'fmt:' . $v : $v; } }
+$GLOBALS['penumbra_cards_email'] = $pcfg;
+$ff = function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for($rows, 'standard', 'R') : null;
+$GLOBALS['penumbra_cards_email'] = $keepG;
+ok('P-pdfFormat', is_array($ff) && count($ff) === 5 && strpos($ff[1], 'fmt:$2,000.00</span>') !== false && strpos($ff[1], '>fmt:$2,000.00</td>') !== false && strpos($ff[1], 'fmt:ID-2') === false, $ff ? substr($ff[1], 0, 500) : '');
+// (cpdf sweep) an array-valued cell: no PHP 8 "Array to string conversion" (P-noWarnings below reads the include's warnings)
+$rowsArr = $rows; $rowsArr[0]['PEOPLE'] = array('Palmtag, Scott', 'Smith, Jo'); $rowsArr[1]['AMT'] = array(1, 2);
+$pa = $havePdf ? penumbra_cards_pdf_pages($rowsArr, false, $pcfg, 'R', function ($raw, $col) { return is_array($raw) ? 'list' : htmlspecialchars((string)$raw); }) : null;
+ok('P-pdfArray', is_array($pa) && count($pa['pages']) === 5);
+// (csweep3) array cells in the email's cards and the PDF's: a list column's array cell shows its html (no chips of the
+// word "Array", no PHP 8 "Array to string conversion"); an EMPTY array cell is blank (the title "(blank)", no big number)
+$aCell = function ($row, $idx, $cols) {
+    $o = array('row' => array(), 'cells' => array());
+    foreach ($cols as $c) { if (!array_key_exists($c, $row)) continue; $raw = $row[$c];
+        $o['cells'][strtoupper($c)] = array('raw' => $raw, 'html' => is_array($raw) ? ($raw ? 'list:' . count($raw) : '') : htmlspecialchars((string)$raw), 'css' => array()); }
+    return $o;
+};
+$rowsA = $rows; $rowsA[0]['PEOPLE'] = array('Palmtag, Scott', 'Smith, Jo'); $rowsA[2]['ID'] = array();
+$e0 = count($ERRS);
+$ea = penumbra_cards_email_html($rowsA, false, $cfg, 'theme-default', $aCell, 0);
+$eaw = array_slice($ERRS, $e0); $eac = $cards($ea['html']);
+$pb = $havePdf ? penumbra_cards_pdf_pages(array(array('ID' => 'ID-9', 'NAME' => array(), 'STATUS' => 'Open', 'AMT' => array(), 'NUM' => '', 'PEOPLE' => '', 'PCT' => '', 'NOTE' => '')), false, $pcfg, 'R',
+    function ($raw, $col) { return is_array($raw) ? '' : htmlspecialchars((string)$raw); }) : null;
+$pb0 = (is_array($pb) && isset($pb['pages'][0])) ? $pb['pages'][0] : '';
+ok('P-arrayCells', count($eac) === 5 && empty($eaw) && strpos($eac[0], 'list:2') !== false && strpos($eac[0], '>Array</span>') === false && strpos($eac[2], '(blank)') !== false
+    && $pb0 !== '' && strpos($pb0, '(blank)') !== false && strpos($pb0, '>AMT</span>') === false,
+    json_encode(array(count($eac), $eaw, $eac ? substr($eac[2], 0, 260) : null, substr($pb0, 0, 260))));
+// (mailhid, 2026-11-05, the user's emailed pivot cards) a value its highlight paints in its own fill (text colour =
+// background colour, spaced and cased apart) mails blank: its line kept, its label, no span, no colour; a list ruled in two
+// colours keeps them on every chip
+$hidFn = function ($row, $idx, $cols) use ($cellFn) {
+    $o = $cellFn($row, $idx, $cols);
+    if ($idx === 0) { $o['cells']['NOTE']['css'] = array('color' => '#00803F', 'background-color' => ' #00803f'); $o['cells']['PEOPLE']['css'] = array('color' => '#c62828', 'background-color' => '#ffebee'); }
+    return $o;
+};
+$hc = $cards(penumbra_cards_email_html($rows, false, $cfg, 'theme-default', $hidFn, 0)['html']); $hc0 = isset($hc[0]) ? $hc[0] : '';
+ok('P-hidBlank', count($hc) === 5 && preg_match('#white-space:nowrap;">NOTE</td><td valign="top" style="[^"]*">&nbsp;</td></tr>#', $hc0) === 1 && strpos($hc0, '>x</span>') === false && stripos($hc0, '#00803f') === false, substr($hc0, -420));
+ok('P-hidKept', substr_count($hc0, 'color:#c62828;background-color:#ffebee;">') === 2 && strpos($hc0, 'color:#c62828;background-color:#ffebee;">Palmtag, Scott</span>') !== false, substr($hc0, 0, 600));
 ok('P-noWarnings', empty($ERRS), implode(' | ', array_slice(array_unique($ERRS), 0, 4)));
 echo implode("\n", $out) . "\n";

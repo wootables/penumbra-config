@@ -125,7 +125,7 @@ try {
   // ---- 1. Sandbox: real readers + shape rules, stubbed DOM ----------------
   var stubs = [
     // pivot token grammar - enough of it for COL and COL:split
-    'function pivotParseFieldToken(t){ t=String(t==null?"":t); var i=t.indexOf(":"); if(i===-1) return {base:t, split:""}; var sp=t.slice(i+1); var m=/^(bin)(\\d+)$/.exec(sp); return {base:t.slice(0,i), split: m?m[1]:sp, binWidth: m?+m[2]:undefined}; }',
+    'function pivotParseFieldToken(t){ t=String(t==null?"":t); var i=t.indexOf(":"); if(i===-1) return {base:t, split:""}; var sp=t.slice(i+1); var am=/^([a-z]+)@([^:]+)/i.exec(sp); if(am) return {base:t.slice(0,i), split:am[1].toLowerCase(), end:am[2], phase: sp.indexOf(":phase")!==-1, prorate: sp.indexOf(":prorate")!==-1}; var m=/^(bin)(\\d+)$/.exec(sp); return {base:t.slice(0,i), split: m?m[1]:sp, binWidth: m?+m[2]:undefined}; }',
     'function pivotFieldBase(t){ return pivotParseFieldToken(t).base; }',
     'function pivotFieldDisplayLabel(t){ var p=pivotParseFieldToken(t); return p.split? p.base+" ("+p.split+")" : p.base; }',
     'function pivotPercentileP(a){ var m=/^p(\\d{1,2})$/.exec(String(a||"")); return m? +m[1] : null; }',
@@ -162,10 +162,15 @@ try {
     grab('function pivotToVizConfig('), grab('function _vizAutoSource('), grab('function getSmartVizDefaults('),
     // autoviz (2026-11-02): auto-build keeps a deliberately picked type
     grab('function _vizAutoColClasses('), grab('function _vizAutoMeasureList('), grab('function _vizAutoSecondCat('),
-    grab('function _vizAutoStateCol('), grab('function _vizAutoGanttDates('), grabVar('_VIZ_AGG_TITLE_WORDS'),
+    // dtpick (2026-11-05): ONE start/end pair rule (penumbraDatePair replaced _vizAutoGanttDates)
+    grab('function _vizAutoStateCol('), grab('function penumbraDatePair('), grabVar('_VIZ_AGG_TITLE_WORDS'),
     grab('function _vizAutoYAxisTitle('), grab('function _vizAutoRetype('),
     // gone (2026-11-03): the retype gantt case words a fixed end through this
-    grab('function _vizGanttEndFixedLabel(')
+    grab('function _vizGanttEndFixedLabel('),
+    // dtpick (2026-11-05): the New / Continuation column, and Chart this column's grouping
+    grab('function _vizAutoPhaseCol('), grab('function _vizChartColumnSplit('),
+    // dtpick B (2026-11-05): active during - the spec reader, the span test, the types that draw it
+    grab('function _vizActiveSpec('), grab('function _vizActiveSpans('), grabVar('_VIZ_ACTIVE_TYPES')
   ].join('\n');
 
   var SB = new Function(stubs + '\n' + real + '\n' +
@@ -175,7 +180,8 @@ try {
     ' score: _vizScoreXCandidate, groups: groupsToVizConfig, report: reportToVizConfig, pivot: pivotToVizConfig,' +
     ' source: _vizAutoSource, smart: getSmartVizDefaults,' +
     ' classes: _vizAutoColClasses, mlist: _vizAutoMeasureList, secondCat: _vizAutoSecondCat,' +
-    ' stateCol: _vizAutoStateCol, ganttDates: _vizAutoGanttDates, ytitle: _vizAutoYAxisTitle, retype: _vizAutoRetype };')();
+    ' stateCol: _vizAutoStateCol, ganttDates: penumbraDatePair, ytitle: _vizAutoYAxisTitle, retype: _vizAutoRetype,' +
+    ' datePair: penumbraDatePair, phaseCol: _vizAutoPhaseCol, chartSplit: _vizChartColumnSplit, activeSpans: _vizActiveSpans };')();
 
   // ---- scenario builders -------------------------------------------------
   // defs: [[name, kind]] kind = text | money | num | date | bool | year(=date at year granularity)
@@ -687,6 +693,110 @@ try {
   m10 = SB.report();
   rt = SB.retype('gantt', 'Gantt', m10);
   eq('mixedcase: gantt retype finds the date pair (start / end rides groupBy)', [rt.ok, m10.config.yAxis, m10.config.groupBy], [true, 'WORKFLOW_CREATED', 'UNDER_REVIEW_SINCE']);
+
+  // ---- 12. dtpick (2026-11-05): one date pair, every grouping offered, the New / Continuation stack ----
+  // static: the chart builder's lists carry every registry grouping; Hour needs a time of day; the old guesser is gone
+  ok('dtpick static: the X / series lists offer every registry period and cycle',
+     /var PENUMBRA_VIZ_DATE_BUCKETS = \['year', 'fy', 'yq', 'fyq', 'ym', 'quarter', 'fquarter', 'month', 'monthnum', 'dow', 'hour'\];/.test(code));
+  ok('dtpick static: Hour only on dates with a time', /if \(id === 'hour' && gran < 3\) return;/.test(grab('function _vizBucketVariantsFor(')));
+  ok('dtpick static: _vizAutoGanttDates is gone (one pair rule)', code.indexOf('function _vizAutoGanttDates(') === -1);
+  ok('dtpick static: the Timeline row takes the same pair', /var pair = penumbraDatePair\(dates\);/.test(grab('function penumbraHeaderTimelineCols(')));
+  var _hcc = grab('function penumbraHeaderChartColumn(');
+  ok('dtpick static: Chart this column groups by the span rule unless told', /\(split === 'raw'\) \? '' : \(split \|\| _vizChartColumnSplit\(base, window\.vizCachedData\)\)/.test(_hcc));
+  ok('dtpick static: ...a grouped axis sorts by label, earliest first', /\$\('#vizSortBy'\)\.val\('label'\);\n\s*\$\('#vizSortDir'\)\.val\('asc'\);/.test(_hcc));
+  ok('dtpick static: the header API offers the Chart by list', /chartVariants: penumbraHeaderChartVariants,/.test(code));
+  // the pair
+  eq('pair: end named like an end, start named like a start', SB.datePair(['AWARD_END_DATE', 'PROJECT_START']), { start: 'PROJECT_START', end: 'AWARD_END_DATE' });
+  eq('pair: AWARD names a start', SB.datePair(['CREATED', 'AWARD_BEGIN', 'AWARD_END']), { start: 'AWARD_BEGIN', end: 'AWARD_END' });
+  eq('pair: FROM names a start (the Timeline knew it, the Gantt did not)', SB.datePair(['LOGGED', 'VALID_FROM', 'VALID_THRU']), { start: 'VALID_FROM', end: 'VALID_THRU' });
+  eq('pair: an AWARD column named like an end is the end, never the start', SB.datePair(['AWARD_END_DATE', 'NOTICE_DATE']), { start: 'NOTICE_DATE', end: 'AWARD_END_DATE' });
+  eq('pair: neutral names -> table order', SB.datePair(['D1', 'D2']), { start: 'D1', end: 'D2' });
+  eq('pair: one date -> null', SB.datePair(['D1']), null);
+  // the span rule reads the rows it is given; Chart this column groups only past 12 dates
+  setTable([['LOG_DATE', 'date'], ['FY', 'year']]);
+  var _rws = setRows(60, function (i) { return { LOG_DATE: iso(2010 + (i % 15), 1 + (i % 12), 3) }; });
+  window.vizCachedData = [];
+  eq('dateSplit: the rows passed, not the builder cache', SB.dateSplit('LOG_DATE', _rws), 'year');
+  eq('chartSplit: 15 years of dates -> years', SB.chartSplit('LOG_DATE', _rws), 'year');
+  var _few = setRows(40, function (i) { return { LOG_DATE: iso(2025, 1 + (i % 10), 1), FY: '2025' }; });
+  eq('chartSplit: 10 distinct dates -> each date as it is', SB.chartSplit('LOG_DATE', _few), '');
+  var _q = setRows(80, function (i) { return { LOG_DATE: iso(2022 + (i % 4), 1 + (i % 12), 1 + (i % 20)), FY: String(2022 + (i % 4)) }; });
+  eq('chartSplit: four years of dates -> quarters', SB.chartSplit('LOG_DATE', _q), 'yq');
+  eq('chartSplit: a bare-year column stays as it is', SB.chartSplit('FY', _q), '');
+  // the New / Continuation column
+  var PH = [['RECORD_ID', 'text'], ['AWARD_TYPE', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date'], ['AMOUNT', 'money']];
+  function phRows(types) {
+    // (dtpick B) six-month awards: no run past a year, so the award type keeps the stack (a long run is section 13's)
+    return setRows(120, function (i) { var y = 2019 + (i % 5), mo = 1 + (i % 12), em = mo + 6, ey = y + (em > 12 ? 1 : 0); return { RECORD_ID: 'R' + i, AWARD_TYPE: types[i % types.length], AWARD_END: iso(ey, em > 12 ? em - 12 : em, 1), AWARD_BEGIN: iso(y, mo, 1), AMOUNT: '$' + (1000 + i) }; });
+  }
+  setTable(PH); phRows(['New', 'Continuation', 'Renewal']);
+  eq('phase: New / Continuation / Renewal is the column', SB.phaseCol(['RECORD_ID', 'AWARD_TYPE'], window.vizCachedData), 'AWARD_TYPE');
+  r = SB.report();
+  eq('report phase: by the START per period, stacked by the award type, bars', [r.config.type, r.config.xAxis, r.config.groupBy, r.config.stacked], ['bar', 'AWARD_BEGIN:yq', 'AWARD_TYPE', true]);
+  eq('report phase: ...on the Paired palette', r.config.vizOptions, { palette: 'paired' });
+  eq('report phase: ...in period order', [r.sortBy, r.sortDir], ['label', 'asc']);
+  has('report phase: ...and says so', r.warnings, /AWARD_TYPE sorts the rows into new and continuing ones, so each bar is stacked by it, in two tones of one colour \(the Paired palette\)/);
+  phRows(['Non-Competing', 'New']);
+  eq('phase: New / Non-Competing counts too', SB.phaseCol(['RECORD_ID', 'AWARD_TYPE'], window.vizCachedData), 'AWARD_TYPE');
+  phRows(['Open', 'Closed', 'Pending']);
+  eq('phase: a status column is no phase', SB.phaseCol(['RECORD_ID', 'AWARD_TYPE'], window.vizCachedData), '');
+  r = SB.report();
+  ok('report phase: ...and its chart has no palette set', !r.config.vizOptions && r.config.groupBy === 'none', JSON.stringify(r.config));
+  phRows(['New', 'Old']);
+  eq('phase: New / Old is no phase (no continuing value)', SB.phaseCol(['RECORD_ID', 'AWARD_TYPE'], window.vizCachedData), '');
+  phRows(['New', 'Continuation', 'Renewal', 'Supplement', 'Transfer']);
+  eq('phase: five values is no phase', SB.phaseCol(['RECORD_ID', 'AWARD_TYPE'], window.vizCachedData), '');
+  setTable([['AWARD_TYPE', 'text'], ['AMOUNT', 'money']]);
+  setRows(60, function (i) { return { AWARD_TYPE: ['New', 'Continuation'][i % 2], AMOUNT: '$' + (10 + i) }; });
+  r = SB.report();
+  ok('report phase: no date -> the award type is charted as it is, no stack', r.config.xAxis === 'AWARD_TYPE' && !r.config.vizOptions && !r.config.stacked, JSON.stringify(r.config));
+  setTable(AWD); awdRows(200);
+  r = SB.report();
+  ok('report phase: a better category X (awdspon) keeps its chart, no Paired palette', r.config.xAxis === 'PRIME_SPONSOR_CATEGORY' && !r.config.vizOptions, JSON.stringify(r.config));
+  // Auto-build's date is the pair's START
+  setTable([['RECORD_ID', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, AWARD_END: iso(2026 + (i % 3), 6, 30), AWARD_BEGIN: iso(2020 + (i % 4), 1 + (i % 12), 5), AMOUNT: '$' + (i * 10) }; });
+  r = SB.report();
+  eq('report date: the START of the pair, not the first date column', pivotBaseOf(r.config.xAxis), 'AWARD_BEGIN');
+  setTable([['STATUS', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { STATUS: STATUS[i % 3], AWARD_END: iso(2026 + (i % 3), 6, 30), AWARD_BEGIN: iso(2020 + (i % 4), 1 + (i % 12), 5), AMOUNT: '$' + (i * 10) }; });
+  m10 = SB.report();
+  rt = SB.retype('line', 'Line', m10);
+  eq('retype line: the X moves to the START of the pair', [rt.ok, pivotBaseOf(m10.config.xAxis)], [true, 'AWARD_BEGIN']);
+  function pivotBaseOf(t) { return String(t || '').split(':')[0]; }
+
+
+  // ---- 13. dtpick B (2026-11-05): active during - Auto-build counts each row in every period it runs ----
+  ok('dtpick B static: the data builder reaches the active helpers only on an @ after a column (harnesses lift it whole)',
+     /var _actX = \(String\(xAxis \|\| ''\)\.indexOf\('@'\) > 0\) \? _vizActiveSpec\(xAxis\) : null;/.test(code));
+  ok('dtpick B static: bars and lines only', /var _VIZ_ACTIVE_TYPES = \{ bar: 1, line: 1 \};/.test(code));
+  var LG = [['RECORD_ID', 'text'], ['AWARD_TYPE', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date'], ['AMOUNT', 'money']];
+  function lgRows(n, months) {
+    return setRows(n, function (i) { var y = 2019 + (i % 5), mo = 1 + (i % 12), em = mo + months, ey = y + Math.floor((em - 1) / 12); em = ((em - 1) % 12) + 1; return { RECORD_ID: 'R' + i, AWARD_TYPE: ['New', 'Continuation'][i % 2], AWARD_END: iso(ey, em, 1), AWARD_BEGIN: iso(y, mo, 1), AMOUNT: '$' + (1000 + i) }; });
+  }
+  setTable(LG); var _lg = lgRows(120, 36);
+  ok('spans: three-year awards run past a year', SB.activeSpans(_lg, { start: 'AWARD_BEGIN', end: 'AWARD_END' }) === true);
+  ok('spans: six-month awards do not', SB.activeSpans(lgRows(120, 6), { start: 'AWARD_BEGIN', end: 'AWARD_END' }) === false);
+  ok('spans: fewer than 10 rows with both dates decide nothing', SB.activeSpans(lgRows(9, 36), { start: 'AWARD_BEGIN', end: 'AWARD_END' }) === false);
+  ok('spans: a blank end runs to today', SB.activeSpans(setRows(20, function (i) { return { AWARD_BEGIN: iso(2020, 1 + (i % 12), 1), AWARD_END: '' }; }), { start: 'AWARD_BEGIN', end: 'AWARD_END' }) === true);
+  lgRows(120, 36);
+  r = SB.report();
+  var _at = r.config.xAxis;
+  ok('report active: three-year awards -> each counted in every period, by the START', /^AWARD_BEGIN:[a-z]+@AWARD_END$/.test(_at), _at);
+  eq('report active: ...stacked into Started / Continuing (the computed phase, ahead of the award type), bars', [r.config.groupBy, r.config.stacked, r.config.type], [_at + ':phase', true, 'bar']);
+  eq('report active: ...on the Paired palette', r.config.vizOptions, { palette: 'paired' });
+  has('report active: ...and says so', r.warnings, /Each row counts in every period from AWARD_BEGIN to AWARD_END \(a blank end runs to today\), stacked into started and continuing/);
+  rt = SB.retype('pie', 'Pie', r);
+  ok('retype: a pie of it is refused, saying why', !rt.ok && /would count a row in several parts/.test(rt.reason || ''), rt.reason);
+  setTable([['STATUS', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { STATUS: STATUS[i % 3], AWARD_END: iso(2025 + (i % 3), 6, 30), AWARD_BEGIN: iso(2020 + (i % 4), 1 + (i % 12), 5), AMOUNT: '$' + (i * 10) }; });
+  r = SB.report();
+  ok('report active: a category X keeps its chart', r.config.xAxis === 'STATUS' && !r.config.vizOptions, JSON.stringify(r.config));
+  has('report active: ...and the HEADS UP names Chart active by', r.warnings, /AWARD_BEGIN to AWARD_END runs past a year for most rows: right-click either column for Chart active by/);
+  setTable([['STATUS', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date']]);
+  setRows(80, function (i) { var mo = 1 + (i % 12); return { STATUS: STATUS[i % 3], AWARD_END: iso(2024, mo, 28), AWARD_BEGIN: iso(2024, mo, 1) }; });
+  r = SB.report();
+  hasNot('report active: one-month spans: no Chart active by hint', r.warnings, /Chart active by/);
 
 } catch (e) {
   FAIL++; LOG.push('HARNESS-ERROR ' + (e && e.stack || e));

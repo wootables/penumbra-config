@@ -71,6 +71,14 @@ FIXTURE = r'''  (function () {
     }
     // json (2026-10-26, jsontot): a nested-table column, J_SUBS = 0-3 rows of SUB_NAME (from four) and SUB_AMT,
     // on this scenario alone (the other scenarios' columns stay as they were). Its own RNG.
+    // (dtpick C, 2026-11-05) active: END_DATE beside AWARD_DATE (a start/end pair) - a blank end every 5th row, the
+    // eirbprotsum placeholder 2100-01-01 every 7th, else an end in 2025-2027. This scenario alone.
+    if (window.__SCN === 'active' || window.__SCN === 'pvactive') {   // (dtpick D2) pvactive too
+      rows.forEach(function (r, ri) {
+        r.END_DATE = (ri % 5 === 0) ? '' : (ri % 7 === 0 ? '2100-01-01' : (2025 + (ri % 3)) + '-' + ('0' + (1 + (ri % 12))).slice(-2) + '-15');
+      });
+      COLS.push('END_DATE');
+    }
     if (window.__SCN === 'json') {
       var seed3 = 4242;
       function rnd3() { seed3 = (seed3 * 1103515245 + 12345) & 0x7fffffff; return seed3 / 0x7fffffff; }
@@ -194,5 +202,20 @@ out = out.replace(_cs, '  <div id="singleColumnOptions">\n' + _cs + '  </div>\n'
 out = out.replace('  <button id="confirmCopyBtn">Copy</button>\n</div>\n', '  <button id="confirmCopyBtn">Copy</button>\n  <button id="copyCopySnippetBtn">Copy snippet</button>\n  </div>\n</div>\n', 1)
 assert 'copyCopySnippetBtn' in out and 'id="singleColumnOptions"' in out and 'id="copyActionsBtn"' in out, 'copy stub'
 assert 'main_dc.js' not in out and 'search_builder_dc' not in out
+# (dtpick D2, 2026-11-05) the pivot builder lifted from the live index.php (as pivmenu's mk_harness does) and a shown
+# Pivot button: the pvactive scenario drives the real builder (Pivot active by, the caret, Generate, Copy Snippet)
+def lift_builder(index_src):
+    s = index_src.replace('\r\n', '\n')
+    i = s.find('<div id="pivotLightbox" class="help-lightbox">')
+    if i < 0: raise SystemExit('lift: the pivot builder not found in index.php')
+    j = s.find('\n</div>\n', i)
+    b = s[i:j + 7]
+    b = re.sub(r'<\?php\s*/\*.*?\*/\s*\?>', '', b, flags=re.S)
+    if '<?' in b: raise SystemExit('lift: PHP left in the pivot builder: %r' % b[b.index('<?'):b.index('<?') + 120])
+    return b.replace('<div id="pivotLightbox" class="help-lightbox">', '<div id="pivotLightbox" class="help-lightbox" style="display:none">', 1)
+_idx = open(r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra\index.php', 'rb').read().decode('utf-8')
+_cs0 = '<div id="copyStub" style="display:none">\n'
+assert out.count(_cs0) == 1, 'builder anchor'
+out = out.replace(_cs0, '<button id="pivotBtn" type="button">Pivot</button>\n' + lift_builder(_idx) + '\n' + _cs0, 1)
 open(os.path.join(HERE, 'harness.html'), 'wb').write(out.encode('utf-8'))
 print('harness.html written (%d bytes)' % len(out))

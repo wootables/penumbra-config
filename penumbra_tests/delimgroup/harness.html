@@ -33,6 +33,279 @@
 <!-- the scheduler's shared change-column list (applyTaskTypeUI fills it) -->
 <div id="schedColumnSelector"></div>
 <!-- the Copy dialog's single-column controls (#confirmCopyBtn is bound at ready time) -->
+<button id="pivotBtn" type="button">Pivot</button>
+<div id="pivotLightbox" class="help-lightbox" style="display:none">
+    <div class="lightbox-content pnb-dlg" style="width: 88%; max-width: 1440px; max-height: 96vh;">
+        <div class="pnb-dlg-head">
+            <span class="pnb-dlg-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#pnbi-pivot"/></svg></span>
+            <div class="pnb-dlg-tt">
+                <h3 class="pivot-builder-title pnb-dlg-title">Pivot Table Builder <span class="tab-help-icon" data-target="#pivotBuilderHelpLightbox" title="Pivot Table Builder Help">?</span></h3>
+                <p class="pnb-dlg-sub">Summarize rows into a cross-tab</p>
+            </div>
+            <span class="pnb-dlg-action" id="pivotPresetMount"></span>
+            <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
+        </div>
+        <div id="pivot-container">
+            <!-- LEFT: Fields Panel -->
+            <div class="pivot-fields-panel">
+                <div class="pivot-fields-header">Fields <span class="bld-help-icon" data-tip="pivot-fields"></span></div>
+                <input type="text" id="pivot-field-search" class="pivot-field-search" placeholder="Search fields..." aria-label="Search fields" />
+                <div id="pivot-source-columns" class="pivot-drop-zone"></div>
+            </div>
+
+            <!-- CENTER: Drop Zones -->
+            <div id="pivot-config-area">
+                <div class="pivot-card" data-zone="rows">
+                    <div class="pivot-card-header">
+                        <span class="pivot-card-title">Rows <span class="bld-help-icon" data-tip="pivot-rows"></span></span>
+                        <div id="pivot-rows-layout" class="pivot-inline-layout">
+                            <label>Layout: <span class="bld-help-icon" data-tip="pivot-rows-layout"></span></label>
+                            <select id="pivot-rows-layout-select">
+                                <option value="nested">Nested (Collapsible)</option>
+                                <option value="nested-static">Nested (Static)</option>
+                                <option value="flat">Side-by-side</option>
+                            </select>
+                            <span class="pivot-inline-sep"></span>
+                            <label>Frozen: <span class="bld-help-icon" data-tip="pivot-rows-frozen"></span></label>
+                            <select id="pivot-sticky-cols">
+                                <option value="3">3</option>
+                                <option value="0">None</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="pivot-rows" class="pivot-drop-zone" data-placeholder="Drag fields here for row grouping"></div>
+                </div>
+
+                <div class="pivot-transpose-row">
+                    <button id="pivotTransposeBtn" class="pivot-transpose-btn" title="Swap Rows and Columns">&#8693;</button>
+                </div>
+
+                <div class="pivot-card" data-zone="cols">
+                    <div class="pivot-card-header">
+                        <span class="pivot-card-title">Columns <span class="bld-help-icon" data-tip="pivot-cols"></span></span>
+                        <div id="pivot-cols-layout" class="pivot-inline-layout">
+                            <label>Layout: <span class="bld-help-icon" data-tip="pivot-cols-layout"></span></label>
+                            <select id="pivot-cols-layout-select">
+                                <option value="nested">Nested (Hierarchical)</option>
+                                <option value="flat">Combined (Year-Quarter)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="pivot-cols" class="pivot-drop-zone" data-placeholder="Drag fields here for column headers"></div>
+                </div>
+
+                <div class="pivot-card" data-zone="vals">
+                    <div class="pivot-card-header">
+                        <span class="pivot-card-title">Values <span class="bld-help-icon" data-tip="pivot-vals"></span></span>
+                    </div>
+                    <div id="pivot-vals" class="pivot-drop-zone pivot-vals-drop" data-placeholder="Drop a column here to add an aggregation"></div>
+                    <table id="pivot-agg-table">
+                        <thead><tr>
+                            <th class="pat-drag"></th>
+                            <th class="pat-agg" data-tip="The math operation applied to each cell of this pivot row. Sum adds values, Count counts matching rows, Average/Median give the center, Min/Max find extremes, Std Deviation and Range measure spread, Count Non-Blank/Blank split rows by whether the value is filled in, and Mode/Antimode find the most/least common value. Derived types (% of Row/Column/Grand Total, % Change, Running Total, Index) are calculated from a base row above them and must be listed after at least one base aggregation. Click any Aggregate cell below to change its type.">Aggregate</th>
+                            <th class="pat-src" data-tip="Which column from your query result this aggregation reads. Sum/Avg/Min/Max/Median/Std Deviation/Range need a numeric column (dollars, counts, etc). Count, Count (Distinct), Count Non-Blank/Blank, Mode and Antimode accept any column. Derived types like % Change or Running Total inherit their source from the base row above and cannot be changed here. Click a cell to pick a different source column.">Source Column</th>
+                            <th class="pat-lbl" data-tip="The header text shown for this value in the generated pivot table, Excel/CSV exports, and scheduled emails. Defaults to the aggregation name ('Sum', 'Count', etc.). Click a cell to type a custom label - handy when you have multiple aggregations and want clearer names like 'Total Awarded' or 'Active Grants Count'.">Display Label</th>
+                            <th class="pat-flt" data-tip="Optional condition that restricts which rows feed into this aggregation. Uses the same syntax as the main filter box - e.g. STATUS = Active, AMOUNT > 1000, DEPT = /^Med/. Leave blank to include all rows (default). Great for side-by-side comparisons in one pivot: add two Sum rows, filter one to 'STATUS = Active' and leave the other unfiltered to show Active vs All.">Filter</th>
+                            <th class="pat-colt" data-tip="Controls how this row is summarized in the footer (totals) row at the bottom of the pivot. Defaults to 'Same as [Aggregate]' - the footer uses the same operation as the cells. Click a cell below to override with a different base aggregation, e.g. show an Average in the footer even though the cells are Sums. Useful when summing sums doesn't make sense (averaging per-row counts, showing a median across columns, etc.).">Column Total</th>
+                            <th class="pat-opt" data-tip="Options for this value. Format: Number, Currency or Percent, and how many decimals. Shading: a color scale or data bars on its cells, each pivot column on its own scale (bars are capped at the 99th percentile, negatives and % changes shade both ways from zero). Applies when you Generate; saved with the pivot, its presets and the report, and scheduled emails show it too.">&#9881;</th>
+                            <th class="pat-rm"></th>
+                        </tr></thead>
+                        <tbody id="pivot-agg-table-body">
+                        </tbody>
+                    </table>
+                    <div class="pivot-agg-bar">
+                        <select id="pivot-aggregation-selector" class="pivot-add-agg-select" title="Add aggregation">
+                            <option value="">+ Add Aggregation</option>
+                            <optgroup label="Totals &amp; Center">
+                                <option value="sum">Sum</option>
+                                <option value="avg">Average</option>
+                                <option value="median">Median</option>
+                            </optgroup>
+                            <optgroup label="Counts">
+                                <option value="count">Count</option>
+                                <option value="distinct">Count (Distinct)</option>
+                                <option value="count_filled">Count Non-Blank</option>
+                                <option value="count_blank">Count Blank</option>
+                            </optgroup>
+                            <optgroup label="Spread">
+                                <option value="min">Minimum</option>
+                                <option value="max">Maximum</option>
+                                <option value="range">Range (Max - Min)</option>
+                                <option value="stddev">Std Deviation</option>
+                            </optgroup>
+                            <optgroup label="Weighted">
+                                <option value="wavg">Weighted Average&hellip;</option>
+                            </optgroup>
+                            <optgroup label="Percentiles">
+                                <option value="p10">P10 (10th percentile)</option>
+                                <option value="p25">P25 (lower quartile)</option>
+                                <option value="p75">P75 (upper quartile)</option>
+                                <option value="p90">P90 (90th percentile)</option>
+                                <option value="p95">P95 (95th percentile)</option>
+                                <option value="p99">P99 (99th percentile)</option>
+                            </optgroup>
+                            <optgroup label="Most / Least Common">
+                                <option value="mode">Mode</option>
+                                <option value="antimode">Antimode</option>
+                            </optgroup>
+                            <optgroup label="Custom">
+                                <option value="formula">Formula (custom)</option>
+                            </optgroup>
+                            <optgroup label="Derived (need a base row above)">
+                                <option value="pct_change">% Change</option>
+                                <option value="pct_change_td">% Change (to date)</option>
+                                <option value="pct_change:down">% Change &#x2193;</option>
+                                <option value="diff">Change (Difference)</option>
+                                <option value="diff:down">Change &#x2193;</option>
+                                <option value="pct_row_total">% of Row Total</option>
+                                <option value="pct_col_total">% of Column Total</option>
+                                <option value="pct_parent_row">% of Parent Row Total</option>
+                                <option value="pct_parent_col">% of Parent Column Total</option>
+                                <option value="pct_cum">Cumulative % &#x2192;</option>
+                                <option value="pct_cum:down">Cumulative % &#x2193; (Pareto)</option>
+                                <option value="index">Index (Base 100)</option>
+                                <option value="index:down">Index &#x2193;</option>
+                                <option value="pct_grand_total">% of Grand Total</option>
+                                <option value="running_total">Running Total &#x2192;</option>
+                                <option value="running_total:down">Running Total &#x2193;</option>
+                                <option value="running_count">Running Count &#x2192;</option>
+                                <option value="running_count:down">Running Count &#x2193;</option>
+                                <option value="ytd">Year to Date &#x2192;</option>
+                                <option value="ytd:down">Year to Date &#x2193;</option>
+                                <option value="yoy">Year over Year %</option>
+                                <option value="yoy:down">Year over Year % &#x2193;</option>
+                                <option value="roll3">3-Period Rolling Avg &#x2192;</option>
+                                <option value="roll6">6-Period Rolling Avg &#x2192;</option>
+                                <option value="roll12">12-Period Rolling Avg &#x2192;</option>
+                                <option value="roll3:down">3-Period Rolling Avg &#x2193;</option>
+                                <option value="roll12:down">12-Period Rolling Avg &#x2193;</option>
+                                <option value="rollsum3">3-Period Rolling Total &#x2192;</option>
+                                <option value="rollsum12">12-Period Rolling Total &#x2192;</option>
+                                <option value="rollsum12:down">12-Period Rolling Total &#x2193;</option>
+                                <option value="prioryear">Same Period Last Year</option>
+                                <option value="prioryear:down">Same Period Last Year &#x2193;</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="pivotErrorBox" style="display: none;" role="alert" aria-live="assertive"></div>
+            </div>
+
+            <!-- RIGHT: Configuration Panel -->
+            <div id="pivot-settings-panel">
+                <div class="pivot-settings-header">Configuration</div>
+
+                <div class="pivot-config-group" id="pivot-row-totals-wrapper">
+                    <div style="display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+                        <label class="pivot-config-label" style="display:inline; margin-bottom:0;">
+                            <input type="checkbox" id="pivot-row-total-override-toggle"> Override Row Totals <span class="pivot-config-hint">(rightmost column)</span>
+                        </label>
+                        <span class="bld-help-icon" data-tip="pivot-row-totals"></span>
+                    </div>
+                    <div id="pivot-row-total-override-container" style="display: none;">
+                        <div class="pivot-setting-hint pivot-row-total-howto">Each box holds one value's cells in the Grand Total column. &times; leaves that value out; clear every box to hide the column.</div>
+                        <div id="pivot-row-total-slots">
+                            <span class="pivot-setting-hint">Add aggregations first</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pivot-config-divider"></div>
+
+                <div class="pivot-config-group">
+                    <label class="pivot-config-label">Sort <span class="bld-help-icon" data-tip="pivot-sort"></span></label>
+                    <div class="pivot-config-row">
+                        <select id="pivot-sort-order">
+                            <option value="asc">Ascending</option>
+                            <option value="desc">Descending</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pivot-config-group">
+                    <label class="pivot-config-label">Rank <span class="bld-help-icon" data-tip="pivot-rank"></span></label>
+                    <div class="pivot-config-row">
+                        <select id="pivot-rank-dir">
+                            <option value="none">None</option>
+                            <option value="top">Top</option>
+                            <option value="bottom">Bottom</option>
+                        </select>
+                        <input type="number" id="pivot-rank-n" min="1" max="9999" value="10" disabled>
+                        <label>by</label>
+                        <select id="pivot-rank-agg" disabled>
+                            <option value="sum">Sum</option>
+                        </select>
+                    </div>
+                    <!-- Scope on its own row: the config column is too narrow
+                         for a fifth inline control (.pivot-config-row is
+                         nowrap), and scope entries can be long field labels. -->
+                    <div class="pivot-config-row pivot-rank-scope-row">
+                        <label>in</label>
+                        <select id="pivot-rank-scope" disabled title="Rank overall, or within each parent row group">
+                            <option value="">Overall</option>
+                        </select>
+                        <span class="bld-help-icon" data-tip="pivot-rank-scope"></span>
+                    </div>
+                    <div class="pivot-config-row">
+                        <label id="pivot-rank-other-label" style="cursor: pointer; opacity: 0.5;">
+                            <input type="checkbox" id="pivot-rank-other" checked disabled>
+                            Show (Other) row
+                        </label>
+                        <span class="bld-help-icon" data-tip="pivot-rank-other"></span>
+                    </div>
+                </div>
+
+                <div class="pivot-config-divider"></div>
+
+                <div class="pivot-config-group">
+                    <label class="pivot-config-label">Options <span class="bld-help-icon" data-tip="pivot-options"></span></label>
+                    <div class="pivot-config-row">
+                        <label style="cursor: pointer;">
+                            <input type="checkbox" id="pivot-no-breakdown">
+                            Disable drill-down links
+                        </label>
+                        <span class="bld-help-icon" data-tip="pivot-no-drilldown"></span>
+                    </div>
+                    <div class="pivot-config-row">
+                        <label style="cursor: pointer;">
+                            <input type="checkbox" id="pivot-hide-empty">
+                            Hide empty rows and columns
+                        </label>
+                        <span class="bld-help-icon" data-tip="pivot-hide-empty"></span>
+                    </div>
+                    <div class="pivot-config-row" id="pivot-collapse-option" style="display:none;">
+                        <label style="cursor: pointer;">
+                            <input type="checkbox" id="pivot-start-expanded">
+                            Start groups expanded
+                        </label>
+                        <span class="bld-help-icon" data-tip="pivot-start-expanded"></span>
+                    </div>
+                </div>
+
+                <div class="pivot-config-divider"></div>
+
+                
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div id="pivot-action-bar">
+            <div class="pivot-action-bar-left">
+                <button id="resetPivotBtn" class="pivot-btn-reset">Reset</button>
+            </div>
+            <div class="pivot-action-bar-right">
+                <select id="pivotSnippetTargetSelect" style="display: none; max-width: 220px;" title="The Custom Code snippet holds more than one pivot command. Selecting one loads its configuration into the builder, and Update Snippet writes your changes back to that same command in place."></select>
+                <button id="updatePivotSnippetBtn" type="button" class="pnb-btn pnb-btn-secondary" style="display: none;" title="Update the pivot action(trigger) command in the Custom Code editor in place. Targets the call this pivot was loaded from (double-click), the snippet's only pivot command, or the one picked in the dropdown. The link label and any condition argument are kept as authored. The pivot is regenerated with these settings so you can see the result.">&#x27F3; Update Snippet</button>
+                <button id="copyPivotSnippetBtn" type="button" class="pnb-btn pnb-btn-secondary" style="display: none;" title="Copy an action(trigger) snippet for the current pivot settings"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Snippet</button>
+                <button id="generatePivotBtn" class="pnb-btn pnb-btn-primary">Generate Pivot &#9654;</button>
+            </div>
+        </div>
+        <button id="closePivotBtn" class="pnb-btn pnb-btn-secondary" style="margin-top: 6px; display: none;">Back to Full Report</button>
+    </div>
+</div>
 <div id="copyStub" style="display:none">
   <button id="copyActionsBtn">Copy</button>
   <div id="copyActionsLightbox">
@@ -202,6 +475,14 @@
     }
     // json (2026-10-26, jsontot): a nested-table column, J_SUBS = 0-3 rows of SUB_NAME (from four) and SUB_AMT,
     // on this scenario alone (the other scenarios' columns stay as they were). Its own RNG.
+    // (dtpick C, 2026-11-05) active: END_DATE beside AWARD_DATE (a start/end pair) - a blank end every 5th row, the
+    // eirbprotsum placeholder 2100-01-01 every 7th, else an end in 2025-2027. This scenario alone.
+    if (window.__SCN === 'active' || window.__SCN === 'pvactive') {   // (dtpick D2) pvactive too
+      rows.forEach(function (r, ri) {
+        r.END_DATE = (ri % 5 === 0) ? '' : (ri % 7 === 0 ? '2100-01-01' : (2025 + (ri % 3)) + '-' + ('0' + (1 + (ri % 12))).slice(-2) + '-15');
+      });
+      COLS.push('END_DATE');
+    }
     if (window.__SCN === 'json') {
       var seed3 = 4242;
       function rnd3() { seed3 = (seed3 * 1103515245 + 12345) & 0x7fffffff; return seed3 / 0x7fffffff; }

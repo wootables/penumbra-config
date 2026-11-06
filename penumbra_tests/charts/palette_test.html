@@ -73,6 +73,7 @@ try {
     'var _isDark = true; function bodyIsDark() { return _isDark; }\n' +
     grab('function _penumbraPaletteDist(') + '\n' +
     grab('function _penumbraBuildPalette(') + '\n' +
+    grab('function _penumbraPairedPalette(') + '\n' +   // (dtpick, 2026-11-05) the Paired palette
     grab('function penumbraResetPaletteCache(') + '\n' +
     grab('function _penumbraPaletteRgb(') + '\n' +
     grab('function penumbraPaletteColor(') + '\n' +
@@ -326,6 +327,38 @@ try {
   eq('shim: light theme leaves an OPAQUE fill alone', P.chart(0, 1), 'rgba(51, 102, 153, 1)');
   P.setDark(true);
   eq('shim: dark theme never darkens', P.chart(0, 0.5), 'rgba(51, 102, 153, 0.5)');
+
+  // ══ 12. PAIRED: TWO TONES OF EACH THEME HUE (dtpick, 2026-11-05) ═══════
+  // For series that come in twos (new and continuing awards, stacked): 1-2 are
+  // the brand strong and light, 3-4 the next hue's pair. Measured on four
+  // brands: Matrix, the muted default, Wolfpack red, Solarized blue.
+  ok('paired: a known palette name', P.NAMES.indexOf('paired') !== -1);
+  function hueOf(rgb) { var l = P.lab(rgb); return Math.atan2(l[2], l[1]); }
+  function hueGap(a, b) { var d = Math.abs(hueOf(a) - hueOf(b)); return d > Math.PI ? 2 * Math.PI - d : d; }
+  [['Matrix', MATRIX], ['Default', MUTED], ['Wolfpack', [153, 0, 0]], ['Solarized', [38, 139, 210]]].forEach(function (t) {
+    var pp = P.build('paired', t[1]), auto = P.build('auto', t[1]);
+    eq('paired ' + t[0] + ': ten colours, five pairs', pp.length, 10);
+    ok('paired ' + t[0] + ': series 1 is the brand', isBrand(pp, t[1]), 'dist=' + P.dist(pp[0], t[1]).toFixed(4));
+    var worstHue = 0, worstL = 1, worstPair = 1, crossMin = Infinity;
+    for (var q = 0; q < 5; q++) {
+      var a = pp[2 * q], b = pp[2 * q + 1];
+      ok('paired ' + t[0] + ': pair ' + (q + 1) + ' strong tone is the auto palette\'s series ' + (q + 1), P.dist(a, auto[q]) < 0.02);
+      worstHue = Math.max(worstHue, hueGap(a, b));
+      worstL = Math.min(worstL, Math.abs(P.lab(a)[0] - P.lab(b)[0]));
+      worstPair = Math.min(worstPair, P.dist(a, b));
+      if (q > 0) crossMin = Math.min(crossMin, hueGap(pp[0], a));
+    }
+    ok('paired ' + t[0] + ': each pair is one hue', worstHue < 0.12, 'worst hue gap=' + worstHue.toFixed(4));
+    ok('paired ' + t[0] + ': the two tones differ in lightness', worstL > 0.15, 'worst dL=' + worstL.toFixed(4));
+    ok('paired ' + t[0] + ': ...and read apart', worstPair > 0.2, 'worst pair dist=' + worstPair.toFixed(4));
+    ok('paired ' + t[0] + ': no colour repeats', minSep(pp) > 0.03, 'minSep=' + minSep(pp).toFixed(4));
+  });
+  // It follows the theme: another brand, another palette (the cache key is the brand)
+  P.setBrand('#00ff41'); P.reset(); var pm = P.rgb('paired', 1);
+  P.setBrand('#990000'); P.reset(); var pw = P.rgb('paired', 1);
+  ok('paired: follows the theme (the light brand tone moves with the brand)', P.dist(pm, pw) > 0.1, 'dist=' + P.dist(pm, pw).toFixed(4));
+  eq('paired: the parser takes it', P.parse('{"palette":"paired"}'), 'paired');
+  P.setBrand('#336699'); P.reset();
 
   document.getElementById('out').textContent =
     'RESULT ' + (FAIL === 0 ? 'ALL-PASS' : 'HAS-FAILURES') + '  pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');

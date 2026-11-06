@@ -246,7 +246,7 @@
     var ABSENT = ['pivot', 'viz', 'download', 'dl-xls', 'dl-pdf', 'dl-print', 'dl-csv', 'dl-tsv', 'dl-json', 'email', 'snapshots', 'journal', 'subscribe', 'settings', 'header', 'find', 'nextpage', 'prevpage', 'clearfilter', 'builder',
                   'taggen', 'managedata', 'formatsql', 'rowlimit', 'wordwrap', 'editorheight', 'tablelist', 'sharestate', 'popout', 'stopquery', 'firstpage', 'lastpage', 'scrollleft', 'scrollright', 'exitpivot', 'expandgroups', 'collapsegroups', 'restoregroup', 'restorepivot', 'asofexit', 'profile', 'rowscard', 'datacard', 'loadcard',
                   'dictionary', 'gendict', 'cmpevergreen', 'col:about',
-                  'cards', 'cardstable', 'cardsize-compact', 'cardsize-standard', 'cardsize-large', 'cardsize-xl', 'carddetails', 'cardlayout', 'cardconfig', 'cardlayouts', 'board', 'cardsort', 'cardprint', 'cardprintone'];   /* (2026-10-31, cards round U) Sort the cards...: the cards suite tests it */   /* (2026-10-30, clayout) Settings > Cards (#spCardsSection) is not in this harness either; (round N, ccfg) nor the card view's Configure cards */   /* (2026-10-28, cards + csize) the Table / Cards switch (#pnbCardsSwitch) and the size control (#pnbCardsSize) are not in this harness: the cards suite tests these rows */   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
+                  'cards', 'cardstable', 'cardsize-compact', 'cardsize-standard', 'cardsize-large', 'cardsize-xl', 'carddetails', 'cardlayout', 'cardconfig', 'cardlayouts', 'board', 'cardsort', 'cardprint', 'cardprintone', 'cardlink'];   /* (2026-10-31, cards round U) Sort the cards...: the cards suite tests it */   /* (2026-10-30, clayout) Settings > Cards (#spCardsSection) is not in this harness either; (round N, ccfg) nor the card view's Configure cards */   /* (2026-10-28, cards + csize) the Table / Cards switch (#pnbCardsSwitch) and the size control (#pnbCardsSize) are not in this harness: the cards suite tests these rows */   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
     var reg = pal('registry')(), bad = reg.filter(function (e) { return !e.needs && ABSENT.indexOf(e.id) < 0; }).map(function (e) { return e.id; });
     R.info.regBad = bad; R.info.regN = reg.length;
     R.chk.registryNeeds = reg.length >= 40 && bad.length === 0;
@@ -2958,6 +2958,112 @@
     penumbra_vars.isGlobalAdmin = wasGlobal; XMLHttpRequest.prototype.open = xo;
     try { if (recentsWere === null) { localStorage.removeItem('pnb_recent_reports'); } else { localStorage.setItem('pnb_recent_reports', recentsWere); } } catch (e) { }
     R.info.calls = xhrUrls.filter(function (u) { return u.indexOf('get_server_reports.php?mode=quicksearch') === 0; }).length;
+  };
+
+  // ---------------------------------------------------------------- pchartby (dtpick, 2026-11-05; the user: "the user should
+  // always be able to choose") a date column's Chart COLUMN by...: the column's own Chart by list in place (As is, then every
+  // grouping), each running Chart this column with its grouping; Chart COLUMN says it groups; none on a text column
+  S.pchartby = async function () {
+    await boot(); await ready();
+    var A0 = A(), oc = A0.chartColumn, calls = [];
+    A0.chartColumn = function (c, s) { calls.push([c, s === undefined ? null : s]); return true; };
+    try {
+      await open('chart v_date by');
+      var r0 = row('Chart V_DATE by...');
+      R.info.root = texts().slice(0, 8);
+      R.chk.pcbRow = !!r0 && !r0.off && /as is, Year, Fiscal Year/.test(r0.sub || '');
+      await pickRow('Chart V_DATE by...'); await enter(); await sleep(150);
+      var t1 = texts();
+      R.info.list = { mode: modeOf(), rows: t1, input: input() ? input().value : null };
+      R.chk.pcbList = modeOf() === 'col' && t1.length >= 11 && t1.every(function (x) { return x.indexOf('Chart by: ') === 0; })
+        && t1.some(function (x) { return /^Chart by: As is/.test(x); }) && t1.indexOf('Chart by: Fiscal Year') >= 0;
+      await pickRow('Chart by: Fiscal Year'); await enter(); await sleep(150);
+      R.info.calls = calls.slice();
+      R.chk.pcbRuns = JSON.stringify(calls) === JSON.stringify([['V_DATE', 'fy']]) && !box();
+      // Chart V_DATE: still one pick, it says it groups by a period
+      await open('chart v_date');
+      var r1 = rows().filter(function (r) { return r.text === 'Chart V_DATE'; })[0];
+      R.chk.pcbChartSub = !!r1 && /grouped into periods that suit its dates/.test(r1.sub || '');   // (dtpick B: no "by" - Chart X by... ranks first)
+      // a text column: no Chart ... by... row, its Chart row as it was
+      await open('chart v_name');
+      var r2 = rows().filter(function (r) { return r.text === 'Chart V_NAME'; })[0];
+      R.chk.pcbText = !row('Chart V_NAME by...') && !!r2 && !/grouped/.test(r2.sub || '');
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    } finally { A0.chartColumn = oc; }
+  };
+
+  // ---------------------------------------------------------------- pactive (dtpick B, 2026-11-05) the start/end
+  // pair's Chart active by... row (main.js headerMenu.activeVariants, stubbed: this fixture has one date column) opens
+  // the column's Chart active by list in place; "chart v_date by" ranks Chart V_DATE by... first (the Chart row's
+  // sub no longer says "by")
+  S.pactive = async function () {
+    await boot(); await ready();
+    var A0 = A(), keepV = A0.activeVariants, keepC = A0.chartActive, calls = [];
+    A0.activeVariants = function (c) {
+      if (c !== 'V_DATE') return [];
+      return [{ id: 'year', label: 'Year', start: 'V_DATE', end: 'V_END' }, { id: 'fy', label: 'Fiscal Year', start: 'V_DATE', end: 'V_END', suggested: true }];
+    };
+    A0.chartActive = function (c, id) { calls.push([c, id]); return true; };
+    try {
+      await open('chart active');
+      var r0 = row('Chart active by... (V_DATE to V_END)');
+      R.info.root = texts().slice(0, 6);
+      R.chk.paRow = !!r0 && !r0.off && /every period it runs/.test(r0.sub || '');
+      await pickRow('Chart active by... (V_DATE to V_END)'); await enter(); await sleep(150);
+      var t1 = texts();
+      R.info.list = { mode: modeOf(), rows: t1, input: input() ? input().value : null };
+      R.chk.paList = modeOf() === 'col' && t1.length === 2 && t1[0] === 'Chart active by: Year' && t1[1] === 'Chart active by: Fiscal Year (suggested)';
+      await pickRow('Chart active by: Fiscal Year (suggested)'); await enter(); await sleep(150);
+      R.info.calls = calls.slice();
+      R.chk.paRuns = JSON.stringify(calls) === JSON.stringify([['V_DATE', 'fy']]);
+      await open('chart v_name active');
+      R.chk.paNone = !row('Chart active by... (V_NAME');
+      await open('chart v_date by');
+      R.info.rank = texts().slice(0, 3);
+      R.chk.paRank = texts()[0] === 'Chart V_DATE by...';
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+      // every act of the Chart active by list: an entry or a recorded exemption
+      var macts = pal('menuActs')(fth('V_DATE')), cov = pal('columnActs')(), miss = macts.filter(function (x) { return cov.indexOf(x) < 0 && !P().exempt(x); });
+      R.info.cover = { acts: macts, missing: miss };
+      R.chk.paCover = macts.indexOf('chartActive-fy') >= 0 && miss.length === 0;
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    } finally { A0.activeVariants = keepV; A0.chartActive = keepC; }
+  };
+
+  // ---------------------------------------------------------------- ppvactive (dtpick D2, 2026-11-05) the pair's
+  // Pivot active by... row (main.js headerMenu.pivotActiveVariants, stubbed as pactive does) opens the column's Pivot
+  // active by list in place; "pivot by v_date active" ranks it first; every act of the list covered
+  S.ppvactive = async function () {
+    await boot(); await ready();
+    var A0 = A(), keepV = A0.pivotActiveVariants, keepP = A0.pivotActive, keepCV = A0.activeVariants, calls = [];
+    A0.pivotActiveVariants = function (c) {
+      if (c !== 'V_DATE') return [];
+      return [{ id: 'year', label: 'Year', start: 'V_DATE', end: 'V_END' }, { id: 'fy', label: 'Fiscal Year', start: 'V_DATE', end: 'V_END' }];
+    };
+    A0.pivotActive = function (c, id) { calls.push([c, id]); return true; };
+    try {
+      await open('pivot active');
+      var r0 = row('Pivot active by... (V_DATE to V_END)');
+      R.info.root = texts().slice(0, 6);
+      R.chk.ppRow = !!r0 && !r0.off && /every period it runs/.test(r0.sub || '');
+      await pickRow('Pivot active by... (V_DATE to V_END)'); await enter(); await sleep(150);
+      var t1 = texts();
+      R.info.list = { mode: modeOf(), rows: t1, input: input() ? input().value : null };
+      R.chk.ppList = modeOf() === 'col' && t1.length === 2 && t1[0] === 'Pivot active by: Year' && t1[1] === 'Pivot active by: Fiscal Year';
+      await pickRow('Pivot active by: Fiscal Year'); await enter(); await sleep(150);
+      R.info.calls = calls.slice();
+      R.chk.ppRuns = JSON.stringify(calls) === JSON.stringify([['V_DATE', 'fy']]);
+      await open('pivot by v_name active');
+      R.chk.ppNone = !row('Pivot active by... (V_NAME');
+      await open('pivot by v_date active');
+      R.info.rank = texts().slice(0, 3);
+      R.chk.ppRank = /^Pivot active by\.\.\. \(V_DATE to V_END\)$/.test(texts()[0] || '');
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+      var macts = pal('menuActs')(fth('V_DATE')), cov = pal('columnActs')(), miss = macts.filter(function (x) { return cov.indexOf(x) < 0 && !P().exempt(x); });
+      R.info.cover = { acts: macts, missing: miss };
+      R.chk.ppCover = macts.indexOf('pivotActive-fy') >= 0 && miss.length === 0;
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    } finally { A0.pivotActiveVariants = keepV; A0.pivotActive = keepP; A0.activeVariants = keepCV; }
   };
 
   window.addEventListener('error', function (e) { (R.errors = R.errors || []).push(String(e.message)); });

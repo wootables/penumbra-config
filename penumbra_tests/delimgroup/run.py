@@ -46,6 +46,8 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 ALL_SCN = ['unit', 'render', 'nested', 'menu', 'snippet', 'bucket', 'json', 'detect', 'chart', 'lists', 'copy']
+ALL_SCN = ALL_SCN + ['active']   # (dtpick C, 2026-11-05) Group by a start/end pair's active grouping
+ALL_SCN = ALL_SCN + ['pvactive']   # (dtpick D2, 2026-11-05) the pivot builder's Active per period
 # (splitviz) main.js loads these on demand from js/ beside the page: the chart scenario draws a real vis() chart
 CHART_LIBS = ['chart-4.5.1.min.js', 'chartjs-plugin-datalabels-2.0.0.min.js', 'chartjs-chart-treemap-3.1.0.min.js',
               'chartjs-chart-sankey-0.19.1.min.js', 'penumbra_charts.js', 'penumbra_geo_us.js']
@@ -151,8 +153,8 @@ CONTROL_RED_LATEST = ['L-copynosql']
 CONTROL_REV = '0d19cfd^'   # LIVE since 0d19cfd (2026-10-27, copymenu 2): the control is the build before it, read from git.
 def scn_of(aid):
     pre = aid.split('-')[0]
-    return {'U': 'unit', 'C': 'render', 'N': 'nested', 'H': 'menu', 'X': 'php', 'J': 'json', 'B': 'nested',
-            'D': 'detect', 'V': 'chart', 'L': 'lists', 'Q': 'copy'}.get(pre) or \
+    return {'U': 'unit', 'C': 'render', 'N': 'nested', 'H': 'menu', 'X': 'php', 'J': 'json', 'B': 'nested', 'A': 'active',
+            'D': 'detect', 'V': 'chart', 'L': 'lists', 'Q': 'copy', 'Y': 'pvactive'}.get(pre) or \
         {'K-count': 'render', 'K-snippet': 'snippet', 'K-bucket': 'bucket', 'K-jcount': 'json', 'P-jbands': 'json',
          'G-reopen': 'bucket', 'G-reopenbin': 'bucket'}.get(aid) or \
         ('render' if pre == 'G' else aid.split('-', 1)[1] if pre in ('P', 'E', 'F') else '?')
@@ -293,6 +295,15 @@ MUTANTS = {
                                   '    }, $s);',
                               ]))]),
 }
+MUTANTS.update({
+    # (dtpick C) Group by an active grouping
+    'ga-spec': ('main', [("        if (spec.end) return spec.phase ? null : _groupActiveSpec(spec);", "        if (false) return null;")]),
+    'ga-multi': ('main', [("multi = !!t.delim || !!t.end;", "multi = !!t.delim;")]),
+    'ga-getter': ('main', [("const _gdKeys = _gbSpec.labels(_gdRaw, function (c) { return _groupRowRaw(rowEl, c); });", "const _gdKeys = _gbSpec.labels(_gdRaw);")]),
+    'ga-far': ('main', [("        if (e !== null && e > today + PENUMBRA_ACTIVE_FAR_DAYS) e = null;", "        if (false) e = null;")]),
+    'ga-offer': ('main', [("                if (_gap && String(_gap.start).toUpperCase() === String(col).toUpperCase()) {", "                if (false) {")]),
+    'ga-act': ('colmenu', [("act: 'groupAs-' + (v.active ? 'active' + v.active : String(v.token).split(':').pop())", "act: 'groupAs-' + String(v.token).split(':').pop()")]),
+})
 MUTANT_RED = {
     # (G-total, G-other and G-csort hold here: the cell grouped whole still counts each row once, and on this fixture
     #  the whole-cell bands drop the same rows into (Other) and order the same three single-name bands first)
@@ -405,6 +416,14 @@ MUTANT_RED = {
     'xdecode': ['X-pieces'],
     'xdelimown': ['X-pieces'],   # (cfread) the surrogate pair and the long codes
 }
+MUTANT_RED.update({
+    'ga-spec': ['A-bands', 'A-status'],   # (the START's own fiscal years: still in order)
+    'ga-multi': ['A-total', 'A-status'],
+    'ga-getter': ['A-bands', 'A-status'],
+    'ga-far': ['A-bands', 'A-order', 'A-status'],
+    'ga-offer': ['A-offer', 'A-label', 'A-bands', 'A-order', 'A-total', 'A-status', 'A-act'],
+    'ga-act': ['A-act'],
+})
 def mutant_scns(name):
     which = MUTANTS[name][0]
     if which == 'runner': return ['php']

@@ -927,6 +927,46 @@ MUTANTS.update({
     'mf-clear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-ggfix-bandClear', 'L-ggfix-listClear'], ['ggfix']),
 })
 
+# (2026-11-05, dtpick) a date column's Chart by list: red on live (no item); chText and chHidden hold on live (guards)
+SCN = SCN + ['mchart']
+CHK['mchart'] = ['chItem', 'chList', 'chNoHour', 'chSuggest', 'chRuns', 'chText', 'chHidden']
+NEW_CH = {'L-mchart-' + c for c in CHK['mchart'] if c not in ('chText', 'chHidden')}
+NEW = NEW | NEW_CH
+NEW = NEW - NEW_CH   # (dtpick is LIVE since 6fdb836, 2026-11-05: old checks now)
+MUTANTS.update({
+    'ch-none': ([('menu', "        if (cvar.length) {\n            use.push({ act: 'chartByList'", "        if (false) {\n            use.push({ act: 'chartByList'")],
+                ['L-mchart-chItem', 'L-mchart-chList', 'L-mchart-chNoHour', 'L-mchart-chSuggest', 'L-mchart-chRuns'], ['mchart']),
+    'ch-noraw': ([('menu', "                    var list = [{ act: 'chartAs-raw',", "                    var list = [], unused = [{ act: 'chartAs-raw',")], ['L-mchart-chList', 'L-mchart-chRuns'], ['mchart']),
+    'ch-vis': ([('main', "        if (!$('#visualizeBtn').is(':visible')) return out;", "        if (false) return out;")], ['L-mchart-chHidden'], ['mchart']),
+    'ch-kind': ([('main', "                if (!def || (def.kind !== 'period' && def.kind !== 'cycle')) return;", "                if (!def) return;")], ['L-mchart-chText'], ['mchart']),
+    'ch-sug': ([('main', "suggested: !light && sf.split === sug });", "suggested: false });")], ['L-mchart-chSuggest'], ['mchart']),
+    'ch-hour': ([('main', "                if (id === 'hour' && gran < 3) return;", "                if (false) return;")], ['L-mchart-chList', 'L-mchart-chNoHour'], ['mchart']),
+    'ch-arg': ([('menu', "                            run: function () { A.chartColumn(col, v.id); } });", "                            run: function () { A.chartColumn(col); } });")], ['L-mchart-chRuns'], ['mchart']),
+})
+
+# (2026-11-05, dtpick B) the start/end pair's Chart active by list: red on live (no item); acNone holds on live (a guard)
+SCN = SCN + ['mactive']
+CHK['mactive'] = ['acItem', 'acTitle', 'acList', 'acRuns', 'acNone']
+NEW_AC = {'L-mactive-' + c for c in CHK['mactive'] if c != 'acNone'}
+NEW = NEW | NEW_AC
+NEW = NEW - NEW_AC   # (dtpick B is LIVE since 21b830a, 2026-11-05: old checks now)
+MUTANTS.update({
+    'ac-none': ([('menu', "        if (avar.length) {\n            use.push({ act: 'chartActiveList'", "        if (false) {\n            use.push({ act: 'chartActiveList'")],
+                ['L-mactive-acItem', 'L-mactive-acTitle', 'L-mactive-acList', 'L-mactive-acRuns'], ['mactive']),
+    'ac-sug': ([('menu', "label: v.label + (v.suggested ? ' (suggested)' : ''), run: function () { A.chartActive(col, v.id); }", "label: v.label, run: function () { A.chartActive(col, v.id); }")], ['L-mactive-acList'], ['mactive']),
+    'ac-arg': ([('menu', "run: function () { A.chartActive(col, v.id); }", "run: function () { A.chartActive(col, 'fy' + v.id); }")], ['L-mactive-acRuns'], ['mactive']),
+})
+
+# (2026-11-05, bdbucket older issues; the user: "fix the older issues") the column menu's Distinct column groups where the
+# report hides Clipboard too (the user's 10-27 rule: that option hides only its Copy button): fmGroupsNone's clipboard half
+# flips; fm-grpclip flips with it (the gate put back)
+NEW_CLIP = {'L-mfltm-fmGroupsNone'}
+NEW = NEW | NEW_CLIP
+NEW = NEW - NEW_CLIP   # (the bdbucket older issues are LIVE since c53b3e2, 2026-11-05: old checks now)
+MUTANTS['fm-grpclip'] = ([('menu', "typeof A.groupValues === 'function' && typeof A.groupVariants === 'function')\n",
+                           "typeof A.groupValues === 'function' && typeof A.groupVariants === 'function' && !document.body.classList.contains('restrict-clipboard'))\n")],
+                         ['L-mfltm-fmGroupsNone'], ['mfltm'])
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:
