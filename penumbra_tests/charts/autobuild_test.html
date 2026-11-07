@@ -131,6 +131,8 @@ try {
     'function pivotPercentileP(a){ var m=/^p(\\d{1,2})$/.exec(String(a||"")); return m? +m[1] : null; }',
     'function pivotWavgWeightCol(a){ var m=/^wavg@(.+)$/.exec(String(a||"")); return m? m[1] : null; }',
     // date granularity per column, set by the scenario (2 = day, 0 = year, -1 = not a date)
+    // (numchart) Column options formats by column, set by a scenario: COLFMT.AMOUNT = 'currency:0'
+    'var COLFMT = {}; function _pnbColOptOn(){ return true; } function _pnbColRenderOpts(c){ var f = COLFMT[String(c||"").toUpperCase()]; if(!f) return { fmt: "", spec: null }; var i=f.indexOf(":"), t=i<0?f:f.slice(0,i), a=i<0?"":f.slice(i+1); return { fmt: f, spec: { t: t, dp: (t==="date"||a==="")? null : +a, p: t==="date"? a : null } }; }',
     'var DATEGRAN = {}; function _pivotFieldDateGran(b){ var k=String(b||"").toUpperCase(); return DATEGRAN.hasOwnProperty(k)? DATEGRAN[k] : -1; }',
     'function parseDate(s){ s=String(s).trim(); var m=/^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(s); if(m) return {date:new Date(+m[1],+m[2]-1,+m[3]), granularity:"day"}; m=/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/.exec(s); if(m) return {date:new Date(+m[3],+m[1]-1,+m[2]), granularity:"day"}; m=/^(\\d{4})$/.exec(s); if(m) return {date:new Date(+m[1],0,1), granularity:"year"}; return null; }',
     // the axis bucketer, minimal: fy / year / ym / month / bin
@@ -157,6 +159,10 @@ try {
     grab('function _vizPickAutoType('), grab('function _vizXIsSequence('), grab('function _vizAutoSort('),
     grab('function _vizAutoDateSplit('), grab('function _vizDistinctCountTok('), grab('function _vizColHasNegative('),
     grab('function _vizColLooksLikeYear('), grab('function _vizPickAutoMeasure('), grab('function _vizSplitWord('),
+    // numchart (2026-11-06): the measure pick's helpers, Chart this column's measure test, the column's chart format
+    grab('function _vizByFill('), grabVar('_VIZ_RATE_NAME_RE'), grab('function _vizIsRateCol('), grab('function _vizColHoldsPctText('),
+    grab('function _vizAutoAggFor('), grab('function _vizColFmtSpec('), grab('function _vizIsMeasureCol('), grabVar('VIZ_LIMIT_UNLIMITED'),
+    grabVar('_VIZ_COLFMT_TYPES'), grab('function _vizColChartFmt('),
     grab('function _vizAutoShape('), grab('function _vizPropsForCol('), grab('function _vizChartableCols('),
     grab('function _vizCanAgg('), grab('function groupsToVizConfig('), grab('function reportToVizConfig('),
     grab('function pivotToVizConfig('), grab('function _vizAutoSource('), grab('function getSmartVizDefaults('),
@@ -181,7 +187,8 @@ try {
     ' source: _vizAutoSource, smart: getSmartVizDefaults,' +
     ' classes: _vizAutoColClasses, mlist: _vizAutoMeasureList, secondCat: _vizAutoSecondCat,' +
     ' stateCol: _vizAutoStateCol, ganttDates: penumbraDatePair, ytitle: _vizAutoYAxisTitle, retype: _vizAutoRetype,' +
-    ' datePair: penumbraDatePair, phaseCol: _vizAutoPhaseCol, chartSplit: _vizChartColumnSplit, activeSpans: _vizActiveSpans };')();
+    ' datePair: penumbraDatePair, phaseCol: _vizAutoPhaseCol, chartSplit: _vizChartColumnSplit, activeSpans: _vizActiveSpans,' +
+    ' COLFMT: COLFMT, byFill: _vizByFill, isRate: _vizIsRateCol, holdsPct: _vizColHoldsPctText, aggFor: _vizAutoAggFor, isMeasure: _vizIsMeasureCol, colChartFmt: _vizColChartFmt };')();
 
   // ---- scenario builders -------------------------------------------------
   // defs: [[name, kind]] kind = text | money | num | date | bool | year(=date at year granularity)
@@ -701,9 +708,8 @@ try {
   ok('dtpick static: Hour only on dates with a time', /if \(id === 'hour' && gran < 3\) return;/.test(grab('function _vizBucketVariantsFor(')));
   ok('dtpick static: _vizAutoGanttDates is gone (one pair rule)', code.indexOf('function _vizAutoGanttDates(') === -1);
   ok('dtpick static: the Timeline row takes the same pair', /var pair = penumbraDatePair\(dates\);/.test(grab('function penumbraHeaderTimelineCols(')));
-  var _hcc = grab('function penumbraHeaderChartColumn(');
-  ok('dtpick static: Chart this column groups by the span rule unless told', /\(split === 'raw'\) \? '' : \(split \|\| _vizChartColumnSplit\(base, window\.vizCachedData\)\)/.test(_hcc));
-  ok('dtpick static: ...a grouped axis sorts by label, earliest first', /\$\('#vizSortBy'\)\.val\('label'\);\n\s*\$\('#vizSortDir'\)\.val\('asc'\);/.test(_hcc));
+  var _hcc = grab('function _vizChartColumnPin(');
+  ok('dtpick static: Chart this column groups by the span rule unless told', /\(s === 'raw'\) \? '' : \(s \|\| _vizChartColumnSplit\(base, window\.vizCachedData\)\)/.test(_hcc));
   ok('dtpick static: the header API offers the Chart by list', /chartVariants: penumbraHeaderChartVariants,/.test(code));
   // the pair
   eq('pair: end named like an end, start named like a start', SB.datePair(['AWARD_END_DATE', 'PROJECT_START']), { start: 'PROJECT_START', end: 'AWARD_END_DATE' });
@@ -797,6 +803,124 @@ try {
   setRows(80, function (i) { var mo = 1 + (i % 12); return { STATUS: STATUS[i % 3], AWARD_END: iso(2024, mo, 28), AWARD_BEGIN: iso(2024, mo, 1) }; });
   r = SB.report();
   hasNot('report active: one-month spans: no Chart active by hint', r.warnings, /Chart active by/);
+
+  // ---- 14. numchart (2026-11-06): a number column charted as the measure; rates average; Chart this column's pins ----
+  function clearFmt() { for (var k in SB.COLFMT) delete SB.COLFMT[k]; }
+  clearFmt();
+  setTable([['DEPT', 'text'], ['PCT_EFFORT', 'num'], ['HOURS', 'num']]);
+  setRows(60, function (i) { return { DEPT: 'D' + (i % 4), PCT_EFFORT: String(10 + (i % 50)), HOURS: String(5 + i) }; });
+  ok('rate: named like a percent', SB.isRate('PCT_EFFORT'));
+  ok('rate: a plain number is not', !SB.isRate('HOURS'));
+  eq('aggFor: a rate averages, an amount adds up', [SB.aggFor('PCT_EFFORT'), SB.aggFor('HOURS')], ['avg', 'sum']);
+  SB.COLFMT.HOURS = 'percent:1';
+  ok('rate: a column formatted as a Percent (Column options)', SB.isRate('HOURS'));
+  clearFmt();
+  setRows(60, function (i) { return { DEPT: 'D' + (i % 4), FILL: (i % 9) + '.5%' }; });
+  ok('rate: cells that read 12.5%', SB.holdsPct('FILL') && SB.isRate('FILL'));
+  setRows(60, function (i) { return { DEPT: 'D' + (i % 4), FILL: i % 10 === 0 ? '5%' : String(i) }; });
+  ok('rate: one cell in ten with a % is no percent column', !SB.holdsPct('FILL'));
+  setRows(60, function (i) { return { PCT_COMPLETE: String(i % 100), HOURS: String(i) }; });
+  eq('measure: a number that adds up ahead of a rate (over table order)', SB.pickMeasure([], ['PCT_COMPLETE', 'HOURS']), 'HOURS');
+  eq('measure: a rate where it is the only one', SB.pickMeasure([], ['PCT_COMPLETE']), 'PCT_COMPLETE');
+  setRows(60, function (i) { return { ADJ_AMT: i % 20 === 0 ? '$5.00' : '', AMOUNT: '$' + (100 + i) }; });
+  eq('measure: a mostly blank money column steps behind a filled one', SB.pickMeasure(['ADJ_AMT', 'AMOUNT'], []), 'AMOUNT');
+  eq('byFill: the well filled in table order, the thin after', SB.byFill(['ADJ_AMT', 'AMOUNT']), ['AMOUNT', 'ADJ_AMT']);
+  setRows(60, function (i) { return { ADJ_AMT: i % 2 ? '$5.00' : '', AMOUNT: '$' + (100 + i) }; });
+  eq('measure: half filled is filled enough (table order kept)', SB.pickMeasure(['ADJ_AMT', 'AMOUNT'], []), 'ADJ_AMT');
+  setTable([['DEPT', 'text'], ['PCT_EFFORT', 'num']]);
+  setRows(60, function (i) { return { DEPT: 'D' + (i % 4), PCT_EFFORT: String(10 + (i % 50)) }; });
+  r = SB.report();
+  eq('report: a rate measure is averaged', [r.config.yAxis, r.config.agg], ['PCT_EFFORT', 'avg']);
+  has('report: ...the lead says average', [r.warnings[0]], /^Charting the average of PCT_EFFORT by DEPT\./);
+  ok('report: ...never a doughnut of averages', r.config.type !== 'doughnut', r.config.type);
+  rt = SB.retype('histogram', 'Histogram', r);
+  hasNot('retype: the stale "average of" lead is stripped too', r.warnings, /^Charting the average of /);
+  // the columns Chart by charts as the measure
+  setTable([['DEPT', 'text'], ['AMOUNT', 'money'], ['EMPLID', 'num'], ['FY', 'year'], ['YRC', 'num'], ['CNT', 'num'], ['LOG_DATE', 'date'], ['FLAG', 'bool']]);
+  setRows(40, function (i) { return { DEPT: 'D' + (i % 3), AMOUNT: '$' + i, EMPLID: String(100000 + i), FY: '2025', YRC: String(2019 + (i % 5)), CNT: String(i % 9), LOG_DATE: iso(2025, 1 + (i % 12), 2), FLAG: i % 2 ? 'Y' : 'N' }; });
+  eq('measure cols: money and a plain number; never an id, a year, a date, text or a flag',
+     ['DEPT', 'AMOUNT', 'EMPLID', 'FY', 'YRC', 'CNT', 'LOG_DATE', 'FLAG'].map(function (c) { return SB.isMeasure(c); }), [false, true, false, false, false, true, false, false]);
+  // pins: Chart this column holds its column where it belongs, the rest is Auto-build's
+  setTable(AWD); awdRows(200);
+  r = SB.report({ y: 'AMOUNT' });
+  eq('pin y: the measure, by the category Auto-build picks', [r.config.yAxis, r.config.agg, r.config.xAxis], ['AMOUNT', 'sum', 'PRIME_SPONSOR_CATEGORY']);
+  has('pin y: the lead names it', [r.warnings[0]], /^Charting the total of AMOUNT by PRIME_SPONSOR_CATEGORY/);
+  r = SB.report({ y: 'AMOUNT', x: 'ORIGINATING SPONSOR' });
+  eq('pin y+x: both kept; 5 shares of a sum -> doughnut, biggest first', [r.config.xAxis, r.config.yAxis, r.config.type, r.sortBy], ['ORIGINATING SPONSOR', 'AMOUNT', 'doughnut', 'value']);
+  r = SB.report({ y: 'AMOUNT', x: 'LOG_DATE:fy' });
+  eq('pin y+x: a period X kept; the award type stacks it (Paired), bars', [r.config.xAxis, r.config.groupBy, r.config.stacked, r.config.type, JSON.stringify(r.config.vizOptions)], ['LOG_DATE:fy', 'TRANSACTION_TYPE', true, 'bar', '{"palette":"paired"}']);
+  eq('pin y+x: ...in period order', [r.sortBy, r.sortDir], ['label', 'asc']);
+  r = SB.report({ x: 'LOG_DATE:fy' });
+  eq('pin x: the rows counted by the period handed over', [r.config.xAxis, r.config.yAxis, r.config.agg], ['LOG_DATE:fy', '', 'count']);
+  eq('dtpick: ...a grouped axis sorts by label, earliest first', [r.sortBy, r.sortDir], ['label', 'asc']);
+  eq('pin x: ...stacked by the award type, as Auto-build stacks a date axis', [r.config.groupBy, r.config.stacked], ['TRANSACTION_TYPE', true]);
+  has('pin x: the lead says the rows are counted', [r.warnings[0]], /^Counting the rows by LOG_DATE by fiscal year\./);
+  r = SB.report({ x: 'TRANSACTION_TYPE' });
+  eq('pin x: the award type itself stays the X axis (not moved to a date, not split by itself)', [r.config.xAxis, r.config.groupBy], ['TRANSACTION_TYPE', 'none']);
+  eq('pin x: ...2 shares of a count -> doughnut', r.config.type, 'doughnut');
+  r = SB.report({ x: 'AMOUNT:bin' });
+  eq('pin x bins: its own ranges, the rows counted, upright, low to high', [r.config.xAxis, r.config.agg, r.config.type, r.config.horizontal, r.sortBy, r.sortDir], ['AMOUNT:bin', 'count', 'bar', false, 'label', 'asc']);
+  has('pin x bins: the lead', [r.warnings[0]], /^Counting the rows by AMOUNT by range\./);
+  setTable([['STATUS', 'text'], ['LOG_DATE', 'date'], ['AMOUNT', 'money']]);
+  setRows(200, function (i) { return { STATUS: STATUS[i % 3], LOG_DATE: iso(2022 + (i % 4), 1 + (i % 12), 1 + (i % 27)), AMOUNT: '$' + (10 + i) }; });
+  r = SB.report({ x: 'LOG_DATE' });
+  eq('pin x As is: each date, not bucketed', r.config.xAxis, 'LOG_DATE');
+  eq('pin x As is: many dates -> a line, upright, in date order, every point', [r.config.type, r.config.horizontal, r.sortBy, r.limit], ['line', false, 'label', 9999]);
+  r = SB.report({ x: 'STATUS' });
+  ok('pin x: a category handed over gets no limit of its own (the applier sizes it)', !r.limit, r.limit);
+  setTable([['CALC_TOTAL', 'text'], ['STATUS', 'text']]);   // a calculated column: no column type, so the reader takes it for text
+  setRows(80, function (i) { return { CALC_TOTAL: String(i % 4), STATUS: STATUS[i % 3] }; });
+  r = SB.report({ y: 'CALC_TOTAL' });
+  eq('pin y: a measure the reader takes for text is never its own X axis', [r.config.xAxis, r.config.yAxis], ['STATUS', 'CALC_TOTAL']);
+  setTable([['RECORD_ID', 'text'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, AMOUNT: '$' + (i * 10) }; });
+  r = SB.report({ y: 'AMOUNT' });
+  eq('pin y: nothing groups it -> its distribution (a histogram)', [r.config.type, r.config.xAxis], ['histogram', 'AMOUNT']);
+  setTable([['DEPT', 'text'], ['PCT_DONE', 'num']]);
+  setRows(1, function () { return { DEPT: 'Chemistry', PCT_DONE: '42' }; });
+  r = SB.report({ y: 'PCT_DONE' });
+  eq('pin y one row: a gauge of its average (a rate)', [r.config.type, r.config.yAxis, r.config.agg], ['gauge', 'PCT_DONE', 'avg']);
+  setTable(LG); lgRows(120, 36);
+  r = SB.report({ x: 'AWARD_BEGIN:fy' });
+  eq('pin x: a period of the START stays that period (Chart active by is an entry of its own)', r.config.xAxis, 'AWARD_BEGIN:fy');
+  hasNot('pin x: ...and no Chart active by hint', r.warnings, /Chart active by/);
+  r = SB.report({ y: 'AMOUNT' });
+  ok('pin y: the active override never runs under Chart this column', String(r.config.xAxis).indexOf('@') < 0 && r.config.yAxis === 'AMOUNT', r.config.xAxis);
+  // the shape keeps an axis handed over
+  setTable(AWD); awdRows(200);
+  s = SB.shape({ xAxis: 'LOG_DATE', groupBy: 'none', agg: 'count', yAxis: '', warnings: [], keepX: true });
+  eq('shape keepX: a raw date handed over stays as it is, a line', [s.xAxis, s.type, s.horizontal], ['LOG_DATE', 'line', false]);
+  awdRows(120, 'US Federal'); w = [];
+  s = SB.shape({ xAxis: 'PRIME_SPONSOR_CATEGORY', groupBy: 'LOG_DATE:fy', agg: 'sum', yAxis: 'AMOUNT', warnings: w, keepX: true });
+  eq('shape keepX: a one-value X handed over is not swapped for its series', [s.xAxis, s.groupBy, w.length], ['PRIME_SPONSOR_CATEGORY', 'LOG_DATE:fy', 0]);
+  // the measure's own format, for the chart
+  setTable(AWD); awdRows(50); clearFmt();
+  var cd = window.vizCachedData;
+  eq('colfmt: none set -> null (the chart keeps its own ladder)', SB.colChartFmt('AMOUNT', 'sum', 'bar', cd), null);
+  SB.COLFMT.AMOUNT = 'currency:0';
+  eq('colfmt: Currency, 0 decimals', SB.colChartFmt('AMOUNT', 'sum', 'bar', cd), { style: 'column', t: 'currency', decimals: 0, scale: 1, prefix: '$', suffix: '' });
+  eq('colfmt: a count keeps none; a distinct count none', [SB.colChartFmt('AMOUNT', 'count', 'bar', cd), SB.colChartFmt('AMOUNT', 'distinct', 'bar', cd)], [null, null]);
+  eq('colfmt: a combo (each series names its own) keeps none', SB.colChartFmt('AMOUNT', 'sum', 'combo', cd), null);
+  SB.COLFMT.AMOUNT = 'number:2';
+  eq('colfmt: Number, 2 decimals, no $', SB.colChartFmt('AMOUNT', 'avg', 'line', cd), { style: 'column', t: 'number', decimals: 2, scale: 1, prefix: '', suffix: '' });
+  SB.COLFMT.PCT = 'percent:1';
+  var pr1 = setRows(40, function (i) { return { PCT: String((i % 10) / 10) }; });
+  eq('colfmt: a Percent column of fractions charts them x100', SB.colChartFmt('PCT', 'avg', 'bar', pr1).scale, 100);
+  var pr2 = setRows(40, function (i) { return { PCT: (i % 10) + '%' }; });
+  eq('colfmt: ...one whose cells read 5% charts them as they are', SB.colChartFmt('PCT', 'avg', 'bar', pr2).scale, 1);
+  SB.COLFMT.LOG_DATE = 'date:MMM D, YYYY';
+  eq('colfmt: a date pattern is no measure format', SB.colChartFmt('LOG_DATE', 'max', 'bar', cd), null);
+  clearFmt();
+  // statics: Chart this column lays out through Auto-build; the formats reach every render
+  ok('numchart static: Chart this column is a Reset, the reader with its pin, the applier, no type pick kept',
+     /\$\('#vizResetBtn'\)\.trigger\('click'\);\n\s*var mapped = reportToVizConfig\(pin\);[\s\S]{0,200}_vizApplyAutoConfig\(mapped\);\n\s*_vizTypeTouched = false;/.test(grab('function _vizChartColumnNow(')));
+  ok('numchart static: ...and never reopens an open builder (its open resets the form)', /if \(!open0\) \$\('#visualizeBtn'\)\.trigger\('click'\);/.test(grab('function penumbraHeaderChartColumn(')));
+  ok('numchart static: the applier keeps a reader\'s own limit', /if \(mapped\.limit\) mapped\.config\.limit = mapped\.limit;/.test(grab('function _vizApplyAutoConfig(')));
+  eq('numchart static: Auto-build and Chart this column share one HEADS UP', (code.match(/_vizShowAutoNotes\(mapped\.warnings\);/g) || []).length, 2);
+  ok('numchart static: the data builder takes the measure\'s own format where the chart sets none', /if \(!out\._fmt && typeof _vizColChartFmt === 'function'\)/.test(grab('function generateChartDataFromMaps(')));
+  eq('numchart static: both renderers write category labels in the X column\'s format', (code.match(/_vizApplyXLabelFmt\(config, data, \w+, horizontal\);/g) || []).length, 2);
+  ok('numchart static: tooltips read the format in full (both renderers)', (code.match(/_vizTipNum\(/g) || []).length >= 20, (code.match(/_vizTipNum\(/g) || []).length);
+  ok('numchart static: Auto-build skips a column the viewer hid', /if \(this\.style && this\.style\.display === 'none'\) return;/.test(grab('function _vizChartableCols(')));
 
 } catch (e) {
   FAIL++; LOG.push('HARNESS-ERROR ' + (e && e.stack || e));

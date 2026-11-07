@@ -623,11 +623,16 @@
   // (gfold) the bands fold as the table's: the wrappers' .open is the truth; a card band mirrors it
   function wrappers() { return qa('#groupedResultsContainer .group-wrapper').filter(function (w) { return !w.classList.contains('group-grand-total'); }); }
   // (cband, 2026-11-01) the bands are the grouped view's own (Stacked draws the cards into them): a band = a shown wrapper,
-  // its toggle = its head (a button while the cards show: tabindex, role, aria-expanded), shut = folded
+  // its toggle = its head's NAME (main.js's disclosure button: tabindex, role, aria-expanded; wcagser 2026-11-06: the head
+  // itself is no button any more), shut = folded
   function grps() { return qa('#groupedResultsContainer .group-wrapper').filter(function (w) { return !w.classList.contains('group-grand-total') && !w.classList.contains('search-hidden') && w.getClientRects().length > 0; }); }
-  function tog(i) { var g = grps()[i]; return g ? q(':scope > .group-header', g) : null; }
-  function openOf(g) { var h = g ? q(':scope > .group-header', g) : null; return !!h && g.classList.contains('open') && h.getAttribute('aria-expanded') === 'true'; }
-  function shut(g) { var h = g ? q(':scope > .group-header', g) : null; return !!h && !g.classList.contains('open') && h.getAttribute('aria-expanded') === 'false'; }
+  function tog(i) { var g = grps()[i]; return g ? q(':scope > .group-header .group-name', g) : null; }
+  // (wcagser) main.js writes the name's aria-expanded at once: the cards drawn (or gone) say the cards' redraw has run, as
+  // the head's own aria-expanded (the redraw's) used to
+  function openOf(g) { var h = g ? q(':scope > .group-header .group-name', g) : null; return !!h && g.classList.contains('open') && h.getAttribute('aria-expanded') === 'true' && !!q('.pnb-card', g); }
+  function shut(g) { var h = g ? q(':scope > .group-header .group-name', g) : null; return !!h && !g.classList.contains('open') && h.getAttribute('aria-expanded') === 'false' && !q('.pnb-card', g); }
+  // (wcagser) a key as the browser sends it: main.js's band handler reads e.which (jQuery: keyCode)
+  function keyC(el, k, code) { el.dispatchEvent(new KeyboardEvent('keydown', { key: k, keyCode: code, which: code, bubbles: true, cancelable: true })); }
   function gname(g) { return g ? text(q(':scope > .group-header .group-name', g)) : null; }
   S.gcoll = async function () {
     await until(function () { return on() && grps().length > 0; }, 10000);
@@ -639,7 +644,7 @@
     R.info.fold = [w0.className, cards().length, qa('tbody tr', w0).length];
     tog(0).click(); await until(function () { return openOf(grps()[0]); }, 4000);
     R.chk.bandAgain = ws[0].classList.contains('open') && openOf(grps()[0]) && cards().length === 300;
-    tog(1).focus(); key(tog(1), 'Enter'); await until(function () { return !ws[1].classList.contains('open'); }, 4000); await sleep(150);
+    tog(1).focus(); keyC(tog(1), 'Enter', 13); await until(function () { return !ws[1].classList.contains('open'); }, 4000); await sleep(150);
     R.chk.bandKey = !ws[1].classList.contains('open') && shut(grps()[1]) && tog(1).getAttribute('aria-expanded') === 'false';
     R.chk.focusKept = document.activeElement === tog(1);
     q('#collapseAllGroups').click(); await until(function () { return cards().length === 0 && grps().every(shut); }, 4000);
@@ -5278,6 +5283,90 @@
     R.chk.linkDensity = document.body.classList.contains('density-compact');   // no density of the reader's own: the link's
     window.PenumbraViewLink.keep(); await sleep(300);
     R.chk.keptDensity = lsMap('penumbra_pref_density').lrfix === 'compact';
+  };
+  // ---- (hscroll, 2026-11-06) the folded header; a Stacked box's column at its left edge; the Board's lane ----
+  S.hsA = async function () {
+    await until(function () { return shownRows().length > 0; }, 8000); await sleep(300);
+    var hc = q('#reportHeaderContainer'); R.info.hasHdr = !!hc;
+    var b0 = window.PenumbraViewLink.build();
+    R.chk.noHdrWhenShown = !!b0.url && b0.url.indexOf('&noheader') < 0;
+    if (hc) hc.classList.add('is-collapsed');
+    var b1 = window.PenumbraViewLink.build(); R.info.url = b1.url && b1.url.slice(0, 160);
+    R.chk.hdrUrl = !!hc && !!b1.url && /&noheader&view=/.test(b1.url);
+    R.chk.hdrSaid = (b1.included || []).indexOf('header hidden') >= 0 && (window.PenumbraViewLink.describe(b1) || []).indexOf('header hidden') >= 0;
+    if (hc) hc.classList.remove('is-collapsed');
+  };
+  function openBox() { return qa('#groupedResultsContainer .group-wrapper.open > .group-content').filter(function (b) { return b.getClientRects().length && b.querySelector('thead th[data-colname]'); })[0] || null; }
+  function boxLeftCol(box) {
+    var edge = box.getBoundingClientRect().left, ths = qa('thead th[data-colname]', box);
+    for (var i = 0; i < ths.length; i++) { var t = ths[i]; if (!t.getClientRects().length || t.getAttribute('data-colname') === '#') continue; if (t.getBoundingClientRect().right > edge + 2) return t.getAttribute('data-colname'); }
+    return null;
+  }
+  S.ghsA = async function () {
+    await until(function () { return qa('#groupedResultsContainer .group-wrapper').length > 0; }, 10000); await sleep(400);
+    var w = q('#groupedResultsContainer .group-wrapper'), hd = w ? q(':scope > .group-header', w) : null;
+    if (w && !w.classList.contains('open') && hd) { hd.click(); await sleep(600); }
+    var box = openBox(); R.info.box = !!box && [box.scrollWidth, box.clientWidth];
+    if (box) { box.scrollLeft = Math.round((box.scrollWidth - box.clientWidth) * 0.6); await sleep(150); }
+    var want = box ? boxLeftCol(box) : null;
+    var d = window.PenumbraViewLink.decode(window.PenumbraViewLink.build().token); R.info.gb = d && d.gb; R.info.want = want;
+    R.chk.carriesCol = !!d && Array.isArray(d.gb) && d.gb.some(function (x) { return x[2] && x[2] === want; }) && !!want;
+    R.info.token = tok(JSON.parse(JSON.stringify(d || {})));
+  };
+  S.ghsB = async function () {
+    await until(function () { return !!openBox(); }, 12000); await sleep(1200);
+    var box = openBox(), want = P.get('want'), got = box ? boxLeftCol(box) : null; R.info.b = { want: want, got: got, sl: box && box.scrollLeft };
+    R.chk.boxAtCol = !!box && box.scrollLeft > 0 && !!want && got === want;
+  };
+  function board() { return q('#pnbCardsHost > .pnb-cards-board'); }
+  function boardLeftLane(b) { var left = b.getBoundingClientRect().left, ls = qa(':scope > .pnb-cards-lane', b); for (var i = 0; i < ls.length; i++) if (ls[i].getBoundingClientRect().right > left + 2) return ls[i].getAttribute('data-lane-key'); return null; }
+  S.gbdA = async function () {
+    await until(function () { return !!board() && qa('.pnb-cards-lane', board()).length > 2; }, 12000); await sleep(600);
+    var b = board(); b.scrollLeft = b.scrollWidth; await sleep(200);   // past the first lane
+    var want = boardLeftLane(b), bb = window.PenumbraViewLink.build(), d = window.PenumbraViewLink.decode(bb.token);
+    R.info.lane = { want: want, bl: d && d.bl, sw: b.scrollWidth, cw: b.clientWidth };
+    R.chk.carriesLane = !!d && !!want && d.bl === want;
+    R.chk.laneSaid = (window.PenumbraViewLink.describe(bb) || []).some(function (x) { return / lane$/.test(x); });
+    R.info.token = tok(JSON.parse(JSON.stringify(d || {}))); R.info.want = want;
+  };
+  S.gbdB = async function () {
+    await until(function () { return !!board() && qa('.pnb-cards-lane', board()).length > 2; }, 12000); await sleep(1500);
+    var b = board(), got = b ? boardLeftLane(b) : null; R.info.b = { want: P.get('want'), got: got, sl: b && b.scrollLeft };
+    R.chk.laneAtLeft = !!b && b.scrollLeft > 0 && got === P.get('want');
+  };
+  // (wcagser, 2026-11-06, WCAG 4.1.2) Stacked bands in the cards: the head is no button (no role, no tabindex, no
+  // aria-expanded): main.js's name and Hide this group X are, siblings - one name + one X tab stop per band, no button in a
+  // button; Enter on the name folds the band (its aria-expanded follows) and again opens it; Shift+F10 on the name opens
+  // the band's menu, Escape back to the name
+  S.gwcag = async function () {
+    await until(function () { return on() && grps().length > 2 && cards().length > 0 && document.body.classList.contains('pnb-cards-inband'); }, 10000); await sleep(200);
+    var gs = grps(), hds = gs.map(function (g) { return q(':scope > .group-header', g); });
+    R.info.head = hds.slice(0, 3).map(function (h) { return h && [h.className, h.getAttribute('role'), h.getAttribute('tabindex'), h.getAttribute('aria-expanded')]; });
+    R.chk.headNoRole = hds.length > 2 && hds.every(function (h) { return !!h && h.classList.contains('pnb-cards-bandhead') && !h.hasAttribute('role') && !h.hasAttribute('tabindex') && !h.hasAttribute('aria-expanded'); });
+    // the tab stops in each band's head: exactly its name and its X, in that order
+    var stops = hds.map(function (h) { return [h].concat(qa('*', h)).filter(function (n) { return n.tabIndex >= 0 && !n.disabled && n.getClientRects().length > 0; }); });
+    R.info.stops = stops.slice(0, 3).map(function (st) { return st.map(function (n) { return n.className || n.tagName; }); });
+    R.chk.tabStops = stops.length > 2 && stops.every(function (st, i) { return st.length === 2 && st.indexOf(q('.group-name', hds[i])) >= 0 && st.indexOf(q('.group-hide', hds[i])) >= 0; });
+    R.chk.hideButton = hds.every(function (h) {
+      var x = q('.group-hide', h), nm = q('.group-name', h);
+      return !!x && x.getAttribute('role') === 'button' && x.getAttribute('aria-label') === 'Hide this group' && !(x.parentNode.closest && x.parentNode.closest('[role="button"], button'))
+        && !!nm && nm.getAttribute('role') === 'button' && !nm.contains(x) && !(nm.parentNode.closest && nm.parentNode.closest('[role="button"], button'));
+    });
+    // Enter on the name: the band folds, the name's aria-expanded follows, the focus stays; Enter again: open
+    var w1 = gs[1], n1 = tog(1), drawn0 = cards().length;
+    n1.focus(); keyC(n1, 'Enter', 13);
+    await until(function () { return !w1.classList.contains('open') && n1.getAttribute('aria-expanded') === 'false'; }, 4000); await sleep(200);
+    var folded = !w1.classList.contains('open') && n1.getAttribute('aria-expanded') === 'false' && document.activeElement === n1 && !q('.pnb-card', w1) && cards().length < drawn0;
+    keyC(n1, 'Enter', 13);
+    await until(function () { return w1.classList.contains('open') && n1.getAttribute('aria-expanded') === 'true' && !!q('.pnb-card', w1); }, 4000); await sleep(200);
+    R.info.enter = [folded, w1.className, n1.getAttribute('aria-expanded'), cards().length, drawn0];
+    R.chk.nameEnter = folded && w1.classList.contains('open') && n1.getAttribute('aria-expanded') === 'true' && !!q('.pnb-card', w1) && !hds[1].hasAttribute('aria-expanded');
+    // Shift+F10 on the name: the band's own menu (the group's items, the cards' with it), focus in it; Escape: the name
+    var n0 = tog(0); n0.focus(); keyOn(n0, 'F10', true); await sleep(100);
+    var m = menu(), a = m ? acts() : []; R.info.menu = a;
+    var opened = !!m && m.contains(document.activeElement) && text(q('.pnb-hm-name', m)) === gname(gs[0]) && a.indexOf('gToggle') >= 0 && a.indexOf('cardSize') >= 0;
+    if (m) { keyOn(document.activeElement, 'Escape'); await sleep(100); }
+    R.chk.nameMenu = opened && !menu() && document.activeElement === n0;
   };
   try { await boot(); if (S[SCN]) await S[SCN](); else throw new Error('no scenario ' + SCN); }
     catch (e) { R.fail = String(e && e.stack || e); }

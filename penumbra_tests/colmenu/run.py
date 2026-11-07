@@ -967,6 +967,52 @@ MUTANTS['fm-grpclip'] = ([('menu', "typeof A.groupValues === 'function' && typeo
                            "typeof A.groupValues === 'function' && typeof A.groupVariants === 'function' && !document.body.classList.contains('restrict-clipboard'))\n")],
                          ['L-mfltm-fmGroupsNone'], ['mfltm'])
 
+# (numchart, 2026-11-06; the user: "Why not apply this same logic when its a currency/number?") a number or money column's
+# Chart by list: red on live (no list on a number column); ncNotText, ncIdNum and ncItem (the item's place, given a
+# stubbed list) hold on live (guards). (dtpick's ch-kind bit through mchart's chText on V_AMOUNT, which takes the number
+# branch now: it bites through ncIdNum - a number column named like an id, the one place left where the date list's
+# period/cycle filter drops anything. ch-hour is DEAD on live as well: the registry's Hour has minGran 3, so its line
+# is redundant - left for its own round.)
+SCN = SCN + ['mnchart']
+CHK['mnchart'] = ['ncReal', 'ncNotText', 'ncIdNum', 'ncItem', 'ncTitle', 'ncList', 'ncSep', 'ncSuggest', 'ncDateTitle', 'ncDates', 'ncRuns']
+NEW_NC = {'L-mnchart-' + c for c in CHK['mnchart'] if c not in ('ncNotText', 'ncIdNum', 'ncItem')}
+NEW = NEW | NEW_NC
+MUTANTS['ch-kind'] = (MUTANTS['ch-kind'][0], ['L-mnchart-ncIdNum'], ['mnchart'])
+MUTANTS.update({
+    'nc-none': ([('menu', "        if (cvar.length && cvar[0].measure) {\n", "        if (false) {\n")],
+                ['L-mnchart-ncReal', 'L-mnchart-ncTitle', 'L-mnchart-ncList', 'L-mnchart-ncSep', 'L-mnchart-ncSuggest', 'L-mnchart-ncDateTitle', 'L-mnchart-ncDates', 'L-mnchart-ncRuns'], ['mnchart']),
+    'nc-main': ([('main', "            if (_vizIsMeasureCol(col, masterRowData)) return _vizMeasureVariants(col, light);", "            if (false) return _vizMeasureVariants(col, light);")], ['L-mnchart-ncReal'], ['mnchart']),
+    'nc-sep': ([('menu', "if (list.length && list[list.length - 1] !== '-' && !list.some(function (it) { return it && it.bins; })) { list.push('-'); }", "if (false) { list.push('-'); }")], ['L-mnchart-ncSep'], ['mnchart']),
+    'nc-sug': ([('menu', "function sug(v) { return v.suggested ? ' (suggested)' : ''; }", "function sug(v) { return ''; }")], ['L-mnchart-ncSuggest'], ['mnchart']),
+    'nc-third': ([('menu', "            if (v.kind === 'date' && v.periods && v.periods.length) {", "            if (false) {")], ['L-mnchart-ncDateTitle', 'L-mnchart-ncDates', 'L-mnchart-ncRuns'], ['mnchart']),
+    'nc-period': ([('menu', "run: function () { A.chartColumn(col, p.id); } };", "run: function () { A.chartColumn(col, v.id); } };")], ['L-mnchart-ncRuns'], ['mnchart']),
+    'nc-catarg': ([('menu', "title: 'The ' + word + ' of ' + name + ' by ' + nameOf(v.token),\n                run: function () { A.chartColumn(col, v.id); } });", "title: 'The ' + word + ' of ' + name + ' by ' + nameOf(v.token),\n                run: function () { A.chartColumn(col, v.token); } });")], ['L-mnchart-ncRuns'], ['mnchart']),
+    'nc-title': ([('menu', "title: 'Open the chart builder with the ' + cmw + ' of this column by the column you pick',", "title: 'Open the chart builder with this column on the X axis',")], ['L-mnchart-ncTitle'], ['mnchart']),
+})
+
+# (2026-11-06, wcagser; WCAG 2.1.1 / 1.3.1 / 4.1.2) Filter by value's tabs by keyboard (Left / Right wrapping, Home / End, the
+# panel following; aria-controls) and Column stats' lines as read-only menu items the arrow keys reach, each "Label: value"
+# (a toggle's and a Notes column's too). Red on live (only a click switches tabs; the lines are role=presentation and the
+# keyboard never lands on one); wsLook holds on live (a guard: the lines keep their look)
+SCN = SCN + ['mwcag']
+CHK['mwcag'] = ['wtAria', 'wtRight', 'wtLeft', 'wtHomeEnd', 'wsNum', 'wsToggle', 'wsNotes', 'wsEnter', 'wsEsc', 'wsLook']
+NEW_WCAG = {'L-mwcag-' + c for c in CHK['mwcag'] if c != 'wsLook'}
+NEW = NEW | NEW_WCAG
+MUTANTS.update({
+    'wc-tabkey': ([('menu', "            setMode(go.getAttribute('data-hp').slice(5));\n", "\n")], ['L-mwcag-wtRight', 'L-mwcag-wtLeft', 'L-mwcag-wtHomeEnd'], ['mwcag']),
+    'wc-statline': ([('menu', ".querySelectorAll('.pnb-hm-item, .pnb-hm-info[role=\"menuitem\"]')", ".querySelectorAll('.pnb-hm-item')")],
+                    ['L-mwcag-wsNum', 'L-mwcag-wsToggle', 'L-mwcag-wsNotes', 'L-mwcag-wsEnter', 'L-mwcag-wsEsc'], ['mwcag']),
+})
+
+NEW = NEW - NEW_WCAG   # (wcagser is LIVE since 42e8b5f, 2026-11-06: old checks now)
+# (2026-11-06, wcagsweep) the filter tabs leave a modified arrow to the browser; Most common's items named "<value>, <count> rows"
+CHK['mwcag'] = CHK['mwcag'] + ['wtModKey', 'wsTopName']
+NEW = NEW | {'L-mwcag-wtModKey', 'L-mwcag-wsTopName'}
+MUTANTS.update({
+    'wc-modkey': ([('menu', "if (!tb || e.altKey || e.ctrlKey || e.metaKey) { return; }", "if (!tb) { return; }")], ['L-mwcag-wtModKey'], ['mwcag']),
+    'wc-topname': ([('menu', "aria: shown + ', ' + n(t.n) + (t.n === 1 ? ' row' : ' rows'), title: t.v === ''", "title: t.v === ''")], ['L-mwcag-wsTopName'], ['mwcag']),
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:

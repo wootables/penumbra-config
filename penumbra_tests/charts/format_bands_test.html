@@ -151,6 +151,28 @@ try {
   eq('target: a hyphen range is REFUSED too', F.target('30-60'), null);
   eq('target: a negative target is not mistaken for a range', F.target('-5'), { value: -5, label: '' });
 
+  // ══ numchart (2026-11-06): style 'column' - a measure in its column's own format (Column options) ══
+  var CN = new Function(grab('function _vizColumnNumText(') + '\n' + grab('function penumbraFormatChartNumber(') + '\nreturn penumbraFormatChartNumber;')();
+  var cur0 = { style: 'column', t: 'currency', decimals: 0, scale: 1, prefix: '$', suffix: '' };
+  eq('column: currency:0, a small value in full', CN(1234.4, cur0, ''), '$1,234');
+  eq('column: currency:0, a big value on the K/M/B ladder in its unit', [CN(12345678, cur0, ''), CN(1500000, cur0, ''), CN(25000, cur0, '')], ['$12.3M', '$1.5M', '$25K']);
+  eq('column: a negative', CN(-2500, cur0, ''), '-$2,500');
+  var cur2 = { style: 'column', t: 'currency', decimals: 2, scale: 1, prefix: '$', suffix: '' };
+  eq('column: currency:2 keeps its cents on the chart', CN(512.4, cur2, ''), '$512.40');
+  eq('column: ...a whole value (an axis tick) drops them', CN(2000, cur2, ''), '$2,000');
+  eq('column: exact (the tooltip): every value in full, cents and all', [CN(1234567.8, Object.assign({ exact: true }, cur2), ''), CN(2000, Object.assign({ exact: true }, cur2), '')], ['$1,234,567.80', '$2,000.00']);
+  eq('column: currency with no decimals named: 2', CN(5.5, { style: 'column', t: 'currency', decimals: null, scale: 1, prefix: '$', suffix: '' }, ''), '$5.50');
+  var pct = { style: 'column', t: 'percent', decimals: 1, scale: 100, prefix: '', suffix: '%' };
+  eq('column: a percent of fractions, x100', [CN(0.1534, pct, ''), CN(0.5, pct, '')], ['15.3%', '50%']);
+  eq('column: ...a percent never goes K', CN(150, pct, ''), '15,000%');
+  var pct1 = { style: 'column', t: 'percent', decimals: null, scale: 1, prefix: '', suffix: '%' };
+  eq('column: a percent of cells that read 15.3% (no x100), up to 2 decimals', [CN(15.3, pct1, ''), CN(15.333, pct1, '')], ['15.3%', '15.33%']);
+  eq('column: number:2 - no $ even where the column is money', CN(3.456, { style: 'column', t: 'number', decimals: 2, scale: 1, prefix: '', suffix: '' }, '$'), '3.46');
+  var numN = { style: 'column', t: 'number', decimals: null, scale: 1, prefix: '', suffix: '' };
+  eq('column: a number with no decimals named: up to 2, trimmed', [CN(3.5, numN, ''), CN(3.333333, numN, ''), CN(7, numN, '')], ['3.5', '3.33', '7']);
+  eq('column: no -0', CN(-0.001, { style: 'column', t: 'number', decimals: 2, scale: 1, prefix: '', suffix: '' }, ''), '0.00');
+  eq('column: the other styles are untouched (compact)', CN(1500000, { style: 'compact', decimals: 1, trim: true, prefix: null, suffix: '', thousands: true }, '$'), '$1.5M');
+
   // ══ 9. THE WRAPPER ATTACHES _fmt TO EVERY PAYLOAD ══════════════════════
   // The builder has 23 exit points; the wrapper is what guarantees all of them
   // carry the format. Drive it with a stub inner so this tests the WRAPPER,

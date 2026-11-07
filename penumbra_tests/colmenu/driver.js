@@ -2069,7 +2069,10 @@
       var bN = bandEl('North'), nmEl = bN ? bN.querySelector('.group-name') : null;
       if (nmEl) { nmEl.focus(); rclick(nmEl, true); }
       var m2 = menu(), br = bN ? bN.getBoundingClientRect() : null, mr = m2 ? m2.getBoundingClientRect() : null;
-      R.chk.gmKbd = !!mr && !!br && Math.abs(mr.top - br.bottom) <= 2 && Math.abs(mr.left - br.left) <= 2 && document.activeElement === m2.querySelector('.pnb-hm-item');
+      // (2026-11-06, cind) under the band - or, where the menu (taller since the Fit all items) would run past the window's
+      // foot, pushed up to it (place(): 4px from the bottom)
+      var under = !!mr && !!br && Math.abs(mr.top - br.bottom) <= 2, clamped = !!mr && !!br && br.bottom + mr.height > window.innerHeight - 4 && Math.abs(mr.bottom - (window.innerHeight - 4)) <= 2;
+      R.chk.gmKbd = !!mr && !!br && (under || clamped) && Math.abs(mr.left - br.left) <= 2 && document.activeElement === m2.querySelector('.pnb-hm-item');
       R.info.kbd = { band: br && [br.left, br.bottom], menu: mr && [mr.left, mr.top] };
       keyOn('Escape');
       R.chk.gmKbdBack = R.chk.gmKbd && !menu() && document.activeElement === nmEl;
@@ -4077,10 +4080,9 @@
       R.info.calls = calls;
       R.chk.chRuns = JSON.stringify(calls) === JSON.stringify([['V_DATE', 'fy'], ['V_DATE', 'raw']]);
       closeMenu();
-      // not on a text or a number column
+      // not on a text column ((numchart, 2026-11-06) a number column's list is of X axes: scenario mnchart)
       rclick(fth('V_NAME')); await sleep(50); var an = acts(); closeMenu();
-      rclick(fth('V_AMOUNT')); await sleep(50); var am = acts(); closeMenu();
-      R.chk.chText = an.indexOf('chartByList') < 0 && am.indexOf('chartByList') < 0 && an.length > 0 && am.length > 0;
+      R.chk.chText = an.indexOf('chartByList') < 0 && an.length > 0;
       // not where the chart builder's button is hidden
       var vb = document.getElementById('visualizeBtn'), vd = vb ? vb.style.display : '';
       if (vb) vb.style.display = 'none';
@@ -4119,6 +4121,210 @@
         rclick(fth('V_NAME')); await sleep(50); var an = acts(); closeMenu();
         R.chk.acNone = an.length > 0 && an.indexOf('chartActiveList') < 0;
       } finally { H.activeVariants = keepV; H.chartActive = keepC; if (vbMade && vb0.parentNode) vb0.parentNode.removeChild(vb0); }
+    },
+    // (numchart, 2026-11-06) a number or money column's Chart by list: the real one on V_AMOUNT (X axes: a category first,
+    // its own Bins, no As is) and none on a text column; then its shape on a stubbed list (main.js headerMenu.chartVariants):
+    // last in the column's tools, the categories, each date column a list of its groupings (a third level, As is first),
+    // a line, the column's own ranges; one (suggested); each runs Chart this column with that X axis
+    mnchart: async function () {
+      var H = A(), keepV = H.chartVariants, keepC = H.chartColumn, calls = [];
+      var vb0 = document.getElementById('visualizeBtn'), vbMade = !vb0;
+      if (!vb0) { vb0 = document.createElement('span'); vb0.id = 'visualizeBtn'; document.body.appendChild(vb0); }
+      var vbSt = vb0.getAttribute('style');
+      if (!jQuery('#visualizeBtn').is(':visible')) { document.body.appendChild(vb0); vb0.style.display = 'inline-block'; vb0.style.width = '20px'; vb0.style.height = '20px'; }
+      try {
+        closeMenu(); rclick(fth('V_AMOUNT')); await sleep(50);
+        var ra = acts(), ri = ra.indexOf('chartByList'), rl = ra.indexOf('clearPrefs'), rit = item('chartByList');
+        if (rit) { rit.click(); await sleep(100); }
+        var rsa = rit ? subActs() : [];
+        R.info.real = { acts: ra, sub: rsa, labels: rit ? subLabels() : [] };
+        R.chk.ncReal = ri >= 0 && ri === rl - 1 && rsa.length > 2 && rsa.indexOf('chartAs-raw') < 0 && rsa.indexOf('chartAs-bin') > 0 && /^chartAs-x\d+$/.test(rsa[0]);
+        closeMenu();
+        rclick(fth('V_NAME')); await sleep(50); var an = acts(); closeMenu();
+        R.chk.ncNotText = an.length > 0 && an.indexOf('chartByList') < 0;
+        // a number column named like an id (H_NUM) is no measure: no list - its bins are no date grouping either
+        var hg = window.getColumnTypeGlyph ? window.getColumnTypeGlyph('H_NUM') : '', hv = keepV('H_NUM');
+        R.info.idNum = { glyph: hg, list: (hv || []).map(function (v) { return v.id; }) };
+        R.chk.ncIdNum = hg === '#' && Array.isArray(hv) && hv.length === 0;
+        H.chartVariants = function (c) {
+          if (c !== 'V_AMOUNT') return keepV(c);
+          return [
+            { id: 'x:V_STATUS', act: 'x0', token: 'V_STATUS', label: 'V_STATUS', kind: 'cat', measure: true, word: 'total', suggested: true },
+            { id: 'x:V_NAME', act: 'x1', token: 'V_NAME', label: 'V_NAME', kind: 'cat', measure: true, word: 'total' },
+            { id: 'x:V_DATE', act: 'd0', token: 'V_DATE', label: 'V_DATE', kind: 'date', measure: true, word: 'total', periods: [
+              { id: 'x:V_DATE', act: 'd0raw', token: 'V_DATE', label: 'As is', ex: '' },
+              { id: 'x:V_DATE:fy', act: 'd0fy', token: 'V_DATE:fy', label: 'Fiscal Year', ex: 'FY25' }] },
+            { id: 'bin', act: 'bin', token: 'V_AMOUNT:bin', label: 'Bins', ex: 'auto', kind: 'bins', measure: true, word: 'total' },
+            { id: 'binlog', act: 'binlog', token: 'V_AMOUNT:binlog', label: 'Order of Magnitude', ex: '10-99', kind: 'bins', measure: true, word: 'total' }];
+        };
+        H.chartColumn = function (c, s) { calls.push([c, s === undefined ? null : s]); return true; };
+        closeMenu(); rclick(fth('V_AMOUNT')); await sleep(50);
+        var a = acts(), ci = a.indexOf('chartByList'), li = a.indexOf('clearPrefs');
+        R.info.acts = a;
+        R.chk.ncItem = ci >= 0 && li === a.length - 1 && ci === li - 1;
+        var it = item('chartByList');
+        R.chk.ncTitle = !!it && /the total of this column by the column you pick/.test(it.getAttribute('title') || '');
+        if (it) { it.click(); await sleep(100); }
+        var sp = subPanel(), sa = it ? subActs() : [], sl = it ? subLabels() : [];
+        R.info.sub = { acts: sa, labels: sl };
+        R.chk.ncList = sa.join() === 'chartAs-x0,chartAs-x1,chartAs-d0,chartAs-bin,chartAs-binlog' && sl[1] === 'V_NAME' && sl[2] === 'V_DATE' && sl[3] === 'Bins';
+        var kids = sp ? Array.prototype.slice.call(sp.querySelectorAll('.pnb-hm-item, .pnb-hm-sep')) : [];
+        var seps = kids.map(function (k) { return k.classList.contains('pnb-hm-sep') ? '-' : k.getAttribute('data-act'); }).join();
+        R.info.seps = seps;
+        R.chk.ncSep = seps === 'chartAs-x0,chartAs-x1,chartAs-d0,-,chartAs-bin,chartAs-binlog';
+        R.chk.ncSuggest = sl[0] === 'V_STATUS (suggested)' && sl.filter(function (l) { return / \(suggested\)$/.test(l); }).length === 1;
+        var d0 = item('chartAs-d0');
+        R.chk.ncDateTitle = !!d0 && /^The total of V_AMOUNT by V_DATE, grouped the way you pick$/.test(d0.getAttribute('title') || '');
+        if (d0) { d0.click(); await sleep(150); }
+        var da = subActs(), dl = subLabels();
+        R.info.dates = { acts: da, labels: dl };
+        R.chk.ncDates = da.join() === 'chartAs-d0raw,chartAs-d0fy' && dl[0] === 'As is' && dl[1] === 'Fiscal Year';
+        var fy = item('chartAs-d0fy'); if (fy) { fy.click(); await sleep(50); }
+        closeMenu(); rclick(fth('V_AMOUNT')); await sleep(50);
+        if (sub('chartByList')) { await sleep(100); var x0 = item('chartAs-x0'); if (x0) { x0.click(); await sleep(50); } }
+        closeMenu(); rclick(fth('V_AMOUNT')); await sleep(50);
+        if (sub('chartByList')) { await sleep(100); var bn = item('chartAs-bin'); if (bn) { bn.click(); await sleep(50); } }
+        R.info.calls = calls;
+        R.chk.ncRuns = JSON.stringify(calls) === JSON.stringify([['V_AMOUNT', 'x:V_DATE:fy'], ['V_AMOUNT', 'x:V_STATUS'], ['V_AMOUNT', 'bin']]);
+        closeMenu();
+      } finally {
+        H.chartVariants = keepV; H.chartColumn = keepC;
+        if (vbMade && vb0.parentNode) vb0.parentNode.removeChild(vb0);
+        else if (vbSt === null) vb0.removeAttribute('style'); else vb0.setAttribute('style', vbSt);
+      }
+    },
+    // (2026-11-06, wcagser; WCAG 2.1.1 / 1.3.1 / 4.1.2) Filter by value's tabs by keyboard (Left / Right wrapping, Home / End
+    // move AND switch, the panel following); Column stats' lines reached by the arrow keys, each named "Label: value" -
+    // a number column's, a toggle's and a Notes column's (those two have no other item: the focus must still go in)
+    mwcag: async function () {
+      function panelEl() { return document.getElementById('pnbHeadPanel'); }
+      function key(k) { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+      function tabsNow() { var p = panelEl(); return p ? Array.prototype.slice.call(p.querySelectorAll('.pnb-hp-mode')) : []; }
+      function tabState() {
+        var p = panelEl(), f = p && p.querySelector('[data-hp="find"]'), l = p && p.querySelector('[data-hp="list"]');
+        var sel = tabsNow().filter(function (b) { return b.getAttribute('aria-selected') === 'true'; });
+        var rows = p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hp-row .pnb-hp-v'), function (v) { return v.textContent; }) : [];
+        return { sel: sel.length === 1 ? sel[0].getAttribute('data-hp') : null, focus: document.activeElement && document.activeElement.getAttribute('data-hp'),
+          roving: tabsNow().map(function (b) { return b.tabIndex; }).join(), find: f ? f.style.display !== 'none' : null, label: l ? l.getAttribute('aria-label') : null,
+          rows: rows.length, ranges: rows.length > 0 && rows.every(function (v) { return v.indexOf('$') >= 0; }) && rows.length <= 9 };
+      }
+      function isValues(s) { return s.sel === 'mode-values' && s.focus === 'mode-values' && s.roving === '0,-1' && s.find === true && s.label === 'Values' && s.rows > 20; }
+      function isRanges(s) { return s.sel === 'mode-ranges' && s.focus === 'mode-ranges' && s.roving === '-1,0' && s.find === false && s.label === 'Ranges' && s.ranges; }
+      closeMenu();
+      rclick(fth('V_AMOUNT'));
+      if (item('filter')) item('filter').click();
+      await sleep(300);
+      var p = panelEl(), tl = p && p.querySelector('.pnb-hp-modes'), tabs = tabsNow(), lst = p && p.querySelector('[data-hp="list"]');
+      R.chk.wtAria = !!tl && tl.getAttribute('role') === 'tablist' && tabs.length === 2 && !!lst && !!lst.id
+        && tabs.every(function (b) { return b.getAttribute('role') === 'tab' && /^(true|false)$/.test(b.getAttribute('aria-selected') || '') && b.getAttribute('aria-controls') === lst.id; })
+        && document.getElementById(lst.id) === lst;
+      var s0 = tabState();
+      R.info.tabs0 = s0;
+      // it opens on Ranges (a long list of amounts), its tab focused: Right wraps to... Values is first, Ranges last
+      key('ArrowRight'); await sleep(50);
+      var s1 = tabState();
+      key('ArrowLeft'); await sleep(50);
+      var s2 = tabState();
+      key('Home'); await sleep(50);
+      var s3 = tabState();
+      key('End'); await sleep(50);
+      var s4 = tabState();
+      key('ArrowLeft'); await sleep(50);
+      var s5 = tabState();
+      R.info.tabs = [s1, s2, s3, s4, s5];
+      R.chk.wtRight = isRanges(s0) && isValues(s1);      // Right from the last tab: wraps to the first, its panel shown
+      R.chk.wtLeft = isRanges(s2) && isValues(s5);       // Left from the first: wraps to the last; Left from the last: the one before
+      R.chk.wtHomeEnd = isValues(s3) && isRanges(s4);
+      // (2026-11-06, wcagsweep) a modified arrow stays the browser's (Alt+Left / Right = Back / Forward): no switch, no move, not prevented
+      var mt = document.activeElement, mev = new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, bubbles: true, cancelable: true });
+      if (mt) mt.dispatchEvent(mev);
+      await sleep(50);
+      var s6 = tabState();
+      R.chk.wtModKey = isValues(s5) && !!mt && !mev.defaultPrevented && isValues(s6) && document.activeElement === mt;
+      R.info.modKey = { s6: s6, prevented: mev.defaultPrevented };
+      key('Escape'); await sleep(100);
+      closeMenu();
+      // Column stats by keyboard: the menu from the heading, Column stats entered with Right, every line walked with Down
+      function walk(col) {
+        closeMenu();
+        var th = fth(col);
+        if (!th.hasAttribute('tabindex')) th.setAttribute('tabindex', '0');
+        th.focus();
+        rclick(th, true);
+        var st = item('stats'), out = { entered: false, lines: [], visited: [], named: true };
+        if (!st) return out;
+        st.focus();
+        key('ArrowRight');
+        var sp = subPanel();
+        if (!sp) return out;
+        var ae = document.activeElement;
+        out.entered = !!ae && sp.contains(ae) && ae !== sp;
+        out.firstIsLine = !!ae && ae.classList.contains('pnb-hm-info');
+        var lines = Array.prototype.slice.call(sp.querySelectorAll('.pnb-hm-info'));
+        out.lines = lines.map(function (d) { return d.querySelector('.pnb-hm-info-k').textContent + ': ' + d.querySelector('.pnb-hm-info-v').textContent; });
+        var seen = [];
+        for (var k = 0; k < 40 && out.entered; k++) {
+          var a = document.activeElement;
+          if (a && a.classList.contains('pnb-hm-info') && seen.indexOf(a) < 0) seen.push(a);
+          key('ArrowDown');
+        }
+        out.visited = seen.map(function (d) { return d.getAttribute('aria-label'); });
+        out.named = lines.length > 0 && lines.every(function (d) {
+          var nm = d.getAttribute('aria-label') || '', kk = d.querySelector('.pnb-hm-info-k').textContent, vv = d.querySelector('.pnb-hm-info-v').textContent;
+          return d.getAttribute('role') === 'menuitem' && nm.indexOf(kk) === 0 && nm.indexOf(vv) > kk.length;
+        });
+        out.all = lines.length > 0 && seen.length === lines.length;
+        return out;
+      }
+      var wN = walk('V_AMOUNT');
+      R.chk.wsNum = wN.entered && wN.all && wN.named && wN.lines.some(function (l) { return /^Total: /.test(l); });
+      closeMenu();
+      var P = window.Penumbra, keepF = P.journalFriendlyCol, keepV = P.journalSearchColumnValue, wT, wD, enterOk = false, escOk = false;
+      P.journalFriendlyCol = function (c) { return c === 'V_STATUS' ? 'Done' : (c === 'V_DATE' ? 'Notes' : (keepF ? keepF(c) : null)); };
+      P.journalSearchColumnValue = function (m, up) {
+        var i = parseInt(String(m.get('V_ID')).slice(3), 10) - 1001;
+        if (up === 'V_STATUS') return { kind: 'toggle', on: i % 3 === 0 };
+        if (up === 'V_DATE') return { kind: 'notes', count: i % 4 === 0 ? 1 + (i % 3) : 0 };
+        return keepV ? keepV(m, up) : null;
+      };
+      try {
+        wT = walk('V_STATUS');
+        R.chk.wsToggle = wT.entered && wT.firstIsLine && wT.all && wT.named && wT.lines.length === 2 && /^Checked: /.test(wT.lines[0]);
+        closeMenu();
+        wD = walk('V_DATE');
+        R.chk.wsNotes = wD.entered && wD.firstIsLine && wD.all && wD.named && wD.lines.length === 3 && /^Rows with notes: /.test(wD.lines[0]);
+        // Enter and Space on a line: nothing happens (the menu stays, the focus too, no filter); Escape: closed, the heading focused
+        closeMenu();
+        var th = fth('V_STATUS');
+        th.focus(); rclick(th, true);
+        if (item('stats')) { item('stats').focus(); key('ArrowRight'); }
+        var ln = document.activeElement, sv = searchVal();
+        var onLine = !!ln && ln.classList.contains('pnb-hm-info');
+        key('Enter'); await sleep(100);
+        key(' '); await sleep(100);
+        enterOk = onLine && !!menu() && document.activeElement === ln && searchVal() === sv;
+        key('Escape'); await sleep(50);
+        escOk = onLine && !menu() && !subPanel() && document.activeElement === th;
+      } finally { P.journalFriendlyCol = keepF; P.journalSearchColumnValue = keepV; }
+      R.chk.wsEnter = enterOk;
+      R.chk.wsEsc = escOk;
+      R.info.walks = { num: wN, toggle: wT, notes: wD };
+      // (2026-11-06, wcagsweep) Most common's items are named "<value>, <count> rows" (not the value and count run together)
+      closeMenu();
+      rclick(fth('V_STATUS')); sub('stats');
+      var tops = subPanel() ? Array.prototype.slice.call(subPanel().querySelectorAll('.pnb-hm-item[data-act^="stats-top-"]')) : [];
+      R.info.topNames = tops.map(function (t) { return t.getAttribute('aria-label'); });
+      R.chk.wsTopName = tops.length > 0 && tops.every(function (t) {
+        var nm = t.getAttribute('aria-label') || '', lb = t.querySelector('.pnb-hm-label').textContent, nt = t.querySelector('.pnb-hm-note').textContent;
+        return /^.+, [\d,]+ rows?$/.test(nm) && nm === lb + ', ' + nt + (nt === '1' ? ' row' : ' rows');
+      });
+      // a guard (holds on live): the lines keep their look - not an item's class, padding or pointer
+      closeMenu();
+      rclick(fth('V_NAME')); sub('stats');
+      var li = subPanel() && subPanel().querySelector('.pnb-hm-info'), cs = li ? getComputedStyle(li) : null;
+      R.chk.wsLook = !!li && !li.classList.contains('pnb-hm-item') && cs.paddingLeft === '28px' && cs.paddingTop === '2px' && cs.cursor !== 'pointer' && cs.minHeight !== '24px';
+      R.info.look = cs ? { pl: cs.paddingLeft, pt: cs.paddingTop, cur: cs.cursor, mh: cs.minHeight } : null;
+      closeMenu();
     },
     mexcl: async function () {
       var td = document.querySelector('#resultsTable tbody tr td a');

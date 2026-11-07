@@ -214,6 +214,22 @@ if ($have && $pg && is_file($PDFP) && is_file($TCPDF)) {   // the candidate plug
     @unlink($tmp);
 }
 ok('P-pvPdfRender', $pdfOk, $pdfInfo);
+// (pdfgaps, 2026-11-06, the user: "if those are cheap to fix lets do those") the PDF generator logs the table's line only
+// when the table is drawn (card pages replace it and log their own); a tile page prints a highlight-hidden value blank,
+// its label kept (both rule forms: plain, and the fill "!important" as int-col-mat's)
+$logC = $logT = '';
+if ($have && $pg && function_exists('penumbra_generate_pdf') && isset($o)) {
+    ob_start(); penumbra_generate_pdf('<table><tr><td>the table</td></tr></table>', 'Tile Report', $o + array('card_pages' => $pg)); $logC = (string)ob_get_clean();
+    ob_start(); penumbra_generate_pdf('<table><tr><td>the table</td></tr></table>', 'Tile Report', $o); $logT = (string)ob_get_clean();
+}
+ok('P-pdfLogTable', strpos($logC, 'Rendering single table') === false && strpos($logC, 'card page(s)') !== false && strpos($logT, 'Rendering single table') !== false,
+    json_encode(array(substr($logC, -260), substr($logT, -200))));
+$pgH = ($have && $tH) ? penumbra_cards_pdf_tile_pages($tH, 'R') : null; $pgI = ($have && $tI) ? penumbra_cards_pdf_tile_pages($tI, 'R') : null;
+$pageOf = function ($r, $who) { if (is_array($r)) foreach ($r['pages'] as $p) if (strpos($p, '>' . $who . '</td>') !== false) return $p; return ''; };
+$eH = $pageOf($pgH, 'Eng'); $eI = $pageOf($pgI, 'Eng'); $hH = $pageOf($pgH, 'Hum');
+ok('P-pvPdfHid', $eH !== '' && preg_match('#>2024 Amt</td><td width="68%" style="[^"]*"></td>#', $eH) === 1 && strpos($eH, '>300</td>') === false
+    && $eI !== '' && preg_match('#>2024 Amt</td><td width="68%" style="[^"]*"></td>#', $eI) === 1 && strpos($eI, '>300</td>') === false
+    && strpos($hH, '>21</td>') !== false, substr($eI, 0, 900));
 
 // ---- the saved setup -------------------------------------------------------------------------------------------------
 $c0 = $have ? penumbra_cards_tiles_cfg(array('viewOptions' => array('cards' => array('tiles' => array('size' => 'large'))))) : 'x';
@@ -230,6 +246,12 @@ ok('S-pvWired', strpos($runN, "\$GLOBALS['penumbra_cards_tiles'] = function_exis
     && strpos($runN, "\$_tilesHere = penumbra_cards_pivot_tiles(\$data, \$pivotSettings, \$themeName, \$formatRules, \$rewriteRules);") !== false
     && substr_count($runN, 'if ($_pcap !== null)') === 12,
     'the tiles cfg, the per-task context reset and record, the body branch, the 12 recorders + the finish');
+// (pdfgaps) a file drop's pivot PDF: the drop records the task's pivot context (its rules parsed there) between its table
+// and its PDF call, so penumbra_cards_pdf_for draws the tiles when the report was saved showing them
+$dA = strpos($runN, '$pdfHtml = _drop_file_build_pdf_html(');
+$dB = $dA !== false ? strpos($runN, "\$GLOBALS['penumbra_cards_tiles_ctx'] = array('theme' => \$themeName, 'settings' => isset(\$apiResult['pivot']) ? \$apiResult['pivot'] : null, 'format' =>", $dA) : false;
+$dC = $dB !== false ? strpos($runN, "'card_pages'  => (function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for(\$processedData, \$viewMode, \$reportTitle) : null)", $dB) : false;
+ok('S-pvDropCtx', $dA !== false && $dB !== false && $dC !== false && ($dC - $dB) < 4000, json_encode(array($dA, $dB, $dC)));
 ok('S-pvSaved', strpos($cjs, "if (H.inPivot()) { var tv = { size: curSize() }, tp = cleanPivot(pvSetup()), tk; if (tp) for (tk in tp) tv[tk] = tp[tk]; return { open: 1, tiles: tv }; }") !== false,
     'cards.js savedView saves a pivot\'s tiles (size + setup)');
 ok('P-pvNoWarnings', empty($ERRS), implode(' | ', array_slice(array_unique($ERRS), 0, 4)));

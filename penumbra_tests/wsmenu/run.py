@@ -73,6 +73,8 @@ NEW_R4 = {'A-cardsList', 'G-listItems'}
 SCN = SCN + ['dmfx']
 CHK['dmfx'] = ['M-items', 'M-allLink', 'M-clear', 'M-export', 'M-gated']
 NEW_R5 = {'M-items', 'M-allLink', 'M-clear', 'M-export', 'M-gated'}
+# (2026-11-06, cind) this round's: the Fit all items under Quick actions - red on the build before it (CONTROL_REV 8808c93)
+NEW_CIND = {'R-items', 'F-items', 'V-items', 'E-items', 'O-items'}
 
 # Each mutant: ([(file key, exact old, new)], [checks that must go red], [scenarios to run]). Every anchor once.
 MUTANTS = {
@@ -142,7 +144,9 @@ MUTANTS = {
     'ws-fitfolded': ([('ws', "            for (i = 0; i < ths.length; i++) { if (shown(ths[i])) { return ths[i]; } }", "            if (ths.length) { return ths[0]; }")], ['F-groupFolded'], ['rfit']),
     'ws-fitcan': ([('ws', "        if (!W || !th || typeof W.canFit !== 'function' || !W.canFit(th)) { return out; }", "        if (!W || !th) { return out; }")], ['V-fitRestricted'], ['rviewer']),
     'ws-fitswap': ([('ws', "                run: function () { W.fitAll(th); } });", "                run: function () { W.fitPage(th); } });")], ['F-fitAll', 'F-grouped'], ['rfit']),
-    'ws-fitorder': ([('ws', "            add(rowHeightItem());\n            fitItems().forEach(add);", "            fitItems().forEach(add);\n            add(rowHeightItem());")], ['R-items', 'F-items'], ['rmenu', 'rfit']),
+    # (cind) back at the foot of the menu, where they were
+    'ws-fitorder': ([('ws', "        if (kind === 'report') { fitItems().forEach(add); rule(); }\n", ""),
+                     ('ws', "            add(rowHeightItem());\n        } else if (kind === 'admin'", "            add(rowHeightItem());\n            fitItems().forEach(add);\n        } else if (kind === 'admin'")], ['R-items', 'F-items'], ['rmenu', 'rfit']),
     'dp-noload': ([('dash', "<script src=\"js/penumbra_wsmenu.js?v=<?php echo (int)@filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-dashLoads'], []),
     'dp-notools': ([('dash', "<?php if (!empty($isAdmin)): ?><div hidden><?php penumbra_admin_tools_menu(); ?></div><?php endif; ?>", "")], ['S-dashLoads'], []),
     'ix-noload': ([('index', "<script defer src=\"js/penumbra_wsmenu.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-indexLoads'], []),
@@ -167,7 +171,7 @@ control_r1 = flag('--control-r1')
 # cut 1b0f3b2: NEW_R3 red, everything else green); --control-r1 the build before the menu (9a9dfb4^: every check but
 # the guards red). Every file the harness reads comes from there, so a control is one consistent build whatever has
 # shipped since.
-CONTROL_REV = '5b124ce'      # (menufix2) menufix live: no Metrics / Health items (menufix's control was 920e818, round 3's 1b0f3b2)
+CONTROL_REV = '8808c93'      # (cind) the build before the Fit all items moved; (menufix2) menufix live: no Metrics / Health items (menufix's control was 920e818, round 3's 1b0f3b2)
 CONTROL_R1_REV = '9a9dfb4^'  # the menu shipped in 9a9dfb4 (2026-11-01): the build before it
 control_rev = opt('--control-rev', CONTROL_R1_REV if control_r1 else CONTROL_REV)
 if control_r1: control = True
@@ -367,8 +371,9 @@ def scenario(name, out):
             p.rclick(gap)
             m, c = p.menu(), p.lastctx()
             A('R-opensBar', m is not None and c.get('prevented') and not c.get('head') and c.get('id') == 'resultsHeader', '%s %s' % (gap, c))
-            A('R-items', m and [i['act'] for i in m['items']] == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow', 'rowHeight',
-                                                                  'fitAll', 'fitPage'], m and [i['act'] for i in m['items']])
+            # (2026-11-06, cind; the user) the two Fit all items right under Quick actions, a block of their own
+            A('R-items', m and [i['act'] for i in m['items']] == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow',
+                                                                  'rowHeight'], m and [i['act'] for i in m['items']])
             A('R-title', m and m['name'] == 'Lazy rows fixture (lrfix)', m and m['name'])
             A('R-foot', m and m['foot'] == FOOT, m and m['foot'])
             notes = dict((i['act'], i['note']) for i in m['items']) if m else {}
@@ -645,7 +650,11 @@ def scenario(name, out):
             p.key('F10', 8)
             if p.menu() is None:
                 p.ev('document.getElementById("wsProbeBtn").dispatchEvent(new MouseEvent("contextmenu", {bubbles: true, cancelable: true, button: 0, clientX: 0, clientY: 0})), 1')
-            p.key('End')
+            # (cind) no longer the last item: walked to from the first
+            p.key('Home')
+            for _ in range(24):
+                if (p.menu() or {}).get('focus') == 'fitPage': break
+                p.key('ArrowDown')
             last = (p.menu() or {}).get('focus')
             p.key('Enter')
             time.sleep(0.3)
@@ -658,11 +667,11 @@ def scenario(name, out):
             m = p.menu() or {'items': []}
             acts = [i['act'] for i in m['items']]
             if name == 'rviewer':
-                A('V-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'rerun', 'metrics', 'feedback', 'cardsShow', 'rowHeight', 'fitAll', 'fitPage'], acts)
+                A('V-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'rerun', 'metrics', 'feedback', 'cardsShow', 'rowHeight'], acts)
                 A('V-rerunNote', [i['note'] for i in m['items'] if i['act'] == 'rerun'] == [''], [i for i in m['items'] if i['act'] == 'rerun'])
             else:
-                A('E-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow', 'rowHeight',
-                                      'fitAll', 'fitPage'], acts)
+                A('E-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow',
+                                      'rowHeight'], acts)
                 p.click(p.ev('window.__ws.itemAt("admin", 0)'))
                 time.sleep(0.5)
                 mm = p.menu() or {'subs': []}
@@ -714,7 +723,7 @@ def scenario(name, out):
             p, ok = rpt('id=lrfix&scn=wso&role=owner')
             p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
             acts = p.acts() or []
-            A('O-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'history', 'cardsShow', 'rowHeight', 'fitAll', 'fitPage'], acts)
+            A('O-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'admin', 'rerun', 'metrics', 'history', 'cardsShow', 'rowHeight'], acts)
         elif name == 'rfit':
             # (round 3, 2026-11-02) Fit all column widths to contents / to page: the header menu's two items, made through
             # a heading of the view on screen; none over the cards, a pivot or a table without rows. The widths module's
@@ -747,9 +756,10 @@ def scenario(name, out):
             p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
             its = (p.menu() or {'items': []})['items']
             fit = [i for i in its if i['act'] in ('fitAll', 'fitPage')]
-            A('F-items', [i['act'] for i in its][-3:] == ['rowHeight', 'fitAll', 'fitPage'] and [i['label'] for i in fit] == ['Fit all column widths to contents', 'Fit all column widths to page']
+            _acts = [i['act'] for i in its]
+            A('F-items', 'quick' in _acts and _acts[_acts.index('quick') + 1:_acts.index('quick') + 3] == ['fitAll', 'fitPage'] and _acts[-1] == 'rowHeight' and [i['label'] for i in fit] == ['Fit all column widths to contents', 'Fit all column widths to page']
               and all(i['role'] == 'menuitem' and not i['disabled'] and not i['note'] and (i['title'] or '').startswith('Every shown column') for i in fit),
-              [(i['act'], i['label'], i['role'], i['note'], (i['title'] or '')[:30]) for i in its[-3:]])
+              [(i['act'], i['label'], i['role'], i['note'], (i['title'] or '')[:30]) for i in its])
             p.key('Escape')
             # the flat table: every shown column fitted, with Undo in the notice
             f, t = pick('fitAll')
@@ -1093,7 +1103,7 @@ try:
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
             # round 2's build: round 3's checks red; the build before the menu: every check but the guards (and no page errors)
-            new = [a for a in want if ((a not in GUARDS and not a.startswith('X-')) if control_r1 else (a in NEW_R5))]
+            new = [a for a in want if ((a not in GUARDS and not a.startswith('X-')) if control_r1 else (a in NEW_CIND))]
             wrong = [a for a in want if (a in failed) != (a in new)]
             print('CONTROL: %s' % ('as expected (%d red, %d %s green)' % (len(new), len(want) - len(new), 'guards' if control_r1 else 'others') if not wrong else 'NOT as expected: %s' % ' '.join(wrong)))
             print('RESULT: GREEN' if not wrong else 'RESULT: RED')

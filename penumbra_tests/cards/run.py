@@ -562,8 +562,22 @@ CHK['vstB'] = ['noteButtons', 'linkLayout', 'calcStrict', 'rowFromLink', 'ownDen
                'keptLayout', 'keptCalc', 'keptRow', 'keptOwnDensity', 'keptToast', 'leaveUrl', 'clearAllLeaves', 'oneLine']
 CHK['vstC'] = ['linkDensity', 'keptDensity']   # (density: the harness loads the theme ids after main.js, so a link's theme is dropped there)
 NEW_VST = {'L-%s-%s' % (sc, c) for sc in ('vstA', 'vstB', 'vstC') for c in CHK[sc]} | {'S-viewstrict'}
-CKL = {'vstB': ('vstA', 'token'), 'vstC': ('vstA', 'token'), 'cklB': ('cklA', 'token'), 'cklC': ('cklA', 'tokenGone'), 'cklD': ('cklA', 'tokenFiltered'), 'cklTB': ('cklT', 'token'), 'gklB': ('gklA', 'token'), 'gklTB': ('gklT', 'token'), 'pklB': ('pklP', 'token'), 'gklD': ('gklC', 'token'), 'gklE': ('gklC', 'tokenFolded', 'want2')}
+# (hscroll, 2026-11-06, the user: the header and the sideways scroll in links)
+SCN = SCN + ['hsA', 'ghsA', 'ghsB', 'gbdA', 'gbdB']
+CHK['hsA'] = ['hdrUrl', 'hdrSaid', 'noHdrWhenShown']
+CHK['ghsA'] = ['carriesCol']
+CHK['ghsB'] = ['boxAtCol']
+CHK['gbdA'] = ['carriesLane', 'laneSaid']
+CHK['gbdB'] = ['laneAtLeft']
+NEW_HS = {'L-%s-%s' % (sc, c) for sc in ('hsA', 'ghsA', 'ghsB', 'gbdA', 'gbdB') for c in CHK[sc]}
+CKL = {'ghsB': ('ghsA', 'token'), 'gbdB': ('gbdA', 'token'), 'vstB': ('vstA', 'token'), 'vstC': ('vstA', 'token'), 'cklB': ('cklA', 'token'), 'cklC': ('cklA', 'tokenGone'), 'cklD': ('cklA', 'tokenFiltered'), 'cklTB': ('cklT', 'token'), 'gklB': ('gklA', 'token'), 'gklTB': ('gklT', 'token'), 'pklB': ('pklP', 'token'), 'gklD': ('gklC', 'token'), 'gklE': ('gklC', 'tokenFolded', 'want2')}
 MUTANTS = {
+    # (hscroll) one per behaviour
+    'hs-hdr': ([('main', "        var hdrPart = hdrHidden ? '&noheader' : '';", "        var hdrPart = '';")], ['L-hsA-hdrUrl'], ['hsA']),
+    'hs-col': ([('main', "colAt = _pnbVlBoxLeftCol(box);", "colAt = null;")], ['L-ghsA-carriesCol'], ['ghsA']),
+    'hs-colto': ([('main', "                if (pr[2]) _pnbVlBoxToCol(box, pr[2]);", "")], ['L-ghsB-boxAtCol'], ['ghsA', 'ghsB']),
+    'hs-lane': ([('main', "var blNow = CDb.boardLane(); if (blNow) v.bl = blNow;", "var blNow = null;")], ['L-gbdA-carriesLane'], ['gbdA']),
+    'hs-laneto': ([('cards', "        if (w.lane) boardToLane(w.lane);", "")], ['L-gbdB-laneAtLeft'], ['gbdA', 'gbdB']),
     # (viewstrict) one per behaviour
     'vs-calc': ([('calc', "        if (!key || linkVisit()) return sessionDefs.slice();", "        if (!key) return sessionDefs.slice();")], ['L-vstB-calcStrict'], ['vstA', 'vstB']),
     'vs-own': ([('main', "if (!u.has('density') && v.dn && !_pnbVlOwnPref('penumbra_pref_density', 'penumbra_user_density', u.get('id'))) {", "if (!u.has('density') && v.dn) {")], ['L-vstB-ownDensity'], ['vstA', 'vstB']),
@@ -1717,6 +1731,9 @@ NEW = NEW - NEW_CARDLINK   # (cardlink + cardlink 2 are LIVE since 39bfe1c / 7c0
 GUARDS |= {'L-vstB-linkLayout', 'L-vstB-visitNoWrite', 'L-vstC-linkDensity'}   # (viewstrict: hold on live - the link's layout and density applied there already; no write visible there: its mutant vs-rhw decides)
 NEW = NEW | (NEW_VST - GUARDS)   # (viewstrict) after every later round's NEW line - add, never replace
 NEW = NEW - NEW_VST   # (viewstrict is LIVE since 387063b, 2026-11-05: old checks now)
+GUARDS |= {'L-hsA-noHdrWhenShown'}   # (hscroll: holds on live - no &noheader there at all)
+NEW = NEW | (NEW_HS - GUARDS)   # (hscroll) after every later round's NEW line - add, never replace
+NEW = NEW - NEW_HS   # (hscroll is LIVE since edae988, 2026-11-06: old checks now)
 NEW = NEW | {'L-vstB-oneLine'}   # (viewstrict 2: the two Settings buttons on one line)
 NEW = NEW - {'L-vstB-oneLine'}   # (viewstrict 2 is LIVE, 2026-11-05: old checks now)
 MUTANTS.update({
@@ -1920,6 +1937,29 @@ NEW = NEW - NEW_TILEGAP   # (tilegap is LIVE since 31fc7e8, 2026-11-06: old chec
 MUTANTS.update({
     # (tilegap) a blank column skipped again
     'tg-js': ([('cards', "                if (!fv && nl) continue;", "                if (!fv) continue;")], ['L-pvgap-gapLine', 'L-pvgap-gapSame'], ['pvgap']),
+})
+# (wcagser, 2026-11-06, WCAG 4.1.2) Stacked grouping in the cards: bandHead no longer makes the head a button (role,
+# tabindex, aria-expanded): main.js's band IIFE owns that - the name the disclosure, the X Hide this group, siblings.
+# gwcag: the head plain, one name + one X tab stop per band, the X a button in no button, Enter on the name folds (its
+# aria-expanded follows), Shift+F10 on the name its menu. The suite's band toggle is the NAME now (tog / openOf / shut);
+# gmenu's Shift+F10 / Escape moved from the head to the name with it (red on live: the head had it there).
+SCN = SCN + ['gwcag']
+CHK['gwcag'] = ['headNoRole', 'tabStops', 'hideButton', 'nameEnter', 'nameMenu']
+NEW_WCAGSER = ({'L-gwcag-%s' % c for c in CHK['gwcag']} | {'L-gmenu-bandKeyboard'}) - GUARDS   # (bandRefocus holds on live: no menu, the focus never left the name)
+NEW = NEW | NEW_WCAGSER   # (wcagser) add, never replace
+# the head's own Enter is gone (main.js's name folds it): k-headkey has nothing to revert; k-head (no mark on the head) now
+# loses Shift+F10 on the name; k-menutag re-anchored (Escape back to the name)
+del MUTANTS['k-headkey']
+MUTANTS['k-head'] = (MUTANTS['k-head'][0], ['L-gwcag-nameMenu', 'L-gmenu-bandKeyboard'], ['gwcag', 'gmenu'])
+MUTANTS['k-menutag'] = ([('cards', "        if (rh) { if (!e.pnbCardMenu) e.pnbCardMenu = { kind: 'band', el: rh, focus: rh.querySelector('.group-name') || rh, card: null }; return; }", "        if (rh) { return; }")], MUTANTS['k-menutag'][1], MUTANTS['k-menutag'][2])
+MUTANTS.update({
+    # (wcagser) the head a button again (the fix reverted at one point): a button holding the name and X buttons, two tab stops
+    'ws-head': ([('cards', "        if (!hd.classList.contains('pnb-cards-bandhead')) hd.classList.add('pnb-cards-bandhead');\n    }\n",
+                  "        if (!hd.classList.contains('pnb-cards-bandhead')) hd.classList.add('pnb-cards-bandhead');\n        if (hd.getAttribute('tabindex') !== '0') hd.setAttribute('tabindex', '0');\n        if (hd.getAttribute('role') !== 'button') hd.setAttribute('role', 'button');\n        if (hd.getAttribute('aria-expanded') !== (open ? 'true' : 'false')) hd.setAttribute('aria-expanded', open ? 'true' : 'false');\n    }\n")],
+                ['L-gwcag-headNoRole', 'L-gwcag-tabStops', 'L-gwcag-hideButton', 'L-gwcag-nameEnter'], ['gwcag']),
+    # (wcagser) Shift+F10 keyed off the head again (the name's goes to nobody)
+    'ws-namekey': ([('cards', "        var bh = bn ? bn.closest('.pnb-cards-bandhead') : null;", "        var bh = e.target && e.target.classList && e.target.classList.contains('pnb-cards-bandhead') ? e.target : null;")],
+                   ['L-gwcag-nameMenu', 'L-gmenu-bandKeyboard'], ['gwcag', 'gmenu']),
 })
 
 def mutate(texts, name):

@@ -406,7 +406,7 @@ MUTANTS = {
                 ['L-pjbusyrm-rmStill', 'L-pjbusyrm-rmObvious', 'S-jarBusy'], ['pjbusyrm']),
     'jb-rmnobar': ([('pcss', "    .pnb-pal-ai-bar i { animation: none; width: 100%;", "    .pnb-pal-ai-bar i { animation: none; width: 0;")], ['L-pjbusyrm-rmObvious', 'S-jarBusy'], ['pjbusyrm']),
     'jb-twolive': ([('pal', "<div class=\"pnb-pal-ai-wait is-busy\">", "<div class=\"pnb-pal-ai-wait is-busy\" aria-live=\"polite\">")], ['L-pjbusy-busySaidOnce'], ['pjbusy']),
-    'jb-nosay': ([('pal', "        var st = mode.state === 'done' ? 'answered' : (waiting ? JARVIS_BUSY : '');\n", "        var st = mode.state === 'done' ? 'answered' : '';\n")], ['L-pjbusy-busySaidOnce'], ['pjbusy']),
+    'jb-nosay': ([('pal', "        var st = mode.state === 'done' ? JARVIS_DONE : (waiting ? JARVIS_BUSY : '');\n", "        var st = mode.state === 'done' ? JARVIS_DONE : '';\n")], ['L-pjbusy-busySaidOnce'], ['pjbusy']),   # (re-aimed 2026-11-06, wcag: the done text is JARVIS_DONE)
     'jb-resay': ([('pal', "        if (ui.status.textContent !== st) { status(st); }", "        status(st);")], ['L-pjbusy-busySaidOnce', 'S-jarBusy'], ['pjbusy']),
     'jb-nobusyattr': ([('pal', "html = '<div class=\"pnb-pal-ai\"' + (waiting ? ' aria-busy=\"true\"' : '') + '>", "html = '<div class=\"pnb-pal-ai\"' + '>")], ['L-pjbusy-busyMarked'], ['pjbusy']),
     'jb-stays': ([('pal', "        if (waiting) { html += jarvisBusyHtml(); }\n", "        if (waiting || mode.state === 'done') { html += jarvisBusyHtml(); }\n")], ['L-pjbusy-busyEndsOnAnswer'], ['pjbusy']),
@@ -757,6 +757,65 @@ MUTANTS.update({
     'pp-query': ([('pal', "pick: 'chartby', query: 'Pivot active by', th: th,", "pick: 'chartby', th: th,")], ['L-ppvactive-ppList'], ['ppvactive']),
     'pp-rank': ([('pal', "            if (kind === 'pivot' && /\\sactive(\\s|\\.|$)/.test(t)) {", "            if (false) {")], ['L-ppvactive-ppRank'], ['ppvactive']),
     'pp-noexempt': ([('pal', "return was(act) || /^pivotActive-[a-z0-9]+$/.test(String(act)); }; })();", "return was(act); }; })();")], ['L-ppvactive-ppCover'], ['ppvactive']),
+})
+
+# (numchart, 2026-11-06) Chart COLUMN by... on a money column: red on live (no row)
+SCN = SCN + ['pnchart']
+CHK['pnchart'] = ['pncRow', 'pncList', 'pncRuns', 'pncChartSub']
+NEW_PNC = {'L-pnchart-' + c for c in CHK['pnchart']}
+NEW = NEW | NEW_PNC
+MUTANTS.update({
+    'nc-palsub': ([('pal', "sub: cm ? 'opens the chart builder with its ' + (cv[0].word || 'total') + ' by the column that groups it best' : ", "sub: false ? '' : ")], ['L-pnchart-pncChartSub'], ['pnchart']),
+    'nc-palpick': ([('pal', "sub: (cm ? 'pick the X axis: ' : 'pick the grouping: as is, ')", "sub: ('pick the grouping: as is, ')")], ['L-pnchart-pncRow'], ['pnchart']),
+})
+
+# (fbucket 2, 2026-11-06) Filter COLUMN by...: a column's buckets in place (the Visual Filter Builder's second dropdown), a
+# pick opens the builder on a new row for it; "filter X by fiscal" selects it and narrows the list; a typed bucket condition
+# (V_DATE:fy = FY26) is a condition on the column. Red on live (no row, no reading of the token).
+SCN = SCN + ['pfbucket']
+CHK['pfbucket'] = ['fbRow', 'fbTop', 'fbList', 'fbRuns', 'fbNarrow', 'fbNum', 'fbText', 'fbHand', 'fbHandRuns', 'fbSlow', 'fbWarm']
+NEW_PFB = {'L-pfbucket-' + c for c in CHK['pfbucket'] if c != 'fbText'}
+NEW = NEW | NEW_PFB
+NEW = NEW - NEW_PFB   # (fbucket 2 is LIVE since 302b3d2, 2026-11-06: old checks now)
+MUTANTS.update({
+    'fb-norow': ([('pal', "            if (fbv.length) {", "            if (false) {")],
+                 ['L-pfbucket-fbRow', 'L-pfbucket-fbTop', 'L-pfbucket-fbList', 'L-pfbucket-fbRuns', 'L-pfbucket-fbNarrow', 'L-pfbucket-fbNum'], ['pfbucket']),
+    'fb-nomode': ([('pal', "        if (e.pick === 'fbucket' && e.th && e.th.isConnected && ui) {", "        if (false) {")],
+                  ['L-pfbucket-fbList', 'L-pfbucket-fbRuns', 'L-pfbucket-fbNarrow'], ['pfbucket']),
+    'fb-noby': ([('pal', "var fbBy = /\\sby\\s+(.+)$/i.exec(ui.input.value || '');", "var fbBy = null;")], ['L-pfbucket-fbNarrow'], ['pfbucket']),
+    'fb-notop': ([('pal', "        else if (c.vr && /^filter", "        else if (false && c.vr && /^filter")],
+                 ['L-pfbucket-fbTop', 'L-pfbucket-fbList', 'L-pfbucket-fbRuns', 'L-pfbucket-fbNarrow'], ['pfbucket']),
+    'fb-nohand': ([('pal', "                if (spTh) { th = spTh; p.column = sp.column + sp.sx; }", "                if (false) { }")],
+                  ['L-pfbucket-fbHand', 'L-pfbucket-fbHandRuns'], ['pfbucket']),
+    'fb-noopen': ([('pal', "        b.openBucketRow(col, sx);", "        // (mutant)")], ['L-pfbucket-fbRuns'], ['pfbucket']),
+    'fb-budget': ([('pal', "            if (until && Date.now() > until) { warmBuckets(); return []; }", "            // (mutant) no time cap")], ['L-pfbucket-fbSlow'], ['pfbucket']),
+    'fb-warm': ([('pal', "        if (bucketWarm === bucketMemo) { return; }", "        return;")], ['L-pfbucket-fbWarm'], ['pfbucket']),
+})
+
+# (wcag 2.1.1 + 4.1.3, 2026-11-06, the November rescan's Serious [2.1.1]) the Jarvis answer in the box was out of the keyboard's reach:
+# every Tab stepped list sections (none there), Enter ran no row. pjtab: Tab from the input walks the answer, a chip, Continue and
+# Copy and wraps inside the box, Shift+Tab back, the focus never out of the dialog, Enter / Space on a button its own, a re-render
+# keeps the place, the arrival said once ("Jarvis answered. Press Tab to read it."), the list modes still step sections on Tab.
+SCN = SCN + ['pjtab']
+CHK['pjtab'] = ['tabAnswer', 'tabChip', 'tabContinue', 'tabCopy', 'tabWraps', 'shiftTabWraps', 'focusStaysIn', 'enterOnButton', 'refocusKept', 'saidAnswered', 'otherModesStep']
+NEW_WT = {'L-pjtab-' + c for c in CHK['pjtab'] if c not in ('focusStaysIn', 'otherModesStep')}   # (those two hold on live: guards)
+NEW = NEW | NEW_WT
+NEW = NEW - NEW_WT   # (wcag 2.1.1 is LIVE since 42e8b5f, 2026-11-06: old checks now)
+MUTANTS.update({
+    'wt-tab': ([('pal', "        if (k === 'Tab' && mode.kind === 'jarvis') { e.preventDefault(); e.stopImmediatePropagation(); jarvisTab(e.shiftKey ? -1 : 1); return; }   // (wcag 2.1.1) the answer and its buttons\n", "")],
+               ['L-pjtab-tabAnswer', 'L-pjtab-tabChip', 'L-pjtab-tabContinue', 'L-pjtab-tabCopy', 'L-pjtab-tabWraps', 'L-pjtab-shiftTabWraps'], ['pjtab']),
+    'wt-keys': ([('pal', "        if (mode.kind === 'jarvis' && e.target !== ui.input) { e.stopPropagation(); return; }", "        if (false) { }")], ['L-pjtab-enterOnButton'], ['pjtab']),
+    'wt-refocus': ([('pal', "        if (focusAt >= 0) { try { (boxTabbables()[focusAt] || ui.input).focus(); } catch (eF) { } }\n", "")], ['L-pjtab-refocusKept'], ['pjtab']),
+    'wt-say': ([('pal', "var st = mode.state === 'done' ? JARVIS_DONE : (", "var st = mode.state === 'done' ? 'answered' : (")], ['L-pjtab-saidAnswered'], ['pjtab']),
+})
+
+# (wcag sweep, 2026-11-06) the Jarvis view's body a region "Jarvis answer", aria-expanded false, "Tab next control"; back to the list
+# the listbox "Matches", expanded, "next section". roleBack holds on live (the body never left the listbox there): a guard.
+CHK['pjtab'] = CHK['pjtab'] + ['roleRegion', 'roleBack']
+NEW = NEW | {'L-pjtab-roleRegion'}
+MUTANTS.update({
+    'ws-region': ([('pal', "        listRole(false);   // (wcag sweep 2026-11-06)", "        // (mutant)")], ['L-pjtab-roleRegion'], ['pjtab']),
+    'ws-back': ([('pal', "    function draw(sections, note) {\n        listRole(true);\n", "    function draw(sections, note) {\n")], ['L-pjtab-roleBack'], ['pjtab']),
 })
 
 args = sys.argv[1:]

@@ -1714,6 +1714,96 @@
     penumbra_vars.isAdmin = was.a; penumbra_vars.isGlobalAdmin = was.g; penumbra_vars.aiAllowed = was.ai; penumbra_vars.aiProxyUrl = was.u;
     history.replaceState(null, '', window.location.pathname + '?scn=pjip');
   };
+  // ---------------------------------------------------------------- pjtab (wcag 2.1.1 + 4.1.3, 2026-11-06)
+  // once Jarvis has answered in the box, the keyboard reaches the answer: Tab from the input walks the answer, its chips, Continue
+  // and Copy in DOM order and wraps inside the box (Shift+Tab back); focus never leaves the dialog; on a button Enter is its own
+  // (not swallowed); a re-render keeps the keyboard's place; the arrival is said once ("Jarvis answered. Press Tab to read it.");
+  // the list modes still step sections on Tab. Through pjip's stand-in (the chips reply): the real AI endpoint is never called.
+  S.pjtab = async function () {
+    await boot(); await ready();
+    history.replaceState(null, '', window.location.pathname + '?scn=pjtab&id=zzconf');
+    var was = { a: penumbra_vars.isAdmin, g: penumbra_vars.isGlobalAdmin, ai: penumbra_vars.aiAllowed, u: penumbra_vars.aiProxyUrl };
+    penumbra_vars.aiProxyUrl = 'ai_assist_chips.json'; penumbra_vars.aiAllowed = true; penumbra_vars.isAdmin = true; penumbra_vars.isGlobalAdmin = true;
+    jipAjaxOn(); jipReqs.length = 0; jipDelay = 700;
+    var thL = fth('V_LINK'); thL.style.display = 'none';
+    var said = [], mo = null;
+    var ok = await open('how do I group these rows'); var picked = await pickRow('Ask Jarvis:');
+    var st = box() ? box().querySelector('.pnb-pal-status') : null;
+    if (st) { mo = new MutationObserver(function () { said.push(st.textContent); }); mo.observe(st, { childList: true, characterData: true, subtree: true }); }
+    if (picked) { await enter(); }
+    await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 4000); await sleep(300);
+    var ans = aiBox() ? aiBox().querySelector('.pnb-pal-ai-answer') : null;
+    var cont = aiBox() ? aiBox().querySelector('[data-ai="continue"]') : null, copy = aiBox() ? aiBox().querySelector('[data-ai="copy"]') : null;
+    var inside = function () { return !!(box() && document.activeElement && box().contains(document.activeElement)); };
+    var name = function (n) { return !n ? 'none' : n === input() ? 'input' : n === ans ? 'answer' : n === cont ? 'continue' : n === copy ? 'copy' : (n.classList && n.classList.contains('ai-action-chip')) ? 'chip' : (n.tagName + '.' + n.className); };
+    // forward: from the input round to the input again
+    try { input().focus(); } catch (e) { }
+    var fwd = [], allIn = true, k;
+    for (k = 0; k < 12; k++) { key('Tab', { target: document.activeElement }); await sleep(20); fwd.push(name(document.activeElement)); allIn = allIn && inside(); if (document.activeElement === input()) break; }
+    R.info.fwd = fwd;
+    R.chk.tabAnswer = ok && picked && !!ans && fwd[0] === 'answer';
+    R.chk.tabChip = fwd.indexOf('chip') > 0;
+    R.chk.tabContinue = fwd.indexOf('continue') > fwd.lastIndexOf('chip') && fwd.indexOf('chip') > 0;
+    R.chk.tabCopy = fwd.indexOf('copy') === fwd.indexOf('continue') + 1 && fwd.indexOf('continue') > 0;
+    R.chk.tabWraps = fwd.length > 3 && fwd[fwd.length - 1] === 'input' && fwd[fwd.length - 2] === 'copy';
+    // backward: Shift+Tab from the input wraps to Copy, then Continue; Shift+Tab from the answer back to the input
+    try { input().focus(); } catch (e) { }
+    key('Tab', { target: document.activeElement, shift: true }); await sleep(20); var b1 = name(document.activeElement); allIn = allIn && inside();
+    key('Tab', { target: document.activeElement, shift: true }); await sleep(20); var b2 = name(document.activeElement); allIn = allIn && inside();
+    if (ans) { try { ans.focus(); } catch (e) { } }
+    var ansHeld = document.activeElement === ans;   // the trap lets the answer hold the focus
+    key('Tab', { target: document.activeElement, shift: true }); await sleep(20); var b3 = name(document.activeElement); allIn = allIn && inside();
+    R.info.back = [b1, b2, ansHeld, b3];
+    R.chk.shiftTabWraps = b1 === 'copy' && b2 === 'continue' && ansHeld && b3 === 'input';
+    // the box is still a modal dialog: a page control's focus comes back inside
+    var probe = document.createElement('button'); probe.type = 'button'; probe.textContent = 'probe'; probe.style.cssText = 'position:fixed;left:4px;top:4px;z-index:5;';
+    document.body.appendChild(probe); if (cont) { try { cont.focus(); } catch (e) { } } probe.focus(); await sleep(30);
+    var backIn = inside(); probe.parentNode.removeChild(probe);
+    R.info.inside = [allIn, backIn, name(document.activeElement)];
+    R.chk.focusStaysIn = !!ans && allIn && backIn;
+    // Enter on a button is the button's own (not swallowed by the box), the box stays in the Jarvis view
+    if (copy) { try { copy.focus(); } catch (e) { } }
+    var entPrevented = copy ? key('Enter', { target: copy }) : true, spPrevented = copy ? key(' ', { target: copy }) : true;
+    R.info.enter = [entPrevented, spPrevented, modeOf(), !!box()];
+    R.chk.enterOnButton = !!copy && document.activeElement === copy && !entPrevented && !spPrevented && modeOf() === 'jarvis' && !!box();
+    // a re-render (a key typed into the input meanwhile) keeps the keyboard's place: Continue again, the new one
+    if (cont) { try { cont.focus(); } catch (e) { } }
+    type((input() ? input().value : '') + ' '); await sleep(60);
+    var cont2 = aiBox() ? aiBox().querySelector('[data-ai="continue"]') : null;
+    R.info.refocus = [name(document.activeElement), !!cont2, cont2 !== cont];
+    R.chk.refocusKept = !!cont2 && cont2 !== cont && document.activeElement === cont2;
+    // the arrival, said once through the box's one live region
+    if (mo) { mo.disconnect(); }
+    var DONE = 'Jarvis answered. Press Tab to read it.';
+    R.info.said = [statusText(), said.filter(function (s, i) { return s !== said[i - 1]; })];
+    R.chk.saidAnswered = statusText() === DONE && said.filter(function (s) { return s === DONE; }).length === 1;   // once: a re-render says nothing again
+    // (wcag sweep, 2026-11-06) the answer is no listbox: the body a region named "Jarvis answer", the combobox collapsed, the footer's
+    // Tab hint "next control"; back to the list (Backspace on the emptied input) the listbox "Matches", expanded, "next section"
+    var bodyEl = function () { return box() ? box().querySelector('.pnb-pal-body') : null; };
+    var tabHint = function () { var hs = box() ? box().querySelectorAll('.pnb-pal-foot .pnb-pal-hint') : []; for (var h = 0; h < hs.length; h++) { var kk = hs[h].querySelector('.pnb-pal-kbd'); if (kk && kk.textContent === 'Tab') { return hs[h].textContent.replace(/\s+/g, ' ').trim(); } } return null; };
+    var roleNow = function () { var b = bodyEl(); return [modeOf(), b ? b.getAttribute('role') : null, b ? b.getAttribute('aria-label') : null, input() ? input().getAttribute('aria-expanded') : null, tabHint()]; };
+    type(''); await sleep(60);
+    var rr = roleNow();
+    R.chk.roleRegion = !!ans && rr[0] === 'jarvis' && !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')) && rr[1] === 'region' && rr[2] === 'Jarvis answer' && rr[3] === 'false' && rr[4] === 'Tab next control';
+    try { input().focus(); } catch (e) { }
+    key('Backspace', { target: input() }); await sleep(80);
+    var rb = roleNow();
+    R.info.roles = [rr, rb, rows().length];
+    R.chk.roleBack = rr[0] === 'jarvis' && rb[0] === 'root' && rows().length > 0 && rb[1] === 'listbox' && rb[2] === 'Matches' && rb[3] === 'true' && rb[4] === 'Tab next section';
+    // every other mode: Tab still steps sections, the focus held in the input
+    key('Escape', { target: input() }); await sleep(60);
+    await open('fr');
+    var s0 = selRow().section; key('Tab', { target: input() }); await sleep(30); var s1 = selRow().section;
+    var rootOk = document.activeElement === input() && !!s1 && s1 !== s0;
+    key('Tab', { target: input(), shift: true }); await sleep(30);
+    rootOk = rootOk && document.activeElement === input() && selRow().section === s0;
+    R.info.other = [s0, s1, selRow().section, name(document.activeElement)];
+    R.chk.otherModesStep = rootOk;
+    key('Escape', { target: input() }); await sleep(60);
+    thL.style.display = ''; jipAjaxOff();
+    penumbra_vars.isAdmin = was.a; penumbra_vars.isGlobalAdmin = was.g; penumbra_vars.aiAllowed = was.ai; penumbra_vars.aiProxyUrl = was.u;
+    history.replaceState(null, '', window.location.pathname + '?scn=pjtab');
+  };
   // the photograph (round 19b): an answer in the box, Dark Blue
   S.pshot19 = async function () {
     await boot(); await ready();
@@ -1856,7 +1946,7 @@
     var shown1 = !!c;
     await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 6000); await sleep(120);
     R.info.answer = [shown1, !!busyCard(), busyAnims().length, jbAnimsAlive(), aiBox() ? aiBox().getAttribute('aria-busy') : 'no box', statusText()];
-    R.chk.busyEndsOnAnswer = shown1 && !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')) && !busyCard() && jbAnimsAlive() === 0 && aiBox().getAttribute('aria-busy') === null && statusText() === 'answered';
+    R.chk.busyEndsOnAnswer = shown1 && !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')) && !busyCard() && jbAnimsAlive() === 0 && aiBox().getAttribute('aria-busy') === null && /answered/.test(statusText() || '');   // (wcag 4.1.3, 2026-11-06: 'answered' or 'Jarvis answered. Press Tab to read it.')
     // 2. an error ends it: the error line in its place (a live alert, as before), nothing left moving, not busy any more
     window.__jipReplyOverride = { status: 'error', message: 'Too many requests right now' }; jipDelay = 700;
     picked = await jbAsk('why does this report run slowly?'); var shown2 = !!busyCard() && busyAnims().length > 0;
@@ -2992,6 +3082,34 @@
     } finally { A0.chartColumn = oc; }
   };
 
+  // ---------------------------------------------------------------- pnchart (numchart, 2026-11-06; the user: "Why not apply
+  // this same logic when its a currency/number?") a money column's Chart COLUMN by...: the column's own Chart by list in place
+  // (its X axes, no As is), each running Chart this column with that X axis; Chart COLUMN says it charts the column's total
+  S.pnchart = async function () {
+    await boot(); await ready();
+    var A0 = A(), oc = A0.chartColumn, calls = [];
+    A0.chartColumn = function (c, s) { calls.push([c, s === undefined ? null : s]); return true; };
+    try {
+      await open('chart v_amount by');
+      var r0 = row('Chart V_AMOUNT by...');
+      R.info.root = texts().slice(0, 8);
+      R.chk.pncRow = !!r0 && !r0.off && /^pick the X axis: /.test(r0.sub || '') && /Bins/.test(r0.sub || '');
+      await pickRow('Chart V_AMOUNT by...'); await enter(); await sleep(150);
+      var t1 = texts();
+      R.info.list = { mode: modeOf(), rows: t1 };
+      R.chk.pncList = modeOf() === 'col' && t1.length >= 3 && t1.every(function (x) { return x.indexOf('Chart by: ') === 0; })
+        && t1.indexOf('Chart by: Bins') >= 0 && !t1.some(function (x) { return x === 'Chart by: As is'; });
+      await pickRow('Chart by: Bins'); await enter(); await sleep(150);
+      R.info.calls = calls.slice();
+      R.chk.pncRuns = JSON.stringify(calls) === JSON.stringify([['V_AMOUNT', 'bin']]) && !box();
+      await open('chart v_amount');
+      var r1 = rows().filter(function (r) { return r.text === 'Chart V_AMOUNT'; })[0];
+      R.info.chartSub = r1 ? r1.sub : null;
+      R.chk.pncChartSub = !!r1 && /its total by the column that groups it best/.test(r1.sub || '');
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    } finally { A0.chartColumn = oc; }
+  };
+
   // ---------------------------------------------------------------- pactive (dtpick B, 2026-11-05) the start/end
   // pair's Chart active by... row (main.js headerMenu.activeVariants, stubbed: this fixture has one date column) opens
   // the column's Chart active by list in place; "chart v_date by" ranks Chart V_DATE by... first (the Chart row's
@@ -3064,6 +3182,79 @@
       R.chk.ppCover = macts.indexOf('pivotActive-fy') >= 0 && miss.length === 0;
       if (box()) { key('Escape', { target: input() }); await sleep(30); }
     } finally { A0.pivotActiveVariants = keepV; A0.pivotActive = keepP; A0.activeVariants = keepCV; }
+  };
+
+  // ---------------------------------------------------------------- pfbucket (fbucket 2, 2026-11-06; the user: "supporting it in
+  // the dropdown menu of the search bar similar to the dropdown menus of charting") Filter COLUMN by...: a column's buckets (the
+  // Visual Filter Builder's second dropdown) in place; a pick opens the builder on a new row for it (openBucketRow, recorded
+  // here); "filter X by fiscal" selects the row and narrows its list; a money column has one, a text column none; a typed
+  // bucket condition (V_DATE:fy = FY26) is a condition on the column and runs into the filter box
+  S.pfbucket = async function () {
+    await boot(); await ready();
+    var B = window._penumbraSearchBuilder, ob = B ? B.openBucketRow : null, calls = [];
+    if (B) B.openBucketRow = function (c, sx) { calls.push([c, sx]); return true; };
+    try {
+      await open('filter v_date by');
+      var r0 = row('Filter V_DATE by...');
+      R.info.root = texts().slice(0, 8);
+      R.chk.fbRow = !!r0 && !r0.off && /^pick the bucket: Year, Fiscal Year, /.test(r0.sub || '');
+      R.chk.fbTop = selRow().text === 'Filter V_DATE by...';
+      await enter(); await sleep(150);
+      var t1 = texts();
+      R.info.list = { mode: modeOf(), rows: t1, input: input() ? input().value : null, ph: input() ? input().getAttribute('placeholder') : null };
+      R.chk.fbList = modeOf() === 'fbucket' && t1.length >= 10 && t1[0] === 'Year' && t1[1] === 'Fiscal Year' && t1.indexOf('Day of Week') >= 0
+        && !!input() && input().value === '' && input().getAttribute('placeholder') === 'Which bucket?';
+      await pickRow('Fiscal Year'); await enter(); await sleep(150);
+      R.info.calls = calls.slice();
+      R.chk.fbRuns = JSON.stringify(calls) === JSON.stringify([['V_DATE', ':fy']]) && !box();
+      // "filter v_date by fiscal": the row is the top match, its list narrowed to the fiscal buckets
+      calls.length = 0;
+      await open('filter v_date by fiscal');
+      var top = selRow().text;
+      await enter(); await sleep(150);
+      var t2 = texts();
+      R.info.narrow = { top: top, mode: modeOf(), rows: t2, input: input() ? input().value : null };
+      R.chk.fbNarrow = top === 'Filter V_DATE by...' && modeOf() === 'fbucket' && !!input() && input().value === 'fiscal'
+        && JSON.stringify(t2.slice().sort()) === JSON.stringify(['Fiscal Quarter', 'Fiscal Year', 'Fiscal Year › Quarter']);
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+      // a money column has its row (its bins); a text column with no buckets (V_STATUS: Open / Closed / Pending) has none
+      // (this fixture's V_NAME, two words a cell, reads as a list split by a space - as the Group dialog reads it: its row is right)
+      await open('filter v_amount by');
+      var r3 = row('Filter V_AMOUNT by...');
+      R.info.num = r3 ? r3.sub : null;
+      R.chk.fbNum = !!r3 && /Bins of /.test(r3.sub || '');
+      await open('filter v_status by');
+      R.info.text = texts().slice(0, 6);
+      R.chk.fbText = !row('Filter V_STATUS by...');
+      // a typed bucket condition: Filter: V_DATE:fy = FY26, run into the filter box
+      await open('V_DATE:fy = FY26');
+      var h = row('Filter: V_DATE:fy = FY26');
+      R.info.hand = texts().slice(0, 6);
+      R.chk.fbHand = !!h && !h.off;
+      if (h) { await pickRow('Filter: V_DATE:fy = FY26'); await enter(); await sleep(500); }
+      var tsb = document.getElementById('tableSearch');
+      R.info.box = tsb ? tsb.value : null;
+      R.chk.fbHandRuns = !!h && !!tsb && tsb.value === 'V_DATE:fy = FY26';
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+      // a slow reading (150 ms a column). fbSlow: the keystroke right after the box opens waits at most ~0.5 s for it.
+      // fbWarm: the reading begins in idle moments when the box opens, so a keystroke after a wait (nothing typed
+      // meanwhile: an empty box renders no combinations) finds every column read - at once, with the row
+      var api = window._penumbraSearchAPI, g0 = api ? api.getBucketVariants : null, d1 = -1, d2 = -1, warmRow = false;
+      if (g0) { api.getBucketVariants = function () { var t = performance.now(); while (performance.now() - t < 150) { } return g0.apply(api, arguments); }; }
+      try {
+        if (P() && P().open) { P().open(''); }
+        var t0 = performance.now(); type('filter v_date by'); d1 = Math.round(performance.now() - t0);
+        if (box()) { key('Escape', { target: input() }); await sleep(30); }
+        if (P() && P().open) { P().open(''); }
+        await sleep(2500);
+        var t1 = performance.now(); type('filter v_date by'); d2 = Math.round(performance.now() - t1);
+        warmRow = !!row('Filter V_DATE by...');
+      } finally { if (g0) { api.getBucketVariants = g0; } }
+      R.info.slow = { firstMs: d1, afterWaitMs: d2, row: warmRow };
+      R.chk.fbSlow = d1 >= 0 && d1 < 500;
+      R.chk.fbWarm = d2 >= 0 && d2 < 140 && warmRow;
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    } finally { if (B) B.openBucketRow = ob; }
   };
 
   window.addEventListener('error', function (e) { (R.errors = R.errors || []).push(String(e.message)); });

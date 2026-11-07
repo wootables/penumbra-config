@@ -19,8 +19,18 @@
 #   A1      the search bar's autocomplete lists the shared name under Pivot Aggregates
 #   M0-M15  browser email reading == penumbra_search.php, query by query (cross-engine)
 #   P1-P11  penumbraStripSrcModifier() + the runner's grouped-summary path (PHP)
-# 92 assertions. Controls: the pre-__SRC build (*.bak-20260928-pivotsrc) fails 49, the build
-# before the alias fix (main.js.bak-20260928-singleagg) exactly E11b. Mutants: engine 10,
+#   X0-X9b  (pvcount, 2026-11-06) the pivot's ROW COUNTS on ?id=int-col-mat's shape (Sum of
+#           AMOUNT_CROSS filtered to COLLEGE_ROLE = Contributing, Hide empty rows): the status
+#           line's total == what a cleared search draws, its "with N filtered results" == the
+#           rows drawn, and (W*) the builder's preview == both - hide-empty, Rank over hidden
+#           rows, Rank within each group, a bucketed row field (LOG_DATE:ym), the aggregate
+#           path; a preview leaves the drawn pivot's (Other) keys and scratch marks alone
+#   Y1-Y4 / Z*  (aggkey, 2026-11-06) the aggregate post-filter keeps the source rows filed under a
+#           matched key, keyed as processPivotData files them: a fixed bin, an AUTO bin (drawn by
+#           the width it matched), a delimiter split, an ACTIVE field (only the matched periods);
+#           Z* = the preview of each. X8 too (LOG_DATE:ym kept no row before)
+# 92 assertions before pvcount. Controls: the pre-__SRC build (*.bak-20260928-pivotsrc) fails 49,
+# the build before the alias fix (main.js.bak-20260928-singleagg) exactly E11b. Mutants: engine 10,
 # preview 6, take 2, email 11, alias 4, aliaspreview 2, note 2, hintemail 1, list 5,
 # reselect 3, sbemail 1, phpstrip 3, runnerstrip 1, rowstrip 4, allstrip 3 - each only its own.
 #
@@ -29,6 +39,8 @@
 #        js\search_builder.js, search_builder_content.php, penumbra_search.php,
 #        schedule_runner.php are read from it; libraries always from the live js\)
 #   powershell -File run.ps1 -Mutant <name>           one behaviour reverted (below)
+#   powershell -File run.ps1 -Here <dir>              run from a copy of this folder (its
+#        harness.html; the generated files land there, not in the installed suite)
 # Writes nothing to the webroot. Exit 1 when any assertion fails - which, run as a
 # scriptblock, ends the calling session too: run it on its own.
 #
@@ -36,9 +48,9 @@
 #   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotsrc'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 # =============================================================================
-param([string]$App = '', [string]$Mutant = '')
+param([string]$App = '', [string]$Mutant = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotsrc' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotsrc' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $App) { $App = $live }
 $php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
@@ -70,6 +82,28 @@ $mutants = @{
   'runnerstrip'= @('runner', ('    $resolvedFilter = penumbraStripSrcModifier($resolvedFilter);' + "`r`n`r`n    // __ROW modifier (correlate"), "`r`n    // __ROW modifier (correlate")
   # parens fix round (2026-10-31): under the unsafe split a condition outside the mixed group is kept (E14 / V14 red without it)
   'unsafekeep' = @('main', 'if (_hasUnsafeOr || aggNamesUpper.indexOf(aqPart.column.toUpperCase()) !== -1) {', 'if (aggNamesUpper.indexOf(aqPart.column.toUpperCase()) !== -1) {')
+  # pvcount (2026-11-06): each count reverted to the distinct raw row-field values it used to be, or the
+  # count-only pass stripped of one part (X* / W* red without it, each only its own)
+  'pvbase'     = @('main', 'baselineTotalPivotRows = penumbraPivotShownBaseline(sourceData, settings);', 'baselineTotalPivotRows = new Set(sourceData.map(function (r) { return settings.rows.map(function (f) { return r.get(f) || ''[Blank]''; }).join(''|||''); })).size;')
+  'pvtotal'    = @('main', 'result.pivotTotal = penumbraPivotShownBaseline(_pvSrcRows, currentPivotSettings);', 'result.pivotTotal = new Set(_pvSrcRows.map(function (r) { return currentPivotSettings.rows.map(function (f) { return r.get(f) || ''[Blank]''; }).join(''|||''); })).size;')
+  'pvmatch'    = @('main', ': penumbraPivotShownRowCount(matchPivotRows, currentPivotSettings, ''asc'');', ': new Set(matchPivotRows.map(function (r) { return currentPivotSettings.rows.map(function (f) { return r.get(f) || ''[Blank]''; }).join(''|||''); })).size;')
+  'pvaggmatch' = @('main', 'var pvtMatch = finalRows.length ? penumbraPivotShownRowCount(finalRows, settings, ''asc'', (keysOf && keysOf.multi) ? matchingRowKeys : null) : 0;', 'var pvtMatch = matchingRowKeys.size;')
+  # (pvaggrows - `if (true)` around the preview's re-key - retired by aggkey: with the rows keyed as the pivot files
+  # them, filtering when every key matched keeps every row, so the mutant is equivalent.)
+  'pvaggtotal' = @('main', 'var pvtTotal = penumbraPivotShownBaseline(sourceData, settings);', 'var pvtTotal = new Set(sourceData.map(function (r) { return settings.rows.map(function (f) { return r.get(f) || ''[Blank]''; }).join(''|||''); })).size;')
+  'pvhide'     = @('main', 'settings.totalRowAggBaseIdx || null, settings.hideEmpty === true, true);', 'settings.totalRowAggBaseIdx || null, false, true);')
+  'pvrank'     = @('main', ('settings.stickyColCount, buildRankConfig(settings), settings.totalRowAggLabels || null,' + "`r`n"), ('settings.stickyColCount, null, settings.totalRowAggLabels || null,' + "`r`n"))
+  'pvexit'     = @('main', 'var _pvCountOnly = arguments[19] === true;', 'var _pvCountOnly = false;')
+  'pvkeep'     = @('main', 'pivotOtherExcludedKeys = _pvCountKeep.ex;', 'void 0;')
+  'pvscratch'  = @('main', '_pnbScratchPv = keepScratch;', 'void keepScratch;')
+  # aggkey (2026-11-06): the aggregate post-filter keys the source rows as processPivotData files them (Y* / Z*)
+  'akrekey'    = @('main', 'return _aggKeysOf(rowDataMap).some(function (k) { return matchingRowKeys.has(k); });', 'return matchingRowKeys.has(settings.rows.map(function (f) { return rowDataMap.get(f) || ''[Blank]''; }).join(''|||''));')
+  'akprevkey'  = @('main', 'return keysOf(rowDataMap).some(function (k) { return matchingRowKeys.has(k); });', 'return matchingRowKeys.has(settings.rows.map(function (f) { return rowDataMap.get(f) || ''[Blank]''; }).join(''|||''));')
+  'akwidth'    = @('main', 'penumbraPivotShareBinWidths(dataToProcess, finalDataToRender);', 'void 0;')
+  'akprevwidth'= @('main', 'penumbraPivotShareBinWidths(dataToProcess, finalRows);', 'void 0;')
+  'akkeep'     = @('main', 'if (_aggKeysOf && _aggKeysOf.multi) penumbraPivotKeepRowKeys(renderPivotData, matchingRowKeys);', 'void 0;')
+  'akprevkeep' = @('main', 'if (keepKeys) penumbraPivotKeepRowKeys(pd, keepKeys);', 'void 0;')
+  'akact'      = @('main', 'if (sp.act) { var rg = _vizActiveRange(', 'if (false) { var rg = _vizActiveRange(')
 }
 $mutFile = ''; $mOld = ''; $mNew = ''
 if ($Mutant) {
@@ -105,8 +139,10 @@ $hooks = @(
   '    _pivotPreSearchCollapseState = null; _pnbPivotBaselineMemo = null;',
   '    var cur = penumbraPivotCurrencyFlags(s.vals, s.aggColOverrides, s.agg);',
   '    var pd = processPivotData(rows, s.rows, s.cols, s.vals, s.agg, getExtraValFields(s.aggColOverrides, s.vals), s.aggFilters);',
-  '    var res = generatePivotTable(pd, s.rows, s.cols, s.vals, s.rowLayout, s.colLayout, s.agg, s.sortOrder, null, cur, s.totalColAggs, s.totalRowAggs, s.colSortOrder, s.stickyColCount, buildRankConfig(s), s.totalRowAggLabels, s.aggColOverrides, s.totalRowAggBaseIdx, false);',
-  '    $(''#pivot-output-container'').html(res.html).show(); penumbraPivotLazyBind(); },',
+  '    var res = generatePivotTable(pd, s.rows, s.cols, s.vals, s.rowLayout, s.colLayout, s.agg, s.sortOrder, null, cur, s.totalColAggs, s.totalRowAggs, s.colSortOrder, s.stickyColCount, buildRankConfig(s), s.totalRowAggLabels, s.aggColOverrides, s.totalRowAggBaseIdx, s.hideEmpty === true);',
+  '    $(''#pivot-output-container'').html(res.html).show(); penumbraPivotLazyBind(); return res.rowCount; },',
+  '  otherKeys: function () { return pivotOtherExcludedKeys.slice(); },',
+  '  scratch: function () { return _pnbScratchPv; },',
   '  hidePivot: function () { $(''#pivot-output-container'').hide(); },',
   '  search: function (text) { $(''#tableSearch'').val(text); window.__PSRC_hides = 0; return runTableSearch(); },',
   '  hint: function (text) { $(''#schedSearchFilter'').val(text); updateSchedFilterHint(); return $(''#schedSearchFilterHint'').text(); },',

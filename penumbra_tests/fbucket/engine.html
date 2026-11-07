@@ -1,0 +1,110 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>fbucket engine</title></head>
+<body>
+<!-- fbucket (2026-11-06): the BROWSER half of the engine checks. Boots the real main.js (run.py patches window.__FB
+     in as the closure's first statement) and runs every corpus query the way the report page's filter does
+     (parseAdvancedQuery + evaluateParsedQuery with the page's own column list), the label cases through
+     penumbraSearchBucketOf + penumbraSearchBucketLabels, and the builder's API calls. It asserts nothing: run.py
+     compares what it prints with the corpus and with php_side.php. The DOM scaffold is the parens harness's. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr><th data-colname="#">#</th></tr></thead><tbody></tbody></table>
+<div id="loadingOverlay" style="display:none"><div class="loader"></div><p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;"><p id="execution-timer"></p><button id="stopQueryBtn">Stop</button></div>
+  <div id="loadingTip" aria-live="polite"></div></div>
+<div id="errorBox"></div><div id="action_overlay"></div>
+<input id="tableSearch" value=""><span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.addEventListener('error', function (e) { window.__errors.push(String(e.message) + ' @' + String(e.filename).split('/').pop() + ':' + e.lineno); });
+</script>
+<script src="penumbra_tiles.js"></script>
+<script src="corpus.js"></script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  function asciiJson(x) {
+    var BS = String.fromCharCode(92);
+    return JSON.stringify(x).replace(/[^\x00-\x7e]/g, function (ch) { return BS + 'u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4); });
+  }
+  function run() {
+    var S = window.__FB, C = window.CORPUS;
+    if (!S || typeof S.evalQ !== 'function' || typeof S.parseQ !== 'function' || !C) {
+      report('RESULTS_JSON:' + asciiJson({ fatal: 'hooks unavailable: ' + (window.__FB_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    var base = C.columns;
+    function toMap(o) { var m = new Map(); base.forEach(function (c) { m.set(c.toUpperCase(), o[c] == null ? '' : String(o[c])); }); return m; }
+    var rows = C.rows.map(toMap);
+    S.setRows(rows);
+    var cols = S.flatCols(base.filter(function (c) { return c !== '#'; }));
+    var out = { pageErrors: [], cols: cols, q: {}, tok: {}, lbl: [], api: {} };
+    C.queries.forEach(function (qq) {
+      var parsed = S.parseQ(qq.q, cols), ids = [];
+      rows.forEach(function (m, i) { if (S.evalQ(m, parsed, cols, false)) ids.push(+C.rows[i].ID); });
+      out.q[qq.slug] = ids;
+      out.tok[qq.slug] = (parsed || []).filter(function (p) { return p && p.type === 'condition'; }).map(function (p) { return p.bucket ? p.bucket.token : null; });
+    });
+    var map = Object.create(null); map.D = 'D'; map.A = 'A'; map.L = 'L';
+    C.labels.forEach(function (c) {
+      var b = S.bucketOf ? S.bucketOf(c.tok, map) : null;
+      out.lbl.push(b && S.bucketLabels ? S.bucketLabels(b, c.text) : null);
+    });
+    var api = window._penumbraSearchAPI || {};
+    function call(fn, args) { try { return typeof api[fn] === 'function' ? api[fn].apply(api, args) : '(none)'; } catch (e) { return 'THROW ' + e; } }
+    out.api.valuesFy = call('getColumnAutocompleteValues', ['D:fy']);
+    out.api.valuesDow = call('getColumnAutocompleteValues', ['D:dow']);
+    out.api.valuesList = call('getColumnAutocompleteValues', ['L:dsemi']);
+    out.api.valuesBinlog = call('getColumnAutocompleteValues', ['AMT:binlog']);
+    out.api.valuesPlain = (call('getColumnAutocompleteValues', ['N']) || []).length;
+    out.api.varD = call('getBucketVariants', ['D']);
+    out.api.varT = call('getBucketVariants', ['T']);
+    out.api.varAMT = call('getBucketVariants', ['AMT']);
+    out.api.varL = call('getBucketVariants', ['L']);
+    out.api.varN = call('getBucketVariants', ['N']);
+    out.api.cmp = [call('compareBucketLabels', ['D:fy', 'FY99', 'FY01']), call('compareBucketLabels', ['D:fy', 'FY26', 'FY25']),
+                   call('compareBucketLabels', ['D:month', 'Mar', 'Mar']), call('compareBucketLabels', ['L:dsemi', 'a', 'b'])];
+    out.pageErrors = window.__errors.slice(0, 6);
+    report('RESULTS_JSON:' + asciiJson(out));
+  }
+  $(function () {
+    setTimeout(function () {
+      try { run(); } catch (e) { report('RESULTS_JSON:' + asciiJson({ fatal: String((e && e.stack) || e), pageErrors: window.__errors.slice(0, 6) })); }
+    }, 30);
+  });
+})();
+</script>
+</body></html>

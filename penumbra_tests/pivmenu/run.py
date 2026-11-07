@@ -253,7 +253,7 @@ MUTANTS.update({
     's-blank': ([('menu', "var blank = list[list.length - 1].v === '' ? list.pop() : null,", "var blank = null,")], ['L-pmbucket-bkCapBlank'], ['pmbucket']),
     's-ronly': ([('menu', "        if (it.readOnly) { return; }", "")], ['L-pmbucket-bkKbd'], ['pmbucket']),
     's-info': ([('menu', "        return { act: 'bdStatsRow-' + k, label: shown, note: c, readOnly: true,", "        return { info: shown, value: c, act: 'bdStatsRow-' + k, readOnly: true,")], ['L-pmbucket-bkKbd', 'L-pmbucket-bkLongLabel'], ['pmbucket']),
-    's-scroll': ([('menu', "        if (i === 0 && sc && typeof it[i].scrollIntoView === 'function' && it[i].getBoundingClientRect().bottom > sc.getBoundingClientRect().bottom)", "        if (false)")], ['L-pmbucket-bkKbdScroll'], ['pmbucket']),
+    # (2026-11-06, wcagser) retired: the stats lines are keyboard stops, so the first stop is at the top and never needs the scroll
     's-listnum': ([('menu', "        if (allNum && !Array.isArray(t) && bdGroupVariants(t).some(function (v) { return v.delim; })) { allNum = false; }\n", "")], ['L-pmbucket-bkListStats'], ['pmbucket']),
     's-cut': ([('menu', "shown = full.length > 28 ? full.slice(0, 27) + '...' : full,", "shown = full,")], ['L-pmbucket-bkLongLabel'], ['pmbucket']),
 })

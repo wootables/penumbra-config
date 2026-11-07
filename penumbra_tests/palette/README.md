@@ -118,3 +118,33 @@ je-chipkeeps, je-backkeeps, je-backany, je-twoasks, je-nostill, je-settled, je-q
 the chip's line. NEW = the union with the undeployed rounds' sets (NEW_JE). Kit: `stage_20261020\jaredge\` (patch_jaredge.py,
 patch_suite_jaredge.py, deploy_jaredge.ps1, DEPLOY.md).
 LIVE since 9120044 (2026-10-23 20:22, on the user's OK: the Esc chip cancels like the key); NEW_JE retired from NEW the same day.
+
+**fbucket 2 (2026-11-06; the user: "supporting it in the dropdown menu of the search bar similar to the dropdown menus of
+charting").** A column with buckets (the Visual Filter Builder's second dropdown: date periods, number ranges, the values of
+a list) has the combination *Filter COLUMN by...* (`combo:filterby:COL`, pick `fbucket`): it lists the column's buckets in
+place (mode `fbucket`, *Which bucket?*, the chip *Filter COLUMN by*), and a pick runs
+`_penumbraSearchBuilder.openBucketRow(col, sx)` (the builder on the box's conditions plus a row for the bucket, its values
+listed: the fbucket suite's O1..O4). "filter X by ..." selects the row (topMatch) and carries the words after "by" into the
+list. A typed bucket condition (`V_DATE:fy = FY26`) is read through `splitColumnToken` as a condition on the shown column.
+Scenario `pfbucket`: fbRow fbTop fbList fbRuns fbNarrow fbNum fbText fbHand fbHandRuns fbSlow fbWarm (fbText, no row on a column
+with no buckets - V_STATUS; this fixture's V_NAME, two words a cell, is a list split by a space for the Group dialog too,
+so it has its row - is green on live). fbSlow / fbWarm: with a reading of 150 ms a column (getBucketVariants stubbed), the keystroke right after the box opens
+takes under 0.5 s (a render waits for buckets at most 120 ms); after a wait with nothing typed (an empty box renders no
+combinations, and the report search re-renders only once text is typed) one keystroke is instant and has the row: the
+reading went on in idle moments from the open. Mutants fb-norow
+fb-nomode fb-noby fb-notop fb-nohand fb-noopen fb-budget fb-warm. NEW_PFB = its checks less fbText.
+
+**wcag 2.1.1 + 4.1.3 (2026-11-06, the November WCAG rescan's Serious [2.1.1]).** Once Jarvis had answered in the box, the keyboard
+could not reach the answer: every Tab inside the box stepped list sections (the Jarvis view has none), Enter ran no row, and the
+focus trap sent stray focus back to the input. In the Jarvis view Tab / Shift+Tab now walk the box's tab stops in DOM order (the
+input, the answer, its links and chips, Continue, Copy; the Esc chip and the help mark stay out at tabindex -1) and wrap inside
+the box; on the answer or a button its own keys work (Enter, Space, arrows), page hotkeys still stand down; a re-render keeps the
+keyboard's place. The arrival is said once through the status span: "Jarvis answered. Press Tab to read it." (was "answered").
+Every other mode is as before (Tab steps sections). Scenario `pjtab`: tabAnswer tabChip tabContinue tabCopy tabWraps shiftTabWraps
+focusStaysIn (guard) enterOnButton refocusKept saidAnswered otherModesStep (guard). pjbusy's busyEndsOnAnswer reads /answered/;
+jb-nosay re-aimed at the JARVIS_DONE line. Mutants wt-tab wt-keys wt-refocus wt-say. NEW_WT = the pjtab checks less the guards.
+
+**wcag sweep (2026-11-06).** In the Jarvis view the answer and its buttons sat in the listbox "Matches" with the combobox
+expanded and the footer saying "Tab next section". listRole(on): the body a region "Jarvis answer", aria-expanded false, the hint
+"Tab next control" (renderJarvis, every state); draw() (every list mode: root, pick, col, theme, fbucket) puts the listbox back.
+pjtab checks roleRegion, roleBack (guard: live never left the listbox). Mutants ws-region ws-back.

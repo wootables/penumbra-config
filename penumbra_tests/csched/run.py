@@ -53,6 +53,9 @@ NEW = NEW | NEW_HIDFIX   # (hidfix) add, never replace
 NEW = NEW - NEW_HIDFIX   # (hidfix is LIVE since 12d2785: the control expects every check green)
 NEW_TILEGAP = {'P-pvBlankCol', 'P-pvPdfBlankCol'}   # (tilegap: a blank column keeps its line, as the tile on screen; P-pvBlankColNoLabels holds on live)
 NEW = NEW | NEW_TILEGAP   # (tilegap) add, never replace
+NEW_PDFGAPS = {'S-pvDropCtx', 'P-pvPdfHid', 'P-pdfLogTable'}   # (pdfgaps: a drop's pivot PDF as tiles; a tile page's hidden value blank; the table's log line)
+NEW = NEW | NEW_PDFGAPS   # (pdfgaps) add, never replace
+NEW = NEW - NEW_PDFGAPS   # (pdfgaps is LIVE since 0b11424: the control expects every check green)
 NEW = NEW - NEW_TILEGAP   # (tilegap is LIVE since 31fc7e8: the control expects every check green)
 EITHER = {'P-budget'}
 MUTANTS = {
@@ -149,6 +152,10 @@ MUTANTS.update({
     'tg-mail': ([('inc', "            if ($fv === '' && $nol) continue;", "            if ($fv === '') continue;")], ['P-pvBlankCol']),
     'tg-nol': ([('inc', "            if ($fv === '' && $nol) continue;", "            if (false && $nol) continue;")], ['P-pvBlankColNoLabels']),
     'tg-pdf': ([('inc', "            // (tilegap) a column with no value keeps its row, blank,", "            if ($fv === '') continue; // (tilegap) a column with no value keeps its row, blank,")], ['P-pvPdfBlankCol']),
+    # (pdfgaps) the drop records no context / a tile page prints a hidden value / the table's line logged under card pages
+    'pg-drop': ([('run', "$GLOBALS['penumbra_cards_tiles_ctx'] = array('theme' => $themeName,", "$GLOBALS['penumbra_cards_tiles_ctxX'] = array('theme' => $themeName,")], ['S-pvDropCtx']),
+    'pg-pdfhid': ([('inc', "(_pnb_cm_hid(_pnb_pv_cssarr($fd['css'])) ? '' : _pnb_cm_h($fv)) . '</td></tr>';", "(_pnb_cm_h($fv)) . '</td></tr>';")], ['P-pvPdfHid']),
+    'pg-log': ([('pdf', "        if (function_exists('log_scheduler') && empty($options['card_pages'])) {", "        if (function_exists('log_scheduler')) {")], ['P-pdfLogTable']),
 })
 
 args = sys.argv[1:]

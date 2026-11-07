@@ -116,6 +116,11 @@ PREF_CARDS = PREF_CARDS + ['pvsave', 'ptpar', 'ptpar2']   # (pvsched) the Save's
 # (viewstrict, 2026-11-05) a strict link visit: vstA makes the link (a column hidden, a calculated column, theme, row
 # height), vstB opens it as a reader with their own calculated column / row height / theme, vstC as one with none
 CFG.update({'vstA': {}, 'vstB': {}, 'vstC': {}})
+# (hscroll, 2026-11-06) the folded header in a link (hsA); a Stacked box scrolled sideways (ghsA makes, ghsB opens); the
+# Board scrolled to a lane (gbdA makes, gbdB opens)
+CFG.update({'hsA': {}, 'ghsA': {}, 'ghsB': {}, 'gbdA': {}, 'gbdB': {}})
+PREF_CARDS = PREF_CARDS + ['gbdA']
+CFG.update({'gwcag': {}}); PREF_CARDS = PREF_CARDS + ['gwcag']   # (wcagser, 2026-11-06) Stacked bands: the head no button, main.js's name + X
 PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu', 'ctrow', 'gtrow', 'ctclear', 'ctsel', 'cklT', 'gklT']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
 
 
@@ -241,6 +246,7 @@ def build(index_src):
         '    if (S === "gcards") st.groupAgg = { column: "H_AMT", type: "sum" };\n'
         '    if (S === "ggcards" || S === "gglnest") st.groupLayout = "list";   // (glist) the List layout (the colmenu harness loads penumbra_grouplist.js for gg*)\n'
         '    if (S === "gglnest") st.groupBy = "H_GROUP,H_GROUP2";\n'
+        '    if (S === "gbdA" || S === "gbdB") st.groupLayout = "board";   // (hscroll) a Board to scroll sideways\n'
         '    if (S === "gboard") st.groupLayout = "board";   // (bdlay) a report saved grouped as a Board\n'
         '    if (S === "gboardbig") st.groupLayout = "board";   // (bdlay2) 2,500 rows in six lanes\n'
         '    if (S === "gboardfew") { st.groupBy = "V_STATUS"; st.groupLayout = "board"; }   // (bdlay2) three lanes: every one fits\n'
@@ -268,6 +274,7 @@ def build(index_src):
         "    if (cs === 'cfieldsB') pref = Object.assign(pref || {}, { cards: { own: 1, title: 'V_NAME', fields: ['V_ID', 'V_AMOUNT', 'V_DATE'], nolabels: 1 } });   // (round R) a kept labels-off setup\n"
         "    if (/^ckl[AB]$/.test(cs)) { var kst = document.createElement('style'); kst.textContent = '#pnbCardDetails .pnb-cdet-body { max-height: 70px !important; overflow: auto !important; }'; document.head.appendChild(kst); }   // (cardlink 2) a details window that scrolls\n"
     "    if (cs === 'vstB') { localStorage.setItem('penumbra_calc_columns', JSON.stringify({ lrfix: [{ name: 'MYCALC', formula: '{H_NUM} * 2' }] })); localStorage.setItem('penumbra_pref_rowExpand', JSON.stringify({ lrfix: true })); localStorage.setItem('penumbra_pref_density', JSON.stringify({ lrfix: 'standard' })); }   // (viewstrict) the reader's own\n"
+    "    if (/^ghs/.test(cs)) { var hst = document.createElement('style'); hst.textContent = '#groupedResultsContainer .group-content { max-width: 320px; } #groupedResultsContainer .group-content > table { min-width: 900px; }'; document.head.appendChild(hst); }   // (hscroll) a group box narrower than its table\n"
     "    if (/^pvl/.test(cs)) { var pst = document.createElement('style'); pst.textContent = '#results-wrapper { max-width: 700px; }'; document.head.appendChild(pst); }   // (linkpos) a wrapper the pivot overflows sideways\n"
         "    if (pref) localStorage.setItem('penumbra_column_prefs', JSON.stringify({ lrfix: pref }));\n"
         "    if (cs === 'cviewer') { var vt = document.getElementById('view-options-tab'); if (vt) vt.parentNode.removeChild(vt); }   // a viewer has no View Options form\n"

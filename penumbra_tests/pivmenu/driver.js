@@ -943,7 +943,9 @@
       key('ArrowRight'); await sleep(200);
       var a3 = document.activeElement, pnl = a3 && a3.closest ? a3.closest('.pnb-hm-sub') : null, rA = a3 ? a3.getBoundingClientRect() : null, rP = pnl ? pnl.getBoundingClientRect() : null;
       var inSight = !!rA && !!rP && rA.top >= rP.top - 1 && rA.bottom <= rP.bottom + 1;
-      R.chk.bkKbdScroll = !!a3 && a3.getAttribute('data-act') === 'bdStatsGroup-year' && !!pnl && pnl.scrollHeight > pnl.clientHeight + 20 && inSight;
+      // (2026-11-06, wcagser) the stats lines are keyboard stops now (WCAG 1.3.1), so the first stop is the top line: named "Label: value", in sight
+      var a3Line = !!a3 && a3.classList.contains('pnb-hm-info') && a3.getAttribute('role') === 'menuitem' && /: /.test(a3.getAttribute('aria-label') || '');
+      R.chk.bkKbdScroll = !!a3 && (a3Line || a3.getAttribute('data-act') === 'bdStatsGroup-year') && !!pnl && pnl.scrollHeight > pnl.clientHeight + 20 && inSight;
       R.info.bkKbdScroll = { act: a3 ? a3.getAttribute('data-act') : null, a: rA ? [Math.round(rA.top), Math.round(rA.bottom)] : null, p: rP ? [Math.round(rP.top), Math.round(rP.bottom)] : null, sh: pnl ? [pnl.scrollHeight, pnl.clientHeight, pnl.scrollTop] : null };
       stS.parentNode.removeChild(stS); closeMenu();
       // a list column's Column stats: no number stats, its lengths instead (V_NAME - Split by space - holding numbers)

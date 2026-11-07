@@ -1,0 +1,4007 @@
+{
+ "columns": [
+  "ID",
+  "D",
+  "T",
+  "AMT",
+  "L",
+  "N",
+  "AWARD DATE",
+  "Q",
+  "Q:fy"
+ ],
+ "rows": [
+  {
+   "ID": "1",
+   "D": "2025-07-01",
+   "T": "2025-07-01 09:15:00",
+   "AMT": "$150,000",
+   "L": "Jones, Jacob;Smith, Ann",
+   "N": "alpha",
+   "AWARD DATE": "07/15/2024",
+   "Q": "2025-01-05",
+   "Q:fy": "x"
+  },
+  {
+   "ID": "2",
+   "D": "06/30/2025",
+   "T": "2025-06-30 23:59:59",
+   "AMT": "99,999.99",
+   "L": "Smith, Ann",
+   "N": "beta",
+   "AWARD DATE": "15-MAR-23",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "3",
+   "D": "15-MAR-99",
+   "T": "",
+   "AMT": "(5,000)",
+   "L": "",
+   "N": "gamma",
+   "AWARD DATE": "2023",
+   "Q": "2025-01-05",
+   "Q:fy": "x"
+  },
+  {
+   "ID": "4",
+   "D": "01-JAN-01",
+   "T": "2001-01-01 00:00:00",
+   "AMT": "1,000,000",
+   "L": "Doe, J; Jones, Jacob ;Doe, J",
+   "N": "delta",
+   "AWARD DATE": "Mar 2025",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "5",
+   "D": "",
+   "T": "",
+   "AMT": "33",
+   "L": "Palmtag",
+   "N": "",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "6",
+   "D": "TBD",
+   "T": "",
+   "AMT": "n/a",
+   "L": "Lee &amp; Co;Kim",
+   "N": "eps",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "7",
+   "D": "12/31/2026",
+   "T": "",
+   "AMT": "250000",
+   "L": "Smith, Ann;Jones, Jacob",
+   "N": "zeta",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "8",
+   "D": "2024-02-29",
+   "T": "2024-02-29 13:00:00",
+   "AMT": "0.5",
+   "L": "kim",
+   "N": "eta",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "9",
+   "D": "@@HTML<b>2025-11-15</b>",
+   "T": "",
+   "AMT": "@@HTML<span>12,345</span>",
+   "L": "@@HTML<i>A;B</i>",
+   "N": "theta",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "10",
+   "D": "Feb 2025",
+   "T": "",
+   "AMT": "1e3",
+   "L": "A|B",
+   "N": "iota",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "11",
+   "D": "2025-08-20",
+   "T": "2025-08-20 07:05:00",
+   "AMT": "45,000",
+   "L": "Kim;Palmtag",
+   "N": "kappa",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "12",
+   "D": "2023-10-01",
+   "T": "",
+   "AMT": "7,500",
+   "L": "Smith, Ann; Lee &amp; Co",
+   "N": "lambda",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "13",
+   "D": "01/02/2026",
+   "T": "",
+   "AMT": "3,000,000",
+   "L": "Doe, J",
+   "N": "mu",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  },
+  {
+   "ID": "14",
+   "D": "2025-12-25",
+   "T": "",
+   "AMT": "$600",
+   "L": "Jones, Jacob; Kim",
+   "N": "nu",
+   "AWARD DATE": "",
+   "Q": "2025-01-05",
+   "Q:fy": "y"
+  }
+ ],
+ "queries": [
+  {
+   "slug": "fy-eq",
+   "q": "D:fy = FY26",
+   "ids": [
+    1,
+    9,
+    11,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-ge",
+   "q": "D:fy >= FY26",
+   "ids": [
+    1,
+    7,
+    9,
+    11,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-lt-century",
+   "q": "D:fy < FY01",
+   "ids": [
+    3
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-multi",
+   "q": "D:fy = /^(?:FY99|FY01)$/",
+   "ids": [
+    3,
+    4
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-ne",
+   "q": "D:fy != FY26",
+   "ids": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    12
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "dow-weekend",
+   "q": "D:dow = /^(?:Sat|Sun)$/",
+   "ids": [
+    9,
+    12
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "month-ge",
+   "q": "D:month >= Jul",
+   "ids": [
+    1,
+    7,
+    9,
+    11,
+    12,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "month-ge-lower",
+   "q": "D:month >= jul",
+   "ids": [
+    1,
+    7,
+    9,
+    11,
+    12,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "ym-eq",
+   "q": "D:ym = 'Jul 2025'",
+   "ids": [
+    1
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "ym-between",
+   "q": "D:ym >= 'Jan 2025' and D:ym <= 'Jun 2025'",
+   "ids": [
+    2,
+    10
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "quarter",
+   "q": "D:quarter = Q1",
+   "ids": [
+    3,
+    4,
+    8,
+    10,
+    13
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fquarter",
+   "q": "D:fquarter = FQ1",
+   "ids": [
+    1,
+    11
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "yq",
+   "q": "D:yq = '2025 Q3'",
+   "ids": [
+    1,
+    11
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fyq",
+   "q": "D:fyq = 'FY26 Q2'",
+   "ids": [
+    9,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "monthnum-12",
+   "q": "D:monthnum = 12",
+   "ids": [
+    7,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "monthnum-2",
+   "q": "D:monthnum = 2",
+   "ids": [
+    8,
+    10
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "year-eq",
+   "q": "D:year = 2025",
+   "ids": [
+    1,
+    2,
+    9,
+    10,
+    11,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "year-gt",
+   "q": "D:year > 2025",
+   "ids": [
+    7,
+    13
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "hour-eq",
+   "q": "T:hour = '09:00'",
+   "ids": [
+    1
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "hour-ge",
+   "q": "T:hour >= '13:00'",
+   "ids": [
+    2,
+    8
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "dow-coarse",
+   "q": "D:dow = 'Feb 2025'",
+   "ids": [
+    10
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-text",
+   "q": "D:fy = TBD",
+   "ids": [
+    6
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-empty",
+   "q": "D:fy = empty",
+   "ids": [
+    5
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-notempty",
+   "q": "D:fy != empty",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "braced-multiword",
+   "q": "{AWARD DATE:fy} = FY25",
+   "ids": [
+    1,
+    4
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "quoted-multiword",
+   "q": "'AWARD DATE:fy' = FY25",
+   "ids": [
+    1,
+    4
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "contains-2tok",
+   "q": "D:fy FY2",
+   "ids": [
+    1,
+    2,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "regex-2tok",
+   "q": "D:fy /^FY2[56]/",
+   "ids": [
+    1,
+    2,
+    9,
+    10,
+    11,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "word-contains",
+   "q": "D:fy contains fy27",
+   "ids": [
+    7
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "case-col",
+   "q": "d:FY = fy26",
+   "ids": [
+    1,
+    9,
+    11,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "braced-spaces",
+   "q": "{ D :fy } = FY26",
+   "ids": [
+    1,
+    9,
+    11,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "fy-vs-number",
+   "q": "D:fy > 2025",
+   "ids": [],
+   "bucket": false
+  },
+  {
+   "slug": "hour-date-only",
+   "q": "D:hour = '00:00'",
+   "ids": [],
+   "bucket": false
+  },
+  {
+   "slug": "colon-column",
+   "q": "{Q:fy} = x",
+   "ids": [
+    1,
+    3
+   ],
+   "bucket": false
+  },
+  {
+   "slug": "colon-column-bare",
+   "q": "Q:fy = x",
+   "ids": [
+    1,
+    3
+   ],
+   "bucket": false
+  },
+  {
+   "slug": "unknown-base",
+   "q": "ZZ:fy = FY26",
+   "ids": [],
+   "bucket": false
+  },
+  {
+   "slug": "unknown-suffix",
+   "q": "D:fiscal = FY26",
+   "ids": [],
+   "bucket": false
+  },
+  {
+   "slug": "bin-eq",
+   "q": "AMT:bin100000 = '100,000 \u2013 199,999'",
+   "ids": [
+    1
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "bin-ge",
+   "q": "AMT:bin100000 >= 200000",
+   "ids": [
+    4,
+    7,
+    13
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "binlog-eq",
+   "q": "AMT:binlog = '100,000 \u2013 999,999'",
+   "ids": [
+    1,
+    7
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "binlog-lt1",
+   "q": "AMT:binlog = '< 1'",
+   "ids": [
+    3,
+    8
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "bins-above",
+   "q": "AMT:bins100000_250000 = 'above 250K'",
+   "ids": [
+    4,
+    7,
+    13
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "bins-below",
+   "q": "AMT:bins100000_250000 = 'below 100K'",
+   "ids": [
+    2,
+    3,
+    5,
+    8,
+    9,
+    11,
+    12,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "bins-unsorted",
+   "q": "AMT:bins250000_100000 = '100K \u2013 250K'",
+   "ids": [
+    1
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "bin-auto",
+   "q": "AMT:bin = '0 \u2013 499,999'",
+   "ids": [
+    1,
+    2,
+    5,
+    7,
+    8,
+    9,
+    11,
+    12,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "bin-auto-neg",
+   "q": "AMT:bin = '-500,000 \u2013 -1'",
+   "ids": [
+    3
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-eq",
+   "q": "L:dsemi = 'Jones, Jacob'",
+   "ids": [
+    1,
+    4,
+    7,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-ne",
+   "q": "L:dsemi != 'Jones, Jacob'",
+   "ids": [
+    2,
+    3,
+    5,
+    6,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-multi",
+   "q": "L:dsemi = /^(?:Palmtag|Kim)$/",
+   "ids": [
+    5,
+    6,
+    8,
+    11,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-entity",
+   "q": "L:dsemi = 'Lee & Co'",
+   "ids": [
+    6,
+    12
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-empty",
+   "q": "L:dsemi = empty",
+   "ids": [
+    3
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-notempty",
+   "q": "L:dsemi != empty",
+   "ids": [
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-contains",
+   "q": "L:dsemi Smith",
+   "ids": [
+    1,
+    2,
+    7,
+    12
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-pipe",
+   "q": "L:dpipe = B",
+   "ids": [
+    10
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "list-html",
+   "q": "L:dsemi = B",
+   "ids": [
+    9
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "mix-group",
+   "q": "(D:fy = FY25 or D:fy = FY27) and AMT:binlog = '100,000 \u2013 999,999'",
+   "ids": [
+    7
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "mix-or",
+   "q": "D:fy = FY26 or N = zeta",
+   "ids": [
+    1,
+    7,
+    9,
+    11,
+    13,
+    14
+   ],
+   "bucket": true
+  },
+  {
+   "slug": "mix-and",
+   "q": "D:fy = FY26 and L:dsemi = Kim",
+   "ids": [
+    11,
+    14
+   ],
+   "bucket": true
+  }
+ ],
+ "labels": [
+  {
+   "tok": "D:year",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "TBD",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:year",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "year"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "TBD",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:fy",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "fy"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "TBD",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:yq",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "yq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "TBD",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:fyq",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "fyq"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "TBD",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:ym",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "ym"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "TBD",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:quarter",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "quarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "TBD",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:fquarter",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "fquarter"
+  },
+  {
+   "tok": "D:month",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "TBD",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:month",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "month"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "TBD",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:monthnum",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "monthnum"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "TBD",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:dow",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "dow"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2025-07-01",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "06/30/2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "6/30/2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "15-MAR-99",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "15-MAR-68",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "15-MAR-69",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "01-JAN-01",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2024-02-29",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "Feb 2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "February 2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2025-02",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "02/2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2025-07-01 09:15:00",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2025-07-01 23:59:59.123",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "18-SEP-25 02:22:00 PM",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "9/18/2025 14:22",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "02/30/2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "TBD",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "5 Mar 2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "31-DEC-2025",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2025 Feb",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "12/31/99",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "1/2/26",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "D:hour",
+   "text": "2026-01-02",
+   "kind": "date",
+   "split": "hour"
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "$150,000",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "99,999.99",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "(5,000)",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "1,000,000",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "0.5",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "0",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "1",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "9.99",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "10",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "-0.5",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "1e3",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "n/a",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "12%",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "\u0002123\u0002",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "+5",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": ".5",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "1 000",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "999999999999",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "-1",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "100000",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "250000",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "249999.999",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "-250,000.5",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin1000",
+   "text": "(0.5)",
+   "kind": "bin",
+   "split": "bin1000",
+   "width": 1000
+  },
+  {
+   "tok": "A:bin7",
+   "text": "$150,000",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "99,999.99",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "(5,000)",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "1,000,000",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "0.5",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "0",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "1",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "9.99",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "10",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "-0.5",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "1e3",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "n/a",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "12%",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "\u0002123\u0002",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "+5",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": ".5",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "1 000",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "999999999999",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "-1",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "100000",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "250000",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "249999.999",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "-250,000.5",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:bin7",
+   "text": "(0.5)",
+   "kind": "bin",
+   "split": "bin7",
+   "width": 7
+  },
+  {
+   "tok": "A:binlog",
+   "text": "$150,000",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "99,999.99",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "(5,000)",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "1,000,000",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "0.5",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "0",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "1",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "9.99",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "10",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "-0.5",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "1e3",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "n/a",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "12%",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "\u0002123\u0002",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "+5",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": ".5",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "1 000",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "999999999999",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "-1",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "100000",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "250000",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "249999.999",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "-250,000.5",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:binlog",
+   "text": "(0.5)",
+   "kind": "bin",
+   "split": "binlog",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "$150,000",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "99,999.99",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "(5,000)",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "1,000,000",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "0.5",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "0",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "1",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "9.99",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "10",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "-0.5",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "1e3",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "n/a",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "12%",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "\u0002123\u0002",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "+5",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": ".5",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "1 000",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "999999999999",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "-1",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "100000",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "250000",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "249999.999",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "-250,000.5",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins100000_250000",
+   "text": "(0.5)",
+   "kind": "bins",
+   "split": "bins100000_250000",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "$150,000",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "99,999.99",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "(5,000)",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "1,000,000",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "0.5",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "0",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "1",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "9.99",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "10",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "-0.5",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "1e3",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "n/a",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "12%",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "\u0002123\u0002",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "+5",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": ".5",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "1 000",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "999999999999",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "-1",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "100000",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "250000",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "249999.999",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "-250,000.5",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins0_10",
+   "text": "(0.5)",
+   "kind": "bins",
+   "split": "bins0_10",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "$150,000",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "99,999.99",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "(5,000)",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "1,000,000",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "0.5",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "0",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "1",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "9.99",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "10",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "-0.5",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "1e3",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "n/a",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "12%",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "\u0002123\u0002",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "+5",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": ".5",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "1 000",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "999999999999",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "-1",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "100000",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "250000",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "249999.999",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "-250,000.5",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "A:bins5",
+   "text": "(0.5)",
+   "kind": "bins",
+   "split": "bins5",
+   "width": null
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "Jones, Jacob;Smith, Ann",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": " a ; b ;a",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "a;;b",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "A|B| c",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "x\ty\t x",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "line1\r\nline2\nline3\rline4",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "one  two   three",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": ";",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "Lee & Co;Kim",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "  solo  ",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "a,b, c ,,a",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dsemi",
+   "text": "p|q|p",
+   "kind": "list",
+   "split": "dsemi"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "Jones, Jacob;Smith, Ann",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": " a ; b ;a",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "a;;b",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "A|B| c",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "x\ty\t x",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "line1\r\nline2\nline3\rline4",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "one  two   three",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": ";",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "Lee & Co;Kim",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "  solo  ",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "a,b, c ,,a",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dcomma",
+   "text": "p|q|p",
+   "kind": "list",
+   "split": "dcomma"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "Jones, Jacob;Smith, Ann",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": " a ; b ;a",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "a;;b",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "A|B| c",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "x\ty\t x",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "line1\r\nline2\nline3\rline4",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "one  two   three",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": ";",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "Lee & Co;Kim",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "  solo  ",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "a,b, c ,,a",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dpipe",
+   "text": "p|q|p",
+   "kind": "list",
+   "split": "dpipe"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "Jones, Jacob;Smith, Ann",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": " a ; b ;a",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "a;;b",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "A|B| c",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "x\ty\t x",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "line1\r\nline2\nline3\rline4",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "one  two   three",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": ";",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "Lee & Co;Kim",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "  solo  ",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "a,b, c ,,a",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dtab",
+   "text": "p|q|p",
+   "kind": "list",
+   "split": "dtab"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "Jones, Jacob;Smith, Ann",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": " a ; b ;a",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "a;;b",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "A|B| c",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "x\ty\t x",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "line1\r\nline2\nline3\rline4",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "one  two   three",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": ";",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "Lee & Co;Kim",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "  solo  ",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "a,b, c ,,a",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dnl",
+   "text": "p|q|p",
+   "kind": "list",
+   "split": "dnl"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "Jones, Jacob;Smith, Ann",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": " a ; b ;a",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "a;;b",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "A|B| c",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "x\ty\t x",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "line1\r\nline2\nline3\rline4",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "one  two   three",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": ";",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "Lee & Co;Kim",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "  solo  ",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "a,b, c ,,a",
+   "kind": "list",
+   "split": "dspace"
+  },
+  {
+   "tok": "L:dspace",
+   "text": "p|q|p",
+   "kind": "list",
+   "split": "dspace"
+  }
+ ]
+}

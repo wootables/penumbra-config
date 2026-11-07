@@ -274,6 +274,150 @@
       info.push('autocomplete menu did not render headless (' + JSON.stringify(acItems) + ') - A1 not run');
     }
 
+    // ---- X / W: the pivot's ROW COUNTS (pvcount, 2026-11-06) -----------------------------
+    // ?id=int-col-mat's shape: CONTRIB_COLLEGE x LEAD_COLLEGE, Sum of AMOUNT_CROSS filtered to
+    // COLLEGE_ROLE = Contributing, Hide empty rows on. Six contributing colleges, four drawn:
+    // 20-PCOM and Chancellor only ever lead. The search's status total and the builder's preview
+    // counted the distinct raw row values (6, and 6 for October, which touches every college)
+    // where the pivot draws 4 and 2; both now read the pivot's own row pass.
+    var ICM = [
+      ['11-CALS',    '14-CoE',   'Contributing', '100', '04-OCT-25'],   // Sat
+      ['11-CALS',    '11-CALS',  'Lead',         '500', '06-OCT-25'],
+      ['14-CoE',     '11-CALS',  'Contributing', '200', '07-OCT-25'],
+      ['14-CoE',     '14-CoE',   'Lead',         '300', '11-OCT-25'],   // Sat
+      ['17-CoS',     '14-CoE',   'Contributing', '50',  '03-NOV-25'],
+      ['17-CoS',     '17-CoS',   'Lead',         '70',  '12-OCT-25'],   // Sun
+      ['20-PCOM',    '11-CALS',  'Lead',         '40',  '13-OCT-25'],
+      ['20-PCOM',    '14-CoE',   'Lead',         '60',  '08-NOV-25'],   // Sat
+      ['Chancellor', '17-CoS',   'Lead',         '10',  '18-OCT-25'],   // Sat
+      ['16-CHASS',   '17-CoS',   'Contributing', '80',  '15-NOV-25'],   // Sat
+      ['16-CHASS',   '16-CHASS', 'Lead',         '25',  '20-OCT-25']
+    ];
+    function icmRows() { return ICM.map(function (r) { return M({ CONTRIB_COLLEGE: r[0], LEAD_COLLEGE: r[1], COLLEGE_ROLE: r[2], AMOUNT_CROSS: r[3], LOG_DATE: r[4] }); }); }
+    function SI(extra) {
+      var s = base({ rows: ['CONTRIB_COLLEGE'], cols: ['LEAD_COLLEGE'], vals: 'AMOUNT_CROSS', agg: ['sum'], aggColOverrides: ['AMOUNT_CROSS'],
+        aggFilters: ['COLLEGE_ROLE = Contributing'], rowLayout: 'nested', colLayout: 'nested', stickyColCount: 3, hideEmpty: true });
+      Object.keys(extra || {}).forEach(function (k) { s[k] = extra[k]; });
+      return s;
+    }
+    jQuery('#tableHeader').html(['#', 'CONTRIB_COLLEGE', 'LEAD_COLLEGE', 'COLLEGE_ROLE', 'AMOUNT_CROSS', 'LOG_DATE'].map(function (c) {
+      return '<th data-colname="' + c + '">' + c + '</th>'; }).join(''));
+    async function execX(q) {
+      var r = await exec(q);
+      var mt = /^([\d,]+) pivot rows/.exec(r.text);
+      r.total = mt ? parseInt(mt[1].replace(/,/g, ''), 10) : -1;
+      return r;
+    }
+    function prevX(q) { var p = api.countMatchingRows(q); return { total: p.pivotTotal, rows: p.pivotMatching, txns: p.matching }; }
+    // want: { total, rows, txns, names? } - executed (status line + the rows drawn), then the preview
+    async function countCase(id, label, q, want) {
+      var r = await execX(q);
+      t(id + ' executed: ' + label, r.total === want.total && r.pivotRows === want.rows && r.txns === want.txns &&
+        (!want.names || JSON.stringify(r.funders) === JSON.stringify(want.names)),
+        'want ' + JSON.stringify(want) + '; got total ' + r.total + ', rows ' + r.pivotRows + ', txns ' + r.txns + ', drawn ' + JSON.stringify(r.funders) + ' (' + r.text + ')');
+      var p = prevX(q);
+      t((id.charAt(0) === 'Y' ? 'Z' : 'W') + id.slice(1) + ' preview == executed: ' + q, p.total === r.total && p.rows === r.pivotRows && p.txns === r.txns,
+        'preview ' + JSON.stringify(p) + ', executed total ' + r.total + ' / rows ' + r.pivotRows + ' / txns ' + r.txns);
+      return r;
+    }
+    var all4 = ['11-CALS', '14-CoE', '16-CHASS', '17-CoS'];
+
+    var drawn0 = P.setPivot(SI(), icmRows());
+    var x0 = await execX('');
+    t('X0 int-col-mat shape: 4 of the 6 colleges drawn (Hide empty rows), and a cleared search says 4 pivot rows',
+      drawn0 === 4 && x0.total === 4 && JSON.stringify(x0.funders) === JSON.stringify(all4),
+      'render rowCount ' + drawn0 + ', status "' + x0.text + '", drawn ' + JSON.stringify(x0.funders));
+    var b0 = api.countMatchingRows('# > 0');
+    t('X0b the builder\'s no-filter count ("# > 0") is the status bar\'s: 4 pivot rows of 11 transactions',
+      b0.pivotTotal === 4 && b0.pivotMatching === 4 && b0.matching === 11, JSON.stringify(b0));
+    var LX = api.getPivotAggregateColumns()[0];
+    await countCase('X1', 'October 2025 = 4 pivot rows, with 2 filtered results (8 transactions, all 6 colleges have one)', 'LOG_DATE = /-(?:OCT)-25$/',
+      { total: 4, rows: 2, txns: 8, names: ['11-CALS', '14-CoE'] });
+    await countCase('X2', 'weekends (the :dow bucket) = 2 drawn, 6 colleges with a weekend row', 'LOG_DATE:dow = /^(?:Sat|Sun)$/',
+      { total: 4, rows: 2, txns: 6, names: ['11-CALS', '16-CHASS'] });
+    await countCase('X3', 'aggregate path keeping every key: {' + LX + '} >= 0 draws the 4 non-empty rows', '{' + LX + '} >= 0',
+      { total: 4, rows: 4, txns: 11, names: all4 });
+    await countCase('X3b', 'aggregate + source: October and {' + LX + '} >= 0 draws 2', 'LOG_DATE = /-(?:OCT)-25$/ and {' + LX + '} >= 0',
+      { total: 4, rows: 2, txns: 8, names: ['11-CALS', '14-CoE'] });
+    await openReport('LOG_DATE = /-(?:OCT)-25$/');
+    var xc = countText();
+    t('X1c the builder says it in words: 4 pivot rows, with 2 filtered results (8 of 11)',
+      xc === '4 pivot rows, with 2 filtered results (8 of 11 source transactions match this filter)', xc);
+    await openReport('');
+    var xb = countText();
+    t('X0c the builder with no filter says 4 pivot rows (11 source transactions), as the status bar', xb === '4 pivot rows (11 source transactions)', xb);
+    jQuery('#searchBuilderLightbox').hide();
+
+    // Rank AFTER hide-empty: Top 4 of 4 drawn rows ranks nothing (the raw count capped 6 at 4 + (Other) = 5).
+    P.setPivot(SI({ rankN: 4, rankDir: 'top', rankAgg: 'sum', rankOther: true }), icmRows());
+    var x4 = await execX('');
+    t('X4 Top 4 over the 4 drawn rows: a cleared search says 4', x4.total === 4, x4.text);
+    await countCase('X4b', 'Top 4, October: 4 pivot rows, with 2 filtered results', 'LOG_DATE = /-(?:OCT)-25$/', { total: 4, rows: 2, txns: 8 });
+
+    // Rank WITHIN each lead college (no filter, no hide-empty): 1 kept + (Other) where there are more.
+    P.setPivot(SI({ rows: ['LEAD_COLLEGE', 'CONTRIB_COLLEGE'], cols: ['COLLEGE_ROLE'], aggFilters: null, hideEmpty: false,
+      rankN: 1, rankDir: 'top', rankAgg: 'sum', rankOther: true, rankScope: 'LEAD_COLLEGE' }), icmRows());
+    var x5 = await execX('');
+    t('X5 Top 1 per lead college: 7 rows drawn of 11 lead/contributor pairs, and a cleared search says 7', x5.total === 7, x5.text);
+    await countCase('X5b', 'Top 1 per lead college, October: 7 drawn of 8 pairs', 'LOG_DATE = /-(?:OCT)-25$/', { total: 7, rows: 7, txns: 8 });
+
+    // A bucketed row field: no row carries a LOG_DATE:ym value of its own (the raw count read 1).
+    P.setPivot(SI({ rows: ['LOG_DATE:ym'] }), icmRows());
+    var x6 = await execX('');
+    t('X6 rows by LOG_DATE:ym: 2 months drawn, and a cleared search says 2', x6.total === 2, x6.text);
+    await countCase('X6b', 'LOG_DATE:ym, CONTRIB_COLLEGE = "11-CALS": 1 month of 2', 'CONTRIB_COLLEGE = "11-CALS"', { total: 2, rows: 1, txns: 2 });
+    LX = api.getPivotAggregateColumns()[0];
+    await countCase('X7', 'LOG_DATE:ym, aggregate path keeping every month: all 11 transactions (the preview re-keyed them: 0)', '{' + LX + '} >= 0',
+      { total: 2, rows: 2, txns: 11 });
+    // (aggkey, 2026-11-06) An aggregate filter keeping SOME months of a bucketed row field: the post-filter re-keyed the
+    // source rows by the raw token and kept none ("2 pivot rows, with 0 filtered results"). October has a 200 cell.
+    await countCase('X8', 'LOG_DATE:ym, {' + LX + '} > 150 keeps October: 1 of 2 months, its 8 transactions', '{' + LX + '} > 150',
+      { total: 2, rows: 1, txns: 8 });
+
+    // A preview's count-only pass leaves the pivot ON SCREEN alone: its (Other) drill-down keys, its scratch marks.
+    P.setPivot(SI({ rankN: 1, rankDir: 'top', rankAgg: 'sum', rankOther: true }), icmRows());
+    LX = api.getPivotAggregateColumns()[0];
+    var ok0 = P.otherKeys().slice().sort(), sc0 = P.scratch();
+    api.countMatchingRows('LOG_DATE = /-(?:OCT)-25$/');
+    var sc1 = P.scratch();
+    api.countMatchingRows('LOG_DATE = /-(?:OCT)-25$/ and {' + LX + '} >= 0');
+    var ok1 = P.otherKeys().slice().sort();
+    t('X9 previews leave the drawn pivot\'s (Other) keys alone (Top 1: 3 colleges ranked out)',
+      JSON.stringify(ok0) === JSON.stringify(ok1) && ok0.length === 3, JSON.stringify(ok0) + ' -> ' + JSON.stringify(ok1));
+    t('X9b ...and its scratch-row marks (a plain preview)', sc1 === sc0, sc1 === sc0 ? 'same' : 'replaced');
+
+    // ---- Y: the aggregate post-filter on bucketed row fields (aggkey, 2026-11-06) ----------------------------
+    // The source rows a post-filter keeps are keyed as processPivotData files them (they were re-keyed by
+    // row.get(token): no row of a bucketed field matched, "No results").
+    // A fixed-width bin: the 200 - 299 bin alone has a cell over 150 (14-CoE's 200 under 11-CALS).
+    P.setPivot(SI({ rows: ['AMOUNT_CROSS:bin100'] }), icmRows());
+    LX = api.getPivotAggregateColumns()[0];
+    await countCase('Y1', 'rows by AMOUNT_CROSS:bin100, {' + LX + '} > 150: the 200 - 299 bin, 1 of 3 drawn', '{' + LX + '} > 150',
+      { total: 3, rows: 1, txns: 1, names: ['200 – 299'] });
+    // An AUTO bin (width 50 over these 12 rows; 18-WCOT's 240 joins 14-CoE's 200 in "200 - 249"): the kept rows
+    // are bucketed by the width the filter matched, not one resolved from the kept rows alone (5: "200 - 204",
+    // "240 - 244", two rows where the filter kept one).
+    P.setPivot(SI({ rows: ['AMOUNT_CROSS:bin'] }), icmRows().concat([M({ CONTRIB_COLLEGE: '18-WCOT', LEAD_COLLEGE: '11-CALS',
+      COLLEGE_ROLE: 'Contributing', AMOUNT_CROSS: '240', LOG_DATE: '21-OCT-25' })]));
+    LX = api.getPivotAggregateColumns()[0];
+    await countCase('Y2', 'rows by AMOUNT_CROSS:bin (auto, 50), {' + LX + '} > 150: "200 - 249", 1 of 3, 2 rows behind it', '{' + LX + '} > 150',
+      { total: 3, rows: 1, txns: 2, names: ['200 – 249'] });
+    // A delimiter split: the pivot reads the column as it is.
+    P.setPivot(SI({ rows: ['CONTRIB_COLLEGE:dsemi'] }), icmRows());
+    LX = api.getPivotAggregateColumns()[0];
+    await countCase('Y3', 'rows by CONTRIB_COLLEGE:dsemi, {' + LX + '} > 150: 14-CoE and its 2 transactions', '{' + LX + '} > 150',
+      { total: 4, rows: 1, txns: 2, names: ['14-CoE'] });
+    // An ACTIVE field (AWARD_START:fy@AWARD_END, alone in Rows): a row counts in every fiscal year it runs.
+    // FY24 = A, FY25 = A B C, FY26 = D. {Count} > 1 keeps FY25; A also runs in FY24, so the re-pivot of the
+    // kept rows (A B C) has FY24 too - only FY25 is drawn, from all 3 rows.
+    var ACT = [['A', '2023-08-01', '2025-03-01'], ['B', '2024-09-01', '2024-12-01'], ['C', '2024-10-01', '2025-05-01'], ['D', '2025-08-01', '2025-10-01']];
+    function actRows() { return ACT.map(function (r, i) { return M({ AWARD_ID: r[0], AWARD_START: r[1], AWARD_END: r[2], DEPT: 'Eng', AMOUNT: String(10 * (i + 1)) }); }); }
+    var drawnA = P.setPivot(base({ rows: ['AWARD_START:fy@AWARD_END'], cols: ['DEPT'], vals: 'AMOUNT', agg: ['count'] }), actRows());
+    LX = api.getPivotAggregateColumns()[0];
+    t('Y4a an active field: FY24, FY25 and FY26 drawn', drawnA === 3, 'render rowCount ' + drawnA);
+    await countCase('Y4', 'AWARD_START:fy@AWARD_END, {' + LX + '} > 1: FY25 alone (not A\'s FY24), from 3 rows', '{' + LX + '} > 1',
+      { total: 3, rows: 1, txns: 3, names: ['FY25'] });
+
     t('no page errors', window.__errors.length === 0, JSON.stringify(window.__errors.slice(0, 4)));
     report('RESULTS_JSON:' + JSON.stringify({ results: results, emailCounts: emailCounts, infoCounts: infoCounts, reportTxns: reportTxns, info: info, pageErrors: window.__errors.slice(0, 6) }));
   }

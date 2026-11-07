@@ -56,7 +56,7 @@ Write-Host "[1/4] staging libraries ..."
 $libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
           'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
           'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
-          'purify.min.js','penumbra_template.js','penumbra_a11y.js')
+          'purify.min.js','penumbra_template.js','penumbra_a11y.js','penumbra_colfmt.js')
 foreach ($f in $libs) { Copy-Item "$js\$f" "$here\$f" -Force }
 New-Item -ItemType Directory -Force -Path "$here\js" | Out-Null
 foreach ($f in @('chart-4.5.1.min.js','chartjs-plugin-datalabels-2.0.0.min.js','chartjs-chart-treemap-3.1.0.min.js','chartjs-chart-sankey-0.19.1.min.js','penumbra_geo_us.js')) {
@@ -97,6 +97,7 @@ $hooks = @(
   '  rowsByPath: _filterRowsByPath, panelExclusions: _applyChartPanelExclusions,',
   '  setMaster: function (r) { var was = masterRowData; masterRowData = r; return was; },',   # (gbar) the Timeline label counts the rows
   '  setSnippet: function (t) { snippetEditor.setValue(t); },',
+  '  setColFmt: function (c, f) { _pnbColOptWrite(c, { fmt: f || null }); },',   # (numchart) a column own format, as Column options writes it
   '  bucketRows: vizBucketRowsForAxis, parseTok: pivotParseFieldToken, activeSearch: (typeof penumbraActiveSearch === ''function'' ? penumbraActiveSearch : null), drillSearch: _chartDrillSearchPart, keep: _chartDrillKeep, bucketSearch: penumbraBucketSearch,',
   '  pvProcess: processPivotData, pvGen: generatePivotTable, pvGate: (typeof _pivotActiveGate === ''function'' ? _pivotActiveGate : null), pvMatch: _pnbPvCellMatcher, pvSearch: _pnbPvDrillSearch, pvExists: penumbraPivotFieldExists };',   # (dtpick D) the pivot   # (dtpick B) active during
   '} catch (e) { window.__CI_ERR = String(e); }'

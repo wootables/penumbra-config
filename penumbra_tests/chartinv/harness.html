@@ -853,7 +853,9 @@
         var cv = hasCV ? HM.chartVariants('START_DATE') : [], ids = cv.map(function (v) { return v.id; });
         assert('Q the Chart by list: every grouping the X list offers the date', ['year', 'fy', 'yq', 'fyq', 'ym', 'quarter', 'fquarter', 'month', 'monthnum', 'dow'].every(function (i) { return ids.indexOf(i) >= 0; }) && ids.indexOf('hour') < 0, ids.join());
         eq('Q no Chart by list on a text column', hasCV ? HM.chartVariants('DEPT') : 'absent', []);
-        eq('Q ...nor a number column', hasCV ? HM.chartVariants('AMOUNT') : 'absent', []);
+        // (numchart, 2026-11-06) a number column's list is its X axes (section N), never the date groupings
+        var qN = hasCV ? HM.chartVariants('AMOUNT') : [];
+        assert('Q ...a number column lists X axes, not date groupings (section N)', qN.length > 0 && qN.every(function (v) { return v.measure; }), JSON.stringify(qN.map(function (v) { return v.id; })));
         HM.chartColumn('START_DATE', 'fy');
         eq('Q Chart by Fiscal Year: the X axis', $('#vizXAxis').val(), 'START_DATE:fy');
         eq('Q ...counted', $('#vizAggregation').val(), 'count');
@@ -877,6 +879,162 @@
       }
       } finally {
         if (window.__CI && window.__CI.setMaster) window.__CI.setMaster(keepQM);
+        $rt.data('columnProperties', cp0); $rt.data('columnNameToOriginalIndex', cni0);
+      }
+    });
+  }
+
+  // ---- N (numchart, 2026-11-06): a number / money column charts as the MEASURE, by the X axis its Chart by list picks;
+  // a chart reads its columns' own formats (Column options): the measure's on the value axis, labels and tooltips, the
+  // X column's on its category labels. Chart this column of a date still counts its rows, laid out by Auto-build.
+  async function runN() {
+    var F = window.__CI;
+    await asection('N', async function () {
+      var HM = window.Penumbra && window.Penumbra.headerMenu;
+      assert('N the header API is there', !!HM && typeof HM.chartVariants === 'function' && typeof HM.chartColumn === 'function');
+      if (!HM) return;
+      await F.loadScript('penumbra_colfmt.js');
+      assert('N (the column options module is up)', !!(window.PenumbraColFmt && window.PenumbraColFmt.openPopover));
+      var $rt = $('#resultsTable'), cp0 = $rt.data('columnProperties'), cni0 = $rt.data('columnNameToOriginalIndex');
+      var QC = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'], qcp = {}, qcni = {};
+      QC.forEach(function (c, i) { qcni[c] = i; qcp[i] = { isDate: c === 'START_DATE' || c === 'END_DATE', isCurrency: c === 'AMOUNT', isNumeric: c === 'N', isBoolean: false }; });
+      $rt.data('columnProperties', qcp); $rt.data('columnNameToOriginalIndex', qcni);
+      var keepM = F.setMaster(FIX);
+      var vb = document.getElementById('visualizeBtn'), vbMade = !vb;
+      if (!vb) { vb = document.createElement('span'); vb.id = 'visualizeBtn'; document.body.appendChild(vb); }
+      var vbShown = $(vb).is(':visible'), vbSt = vb.getAttribute('style');
+      if (!vbShown) { vb.style.display = 'inline-block'; $(vb).parents().filter(function () { return $(this).css('display') === 'none'; }).addClass('zzn-shown').css('display', 'block'); }
+      var $lb = $('#visualizationLightbox'), shown0 = $lb.css('display');
+      $lb.css('display', 'flex');
+      openBuilder();   // (the builder as the Chart button leaves it: its lists filled, its live listeners on)
+      function x() { return $('#vizXAxis').val(); }
+      function y() { return $('#vizYAxis').val() || ''; }
+      function agg() { return $('#vizAggregation').val(); }
+      function type() { return $('.viz-type-option.active').data('type'); }
+      function tipOf(ch, v) {
+        var ds = ch.data.datasets[0], cbs = ch.options.plugins.tooltip.callbacks;
+        return cbs.label.call(ch.tooltip || {}, { parsed: { x: 0, y: v, r: 0 }, raw: v, dataset: ds, dataIndex: 0, datasetIndex: 0, label: String(ch.data.labels[0]), chart: ch });
+      }
+      try {
+        // 1. the list
+        var cv = HM.chartVariants('AMOUNT'), byKind = function (k) { return cv.filter(function (v) { return v.kind === k; }); };
+        assert('N AMOUNT (money): a Chart by list of X axes', cv.length > 0 && cv.every(function (v) { return v.measure; }), JSON.stringify(cv.map(function (v) { return v.id; })));
+        var cats = byKind('cat').map(function (v) { return v.token; });
+        assert('N ...the columns that group it best (Auto-build scoring): STATUS, not the id-like AWARD_ID, never a number', cats.indexOf('STATUS') >= 0 && cats.indexOf('AWARD_ID') < 0 && cats.indexOf('N') < 0 && cats.indexOf('AMOUNT') < 0, cats.join());
+        var dts = byKind('date');
+        eq('N ...each date column a list of its groupings', dts.map(function (v) { return v.token; }), ['START_DATE', 'END_DATE']);
+        var p0 = (dts[0] && dts[0].periods) || [];
+        assert('N ...As is first, then every grouping its dates take (Fiscal Year among them, no Hour)', p0.length > 5 && p0[0].label === 'As is' && p0[0].id === 'x:START_DATE' &&
+          p0.some(function (p) { return p.id === 'x:START_DATE:fy'; }) && !p0.some(function (p) { return /:hour$/.test(p.id); }), JSON.stringify(p0.map(function (p) { return p.id; })));
+        eq('N ...then its own ranges', byKind('bins').map(function (v) { return v.id; }), ['bin', 'binlog']);
+        var sug = cv.filter(function (v) { return v.suggested; });
+        // (DEPT, STATUS, FY and STATE all score alike here - a dozen values or fewer - and Auto-build takes the first in table order)
+        eq('N ...Auto-build\'s pick named (suggested): one, the category it would chart AMOUNT by', sug.map(function (v) { return v.token; }), ['DEPT']);
+        assert('N ...acts the palette exempts (chartAs-[a-z0-9]+)', cv.every(function (v) { return /^[a-z0-9]+$/.test(v.act); }) && p0.every(function (p) { return /^[a-z0-9]+$/.test(p.act); }));
+        eq('N a text column has no Chart by list', HM.chartVariants('DEPT'), []);
+        assert('N a plain number column (N) has one', HM.chartVariants('N').length > 0 && HM.chartVariants('N')[0].measure === true);
+        assert('N a date column keeps its date groupings', HM.chartVariants('START_DATE').some(function (v) { return v.id === 'fy'; }) && !HM.chartVariants('START_DATE').some(function (v) { return v.measure; }));
+        // a column the viewer hid is no X axis Auto-build offers (or picks)
+        var thS = document.querySelector('#resultsTable thead th[data-colname="STATUS"]'), stS = thS.getAttribute('style');
+        thS.style.display = 'none';
+        var cvH = HM.chartVariants('AMOUNT');
+        assert('N a hidden column (STATUS) is neither listed nor suggested', !cvH.some(function (v) { return v.token === 'STATUS'; }) && !cvH.some(function (v) { return v.suggested && v.token === 'STATUS'; }), JSON.stringify(cvH.map(function (v) { return v.token + (v.suggested ? '*' : ''); })));
+        if (stS === null) thS.removeAttribute('style'); else thS.setAttribute('style', stS);
+        // 2. Chart this column on the measure: Auto-build with the column held on the Y axis
+        HM.chartColumn('AMOUNT');
+        eq('N Chart AMOUNT: its total on the Y axis, by Auto-build\'s pick (the suggested one)', [y(), agg(), x()], ['AMOUNT', 'sum', sug.length ? sug[0].token : '?']);
+        assert('N ...the chart drew', !!Chart.getChart('vizChart'));
+        assert('N ...titled', /AMOUNT/.test($('#vizTitle').val() || ''), $('#vizTitle').val());
+        HM.chartColumn('AMOUNT', 'x:DEPT');
+        eq('N Chart by DEPT: the X axis picked, the measure kept', [x(), y(), agg()], ['DEPT', 'AMOUNT', 'sum']);
+        HM.chartColumn('AMOUNT', 'x:START_DATE:fy');
+        eq('N Chart by START_DATE > Fiscal Year: in period order, every period', [x(), $('#vizSortBy').val(), $('#vizSortDir').val(), $('#vizLimit').val()], ['START_DATE:fy', 'label', 'asc', '9999']);
+        HM.chartColumn('AMOUNT', 'bin');
+        eq('N Chart by Bins: its own ranges, the rows counted', [x(), y(), agg()], ['AMOUNT:bin', '', 'count']);
+        HM.chartColumn('N');
+        eq('N Chart N (a plain number): its total', [y(), agg()], ['N', 'sum']);
+        // the date path through Auto-build: the rows counted, Auto-build's shape
+        HM.chartColumn('START_DATE', 'fy');
+        eq('N Chart a date by Fiscal Year: counted (the date is what is charted)', [x(), y(), agg()], ['START_DATE:fy', '', 'count']);
+        eq('N ...Auto-build\'s shape: a line through the periods', type(), 'line');
+        // 3. the measure's own format on the chart
+        HM.chartColumn('AMOUNT', 'x:STATUS');
+        var ch = Chart.getChart('vizChart');
+        eq('N no format set: the chart keeps its own ladder (no column format rides along)', ch && ch.data._fmt, null);
+        var legacy = ch ? tipOf(ch, 1234567.8) : '';
+        assert('N ...and its tooltip reads as before ($ and up to 3 decimals)', /\$1,234,567\.8$/.test(legacy), legacy);
+        F.setColFmt('AMOUNT', 'currency:0');
+        HM.chartColumn('AMOUNT', 'x:STATUS');
+        ch = Chart.getChart('vizChart');
+        var fm = ch && ch.data._fmt;
+        eq('N currency:0: the chart carries the column\'s format', fm ? [fm.style, fm.t, fm.decimals] : null, ['column', 'currency', 0]);
+        var yt = ch ? ch.scales.y.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N ...the value axis in dollars, no cents', yt.length > 1 && yt.every(function (l) { return /^-?\$\d/.test(l); }) && !yt.some(function (l) { return /\.\d\d$/.test(l); }), JSON.stringify(yt));
+        eq('N ...a tooltip in full, in the column\'s format', ch ? tipOf(ch, 1234567.8) : '', 'AMOUNT: $1,234,568');
+        var rr = await renderReport(window.vizBuildCodeFromForm());
+        assert('N ...the report\'s chart carries it too', !!rr.chart && rr.chart.data._fmt && rr.chart.data._fmt.style === 'column', rr.text || '');
+        if (rr.chart) eq('N ...and its tooltip', tipOf(rr.chart, 1234567.8), 'AMOUNT: $1,234,568');
+        F.setColFmt('AMOUNT', 'number:2');
+        HM.chartColumn('AMOUNT', 'x:STATUS');
+        ch = Chart.getChart('vizChart');
+        eq('N number:2 on a money column: no $, two decimals', ch ? tipOf(ch, 1234567.8) : '', 'AMOUNT: 1,234,567.80');
+        HM.chartColumn('AMOUNT', 'bin');
+        ch = Chart.getChart('vizChart');
+        eq('N ...a count of it keeps no format of its', ch && ch.data._fmt, null);
+        F.setColFmt('AMOUNT', null);
+        // 4. the X column's own format on its category labels: a date pattern, drawn only
+        F.setColFmt('START_DATE', 'date:MMM D, YYYY');
+        HM.chartColumn('START_DATE', 'raw');
+        ch = Chart.getChart('vizChart');
+        var lab0 = ch ? String(ch.data.labels[0]) : '', tk = ch ? ch.scales.x.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N As is on a date formatted MMM D, YYYY: the labels stay the values', /^\d{4}-\d\d-\d\d$/.test(lab0), lab0);
+        assert('N ...the axis reads in the pattern', tk.length > 0 && tk.every(function (l) { return /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(l); }), JSON.stringify(tk.slice(0, 4)));
+        var ttl = ch ? ch.options.plugins.tooltip.callbacks.title([{ label: lab0 }]) : '';
+        assert('N ...the tooltip title too', /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(ttl), ttl);
+        rr = await renderReport(window.vizBuildCodeFromForm());
+        var rtk = rr.chart ? rr.chart.scales.x.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N ...on the report\'s chart as well', rtk.length > 0 && /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(rtk[0]), JSON.stringify(rtk.slice(0, 3)));
+        F.setColFmt('START_DATE', null);
+        HM.chartColumn('START_DATE', 'raw');
+        ch = Chart.getChart('vizChart');
+        tk = ch ? ch.scales.x.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N ...no format: the axis reads the values', tk.length > 0 && /^\d{4}-\d\d-\d\d$/.test(tk[0]), JSON.stringify(tk.slice(0, 3)));
+        // 5. (numchart 2) the series names (Group By) in the series column's own format: the legend and each tooltip
+        //    line; the datasets keep their names (the series filter and the clicks read them)
+        var SD = ['2024-01-15', '2024-07-01', '2025-03-31', '2025-12-25'];
+        var rowsG = FIX.map(function (m, i) { var c = new Map(m); c.set('SER_DATE', SD[i % 4]); return c; });
+        F.setColFmt('SER_DATE', 'date:MMM D, YYYY');
+        var cfgG = { type: 'bar', xAxis: 'STATUS', yAxis: 'AMOUNT', groupBy: 'SER_DATE', agg: 'sum', limit: 9999 };
+        var bg = buildAndRender(cfgG, rowsG), chG = bg.chart;
+        var names = chG ? chG.data.datasets.map(function (d) { return d.label; }) : [];
+        assert('N series by a date column formatted MMM D, YYYY: the datasets keep their values', names.length === 4 && names.every(function (n) { return /^\d{4}-\d\d-\d\d$/.test(n); }), JSON.stringify(names));
+        var leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...the legend reads in the pattern', leg.length === 4 && leg.every(function (t) { return /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(t); }), JSON.stringify(leg));
+        var rawG = chG ? chG.config._config.options : null;
+        var tipG = rawG ? rawG.plugins.tooltip.callbacks.label.call(chG.tooltip || {}, { parsed: { x: 0, y: 1500 }, raw: 1500, dataset: chG.data.datasets[0], dataIndex: 0, datasetIndex: 0, label: String(chG.data.labels[0]), chart: chG }) : '';
+        assert('N ...each tooltip line names its series in the pattern', /^[A-Z][a-z]{2} \d{1,2}, \d{4}: /.test(tipG), tipG);
+        assert('N ...and the series name is read from a stand-in: the dataset itself unchanged', chG && /^\d{4}-/.test(chG.data.datasets[0].label), chG ? chG.data.datasets[0].label : '');
+        F.setColFmt('SER_DATE', null);
+        bg = buildAndRender(cfgG, rowsG); chG = bg.chart;
+        leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...no format: the legend reads the values', leg.length === 4 && leg.every(function (t) { return /^\d{4}-\d\d-\d\d$/.test(t); }), JSON.stringify(leg));
+        F.setColFmt('SER_DATE', 'date:MMM D, YYYY');
+        bg = buildAndRender({ type: 'line', xAxis: 'STATUS', yAxis: 'AMOUNT', groupBy: 'SER_DATE', agg: 'sum', limit: 9999, sortBy: 'label', sortDir: 'asc' }, rowsG); chG = bg.chart;
+        leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...a line chart\'s legend too', leg.length === 4 && leg.every(function (t) { return /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(t); }), JSON.stringify(leg));
+        F.setColFmt('SER_DATE', null);
+        // a series of a grouping keeps its buckets' own names
+        F.setColFmt('START_DATE', 'date:MMM D, YYYY');
+        bg = buildAndRender({ type: 'bar', xAxis: 'STATUS', yAxis: 'none', groupBy: 'START_DATE:fy', agg: 'count', limit: 9999 }, FIX); chG = bg.chart;
+        leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...a series of a grouping (START_DATE by Fiscal Year) keeps its bucket names', leg.length > 0 && leg.every(function (t) { return /^FY\d\d$/.test(t); }), JSON.stringify(leg));
+        F.setColFmt('START_DATE', null);
+      } finally {
+        try { F.setColFmt('AMOUNT', null); F.setColFmt('START_DATE', null); F.setColFmt('SER_DATE', null); } catch (e) { }
+        $lb.css('display', shown0);
+        if (!vbShown) { if (vbSt === null) vb.removeAttribute('style'); else vb.setAttribute('style', vbSt); $('.zzn-shown').css('display', '').removeClass('zzn-shown'); }
+        if (vbMade && vb.parentNode) vb.parentNode.removeChild(vb);
+        F.setMaster(keepM);
         $rt.data('columnProperties', cp0); $rt.data('columnNameToOriginalIndex', cni0);
       }
     });
@@ -1157,6 +1315,7 @@
     if (!ONLY || ONLY === 'G') await runG();   // (glong)
     if (!ONLY || ONLY === 'S') await runS();   // (gsortcolor)
     if (!ONLY || ONLY === 'E') await runE();   // (gone)
+    if (!ONLY || ONLY === 'N') await runN();   // (numchart) last: it loads the column options module
     // E (email / PDF) runs in the vischarts suite on these very calls and rows.
     Object.keys(EXPORT_CODES).forEach(function (t) { results.push({ name: 'EXPORT code ' + t, pass: true, detail: EXPORT_CODES[t], export: true }); });
     var cols = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'];

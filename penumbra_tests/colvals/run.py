@@ -16,7 +16,9 @@
 #   W4  two values ticked and settled ("Multiple Values Selected (2)"): ONE click
 #       on the arrow reopens the list with both still ticked
 #   W5  Alt+Down in the box opens the same list
-#   W6  a between row's To box has no arrow
+#   W6  (2026-11-06, tobox c6b96d2) a between row's To box has its own arrow: at its right edge,
+#       its inner height, the To text clear of it, role + a title naming To; a REAL click on it
+#       opens the value list from the To box (until tobox: "the To box has no arrow")
 #   W7  no page errors
 #   W8  (sweep) a row whose column has NO value list (a stub NOTE column): no arrow
 #   W9  ...switched to a column with values: the arrow is back
@@ -36,21 +38,29 @@ APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 CR = '\r\n'
 
+# (2026-11-06) tobox (c6b96d2) gave the To box its own arrow: the show / padding rules lost their
+# :not(.sb-value-cell-secondary), and the show rule took a comment line. The css anchors follow them.
+TOBOX_NOTE = '    /* (2026-11-06, tobox) the To box of a between row has its own arrow */'
 MUTANTS = {
-    'noshow':   ('css', '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {' + CR + '    display: flex;',
-                 '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {' + CR + '    display: none;', ['W1', 'W2', 'W4']),
-    'anycol':   ('css', '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {',
-                 '.sb-condition-row:not(.sb-row-novals) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {', ['W0']),
-    'nopad':    ('css', '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-input {' + CR + '    padding-right: 28px;',
-                 '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-input {' + CR + '    padding-right: 8px;', ['W1']),
+    'noshow':   ('css', '.sb-value-cell > .sb-value-arrow {' + CR + TOBOX_NOTE + CR + '    display: flex;',
+                 '.sb-value-cell > .sb-value-arrow {' + CR + TOBOX_NOTE + CR + '    display: none;', ['W1', 'W2', 'W4', 'W6']),
+    'anycol':   ('css', '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell > .sb-value-arrow {',
+                 '.sb-condition-row:not(.sb-row-novals) .sb-value-cell > .sb-value-arrow {', ['W0']),
+    'nopad':    ('css', '.sb-value-cell > .sb-value-input {' + CR + '    padding-right: 28px;',
+                 '.sb-value-cell > .sb-value-input {' + CR + '    padding-right: 8px;', ['W1', 'W6']),
     'notoggle': ('js', "            $(this).data('sbWasOpen', !!(inputEl && isAutocompleteVisible() && _acActiveInput === inputEl));",
                  "            $(this).data('sbWasOpen', false);", ['W3']),
     'mdblur':   ('js', "            if (e.button !== 0) return;" + CR + "            e.preventDefault();" + CR + "            var inputEl",
                  "            if (e.button !== 0) return;" + CR + "            var inputEl", ['W3']),
     'novals':   ('js', "        $row.toggleClass('sb-row-novals', !!col && !(vals && vals.length) && !_sbMode.includeRecipientVars);",
                  "        $row.toggleClass('sb-row-novals', false);", ['W8']),
-    'novalcss': ('css', '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {',
-                 '.sb-condition-row:has(.sb-col-select option:checked:not([value=""])) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {', ['W8']),
+    'novalcss': ('css', '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell > .sb-value-arrow {',
+                 '.sb-condition-row:has(.sb-col-select option:checked:not([value=""])) .sb-value-cell > .sb-value-arrow {', ['W8']),
+    # (tobox) the To box's arrow element gone from the row's markup; the show rule back to the From box only
+    'tobox':    ('js', "'<span class=\"sb-value-arrow\" role=\"button\" title=\"(Alt+Down) Show the values for To\"",
+                 "'<span class=\"sb-value-arrow-gone\" role=\"button\" title=\"(Alt+Down) Show the values for To\"", ['W6']),
+    'toshow':   ('css', '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell > .sb-value-arrow {',
+                 '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {', ['W6']),
     'noalt':    ('js', "            // Alt+Down = the value arrow (2026-10-13), as on the search bars." + CR + "            if (e.altKey",
                  "            // Alt+Down = the value arrow (2026-10-13), as on the search bars." + CR + "            if (false && e.altKey", ['W5']),
 }
@@ -114,6 +124,18 @@ window.V = {
   item: function (v) {
     var el = $('#sbAutocompleteDropdown .sb-ac-item').filter(function () { return $(this).attr('data-value') === v; })[0];
     if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  },
+  // (2026-11-06, tobox) a between row's To box and its own arrow, measured as geo() measures the From pair
+  arrowTo: function (i) { return V.row(i).find('.sb-value-cell-secondary').children('.sb-value-arrow')[0]; },
+  boxTo: function (i) { return V.row(i).find('.sb-value-input-secondary')[0]; },
+  geoTo: function (i) {
+    var a = V.arrowTo(i), b = V.boxTo(i);
+    if (!a || !b) return { arrow: !!a, box: !!b };
+    var ab = a.getBoundingClientRect(), bb = b.getBoundingClientRect(), cs = getComputedStyle(b);
+    return { shown: a.getClientRects().length > 0 && getComputedStyle(a).display !== 'none',
+             right: bb.right - ab.right, top: ab.top - bb.top, bottom: bb.bottom - ab.bottom, w: ab.width,
+             pr: parseFloat(cs.paddingRight), x: ab.left + ab.width / 2, y: ab.top + ab.height / 2,
+             role: a.getAttribute('role'), title: a.getAttribute('title') };
   },
   blurs: 0
 };
@@ -196,8 +218,23 @@ def checks(pg):
     ops = pg.ev("V.row(0).find('.sb-op-select option').map(function(){return this.value;}).get()") or []
     btw = [o for o in ops if 'between' in o.lower()]
     if btw: pg.ev("T.op(0, %s); true" % json.dumps(btw[0])); time.sleep(0.3)
-    sec = pg.ev("(function(){var c=V.row(0).find('.sb-value-cell-secondary'); return [c.is(':visible'), c.find('.sb-value-arrow').length];})()")
-    rec('W6', "a between row's To box has no arrow", bool(btw) and sec[0] and sec[1] == 0, {'between': btw, 'to shown / arrows': sec})
+    # (2026-11-06, tobox c6b96d2: "the To box of a between row gets its own value-list arrow") the To box shown, its own
+    # arrow at its right edge, its inner height, the To text clear of it, role + a title naming To; a REAL click on it
+    # opens the value list from the To box (the focus there, not in From)
+    pg.ev("$('#sbAutocompleteDropdown').hide(); V.row(0).find('.sb-value-input').blur(); true"); time.sleep(0.3)
+    to_shown = pg.ev("V.row(0).find('.sb-value-cell-secondary').is(':visible')")
+    g6 = pg.ev('V.geoTo(0)') or {}
+    if g6.get('shown'):
+        pg.click(g6['x'], g6['y']); pg.wait("$('#sbAutocompleteDropdown').is(':visible')", 3000); time.sleep(0.3)
+    s6 = pg.ev("({ open: $('#sbAutocompleteDropdown').is(':visible'), shown: $('#sbAutocompleteDropdown .sb-ac-item:visible').map(function(){return $(this).attr('data-value');}).get().slice(0, 6),"
+               " toFocus: document.activeElement === V.boxTo(0) })") or {}
+    ok6 = bool(btw) and to_shown and g6.get('shown') and abs(g6['right'] - 1) <= 0.6 and abs(g6['top'] - 1) <= 0.6 and abs(g6['bottom'] - 1) <= 0.6 \
+        and g6['pr'] >= g6['w'] + 1 and g6.get('role') == 'button' and (g6.get('title') or '').startswith('(Alt+Down)') and 'To' in (g6.get('title') or '') \
+        and s6.get('open') and s6.get('toFocus') and (s6.get('shown') or [])[:6] == ['Alice', 'Alan', 'Albert', 'Bob', '[1,2]', 'X|Y']
+    rec('W6', "a between row's To box has its own arrow (tobox): at its right edge, its inner height, the text clear of it, role + a title naming To; a REAL click opens the list from the To box",
+        ok6, {'between': btw, 'toShown': to_shown, 'geo': g6, 'click': s6})
+    # Escape closes the list - and with no list open the builder itself, which W8 - W10 need open
+    if s6.get('open'): pg.key('Escape', 27); time.sleep(0.3)
     # W8 / W9 (sweep): no arrow on a column with nothing to list; it comes with a column that has values
     pg.ev("$('#sbAutocompleteDropdown').hide(); true"); time.sleep(0.2)
     pg.ev("T.setup('NOTE = x'); $('#sbAutocompleteDropdown').hide(); V.box(0).blur(); true"); time.sleep(0.4)

@@ -1,0 +1,243 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>fbucket builder</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="search_builder.css">
+</head>
+<body>
+<!-- fbucket (2026-11-06): the Visual Search Builder half. The REAL main.js (its _penumbraSearchAPI: the column list
+     from the header, the value lists, the buckets) under the REAL js/search_builder.js with the REAL markup of
+     search_builder_content.php and its stylesheet, over the corpus rows. run.py drives it step by step over CDP
+     through window.T and asserts. PenumbraPresets is stubbed (as parens/builder.html does) so the preset round trip
+     - getState / applyState - can be called. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<div id="reportHeaderContainer"></div>
+<input type="hidden" id="reportSubtitle" value="Harness">
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="tableSearchContainer"><input type="text" id="tableSearch" autocomplete="off"></div>
+<div id="resultCount"></div>
+<div id="loadingOverlay" style="display:none"><p></p></div>
+<table id="resultsTable"><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<div id="action_overlay" class="pnb-toast-dock"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="searchBuilderContainer"></div>
+<select id="schedEventType"><option value="EMAIL" selected>EMAIL</option></select>
+<input type="text" id="schedSearchFilter"><div id="schedSearchFilterHint"></div>
+<!-- (fbucket 2) a filter box of another kind (a chart's Filter Expression, a pivot cell's): it lists no bucket -->
+<input type="text" id="plainFilter">
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="corpus.js"></script>
+<script src="sb_markup.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [], canEditReport: true
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax;
+  // The builder lazy-loads its markup with $.get(url, callback): hand it the real file's HTML.
+  jQuery.get = function (url, a, b) {
+    var cb = typeof a === 'function' ? a : (typeof b === 'function' ? b : null);
+    var d = jQuery.Deferred();
+    if (String(url).indexOf('search_builder_content.php') === 0) { if (cb) cb(window.__SB_MARKUP); d.resolve(window.__SB_MARKUP); }
+    else { d.resolve({}); }
+    return d.promise();
+  };
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+  window.confirm = function () { return true; };
+  // main.js's resize handler calls the header stacker the report page sets up (not this page): U18 resizes
+  window.stackHeaders = function () {};
+  window.__errors = [];
+  window.addEventListener('error', function (e) { window.__errors.push(String(e.message) + ' @' + String(e.filename).split('/').pop() + ':' + e.lineno); });
+  window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason))); });
+  window.PenumbraPresets = {
+    NS: { SEARCH: 'search' },
+    reportId: function () { return 'harness'; },
+    create: function (opts) { window.__presetOpts = opts; var noop = function () {}; return { setLoaded: noop, refresh: noop, close: noop, open: noop, destroy: noop, setLabel: noop, loaded: function () { return null; } }; },
+    list: function () { return []; }, save: function () { return true; }, remove: function () {},
+    getPin: function () { return null; }, setPin: function () {}
+  };
+</script>
+<script src="main_patched.js"></script>
+<script src="search_builder.js"></script>
+<script>
+window.T = (function () {
+  var C = window.CORPUS;
+  function M(o) { var m = new Map(); C.columns.forEach(function (c) { m.set(c.toUpperCase(), o[c] == null ? '' : String(o[c])); }); return m; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+  var T = {
+    boot: function () {
+      if (!window.__FB) return 'no hooks: ' + (window.__FB_ERR || 'n/a');
+      window.__FB.setRows(C.rows.map(M));
+      $('#tableHeader').html(['#'].concat(C.columns.filter(function (c) { return c !== 'ID'; }).concat(['ID'])).map(function (c) {
+        return '<th data-colname="' + esc(c.toUpperCase()) + '">' + esc(c) + '</th>';
+      }).join(''));
+      return 'ok';
+    },
+    open: function (q) { $('#tableSearch').val(q || ''); window.openSearchBuilder(); return true; },
+    openSched: function (q) { $('#schedSearchFilter').val(q || ''); window._penumbraSearchBuilder.openForScheduler(function (v) { window.__schedGot = v; }); return true; },
+    isOpen: function () { return $('#searchBuilderLightbox').is(':visible') && $('#sbConditionsContainer .sb-condition-row').length > 0; },
+    row: function (i) { return $('#sbConditionsContainer .sb-condition-row').eq(i || 0); },
+    rows: function () { return $('#sbConditionsContainer .sb-condition-row').length; },
+    setCol: function (i, c) { T.row(i).find('.sb-col-select').val(c).trigger('change'); return T.row(i).find('.sb-col-select').val(); },
+    setBucket: function (i, sx) { T.row(i).find('.sb-bucket-select').val(sx).trigger('change'); return T.row(i).find('.sb-bucket-select').val(); },
+    setOp: function (i, op) { T.row(i).find('.sb-op-select').val(op).trigger('change'); return true; },
+    setVal: function (i, v, v2) {
+      var $r = T.row(i);
+      $r.find('.sb-value-input').not('.sb-value-input-secondary').val(v).trigger('input');
+      if (v2 !== undefined) $r.find('.sb-value-input-secondary').val(v2).trigger('input');
+      return true;
+    },
+    addRow: function () { $('#sbAddConditionBtn').trigger('click'); return T.rows(); },
+    removeRow: function (i) { T.row(i).find('.sb-remove-row-btn').trigger('click'); return T.rows(); },
+    state: function (i) {
+      var $r = T.row(i), $b = $r.find('.sb-bucket-select'), $in = $r.find('.sb-value-input').not('.sb-value-input-secondary'), $tip = $r.find('.sb-date-tip');
+      return {
+        col: $r.find('.sb-col-select').val() || '',
+        bucketShown: $b.length > 0 && $b.css('display') !== 'none',
+        bucketOpts: $b.find('option').map(function () { return [[this.value, $(this).text()]]; }).get(),
+        bucket: $b.length ? ($b.val() || '') : null,
+        rowClass: $r.hasClass('sb-row-bucket'),
+        op: $r.find('.sb-op-select').val() || '',
+        val: $in.val() || '',
+        val2: $r.find('.sb-value-input-secondary').val() || '',
+        multi: $r.data('sb-multi-values') || null,
+        tip: $tip.text(), tipShown: $tip.css('display') !== 'none',
+        datepicker: $in.hasClass('hasDatepicker'),
+        warn: $r.find('.sb-range-warning').css('display') !== 'none'
+      };
+    },
+    preview: function () { return $('#sbQueryPreview').text(); },
+    wide: function () { return $('#searchBuilderLightbox .sb-lightbox-content').hasClass('sb-wide'); },
+    submit: function () { $('#sbSubmitBtn').trigger('click'); return true; },
+    box: function () { return $('#tableSearch').val(); },
+    schedBox: function () { return $('#schedSearchFilter').val(); },
+    acOpen: function () { return $('#sbAutocompleteDropdown').is(':visible'); },
+    acItems: function () { return $('#sbAutocompleteDropdown .sb-ac-item').map(function () { return $(this).attr('data-value'); }).get(); },
+    acItemAt: function (v) {
+      var el = $('#sbAutocompleteDropdown .sb-ac-item').filter(function () { return $(this).attr('data-value') === v; })[0];
+      if (!el) return null;
+      var cb = el.querySelector('.sb-ac-checkbox') || el, r = cb.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    },
+    hideAc: function () { $('#sbAutocompleteDropdown').hide(); return true; },
+    getState: function () { return window.__presetOpts ? JSON.parse(JSON.stringify(window.__presetOpts.getState())) : null; },
+    applyState: function (s) { window.__presetOpts.applyState(s); return true; },
+    // Every visible control of row i: its box, and whether they share one line (no wrap) inside the dialog
+    geo: function (i) {
+      var $r = T.row(i), sel = ['.sb-row-joiner', '.sb-row-group', '.sb-col-select', '.sb-bucket-select', '.sb-op-select', '.sb-value-input:not(.sb-value-input-secondary)', '.sb-remove-row-btn'];
+      var out = { boxes: {}, content: null, row: null };
+      sel.forEach(function (s) {
+        var el = $r.find(s)[0];
+        if (!el || !el.getClientRects().length) return;
+        var b = el.getBoundingClientRect();
+        out.boxes[s] = { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom), w: Math.round(b.width) };
+      });
+      var rb = $r[0].getBoundingClientRect(), cb = $('#searchBuilderLightbox .sb-lightbox-content')[0].getBoundingClientRect();
+      out.row = { l: Math.round(rb.left), r: Math.round(rb.right), sw: $r[0].scrollWidth, cw: $r[0].clientWidth };
+      out.content = { l: Math.round(cb.left), r: Math.round(cb.right), w: Math.round(cb.width) };
+      // the links under the value (split / clear / select column instead): how many lines they take
+      var $acts = $r.find('.sb-value-actions'), a = $acts[0];
+      out.actLines = a ? Math.round(a.getBoundingClientRect().height) : 0;
+      out.tipOneLine = (function () { var t = $r.find('.sb-date-tip')[0]; return !t || !t.getClientRects().length || t.getClientRects().length === 1; })();
+      return out;
+    },
+    // ---- (fbucket 2) the filter boxes' lists: attachFilterAutocomplete over the real main.js API, as main.js attaches
+    // the report's box and the Scheduler's; #plainFilter as a chart's Filter Expression box is attached
+    boxes: function () {
+      var sb = window._penumbraSearchBuilder;
+      sb.attachFilterAutocomplete('#tableSearch', { includePresets: true, includeRecipientVars: false, onSearchExecute: function () { window.__ran = (window.__ran || 0) + 1; }, onInputChange: null });
+      sb.attachFilterAutocomplete('#schedSearchFilter', { includePresets: false, includeRecipientVars: function () { return $('#schedEventType').val() === 'EMAIL'; }, onSearchExecute: null, onInputChange: function () { } });
+      sb.attachFilterAutocomplete('#plainFilter', { excludeCategories: ['aggregate'] });
+      return true;
+    },
+    // the list the box shows: headers as { h }, items as { t: the text (no glyph, no example), b: a bucket entry,
+    // g: the glyph, ex: the example, pad: the item's left padding }
+    menu: function (sel) {
+      var $w = $(sel).autocomplete('widget');
+      if (!$w.is(':visible')) return null;
+      return $w.children('li').map(function () {
+        var $li = $(this), $d = $li.children('div').first();
+        if ($li.hasClass('sb-autocomplete-header')) return [{ h: $li.text().trim() }];
+        var $c = $d.clone(); $c.find('.sb-ac-bucket-glyph, .sb-ac-bucket-ex').remove();
+        return [{ t: $c.text().trim(), b: $li.hasClass('sb-autocomplete-bucket'), g: $d.find('.sb-ac-bucket-glyph').length > 0,
+                  ex: $d.find('.sb-ac-bucket-ex').text(), pad: parseFloat(getComputedStyle($d[0]).paddingLeft) || 0 }];
+      }).get();
+    },
+    items: function (sel) { var m = T.menu(sel); return m ? m.filter(function (x) { return !x.h; }).map(function (x) { return x.t; }) : null; },
+    itemAt: function (sel, text) {
+      var li = $(sel).autocomplete('widget').children('li').filter(function () {
+        var $c = $(this).children('div').first().clone(); $c.find('.sb-ac-bucket-glyph, .sb-ac-bucket-ex').remove(); return $c.text().trim() === text;
+      })[0];
+      if (!li) return null;
+      li.scrollIntoView({ block: 'nearest' });
+      var r = li.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 60), y: r.top + r.height / 2 };
+    },
+    focusBox: function (sel, val) {
+      T.closeMenus();
+      var el = $(sel)[0]; el.value = val || ''; el.focus();
+      try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { }
+      return document.activeElement === el;
+    },
+    closeMenus: function () { ['#tableSearch', '#schedSearchFilter', '#plainFilter'].forEach(function (s) { try { $(s).autocomplete('close'); } catch (e) { } }); return true; },
+    boxVal: function (sel) { return $(sel).val(); },
+    trailing: function (sel, val) { $(sel).val(val); return window._penumbraSearchBuilder.trailingColumn(sel); },
+    // a double-click with the caret at `at` (the handler reads the caret): the range it selects
+    dbl: function (sel, val, at) { var el = $(sel)[0]; T.closeMenus(); el.value = val; el.focus(); el.setSelectionRange(at, at); $(el).trigger('dblclick'); return [el.selectionStart, el.selectionEnd]; },
+    // the rows a query keeps through the page's own engine (the report's filter reads it so)
+    ids: function (q) {
+      var S = window.__FB, rows = C.rows.map(M), cols = S.flatCols(C.columns.filter(function (c) { return c !== '#'; }));
+      var parsed = S.parseQ(q, cols), out = [];
+      rows.forEach(function (m, i) { if (S.evalQ(m, parsed, cols, false)) out.push(+C.rows[i].ID); });
+      return out;
+    },
+    api: function (fn, args) { var a = window._penumbraSearchAPI || {}; try { return typeof a[fn] === 'function' ? a[fn].apply(a, args) : '(none)'; } catch (e) { return 'THROW ' + e; } },
+    sbApi: function (fn, args) { var a = window._penumbraSearchBuilder || {}; try { return typeof a[fn] === 'function' ? a[fn].apply(a, args) : '(none)'; } catch (e) { return 'THROW ' + e; } },
+    // a slow bucket reading: getBucketVariants takes `ms` a column (0 = as it is)
+    slow: function (ms) {
+      var a = window._penumbraSearchAPI, f = a.__gbv0 || a.getBucketVariants;
+      a.__gbv0 = f;
+      a.getBucketVariants = ms ? function () { var t = performance.now(); while (performance.now() - t < ms) { } return f.apply(a, arguments); } : f;
+      return true;
+    },
+    // the column arrow's list on an empty box (showColumnList, synchronous): how long it took, in ms
+    listTimed: function (sel) {
+      T.closeMenus(); $(sel).val(''); $(sel)[0].blur();
+      var t = performance.now(); window._penumbraSearchBuilder.showColumnList(sel); return Math.round(performance.now() - t);
+    },
+    // the palette's Filter COLUMN by...: the builder on the box's conditions plus a row for the column's bucket
+    openBucket: function (q, col, sx) {
+      $('#tableSearch').val(q || '');
+      var b = window._penumbraSearchBuilder;
+      if (!b || typeof b.openBucketRow !== 'function') return false;
+      b.openBucketRow(col, sx); return true;
+    },
+    errors: function () { return window.__errors.slice(0, 8); }
+  };
+  return T;
+})();
+</script>
+</body></html>
