@@ -133,6 +133,9 @@ takes under 0.5 s (a render waits for buckets at most 120 ms); after a wait with
 combinations, and the report search re-renders only once text is typed) one keystroke is instant and has the row: the
 reading went on in idle moments from the open. Mutants fb-norow
 fb-nomode fb-noby fb-notop fb-nohand fb-noopen fb-budget fb-warm. NEW_PFB = its checks less fbText.
+Sweep (2026-11-06): fbKw - "v_date fy" and "v_date dow" find the row (two words: each must be in the label or the keywords, so
+the bucket ids fy fyq yq ym dow monthnum binlog dsemi dpipe dcomma are the row's keywords; "filter v_date by fy" is a question,
+found by its long words alone). A chip's lookup reads buckets only for Filter COLUMN by... (c-unknown re-anchored). Mutant fb-kw.
 
 **wcag 2.1.1 + 4.1.3 (2026-11-06, the November WCAG rescan's Serious [2.1.1]).** Once Jarvis had answered in the box, the keyboard
 could not reach the answer: every Tab inside the box stepped list sections (the Jarvis view has none), Enter ran no row, and the
@@ -148,3 +151,14 @@ jb-nosay re-aimed at the JARVIS_DONE line. Mutants wt-tab wt-keys wt-refocus wt-
 expanded and the footer saying "Tab next section". listRole(on): the body a region "Jarvis answer", aria-expanded false, the hint
 "Tab next control" (renderJarvis, every state); draw() (every list mode: root, pick, col, theme, fbucket) puts the listbox back.
 pjtab checks roleRegion, roleBack (guard: live never left the listbox). Mutants ws-region ws-back.
+
+**wcag mod (2026-11-07, the November rescan's Moderate M6 M7 M8).** status(t, sr): sr = words for a screen reader only, a
+`.pnb-pal-sr` span (1px, clipped) inside the same live region after the shown words; the footer shows exactly what it did.
+The main list says "No matches" when its note is drawn; the Which column?, column-actions, Filter COLUMN by... and theme lists
+say countSay(rows, q): "N options" untyped, "N matches" typed, "No matches". A Jarvis answer adds "It begins: <first sentence>"
+(150 characters at most, "..." when cut) after "Jarvis answered. Press Tab to read it.", said once (the said-once compare
+names the lead; S-jarBusy and jb-resay re-aimed; pjtab's saidAnswered reads the shown words). At 480px and less the Esc chip
+stays, drawn as an X (28px square, same chip style, same name "Close quick actions"). Scenarios `pwcagm` (noMatchSaid srHidden
+matchCountKept(guard) pickCount pickNone colCount bucketCount themeCount escDesktopSame(guard) leadSaid leadCapped) and
+`pnarrow` (the runner sets a 400px window: sheetFull(guard) escNarrowShown escNarrowCloses). Mutants wm-none wm-pick wm-col
+wm-bucket wm-theme wm-lead wm-uncap wm-drawn wm-noesc wm-noglyph wm-wide (the guard escDesktopSame). NEW_WM = those less the guards.

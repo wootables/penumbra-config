@@ -76,7 +76,7 @@
 # Rebuilds SRC.js from the LIVE app files each run, so it always tests what is
 # deployed. Writes nothing to the webroot. Exit code 1 when any assertion fails.
 # =============================================================================
-param([string]$MainJs = '', [string]$ChartsJs = '',
+param([string]$MainJs = '', [string]$ChartsJs = '', [string]$A11yJs = '',
       [ValidateSet('', 'xdecl', 'xread', 'tmdecl', 'tmread')][string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (UNC .ps1 files are GPO-blocked).
@@ -86,6 +86,8 @@ $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }
 # -ChartsJs (2026-10-15): a staged penumbra_charts.js instead of the live one.
 if (-not $ChartsJs) { $ChartsJs = "$js\penumbra_charts.js" }
+# -A11yJs (wcag mod 2026-11-07): a staged penumbra_a11y.js for gantt_a11y_test.
+if (-not $A11yJs) { $A11yJs = "$js\penumbra_a11y.js" }
 
 # Chrome first: on this box headless EDGE emits nothing for these pages, and
 # cscript's JScript engine is ES3 so it cannot parse main.js at all.
@@ -98,6 +100,7 @@ if (-not (Test-Path $browser)) { throw 'no Chrome or Edge found' }
 Write-Host "[1/3] staging JS from the live app ..."
 Copy-Item "$js\moment.min.js"       "$here\moment.min.js"       -Force
 Copy-Item $ChartsJs  "$here\penumbra_charts.js"  -Force
+Copy-Item $A11yJs    "$here\penumbra_a11y.js"    -Force   # (wcag mod 2026-11-07) gantt_a11y_test
 # The geo asset is a LIVE APP FILE too, and outline_map_test asserts directly
 # against it (feature counts, projection landmarks, centroid arming). Without
 # this copy the suite happily tested whatever build_geo.pl last left here while
@@ -163,7 +166,7 @@ Write-Host ("      SRC.js rebuilt: {0} source chars -> {1} bytes" -f $text.Lengt
 Write-Host "[2/3] running 16 harnesses headlessly ..."
 $suites = @('funnel_test','gauge_test','box_pareto_test','gantt_test','map_test',
             'dough_roundtrip_test','module_test','bridge_test','format_bands_test','outline_map_test','palette_test','autobuild_test',
-            'drill_other_test','values_roundtrip_test','sankey_test','sunburst_test')
+            'drill_other_test','values_roundtrip_test','sankey_test','sunburst_test','gantt_a11y_test')
 $rows = @()
 foreach ($s in $suites) {
     # Its own profile per run: a stale disk cache will happily serve the

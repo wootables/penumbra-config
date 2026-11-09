@@ -407,7 +407,7 @@ MUTANTS = {
     'jb-rmnobar': ([('pcss', "    .pnb-pal-ai-bar i { animation: none; width: 100%;", "    .pnb-pal-ai-bar i { animation: none; width: 0;")], ['L-pjbusyrm-rmObvious', 'S-jarBusy'], ['pjbusyrm']),
     'jb-twolive': ([('pal', "<div class=\"pnb-pal-ai-wait is-busy\">", "<div class=\"pnb-pal-ai-wait is-busy\" aria-live=\"polite\">")], ['L-pjbusy-busySaidOnce'], ['pjbusy']),
     'jb-nosay': ([('pal', "        var st = mode.state === 'done' ? JARVIS_DONE : (waiting ? JARVIS_BUSY : '');\n", "        var st = mode.state === 'done' ? JARVIS_DONE : '';\n")], ['L-pjbusy-busySaidOnce'], ['pjbusy']),   # (re-aimed 2026-11-06, wcag: the done text is JARVIS_DONE)
-    'jb-resay': ([('pal', "        if (ui.status.textContent !== st) { status(st); }", "        status(st);")], ['L-pjbusy-busySaidOnce', 'S-jarBusy'], ['pjbusy']),
+    'jb-resay': ([('pal', "        if (ui.status.textContent !== st + (lead ? ' ' + lead : '')) { status(st, lead); }", "        status(st, lead);")], ['L-pjbusy-busySaidOnce', 'S-jarBusy'], ['pjbusy']),
     'jb-nobusyattr': ([('pal', "html = '<div class=\"pnb-pal-ai\"' + (waiting ? ' aria-busy=\"true\"' : '') + '>", "html = '<div class=\"pnb-pal-ai\"' + '>")], ['L-pjbusy-busyMarked'], ['pjbusy']),
     'jb-stays': ([('pal', "        if (waiting) { html += jarvisBusyHtml(); }\n", "        if (waiting || mode.state === 'done') { html += jarvisBusyHtml(); }\n")], ['L-pjbusy-busyEndsOnAnswer'], ['pjbusy']),
     'jb-errstays': ([('pal', "        if (waiting) { html += jarvisBusyHtml(); }\n", "        if (waiting || mode.state === 'failed') { html += jarvisBusyHtml(); }\n")], ['L-pjbusy-busyEndsOnError', 'L-pjbusy-errorReadable'], ['pjbusy']),
@@ -615,7 +615,7 @@ MUTANTS = {
     'j-nosend': ([('pal', "            var sb = byId('aiSendBtn'); if (sb) { click(sb); } else { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }   // the panel's own send (its Send button, else its Enter handler), once\n", "")], ['L-pjar-sendsOnce', 'S-jarvisOnce'], ['pjar']),
     'j-summary': ([('pal', "            input.value = text;\n            input.dispatchEvent(new Event('input', { bubbles: true }));\n", "            input.value = text;\n            var cS = byId('aiProfileOn'); if (cS) { cS.checked = !cS.checked; }\n            input.dispatchEvent(new Event('input', { bubbles: true }));\n")], ['L-pjar-summaryUntouched', 'S-jarvisOnce'], ['pjar']),
     # --- (round 17) an unknown id rendered as a chip; a chip that applies the grouping itself; the block shown raw; the gate skipped
-    'c-unknown': ([('pal', "            e = comboEntries().filter(function (x) { return x.id === cid; })[0] || null;\n", "            e = comboEntries().filter(function (x) { return x.id === cid; })[0] || { id: cid, label: cid, icon: { pal: 'ask' }, avail: true, run: function () { } };\n")], ['L-pchip-unknownDropped'], ['pchip']),
+    'c-unknown': ([('pal', "            e = comboEntries(id !== 'combo:filterby').filter(function (x) { return x.id === cid; })[0] || null;\n", "            e = comboEntries(id !== 'combo:filterby').filter(function (x) { return x.id === cid; })[0] || { id: cid, label: cid, icon: { pal: 'ask' }, avail: true, run: function () { } };\n")], ['L-pchip-unknownDropped'], ['pchip']),
     'c-applies': ([('pal', "if (!r) { return false; } try { r.run(); } catch (e2) { toast('That action could not run.'); return false; } return true; };", "if (!r) { return false; } try { r.run(); setTimeout(function () { var b = el('confirmGroupingBtn'); if (b) { click(b); } }, 300); } catch (e2) { toast('That action could not run.'); return false; } return true; };")], ['L-pchip-chipOpensNotApplies'], ['pchip']),
     'c-raw': ([('main', "            $msg.html(renderAiMarkdown(split.text));\n", "            $msg.html(renderAiMarkdown(text));\n")], ['L-pchip-blockNeverRaw', 'S-chipsSafe'], ['pchip']),
     # --- (round 18a) the time budget gone: PHP's 90-s limit kills a slow provider call mid-flight again
@@ -773,10 +773,11 @@ MUTANTS.update({
 # pick opens the builder on a new row for it; "filter X by fiscal" selects it and narrows the list; a typed bucket condition
 # (V_DATE:fy = FY26) is a condition on the column. Red on live (no row, no reading of the token).
 SCN = SCN + ['pfbucket']
-CHK['pfbucket'] = ['fbRow', 'fbTop', 'fbList', 'fbRuns', 'fbNarrow', 'fbNum', 'fbText', 'fbHand', 'fbHandRuns', 'fbSlow', 'fbWarm']
+CHK['pfbucket'] = ['fbRow', 'fbTop', 'fbList', 'fbRuns', 'fbNarrow', 'fbNum', 'fbText', 'fbHand', 'fbHandRuns', 'fbSlow', 'fbWarm', 'fbKw']
 NEW_PFB = {'L-pfbucket-' + c for c in CHK['pfbucket'] if c != 'fbText'}
 NEW = NEW | NEW_PFB
 NEW = NEW - NEW_PFB   # (fbucket 2 is LIVE since 302b3d2, 2026-11-06: old checks now)
+# (fbucket sweep) L-pfbucket-fbKw: NEW until the sweep landed; retired at the deploy
 MUTANTS.update({
     'fb-norow': ([('pal', "            if (fbv.length) {", "            if (false) {")],
                  ['L-pfbucket-fbRow', 'L-pfbucket-fbTop', 'L-pfbucket-fbList', 'L-pfbucket-fbRuns', 'L-pfbucket-fbNarrow', 'L-pfbucket-fbNum'], ['pfbucket']),
@@ -790,6 +791,7 @@ MUTANTS.update({
     'fb-noopen': ([('pal', "        b.openBucketRow(col, sx);", "        // (mutant)")], ['L-pfbucket-fbRuns'], ['pfbucket']),
     'fb-budget': ([('pal', "            if (until && Date.now() > until) { warmBuckets(); return []; }", "            // (mutant) no time cap")], ['L-pfbucket-fbSlow'], ['pfbucket']),
     'fb-warm': ([('pal', "        if (bucketWarm === bucketMemo) { return; }", "        return;")], ['L-pfbucket-fbWarm'], ['pfbucket']),
+    'fb-kw': ([('pal', " fy fyq yq ym dow monthnum binlog dsemi dpipe dcomma'", "'")], ['L-pfbucket-fbKw'], ['pfbucket']),
 })
 
 # (wcag 2.1.1 + 4.1.3, 2026-11-06, the November rescan's Serious [2.1.1]) the Jarvis answer in the box was out of the keyboard's reach:
@@ -816,6 +818,30 @@ NEW = NEW | {'L-pjtab-roleRegion'}
 MUTANTS.update({
     'ws-region': ([('pal', "        listRole(false);   // (wcag sweep 2026-11-06)", "        // (mutant)")], ['L-pjtab-roleRegion'], ['pjtab']),
     'ws-back': ([('pal', "    function draw(sections, note) {\n        listRole(true);\n", "    function draw(sections, note) {\n")], ['L-pjtab-roleBack'], ['pjtab']),
+})
+
+# (wcag mod, 2026-11-07, the November rescan's Moderate M6 + M7 [4.1.3], M8 [1.4.10]) pwcagm: the status says "No matches" on an empty
+# search and a count in the Which column?, column-actions, Filter COLUMN by... and theme lists; a Jarvis answer's first sentence after
+# "Jarvis answered. Press Tab to read it." (once, capped at 150 characters); all of it in a never-drawn span inside the one live region,
+# the footer's shown words unchanged. pnarrow (a 400px window): the full-screen box keeps its Esc chip as an X close control.
+# Guards (green on live too): matchCountKept, escDesktopSame, sheetFull.
+SCN = SCN + ['pwcagm', 'pnarrow']
+CHK['pwcagm'] = ['noMatchSaid', 'srHidden', 'matchCountKept', 'pickCount', 'pickNone', 'colCount', 'bucketCount', 'themeCount', 'escDesktopSame', 'leadSaid', 'leadCapped']
+CHK['pnarrow'] = ['sheetFull', 'escNarrowShown', 'escNarrowCloses']
+NEW_WM = ({'L-pwcagm-' + c for c in CHK['pwcagm']} | {'L-pnarrow-' + c for c in CHK['pnarrow']}) - {'L-pwcagm-matchCountKept', 'L-pwcagm-escDesktopSame', 'L-pnarrow-sheetFull'}
+NEW = NEW | NEW_WM | {'S-jarBusy'}   # (S-jarBusy: its "said once" line now names the lead)
+MUTANTS.update({
+    'wm-none': ([('pal', ", note ? 'No matches' : '');   // (wcag mod 2026-11-07)", ", '');   // (wcag mod 2026-11-07)")], ['L-pwcagm-noMatchSaid', 'L-pwcagm-srHidden'], ['pwcagm']),
+    'wm-pick': ([('pal', "        status('', countSay(rows.length, q));   // (wcag mod 2026-11-07) a count, as the main list says one\n", "        status('');\n")], ['L-pwcagm-pickCount', 'L-pwcagm-pickNone'], ['pwcagm']),
+    'wm-col': ([('pal', "        status('', countSay(rows.length, q));   // (wcag mod 2026-11-07)\n    }\n    // (2026-11-06, fbucket 2)", "        status('');\n    }\n    // (2026-11-06, fbucket 2)")], ['L-pwcagm-colCount'], ['pwcagm']),
+    'wm-bucket': ([('pal', "'No bucket matches <b>' + esc(q) + '</b>');\n        status('', countSay(rows.length, q));", "'No bucket matches <b>' + esc(q) + '</b>');\n        status('');")], ['L-pwcagm-bucketCount'], ['pwcagm']),
+    'wm-theme': ([('pal', "'No theme matches <b>' + esc(q) + '</b>');\n        status('', countSay(rows.length, q));", "'No theme matches <b>' + esc(q) + '</b>');\n        status('');")], ['L-pwcagm-themeCount'], ['pwcagm']),
+    'wm-lead': ([('pal', "            lead = jarvisLead(ans.textContent);   // (wcag mod 2026-11-07) read before the chips join it\n", "")], ['L-pwcagm-leadSaid', 'L-pwcagm-leadCapped'], ['pwcagm']),
+    'wm-uncap': ([('pal', "        if (s.length > 150) { s = s.substring(0, 147)", "        if (s.length > 1500) { s = s.substring(0, 147)")], ['L-pwcagm-leadCapped'], ['pwcagm']),
+    'wm-drawn': ([('pcss', ".pnb-pal-sr { position: absolute;", ".pnb-pal-zz { position: absolute;")], ['L-pwcagm-srHidden', 'L-pwcagm-leadSaid'], ['pwcagm']),
+    'wm-noesc': ([('pcss', "    .pnb-pal-in > .pnb-pal-esc { display: inline-flex;", "    .pnb-pal-in > .pnb-pal-esc { display: none;")], ['L-pnarrow-escNarrowShown', 'L-pnarrow-escNarrowCloses'], ['pnarrow']),
+    'wm-noglyph': ([('pcss', "    .pnb-pal-in > .pnb-pal-esc::before { content:", "    .pnb-pal-in > .pnb-pal-esc::after { content:")], ['L-pnarrow-escNarrowShown'], ['pnarrow']),
+    'wm-wide': ([('pcss', "/* (wcag mod 2026-11-07, 1.4.10) the full-screen sheet keeps a close control for pointer and touch: the Esc chip, drawn as an X\n   (its name stays \"Close quick actions\"), 28px square; the desktop chip is untouched */\n@media (max-width: 480px) {", "/* (mutant) */\n@media (min-width: 1px) {")], ['L-pwcagm-escDesktopSame'], ['pwcagm']),
 })
 
 args = sys.argv[1:]
@@ -923,6 +949,7 @@ def run_page(path, shot_path=None):
         call('Page.enable'); call('Network.enable'); call('Network.setCacheDisabled', {'cacheDisabled': True})
         if 'scn=pshot9' in path: call('Emulation.setDeviceMetricsOverride', {'width': 1440, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})   # (round 9) the photo at 1440px
         call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        if path.endswith('scn=pnarrow'): call('Emulation.setDeviceMetricsOverride', {'width': 400, 'height': 800, 'deviceScaleFactor': 1, 'mobile': False})   # (wcag mod 2026-11-07) the phone / 400% zoom width
         if path.endswith('scn=pjbusy'): call('Emulation.setDeviceMetricsOverride', {'width': 1280, 'height': 600, 'deviceScaleFactor': 1, 'mobile': False})   # (jarbusy) a short window
         if 'scn=pjbusy' in path or 'scn=pshotjb' in path:   # (jarbusy) the motion preference set either way: Edge reads Windows' "Animation effects" (off = reduce)
             rm = 'scn=pjbusyrm' in path or ('scn=pshotjb' in path and os.environ.get('PNB_JBRM'))
@@ -1300,7 +1327,7 @@ def static_checks(texts):
         # brought into view), animated in the stylesheet by three keyframes and held still under reduced motion (a full bar, solid dots,
         # plain lines); the hint never faded by opacity; the error in the themes' danger token
         ('S-jarBusy', "if (waiting) { html += jarvisBusyHtml(); }" in pal and "var JARVIS_BUSY = 'Jarvis is thinking. Esc cancels.';" in pal
-         and "if (ui.status.textContent !== st) { status(st); }" in pal and 'aria-live="polite">Thinking' not in pal and "card.scrollIntoView({ block: 'nearest' })" in pal
+         and "if (ui.status.textContent !== st + (lead ? ' ' + lead : '')) { status(st, lead); }" in pal and 'aria-live="polite">Thinking' not in pal and "card.scrollIntoView({ block: 'nearest' })" in pal
          and all(('@keyframes %s ' % k) in texts['pcss'] for k in ('pnbPalAiBar', 'pnbPalAiDot', 'pnbPalAiShimmer'))
          and '@media (prefers-reduced-motion: reduce) {\n    .pnb-pal-ai-bar i { animation: none; width: 100%;' in texts['pcss'].replace('\r\n', '\n')
          and '    .pnb-pal-ai-dots i { animation: none; opacity: 1; transform: none; }' in texts['pcss'] and '    .pnb-pal-ai-skel i { animation: none;' in texts['pcss']

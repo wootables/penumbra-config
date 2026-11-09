@@ -87,6 +87,14 @@ $mutantDefs = [ordered]@{
   'nopin'     = @{ file = 'module'; edits = @(,@('                        if (c) { cardPop.pin(item, ico, c.help + (c.fn ? cardMoreHtml(c.fn) : '''')); }', '')); red = @('N9') }
   # Copy copies the placeholder text, not the realized recipe
   'norealcopy' = @{ file = 'module'; edits = @(,@('run: function () { copyToClipboard(realizeColumns(text()), item.ownerDocument); } });', 'run: function () { copyToClipboard(text(), item.ownerDocument); } });')); red = @('N10') }
+  # (wcag mod 2026-11-07, M15) the pinned card does not describe its row
+  'm15desc'   = @{ file = 'module'; edits = @(,@("            row.setAttribute('aria-describedby', 'snipCardPop');   // (wcag mod 2026-11-07)", '')); red = @('N20','N21') }
+  # How to use by Enter no longer hands the focus to the card
+  'm15enter'  = @{ file = 'module'; edits = @(,@("setTimeout(function () { it.run(); if (kb && act === 'help') { cardPop.enter(row); } }, 0);", "setTimeout(function () { it.run(); }, 0);")); red = @('N21','N22','N23') }
+  # the card's own Escape gone (main.js's path still shuts it, but nothing gives the row the focus back)
+  'm15back'   = @{ file = 'module'; edits = @(,@("            if (back && back.ownerDocument.contains(back)) {", "            if (false) {")); red = @('N22','N23') }
+  # Tab off the card's last stop does nothing
+  'm15tab'    = @{ file = 'module'; edits = @(,@("    pop.addEventListener('keydown', onPinKey);   // (wcag mod 2026-11-07)", '')); red = @('N23') }
 }
 function Apply-Mutant([string]$name) {
   if (-not $mutantDefs.Contains($name)) { throw "unknown mutant '$name' (known: $(($mutantDefs.Keys) -join ', '))" }

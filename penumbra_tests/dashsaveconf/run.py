@@ -30,7 +30,7 @@ CSS = ['main.css', 'penumbra_tiles.css', 'penumbra_dashboard.css']
 SCN = ['base', 'conflict', 'self', 'nover', 'isnew', 'plainerr']
 CHK = {
     'base': ['sentBase', 'noForce', 'versionMoved'],
-    'conflict': ['noticeWho', 'noticeEscaped', 'noticeButtons', 'buttonBack', 'openLatest', 'openNoSave', 'forceSent', 'forceSaved', 'forceOnce', 'versionAdopted'],
+    'conflict': ['noticeWho', 'noticeEscaped', 'noticeButtons', 'buttonBack', 'msgFocused', 'openLatest', 'openNoSave', 'forceSent', 'forceSaved', 'forceOnce', 'versionAdopted'],
     'self': ['selfWords', 'unknownWho', 'oneNotice'],
     'nover': ['noVersionNoBase'],
     'isnew': ['newNoBase', 'newAdopts'],
@@ -54,6 +54,9 @@ MUTANTS = {
     'noescape': ([('js', "<span style='color: var(--accent-danger, #cc0000)'>NOT SAVED:</span> \" + escapeHtml(lead) +", "<span style='color: var(--accent-danger, #cc0000)'>NOT SAVED:</span> \" + lead +")],
                  ['L-conflict-noticeEscaped'], ['conflict']),
     'nohop': ([('js', SRC['S-hopVersion'], "")], ['S-hopVersion'], []),
+    # (wcag mod 2026-11-07, M24) the conflict toast takes focus
+    'noconffocus': ([('js', "        if (msg && (!ae || ae === document.body", "        if (false && (!ae || ae === document.body")],
+                    ['L-conflict-msgFocused'], ['conflict']),
     # manage_dashboard.php / dashboard.php
     'noforce': ([('md', "    if (!empty($data['force'])) return false;\n", "")], ['P-D4'], []),
     'noconflictcall': ([('md', "            if (dashSaveConflict($input, $dashCurVer)) {", "            if (false && dashSaveConflict($input, $dashCurVer)) {")], ['P-O1'], []),

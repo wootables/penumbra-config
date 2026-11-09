@@ -1962,6 +1962,35 @@ MUTANTS.update({
                    ['L-gwcag-nameMenu', 'L-gmenu-bandKeyboard'], ['gwcag', 'gmenu']),
 })
 
+# (wcag mod 2026-11-07) the November WCAG Moderate findings on the cards: M1 a Fields list on the keyboard's card menu,
+# M5 the focus after Show as table / Hide this field from it, M3 the note icons at full opacity, M4 --brand-text on the
+# tiles' total title and three hovers, M25 the mailed bar's words (cards and tiles)
+SCN = SCN + ['cwmkbd', 'cwmmail', 'cwmmail2', 'pvwmail', 'pvwmail2']
+CHK['cwmkbd'] = ['restOpacity', 'totalTitle', 'hoverTokens', 'mouseSame', 'kbdFields', 'fieldList', 'fieldMenu', 'fieldEscBack', 'fieldFilter', 'hideFocusRow', 'tableFocusRow']
+CHK['cwmmail'] = ['barWords', 'barStyled']
+CHK['cwmmail2'] = ['barListedSkip']
+CHK['pvwmail'] = ['tileWords']
+CHK['pvwmail2'] = ['tileSameSkip']
+GUARDS |= {'L-cwmkbd-mouseSame', 'L-cwmmail2-barListedSkip', 'L-pvwmail2-tileSameSkip'}   # (wcag mod: hold on live - no Fields, no bar words there)
+NEW_WCAGMOD = {'L-%s-%s' % (sc, c) for sc in ('cwmkbd', 'cwmmail', 'cwmmail2', 'pvwmail', 'pvwmail2') for c in CHK[sc]} - GUARDS
+NEW_WCAGMOD |= {'L-cnote-quietIcons'}   # (wcag mod, M3) the note icons at full opacity at rest: red on live (faint there)
+NEW = NEW | NEW_WCAGMOD   # (wcag mod) add, never replace
+MUTANTS.update({
+    'wm-opacity': ([('cardscss', "gap: 0; opacity: 1; position: static;", "gap: 0; opacity: 0.35; position: static;")], ['L-cwmkbd-restOpacity', 'L-cnote-quietIcons'], ['cwmkbd', 'cnote']),
+    'wm-total': ([('cardscss', ".pnb-card-pv.is-total .pnb-card-title { color: var(--brand-text, var(--brand-primary, #336699)); }", ".pnb-card-pv.is-total .pnb-card-title { color: var(--brand-primary, #336699); }")], ['L-cwmkbd-totalTitle'], ['cwmkbd']),
+    'wm-hover': ([('cardscss', ".pnb-cards-grptoggle:hover { color: var(--brand-text, var(--brand-primary, #336699)); }", ".pnb-cards-grptoggle:hover { color: var(--brand-primary, #336699); }")], ['L-cwmkbd-hoverTokens'], ['cwmkbd']),
+    'wm-fields': ([('cards', "if (t.kbd && t.kind === 'card' && t.card && !t.pivot && !t.inDetails) { var fm", "if (false) { var fm")],
+                  ['L-cwmkbd-kbdFields', 'L-cwmkbd-fieldList', 'L-cwmkbd-fieldMenu', 'L-cwmkbd-fieldEscBack', 'L-cwmkbd-fieldFilter', 'L-cwmkbd-hideFocusRow'], ['cwmkbd']),
+    'wm-mouse': ([('cards', "if (t.kbd && t.kind === 'card' && t.card && !t.pivot && !t.inDetails) { var fm", "if (t.kind === 'card' && t.card && !t.pivot && !t.inDetails) { var fm")], ['L-cwmkbd-mouseSame'], ['cwmkbd']),
+    'wm-run': ([('cards', "run: function () { if (v.isConnected) openMenu(v, null); } });", "run: function () { } });")],
+               ['L-cwmkbd-fieldMenu', 'L-cwmkbd-fieldEscBack', 'L-cwmkbd-fieldFilter', 'L-cwmkbd-hideFocusRow'], ['cwmkbd']),
+    'wm-table': ([('cards', "run: function () { keepRowFocus(function () { set('table'); }); } });", "run: function () { set('table'); } });")], ['L-cwmkbd-tableFocusRow'], ['cwmkbd']),
+    'wm-mailbar': ([('cards', "if (rv && !mailHid(st(rTd))", "if (false && rv && !mailHid(st(rTd))")], ['L-cwmmail-barWords', 'L-cwmmail-barStyled'], ['cwmmail']),
+    'wm-maillisted': ([('cards', ".concat(r.sub, r.fields).indexOf(r.bar) < 0)", ".concat(r.sub, r.fields).indexOf(r.bar) < 0 || true)")], ['L-cwmmail2-barListedSkip'], ['cwmmail2']),
+    'wm-mailtile': ([('cards', "if (mlab && !(mbig", "if (false && mlab && !(mbig")], ['L-pvwmail-tileWords'], ['pvwmail']),
+    'wm-mailtilebig': ([('cards', "if (mlab && !(mbig && mlab.slice(-(mbig.length + 2)) === ': ' + mbig) && mlines", "if (mlab && mlines")], ['L-pvwmail2-tileSameSkip'], ['pvwmail2']),
+})
+
 def mutate(texts, name):
     t = dict(texts)
     for f, old, new in MUTANTS[name][0]:

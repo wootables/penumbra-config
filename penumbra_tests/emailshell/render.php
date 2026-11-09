@@ -29,7 +29,7 @@ function penumbraUnityEmail($p) {
     return $p . '@ncsu.edu';
 }
 
-require '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra/penumbra_email_shell.php';
+require (isset($argv[2]) && $argv[2] !== '' ? rtrim($argv[2], '/\\') : '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra') . '/penumbra_email_shell.php';   // argv[2] = the app dir (wcag mod 2026-11-07: stage runs)
 require dirname(__FILE__) . DIRECTORY_SEPARATOR . 'extracted.php';
 
 // ---- fixed cases, one per framing branch -------------------------------------

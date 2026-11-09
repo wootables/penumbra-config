@@ -622,6 +622,10 @@ try {
   var glTxt = [], glCtx = { save:function(){}, restore:function(){}, fillText:function (t, x, y) { glTxt.push([t, x, y]); } };
   if (glNote) glNote.afterDraw({ chartArea: { left: 40, right: 500, top: 10, bottom: 300 }, ctx: glCtx, height: 330 });
   eq('glong: ...under the plot, at its left edge', glTxt, [['1 row with no start or end date is not shown.', 40, 327]]);
+  // (wcag mod 2026-11-07, M22) the note is drawn at full alpha and rides the chart data for the screen-reader table
+  ok('wcagmod gnote: drawn at full alpha', !!glNote && !('globalAlpha' in glCtx && glCtx.globalAlpha !== 1), 'globalAlpha=' + glCtx.globalAlpha);
+  var glcA = cfg(); glcA.data = { datasets: [] }; G.apply(glcA, gl1, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+  eq('wcagmod gnote: the note reaches the a11y data (data._a11yNote)', glcA.data._a11yNote, 'Showing 12 of 30 bars. 3 rows with no start or end date are not shown.');
   var glc2 = cfg(); G.apply(glc2, gl3, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
   ok('glong: 5 bars, nothing left out: no top axis, no note', !glc2.options.scales.xTop && !(glc2.plugins || []).some(function (p) { return p.id === 'penumbraGanttNote'; }));
   var glc3 = cfg(); glc3.options.layout = { padding: 8 }; G.apply(glc3, gl1, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
@@ -691,6 +695,17 @@ try {
   ok('gvpos: both renderers hand the position over',
      (code.match(/valuePos: valuePos\s+\/\/ \(gvpos/g) || []).length === 2,
      'call sites found: ' + ((code.match(/valuePos: valuePos\s+\/\/ \(gvpos/g) || []).length));
+  // (wcag mod 2026-11-07, M23) the ink is chosen by WCAG contrast against the fill as it renders (alpha over the backdrop)
+  var gkData = gsGen(rows([['Mid','01/01/2026','03/01/2026'],['Deep','02/01/2026','05/01/2026']]), {}, 'label');
+  gkData.datasets[0]._baseColors = ['rgba(70, 130, 180, 0.8)', 'rgba(20, 40, 90, 0.8)'];
+  var gkC = cfg(); gkC.data = { datasets: gkData.datasets };
+  G.apply(gkC, gkData, {showValues:true, textColor:'#111', isDark:false, fsBoost:0, valuePos:'center'});
+  var gkInk = gkC.options.plugins.datalabels.color;
+  eq('wcagmod gink: a mid-tone bar on a light page takes dark ink (white was 3:1)', typeof gkInk === 'function' ? gkInk({dataIndex:0}) : null, '#1f1f1f');
+  eq('wcagmod gink: a deep bar keeps white', typeof gkInk === 'function' ? gkInk({dataIndex:1}) : null, '#ffffff');
+  var gkHost = document.createElement('div'); gkHost.style.background = 'rgb(20, 20, 20)'; var gkCv = document.createElement('canvas'); gkHost.appendChild(gkCv); document.body.appendChild(gkHost);
+  eq('wcagmod gink: the same mid-tone bar over a dark backdrop takes white (alpha over the canvas background)', typeof gkInk === 'function' ? gkInk({dataIndex:0, chart:{canvas:gkCv}}) : null, '#ffffff');
+  document.body.removeChild(gkHost);
 
   // ---- (gtrunc) long filter values ellipsize in the chart menu ----
   ok('gtrunc: the filter leaf wraps its value in a label span',

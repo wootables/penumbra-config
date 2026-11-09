@@ -3,6 +3,10 @@
 #
 #   powershell -File run.ps1              compare against the stored baseline
 #   powershell -File run.ps1 -Rebaseline  accept current output as the new truth
+#   ... -App DIR                          DIR\schedule_runner.php + DIR\penumbra_email_shell.php (default: live)
+#   ... -Mutant NAME                      a temp copy of -App with one fix reverted (see $mutants)
+#   run as a scriptblock (unsigned scripts are blocked):
+#   & ([scriptblock]::Create([IO.File]::ReadAllText('...\emailshell\run.ps1'))) -App DIR
 #
 # WHAT IT PROVES: send_scheduler_failure_email() still emits exactly the markup
 # it emitted when the shared shell (penumbra_email_shell.php) was extracted from
@@ -10,25 +14,57 @@
 # broken for a week in Aug 2026 - so any change to the shared template has to
 # demonstrate it did not alter those emails.
 #
-# HOW: the function is text-extracted from the LIVE schedule_runner.php, its
+# HOW: the function is text-extracted from schedule_runner.php, its
 # mail() and quoted_printable_encode() calls are patched out, and it is driven
 # over five framing branches (plain failure, NOAUTH, transient test, missing
 # report, DB_DUMP). Nothing is ever sent. The time-varying "When" row is
 # normalised before comparison.
 #
+# LANG (wcag mod 2026-11-07, WCAG 3.1.1): every email shell opens <html lang="en">.
+# The baseline comparison folds the lang attribute back to <html> so the markup
+# proof still holds byte for byte; L1-L3 below then demand the attribute.
+#   L1  every rendered failure email opens <!DOCTYPE html><html lang="en">
+#   L2  penumbra_email_shell.php: no bare <html>, one <html lang="en">
+#   L3  schedule_runner.php: no bare <html>, six <html lang=
+#
 # A FAILURE HERE IS NOT NECESSARILY A BUG - if you deliberately restyled the
 # automated emails, re-run with -Rebaseline. Just look at the diff first.
 # =============================================================================
-param([switch]$Rebaseline)
+param([switch]$Rebaseline, [string]$App = '', [string]$Mutant = '')
 
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\emailshell' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 $php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+
+# Each mutant reverts ONE lang site (file, new text, old text); the anchor must match exactly once.
+$mutants = @{
+    'shell'   = @('penumbra_email_shell.php', '$h  = ''<!DOCTYPE html><html lang="en"><body', '$h  = ''<!DOCTYPE html><html><body');
+    'sr963'   = @('schedule_runner.php', '$html  = ''<!DOCTYPE html><html lang="en"><body', '$html  = ''<!DOCTYPE html><html><body');
+    'sr19819' = @('schedule_runner.php', '$html = "<!DOCTYPE html><html lang=''en''><head>', '$html = "<!DOCTYPE html><html><head>');
+    'sr26768' = @('schedule_runner.php', '$fullHtmlReport = "<!DOCTYPE html><html lang=''en''>', '$fullHtmlReport = "<!DOCTYPE html><html>');
+    'sr27614' = @('schedule_runner.php', '$final_html_body = "<!DOCTYPE html><html lang=''en''>', '$final_html_body = "<!DOCTYPE html><html>');
+    'sr27995' = @('schedule_runner.php', ('$prAfC = 0;' + "`r`n`r`n" + '                                $personalHtml = "<!DOCTYPE html><html lang=''en''>'), ('$prAfC = 0;' + "`r`n`r`n" + '                                $personalHtml = "<!DOCTYPE html><html>'));
+    'sr28626' = @('schedule_runner.php', '                                    $personalHtml = "<!DOCTYPE html><html lang=''en''>', '                                    $personalHtml = "<!DOCTYPE html><html>')
+}
+$tmp = $null
+if ($Mutant) {
+    if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant $Mutant (have: $($mutants.Keys -join ', '))" }
+    $tmp = Join-Path $env:TEMP ('emailshell_' + [guid]::NewGuid().ToString('N').Substring(0, 6)); [void][IO.Directory]::CreateDirectory($tmp)
+    foreach ($f in @('schedule_runner.php', 'penumbra_email_shell.php')) { [IO.File]::Copy((Join-Path $app $f), (Join-Path $tmp $f)) }
+    $m = $mutants[$Mutant]; $mp = Join-Path $tmp $m[0]
+    $s = [IO.File]::ReadAllText($mp)
+    $n = ([regex]::Matches($s, [regex]::Escape($m[1]))).Count
+    if ($n -ne 1) { throw "mutant $Mutant anchor matched $n times" }
+    $s = $s.Replace($m[1], $m[2]); [IO.File]::WriteAllText($mp, $s, (New-Object Text.UTF8Encoding($false)))
+    $app = $tmp
+    Write-Host "MUTANT $Mutant"
+}
+Write-Host "APP: $app"
 
 $fns = @('_sfe_h','_sfe_get','_sfe_kv_row','_sfe_resolve_recipients','send_scheduler_failure_email')
 
-Write-Host "[1/3] extracting the email builder from the live schedule_runner.php ..."
+Write-Host "[1/3] extracting the email builder from $app\schedule_runner.php ..."
 $src = [IO.File]::ReadAllLines("$app\schedule_runner.php")
 $out = New-Object System.Collections.Generic.List[string]
 $out.Add('<?php')
@@ -55,21 +91,31 @@ if ($text -match '(?<!pnb_fake_)(?<!penumbraUnityE)\bmail\(\$to') { throw "SAFET
 Write-Host "[2/3] rendering five framing branches ..."
 $target = if ($Rebaseline) { "$here\before" } else { "$here\after" }
 if (Test-Path $target) { Remove-Item "$target\*.html" -Force -ErrorAction SilentlyContinue }
-& $php -n "$here\render.php" $target
+& $php -n "$here\render.php" $target $app
 if ($LASTEXITCODE -ne 0) { throw "render failed" }
 
 if ($Rebaseline) { Write-Host "`nBASELINE UPDATED ($here\before)"; exit 0 }
 
 Write-Host "[3/3] comparing against baseline ..."
 $fail = 0
+function Fold-Lang([string]$s) { return $s.Replace('<html lang="en">', '<html>').Replace("<html lang='en'>", '<html>') }
 foreach ($f in Get-ChildItem "$here\before\*.html") {
-    $a = (Get-FileHash $f.FullName -Algorithm MD5).Hash
     $bPath = "$here\after\$($f.Name)"
     if (-not (Test-Path $bPath)) { Write-Host "  MISSING  $($f.Name)"; $fail++; continue }
-    $b = (Get-FileHash $bPath -Algorithm MD5).Hash
-    if ($a -eq $b) { Write-Host "  match    $($f.Name)" }
+    $a = [IO.File]::ReadAllText($f.FullName); $b = [IO.File]::ReadAllText($bPath)
+    if ((Fold-Lang $a) -eq (Fold-Lang $b)) { Write-Host "  match    $($f.Name)" }
     else           { Write-Host "  DIFFERS  $($f.Name)"; $fail++ }
+    if ($b.StartsWith('<!DOCTYPE html><html lang="en">')) { Write-Host "  ok   L1 $($f.Name) opens <html lang=""en"">" }
+    else { Write-Host "  FAIL L1 $($f.Name) opens $($b.Substring(0, [Math]::Min(40, $b.Length)))"; $fail++ }
 }
-if ($fail) { Write-Host "`n$fail case(s) changed. Inspect: fc /N before\<name>.html after\<name>.html"; exit 1 }
-Write-Host "`nALL MATCH - the shared shell still emits the scheduler's original markup."
+$sh = [IO.File]::ReadAllText("$app\penumbra_email_shell.php")
+$nb = ([regex]::Matches($sh, '<html>')).Count; $nl = ([regex]::Matches($sh, '<html lang="en">')).Count
+if ($nb -eq 0 -and $nl -eq 1) { Write-Host "  ok   L2 penumbra_email_shell.php: 0 bare <html>, 1 <html lang=""en"">" } else { Write-Host "  FAIL L2 penumbra_email_shell.php: $nb bare <html>, $nl lang"; $fail++ }
+$sr = [IO.File]::ReadAllText("$app\schedule_runner.php")
+$nb = ([regex]::Matches($sr, '<html>')).Count; $nl = ([regex]::Matches($sr, '<html lang=')).Count
+if ($nb -eq 0 -and $nl -eq 6) { Write-Host "  ok   L3 schedule_runner.php: 0 bare <html>, 6 <html lang=" } else { Write-Host "  FAIL L3 schedule_runner.php: $nb bare <html>, $nl lang"; $fail++ }
+if ($tmp -and (Split-Path -Leaf $tmp) -like 'emailshell_*') { try { [IO.Directory]::Delete($tmp, $true) } catch { } }
+if ($fail) { Write-Host "`n$fail check(s) failed. Inspect: fc /N before\<name>.html after\<name>.html"; Write-Host 'RESULT: RED'; exit 1 }
+Write-Host "`nALL MATCH - the shared shell still emits the scheduler's original markup, every shell with lang=""en""."
+Write-Host 'RESULT: GREEN'
 exit 0

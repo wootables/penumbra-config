@@ -843,6 +843,8 @@
       blurAll(); await ctrlF();
       if (F()) F()._setSlice(0.01);   // a slice per 32 rows: the read spans many tasks
       var i = inp(), seenBusy = false, seenText = false, seenSpin = false;
+      // (wcag mod 2026-11-07, M9) every text the status region holds during the read
+      var lives = [], lv = barEl() && barEl().querySelector('.pnb-find-live[role="status"]');
       if (i) { i.value = 'kilo'; i.dispatchEvent(new Event('input', { bubbles: true })); }
       var t0 = Date.now();
       while (i && Date.now() - t0 < 5000) {
@@ -850,6 +852,7 @@
         if (s.scanning) {
           seenBusy = seenBusy || b.classList.contains('pnb-find-busy');
           seenText = seenText || /^Searching\.\.\./.test(s.count || '');
+          if (lives[lives.length - 1] !== (s.live || '')) lives.push(s.live || '');
           var sp = b.querySelector('.pnb-find-spin');
           seenSpin = seenSpin || drawn(sp);
         }
@@ -862,6 +865,17 @@
       R.chk.busyShown = seenBusy && seenSpin;
       R.chk.busyText = seenText;
       R.chk.busyGone = !!sp2 && !barEl().classList.contains('pnb-find-busy') && !drawn(sp2) && st().n > 0;
+      // (wcag mod 2026-11-07, M9) the region announces the RESULT only: no "Searching... N%" ever
+      // reaches it (the visible count still ticks, busyText), and it ends on the final count
+      var sEnd = st();
+      R.chk.liveQuiet = seenText && !!lv && lives.every(function (t) { return !/Searching|%/.test(t); }) &&
+        !!sEnd.live && !/Searching/.test(sEnd.live) && (sEnd.live || '').indexOf(sEnd.count || '\u0000') === 0;
+      // (wcag mod 2026-11-07, M10) "Filter to N rows" reads in --brand-text, not bare --brand-primary
+      var fb = barEl() && barEl().querySelector('.pnb-find-filter');
+      document.body.style.setProperty('--brand-text', 'rgb(1, 2, 3)');
+      R.chk.filterBrandText = !!fb && getComputedStyle(fb).color === 'rgb(1, 2, 3)' && getComputedStyle(fb).borderTopColor !== 'rgb(1, 2, 3)';
+      document.body.style.removeProperty('--brand-text');
+      R.info.liveQuiet = { lives: lives.slice(0, 12), end: sEnd.live, count: sEnd.count, filterColor: fb ? getComputedStyle(fb).color : null };
     },
     // The count's words change in place (one text node - penumbra_a11y.js sweeps the page
     // after any node is added or removed), and the matches are StaticRanges (no live ones).

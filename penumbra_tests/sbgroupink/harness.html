@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8"><title>sbgroupink</title>
+<!-- sbgroupink harness (wcag mod 2026-11-07, M16): the REAL css/search_builder.css, the Visual Filter Builder's
+     ( ) group toggle under every theme's tokens (themes.js, built by run.py from themes_config.php + main.css).
+     C1: the ON state's ink on its fill reads 4.5:1 or better on every theme.
+     C2: the hover / focus ink (read from the stylesheet's own rule) reads 4.5:1 on the button's surface on every theme. -->
+<link rel="stylesheet" href="search_builder.css">
+<script src="themes.js"></script>
+</head><body>
+<div id="host"></div>
+<pre id="out"></pre>
+<script>
+(function () {
+  var res = {}, info = { c1: [], c2: [] };
+  function rgb(s) { var m = /rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(String(s)); return m ? [+m[1], +m[2], +m[3]] : null; }
+  function rel(c) { c = c.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+  function ratio(a, b) { var x = rel(a), y = rel(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  // the hover rule's colour declaration, as the stylesheet writes it
+  var hoverColor = null;
+  try {
+    for (var s = 0; s < document.styleSheets.length; s++) {
+      var rules = document.styleSheets[s].cssRules || [];
+      for (var r = 0; r < rules.length; r++) {
+        var sel = rules[r].selectorText || '';
+        if (/\.sb-row-group:hover/.test(sel) && rules[r].style.getPropertyValue('color')) hoverColor = rules[r].style.getPropertyValue('color');
+      }
+    }
+  } catch (e) { info.err = String(e); }
+  info.hoverColor = hoverColor;
+  var ok1 = true, ok2 = !!hoverColor, n = 0;
+  (window.PNB_THEMES || []).forEach(function (t) {
+    n++;
+    var host = document.getElementById('host');
+    host.innerHTML = '';
+    var wrap = document.createElement('div');
+    Object.keys(t.vars).forEach(function (k) { wrap.style.setProperty('--' + k, t.vars[k]); });
+    host.appendChild(wrap);
+    var on = document.createElement('button'); on.type = 'button'; on.className = 'sb-row-group sb-on'; on.textContent = '( )'; wrap.appendChild(on);
+    var off = document.createElement('button'); off.type = 'button'; off.className = 'sb-row-group'; off.textContent = '( )'; wrap.appendChild(off);
+    var cs = getComputedStyle(on), r1 = ratio(rgb(cs.color), rgb(cs.backgroundColor));
+    if (!(r1 >= 4.5)) ok1 = false;
+    info.c1.push(t.id + ' ' + r1.toFixed(2));
+    if (hoverColor) {
+      var probe = document.createElement('span'); probe.style.color = hoverColor; wrap.appendChild(probe);
+      var r2 = ratio(rgb(getComputedStyle(probe).color), rgb(getComputedStyle(off).backgroundColor));
+      if (!(r2 >= 4.5)) ok2 = false;
+      info.c2.push(t.id + ' ' + r2.toFixed(2));
+    }
+  });
+  res['C1 on-state ink 4.5:1 on every theme'] = (ok1 && n > 0 ? 'PASS ' : 'FAIL ') + n + ' themes: ' + info.c1.join(', ');
+  res['C2 hover ink 4.5:1 on every theme'] = (ok2 && n > 0 ? 'PASS ' : 'FAIL ') + 'rule=' + hoverColor + ' : ' + info.c2.join(', ');
+  document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(res);
+})();
+</script>
+</body></html>

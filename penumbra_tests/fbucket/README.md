@@ -106,3 +106,39 @@ or css mutant reruns the builder page alone (the engine page loads neither). `--
 
 **Control.** CONTROL_REV stays the build before fbucket: every new assert red there but D6, D12, D16 (they need nothing
 of the round). `--rev 4b725a0` (phase 1 alone) gives the same new reds.
+
+## The sweep (2026-11-06): the user's "full bugsweep and we can call this done"
+
+A differential run on live (33 typed queries, the browser's rows == the server's for every one) found no engine split; the
+fixes are in the boxes' lists, `openBucketRow`, the Scheduler's band-summary filter and two help lines.
+
+| assert | what |
+|---|---|
+| O5 | the builder's markup failing once (`T.failNextMarkup`) leaves no ask behind: the next open is one empty row, not the bucket's (was: a stale `_sbBucketRowAsk` added the row to the next open) |
+| O6 | a filter the builder cannot show (a nested group) and a bucket asked for: no row, Filter disabled, the notice names the token to add (`D:fy`) (was: the row replaced the nested filter) |
+| O7, O8 | an empty row that is not blank (`= empty`) is kept; the bucket row joins with `and` (was: OR after an OR row) |
+| D21 | a value typed after a word with a colon (`year/500`) lists no buckets: buckets come from the start of a token only |
+| D22 | a name with a space must be braced to be a bucket (`AWARD DATE:fy` bare: no bucket list; `{AWARD DATE:fy}`: its values) |
+| D23 | a brace inside a value (`a{b`) is no token |
+| D24 | a token at the end of the box reads no values on its own (the arrow's column: its values are read when listed) |
+| D25 | the bucket entries' aria-labels carry the example (`AMT by Order of Magnitude, 10–99`) |
+| D26 | a double-click on a plain `ID:123` (no bucket) selects the word as before, not a token |
+| D27 | `{AWARD DATE:f}` (closed brace) lists its fiscal buckets |
+| D28 | a value with an apostrophe is written in double quotes (`"O'Brien"`): single-quoted, the engines found no row |
+| U22 | a quoted bucket token (`'AWARD DATE:fy' = FY26`) reopens in the builder as AWARD DATE by Fiscal Year |
+
+Mutants (12, one per fix): sw-labelwords sw-unbraced sw-guard sw-emptyop sw-joiner sw-bracescan sw-quotedrev sw-trailscan
+sw-aria sw-dbltoken sw-termbrace sw-apostrophe; sb2-prefix sb2-dbl sb2-brace sb2-trail sb2-empty re-anchored on the
+changed lines. Fourteen earlier mutants' red sets grew by the sweep's checks that read the lines they break, each read
+before it was recorded (mutants_expect.before_sweep.json in the kit = the old sets): js-binbake +D25 (a bin's label),
+js-parse +D14 D22 D24 U22 (the builder asks the engine whether a token is a bucket: a double-click joins only a bucket),
+sb-presetsplit / sb-syncafter / sb-token +U22, sb2-box +D22 D23 D24 D25 D27, sb2-brace +D27, sb2-filter +D21 D23 D27,
+sb2-items +D23 D25 D27, sb2-prefix +D23 D27, sb2-render +D25, sb2-row +O6 O7 O8, sb2-tokstart +D21 (year inside D:year),
+sb2-trail +D22 D24. Control: CONTROL_RED adds D22-D25, D27, D28, O5-O8, U22 (D21 and D26 green there). The server side (`schedule_runner.php`: a bare `AMOUNT:bin` in a task's band-summary filter is sized from
+the task's rows, as `php_apply_search_filter` sizes it) is proved by the kit's `e2_test.php`, never by requiring the runner
+(it opens Oracle and sends email): it extracts `_cf_apply_group_summary_filter` and runs it on fixture rows.
+
+**Left as decisions (not fixed; each reached only by typing a token by hand - no list or builder offers it):** a bucket
+token in a highlight / snippet / pivot rule condition is read on the page but not in a scheduled email (the email
+condition engine has no buckets; those editors never open the builder nor list buckets); a journal column's bucket gives
+the page no rows where the server gives some; a bare `:bin` in a second URL filter is sized on the first filter's survivors.

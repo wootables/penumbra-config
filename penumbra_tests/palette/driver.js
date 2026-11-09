@@ -1776,7 +1776,7 @@
     if (mo) { mo.disconnect(); }
     var DONE = 'Jarvis answered. Press Tab to read it.';
     R.info.said = [statusText(), said.filter(function (s, i) { return s !== said[i - 1]; })];
-    R.chk.saidAnswered = statusText() === DONE && said.filter(function (s) { return s === DONE; }).length === 1;   // once: a re-render says nothing again
+    R.chk.saidAnswered = shownText() === DONE && said.filter(function (s) { return s.indexOf(DONE) === 0; }).length === 1;   // once: a re-render says nothing again; (wcag mod 2026-11-07) the shown words (the answer's lead follows, never drawn)
     // (wcag sweep, 2026-11-06) the answer is no listbox: the body a region named "Jarvis answer", the combobox collapsed, the footer's
     // Tab hint "next control"; back to the list (Backspace on the emptied input) the listbox "Matches", expanded, "next section"
     var bodyEl = function () { return box() ? box().querySelector('.pnb-pal-body') : null; };
@@ -3226,6 +3226,13 @@
       await open('filter v_status by');
       R.info.text = texts().slice(0, 6);
       R.chk.fbText = !row('Filter V_STATUS by...');
+      // (fbucket sweep) the row's keywords hold the bucket ids: two words, each in the label or the keywords, find it
+      // ("v_date fy", "v_date dow"; "filter v_date by fy" is a question: its long words alone find the row)
+      await open('v_date fy');
+      var kwFy = !!row('Filter V_DATE by...');
+      await open('v_date dow');
+      R.info.kw = [kwFy, !!row('Filter V_DATE by...')];
+      R.chk.fbKw = kwFy && !!row('Filter V_DATE by...');
       // a typed bucket condition: Filter: V_DATE:fy = FY26, run into the filter box
       await open('V_DATE:fy = FY26');
       var h = row('Filter: V_DATE:fy = FY26');
@@ -3255,6 +3262,125 @@
       R.chk.fbWarm = d2 >= 0 && d2 < 140 && warmRow;
       if (box()) { key('Escape', { target: input() }); await sleep(30); }
     } finally { if (B) B.openBucketRow = ob; }
+  };
+
+  // (wcag mod, 2026-11-07, the November rescan's Moderate M6 + M7 [4.1.3]) the box's one live region (the footer's status) says
+  // more to a screen reader, its shown words unchanged: a search with no match "No matches"; the Which column?, column-actions,
+  // Filter COLUMN by... and theme lists their count ("N options" untyped, "N matches" typed, "No matches"); a Jarvis answer
+  // "It begins: <its first sentence>" (150 characters at most) after "Jarvis answered. Press Tab to read it.", once. The extra words sit in a
+  // .pnb-pal-sr span inside the status, never drawn (1px clipped). The main list's own count and the desktop Esc chip unchanged (guards).
+  function srText() { var s = box() ? box().querySelector('.pnb-pal-status .pnb-pal-sr') : null; return s ? s.textContent : null; }
+  function shownText() { var s = box() ? box().querySelector('.pnb-pal-status') : null; if (!s) return null; var t = ''; Array.prototype.forEach.call(s.childNodes, function (n) { if (n.nodeType === 3) t += n.nodeValue; }); return t; }
+  function srHiddenNow() { var s = box() ? box().querySelector('.pnb-pal-status .pnb-pal-sr') : null; if (!s) return false; var r = s.getBoundingClientRect(), cs = getComputedStyle(s); return r.width <= 1 && r.height <= 1 && cs.position === 'absolute' && cs.overflow === 'hidden'; }
+  function cnt(n, typed) { return n ? n + (typed ? (n === 1 ? ' match' : ' matches') : (n === 1 ? ' option' : ' options')) : 'No matches'; }
+  S.pwcagm = async function () {
+    await boot(); await ready();
+    // the main list: a typed search with no match says "No matches"; nothing shown in the footer for it; the hidden words not drawn
+    // (the filter box and Find take any text on a report: both out of the way for this one search, back after it)
+    var tsb = document.getElementById('tableSearch'), tsd = tsb ? tsb.style.display : '', PF = window.Penumbra ? window.Penumbra.find : undefined;
+    if (tsb) tsb.style.display = 'none'; if (window.Penumbra) window.Penumbra.find = null;
+    var ok, note, stEl;
+    try {
+      ok = await open('zzqqxxjj');
+      note = box() ? box().querySelector('.pnb-pal-note') : null; stEl = box() ? box().querySelector('.pnb-pal-status') : null;
+      R.info.none = [ok, texts().slice(0, 4), note ? note.textContent : null, shownText(), srText(), stEl ? stEl.getBoundingClientRect().width : null];
+      R.chk.srHidden = srHiddenNow() && !!stEl && stEl.getBoundingClientRect().width <= 1;
+    } finally { if (tsb) tsb.style.display = tsd; if (window.Penumbra) window.Penumbra.find = PF; }
+    R.chk.noMatchSaid = ok && !!note && shownText() === '' && srText() === 'No matches';
+    // a search with matches: the shown count as before, nothing extra (a guard)
+    type('freeze up'); await sleep(60);
+    R.info.some = [shownText(), srText()];
+    R.chk.matchCountKept = /^[0-9]+ match(es)?/.test(shownText() || '') && srText() === null;
+    // Which column?: "N options" untyped, "N matches" typed, "No matches"; the footer shows none of it
+    await enter(); await sleep(60);
+    var p0 = [modeOf(), rows().length, shownText(), srText()];
+    type('v_am'); await sleep(60);
+    var p1 = [rows().length, shownText(), srText()];
+    type('zzqq'); await sleep(60);
+    var p2 = [rows().length, shownText(), srText()];
+    R.info.pick = [p0, p1, p2];
+    R.chk.pickCount = p0[0] === 'pick' && p0[1] > 1 && p0[2] === '' && p0[3] === cnt(p0[1], false) && p1[0] >= 1 && p1[1] === '' && p1[2] === cnt(p1[0], true);
+    R.chk.pickNone = p0[0] === 'pick' && p2[0] === 0 && p2[1] === '' && p2[2] === 'No matches';
+    // a column's actions
+    await open('v_name'); await pickRow('V_NAME', 'Columns'); await enter(); await sleep(60);
+    var c0 = [modeOf(), rows().length, shownText(), srText()];
+    type('sort'); await sleep(60);
+    var c1 = [rows().length, shownText(), srText()];
+    R.info.col = [c0, c1];
+    R.chk.colCount = c0[0] === 'col' && c0[1] > 3 && c0[2] === '' && c0[3] === cnt(c0[1], false) && c1[0] >= 1 && c1[2] === cnt(c1[0], true);
+    // Filter COLUMN by...: the column's buckets
+    var B = window._penumbraSearchBuilder, ob = B ? B.openBucketRow : null;
+    if (B) B.openBucketRow = function () { return true; };
+    try {
+      await open('filter v_date by'); await pickRow('Filter V_DATE by...'); await enter(); await sleep(150);
+      var b0 = [modeOf(), rows().length, shownText(), srText()];
+      R.info.bucket = b0;
+      R.chk.bucketCount = b0[0] === 'fbucket' && b0[1] >= 10 && b0[2] === '' && b0[3] === cnt(b0[1], false);
+    } finally { if (B) B.openBucketRow = ob; }
+    // the theme list
+    await open('theme'); await pickRow('Theme...', 'Actions'); await enter(); await sleep(60);
+    var t0 = [modeOf(), rows().length, shownText(), srText()];
+    type('dark'); await sleep(60);
+    var t1 = [rows().length, shownText(), srText()];
+    R.info.theme = [t0, t1];
+    R.chk.themeCount = t0[0] === 'theme' && t0[1] > 5 && t0[2] === '' && t0[3] === cnt(t0[1], false) && t1[0] >= 1 && t1[2] === cnt(t1[0], true);
+    key('Escape', { target: input() }); await sleep(60);
+    // the desktop Esc chip: shown, its word "Esc", no X drawn (a guard: unchanged)
+    await open('');
+    var esc0 = box() ? box().querySelector('.pnb-pal-in > .pnb-pal-esc') : null, ecs = esc0 ? getComputedStyle(esc0) : null, er = esc0 ? esc0.getBoundingClientRect() : null;
+    R.info.escDesk = esc0 ? [ecs.display, ecs.fontSize, getComputedStyle(esc0, '::before').content, esc0.textContent, Math.round(er.width), Math.round(er.height)] : null;
+    R.chk.escDesktopSame = !!esc0 && ecs.display !== 'none' && ecs.fontSize === '11px' && esc0.textContent === 'Esc' && /^(none|normal)$/.test(getComputedStyle(esc0, '::before').content);
+    key('Escape', { target: input() }); await sleep(60);
+    // Jarvis: the answer's first sentence said after the shown words, once; a long first sentence capped at 150 characters
+    history.replaceState(null, '', window.location.pathname + '?scn=pwcagm&id=zzconf');
+    var was = { a: penumbra_vars.isAdmin, g: penumbra_vars.isGlobalAdmin, ai: penumbra_vars.aiAllowed, u: penumbra_vars.aiProxyUrl };
+    penumbra_vars.aiProxyUrl = 'ai_assist_chips.json'; penumbra_vars.aiAllowed = true; penumbra_vars.isAdmin = true; penumbra_vars.isGlobalAdmin = true;
+    jipAjaxOn(); jipReqs.length = 0; jipDelay = 400;
+    var thL = fth('V_LINK'); thL.style.display = 'none';
+    var DONE = 'Jarvis answered. Press Tab to read it.', said = [], mo = null;
+    try {
+      await open('how do I group these rows'); var picked = await pickRow('Ask Jarvis:');
+      var st = box() ? box().querySelector('.pnb-pal-status') : null;
+      if (st) { mo = new MutationObserver(function () { said.push(st.textContent); }); mo.observe(st, { childList: true, characterData: true, subtree: true }); }
+      if (picked) { await enter(); }
+      await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 4000); await sleep(200);
+      type((input() ? input().value : '') + ' '); await sleep(80);   // a re-render: nothing said again
+      if (mo) { mo.disconnect(); }
+      var full = DONE + ' It begins: Group the rows by their status and look at the open ones.';
+      R.info.lead = [picked, shownText(), srText(), said.filter(function (s, i) { return s !== said[i - 1]; })];
+      R.chk.leadSaid = !!picked && shownText() === DONE && srText() === ' It begins: Group the rows by their status and look at the open ones.' && srHiddenNow()
+        && said.filter(function (s) { return s === full; }).length === 1;
+      key('Escape', { target: input() }); await sleep(80);
+      var longS = 'Word '; while (longS.length < 300) { longS += 'more words without any stop '; }
+      window.__jipReplyOverride = { status: 'success', reply: longS + 'end. Second sentence.' };
+      await open('why are these rows grouped like this today'); picked = await pickRow('Ask Jarvis:'); if (picked) { await enter(); }
+      await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 4000); await sleep(200);
+      var lt = srText() || '';
+      R.info.cap = [picked, lt.length, lt.slice(-20), shownText()];
+      R.chk.leadCapped = !!picked && shownText() === DONE && lt.indexOf(' It begins: Word more words') === 0 && lt.length <= 12 + 150 && /\.\.\.$/.test(lt) && lt.indexOf('Second') < 0;
+    } finally {
+      window.__jipReplyOverride = null;
+      if (box()) { key('Escape', { target: input() }); await sleep(60); }
+      thL.style.display = ''; jipAjaxOff();
+      penumbra_vars.isAdmin = was.a; penumbra_vars.isGlobalAdmin = was.g; penumbra_vars.aiAllowed = was.ai; penumbra_vars.aiProxyUrl = was.u;
+      history.replaceState(null, '', window.location.pathname + '?scn=pwcagm');
+    }
+  };
+  // (wcag mod, 2026-11-07, M8 [1.4.10]) a 400px-wide window (the runner sets it; 400% zoom of a 1600px screen): the box fills the
+  // screen and keeps its close control for pointer and touch: the Esc chip drawn as an X, 24px at least, named "Close quick actions";
+  // a click on it closes the box
+  S.pnarrow = async function () {
+    await boot(); await ready();
+    var ok = await open('');
+    var bx = box() ? box().querySelector('.pnb-pal') : null, br = bx ? bx.getBoundingClientRect() : null;
+    var esc0 = box() ? box().querySelector('.pnb-pal-in > .pnb-pal-esc') : null, ecs = esc0 ? getComputedStyle(esc0) : null, er = esc0 ? esc0.getBoundingClientRect() : null;
+    var before = esc0 ? getComputedStyle(esc0, '::before').content : null;
+    R.info.narrow = { ok: ok, w: window.innerWidth, box: br ? [Math.round(br.width), Math.round(br.height)] : null, esc: esc0 ? [ecs.display, Math.round(er.width), Math.round(er.height), before, esc0.getAttribute('aria-label'), ecs.color] : null };
+    R.chk.sheetFull = ok && window.innerWidth <= 480 && !!br && Math.round(br.width) === window.innerWidth;
+    R.chk.escNarrowShown = !!esc0 && ecs.display !== 'none' && er.width >= 24 && er.height >= 24 && er.right <= window.innerWidth && before === '"×"' && esc0.getAttribute('aria-label') === 'Close quick actions';
+    var shown = !!esc0 && ecs.display !== 'none';
+    if (shown) { esc0.click(); await sleep(80); }
+    R.chk.escNarrowCloses = shown && !box();
   };
 
   window.addEventListener('error', function (e) { (R.errors = R.errors || []).push(String(e.message)); });

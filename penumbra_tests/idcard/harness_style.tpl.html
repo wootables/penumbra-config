@@ -1,0 +1,71 @@
+<!doctype html><html><head><meta charset="utf-8"><title>RUN</title>
+__CSS__
+<script>
+/* idcard look check (wcag mod 2026-11-07, M2): the card's actions became <button>s; with
+   index.php's stylesheets (in its order; :hover / :focus-visible rewritten to the classes
+   .__h / .__fv so they can be forced) every action must compute EXACTLY as the live <a>
+   did, at rest, hovered and keyboard-focused, on several themes. */
+window.__errs=[]; window.onerror=function(m){window.__errs.push(String(m));};
+const penumbra_vars = {lastAccess: 90000, isReportOwner:false, canEditReport:false, isGlobalAdmin:false, noadm:false,
+ reportTags:['A'], reportTables:[], journal:{installed:false},
+ reportIdCard:{id:'demoX', created:'2026-01-05 00:07', createdAgo: 90000, updated:'2026-10-30 16:05', updatedAgo: 30, owner:'JDoe'}};
+window.penumbraOpenFeedbackDialog=function(){};
+window.fetch=function(){ return new Promise(function(){}); };
+history.replaceState(null,'','?id=demoX');
+</script></head><body>
+<nav><span class="pnb-crumb-step" id="pnbCrumbReport"><a class="pnb-crumb-item" href="index.php?id=demoX">demox</a></span></nav>
+<h2 id="mainReportTitle">My Report</h2>
+<script src="__ORIG__"></script>
+<script>window.__origHtml = window.penumbraIdCard.html;</script>
+<script src="__TARGET__"></script>
+<script>
+window.addEventListener("load", function(){
+ var out=[], pass=0, fail=0;
+ function ok(name, cond, d){ if(cond){pass++;} else {fail++; out.push('FAIL '+name+(d?' '+d:''));} }
+ function finish(){ document.title='DONE pass='+pass+' fail='+fail+' errs='+JSON.stringify(window.__errs)+' '+out.join(' | '); document.body.setAttribute('data-r', document.title); }
+ // box-sizing / width / height are left to the box check below (the border box's own place and size, exact):
+ // a <button> is border-box, an <a> content-box, so the same box reads as different numbers there.
+ var PROPS=['display','position','margin-top','margin-right','margin-bottom','margin-left',
+  'padding-top','padding-right','padding-bottom','padding-left','border-top-width','border-top-style','border-top-color',
+  'border-right-width','border-right-style','border-bottom-width','border-bottom-style','border-bottom-color','border-left-width','border-left-style',
+  'border-top-left-radius','border-bottom-right-radius','background-color','background-image','box-shadow','color','font-family','font-size',
+  'font-weight','font-style','line-height','letter-spacing','word-spacing','text-transform','text-indent','text-shadow','text-align',
+  'text-decoration-line','text-decoration-style','text-decoration-color','vertical-align','white-space','cursor','filter','opacity',
+  'outline-style','outline-width','outline-color','outline-offset'];
+ try {
+  var THEMES=['', 'is-dark theme-dark-blue', 'theme-wolfpack', 'is-dark theme-wolfpack-dark', 'theme-light-sepia', 'is-dark theme-charcoal-gold', 'theme-tangerine', 'theme-midnight'];
+  var A=document.createElement('div'), B=document.createElement('div');
+  A.className=B.className='pnb-idc bld-help-pop open';
+  A.style.left='10px'; B.style.left='400px'; A.style.top=B.style.top='10px';
+  A.innerHTML=window.__origHtml('demoX'); B.innerHTML=window.penumbraIdCard.html('demoX');
+  document.body.appendChild(A); document.body.appendChild(B);
+  ok('sane-orig-links', A.querySelectorAll('a[data-idc]').length===3);
+  ok('sane-target-buttons', B.querySelectorAll('button[data-idc]').length===3);
+  var compared=0, bad={}, hbad=[];
+  function note(k, d){ (bad[k]=bad[k]||[]).push(d); }
+  THEMES.forEach(function(th){
+   document.body.className=th;
+   ['feedback','copylink','copyid'].forEach(function(w){
+    var x=A.querySelector('[data-idc="'+w+'"]'), y=B.querySelector('[data-idc="'+w+'"]');
+    ['', '__h', '__fv'].forEach(function(state){
+     if (state){ x.classList.add(state); y.classList.add(state); }
+     var cx=getComputedStyle(x), cy=getComputedStyle(y), diff=[];
+     PROPS.forEach(function(p){ var u=cx.getPropertyValue(p), v=cy.getPropertyValue(p); compared++; if(u!==v) diff.push(p+': '+u+' vs '+v); });
+     var rx=x.getBoundingClientRect(), ry=y.getBoundingClientRect(), ax=A.getBoundingClientRect(), by=B.getBoundingClientRect();
+     if (Math.abs((rx.left-ax.left)-(ry.left-by.left))>0.5 || Math.abs((rx.top-ax.top)-(ry.top-by.top))>0.5 || Math.abs(rx.width-ry.width)>0.5 || Math.abs(rx.height-ry.height)>0.5)
+       diff.push('box '+[rx.left-ax.left,rx.top-ax.top,rx.width,rx.height].map(Math.round)+' vs '+[ry.left-by.left,ry.top-by.top,ry.width,ry.height].map(Math.round));
+     if (diff.length) note('look-'+w+'-'+(state||'rest'), (th||'default')+': '+diff.join('; '));
+     if (state){ x.classList.remove(state); y.classList.remove(state); }
+    });
+   });
+   var ha=A.getBoundingClientRect().height, hb=B.getBoundingClientRect().height;
+   if (Math.abs(ha-hb)>=0.5) hbad.push((th||'default')+' '+ha+' vs '+hb);
+  });
+  // one check per action and state, over every theme (the first theme's difference as the detail)
+  ['feedback','copylink','copyid'].forEach(function(w){ ['rest','__h','__fv'].forEach(function(st){ var k='look-'+w+'-'+st; ok(k, !bad[k], bad[k] ? bad[k].length+' themes, '+bad[k][0] : ''); }); });
+  ok('look-card-height', !hbad.length, hbad.join('; '));
+  ok('sane-compared', compared > 1000);
+ } catch(e){ fail++; out.push('THREW '+e.message); }
+ finish();
+});
+</script></body></html>

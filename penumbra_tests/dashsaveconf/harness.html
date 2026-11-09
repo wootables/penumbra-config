@@ -86,6 +86,9 @@ const penumbra_dash_vars = {
       chk.noticeEscaped = !!c && !c.querySelector('.pnb-toast-msg b');
       chk.noticeButtons = !!c && !!c.querySelector('.dash-save-conflict-force') && !!c.querySelector('.dash-save-conflict-open');
       chk.buttonBack = $('#dashSaveBtn').prop('disabled') === false;
+      // (wcag mod 2026-11-07, M24) focus moves to the toast's message (not a button: a stray Enter does nothing)
+      chk.msgFocused = !!c && document.activeElement === c.querySelector('#undo_text');
+      info.focused = document.activeElement ? (document.activeElement.className || document.activeElement.id || document.activeElement.tagName) : null;
       $(c).find('.dash-save-conflict-open').trigger('click');
       chk.openLatest = OPENED.length === 1 && OPENED[0][0] === 'dashboard.php?id=demo' && OPENED[0][1] === '_blank';
       chk.openNoSave = POSTS.length === 1;

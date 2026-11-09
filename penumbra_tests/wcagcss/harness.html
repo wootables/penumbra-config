@@ -1,0 +1,120 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>wcagcss</title>
+<link rel="stylesheet" href="main.css">
+%%THEMECSS%%
+<style id="askcss">%%ASKCSS%%</style>
+</head><body class="pnb-adm">
+<div id="reportHeaderContainer"><h1 id="mainReportTitle">Report title</h1></div>
+<div class="pnb-adm-card" id="card">
+  <h2>Outage history <span class="pnb-out-exw"><button type="button" class="pnb-out-exp" id="exp" aria-label="Export"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></button></span></h2>
+  <div class="pnb-rows pnb-rows-out" role="table">
+    <div class="pnb-row kw" role="row" id="kwrow"><span class="t" role="cell">Mon 03 Nov 03:03</span><span class="c" role="cell">INFOED</span><span class="d" role="cell">5m</span><span class="to" role="cell">to 03:10</span><span class="p" role="cell"><span class="pt">timeout</span><span class="pnb-out-tag">recurring</span></span><span class="k" role="cell">3 checks</span></div>
+  </div>
+  <p><button type="submit" id="pnbAskGo" style="%%ASKGOSTYLE%%">Ask</button>
+     <button type="button" class="pnb-ask-vote is-mine" id="vote">Yes</button></p>
+  <button type="button" class="pnb-ask-from-search" id="fromsearch">Ask the help instead</button>
+  <div class="pnb-log-head"><span id="logMeta"></span><span id="logHint"></span></div>
+  <pre class="pnb-log-body" id="logBody" tabindex="0" role="tabpanel" aria-label="Log lines"></pre>
+  <button type="button" id="outside">outside</button>
+</div>
+<pre id="out">running</pre>
+<script>
+(function () {
+    var body = document.getElementById('logBody'), meta = document.getElementById('logMeta'), hint = document.getElementById('logHint');
+    var newest = { checked: false }, current = 'php';
+    function badge() { } function paintDays() { }
+%%LOGJS%%
+    window.__render = render; window.__newest = newest;
+})();
+var THEMES = %%THEMES%%, BRIGHT = ['theme-tangerine', 'theme-hello-kitty', 'theme-neon-pulse', 'theme-amethyst', 'theme-midnight', 'theme-solarized-dark', 'theme-solarized-light'];
+var out = [];
+function A(ok, id, msg) { out.push((ok ? 'ok   ' : 'FAIL ') + id + ' ' + msg); }
+function I(id, msg) { out.push('INFO ' + id + ' ' + msg); }
+function rgba(s) {
+    var m = /rgba?\(([^)]+)\)/.exec(s);
+    if (m) { var p = m[1].split(/[ ,\/]+/).filter(Boolean).map(parseFloat); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; }
+    m = /color\(srgb ([^)]+)\)/.exec(s);
+    if (m) { var q = m[1].split(/[ \/]+/).filter(Boolean).map(parseFloat); return [q[0] * 255, q[1] * 255, q[2] * 255, q.length > 3 ? q[3] : 1]; }
+    return null;
+}
+function over(f, b) { var a = f[3]; return [f[0] * a + b[0] * (1 - a), f[1] * a + b[1] * (1 - a), f[2] * a + b[2] * (1 - a), 1]; }
+function bgOf(el) {   // composite the backgrounds from the root down
+    var chain = []; for (var e = el; e && e.nodeType === 1; e = e.parentElement) chain.push(e);
+    var c = [255, 255, 255, 1];
+    for (var i = chain.length - 1; i >= 0; i--) { var b = rgba(getComputedStyle(chain[i]).backgroundColor); if (b && b[3] > 0) c = over(b, c); }
+    return c;
+}
+function opac(el) { var o = 1; for (var e = el; e && e.nodeType === 1; e = e.parentElement) o *= parseFloat(getComputedStyle(e).opacity); return o; }
+function lum(c) { var f = c.slice(0, 3).map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]; }
+function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+function inkRatio(el) {   // text ink (with every ancestor opacity) over the composited background
+    var bg = bgOf(el), f = rgba(getComputedStyle(el).color); f[3] *= opac(el);
+    return ratio(over(f, bg), bg);
+}
+function setTheme(t) { document.body.className = t + ' registry-theme pnb-adm'; }
+var askEls = [['askgo', 'pnbAskGo'], ['vote', 'vote'], ['fromsearch', 'fromsearch']];
+var rowCells = ['c', 'd', 't', 'to', 'pt', 'k'];
+THEMES.forEach(function (t) {
+    setTheme(t);
+    var bright = BRIGHT.indexOf(t) >= 0;
+    // C11: the Ask controls, white on their own fill
+    askEls.forEach(function (p) {
+        var r = inkRatio(document.getElementById(p[1]));
+        A(r >= 4.5, 'C11-' + p[0] + '-' + t, r.toFixed(2) + ':1 (want >= 4.5)' + (bright ? ' [DEEPFILL theme]' : ''));
+    });
+    // C20: a known-window outage row is not dimmed by opacity and its text passes 4.5:1
+    var row = document.getElementById('kwrow');
+    A(parseFloat(getComputedStyle(row).opacity) === 1, 'C20-opacity-' + t, 'row opacity ' + getComputedStyle(row).opacity);
+    var worst = 99, wc = '';
+    rowCells.forEach(function (c) { var r = inkRatio(row.querySelector('.' + c)); if (r < worst) { worst = r; wc = c; } });
+    A(worst >= 4.5, 'C20-ink-' + t, 'lowest cell .' + wc + ' ' + worst.toFixed(2) + ':1 (want >= 4.5)');
+    var c = row.querySelector('.c'), tc = row.querySelector('.t');
+    A(getComputedStyle(c).color === getComputedStyle(tc).color, 'C20-muted-' + t, 'component reads muted like the time: ' + getComputedStyle(c).color + ' vs ' + getComputedStyle(tc).color);
+    // C21: the export icon at rest, 3:1 non-text contrast
+    var x = document.getElementById('exp'), xr = inkRatio(x);
+    A(parseFloat(getComputedStyle(x).opacity) === 1 && xr >= 3, 'C21-' + t, 'opacity ' + getComputedStyle(x).opacity + ', ' + xr.toFixed(2) + ':1 (want 1 and >= 3)');
+});
+// C18: Amber Terminal's title cursor blinks a few times, then stays
+setTheme('theme-terminal');
+var ca = getComputedStyle(document.getElementById('mainReportTitle'), '::after');
+var rm = matchMedia('(prefers-reduced-motion: reduce)').matches, an = ca.animationName, ac = ca.animationIterationCount;
+if (rm) {   // headless Edge may report reduce motion (the cursor is then off): read the motion rule itself
+    an = ''; ac = '';
+    for (var si = 0; si < document.styleSheets.length; si++) {
+        var rules; try { rules = document.styleSheets[si].cssRules; } catch (e) { continue; }
+        for (var ri = 0; ri < rules.length; ri++) {
+            var ru = rules[ri];
+            if (ru.type === 1 && ru.selectorText === 'body.theme-terminal #mainReportTitle::after' && ru.style.animationName) { an = ru.style.animationName; ac = ru.style.animationIterationCount; }
+        }
+    }
+}
+A(an === 'pnbHdrCursor' && ac !== 'infinite' && parseFloat(ac) <= 5,
+  'C18-cursor', 'animation ' + an + ' x ' + ac + ' (want pnbHdrCursor, finite, <= 5)' + (rm ? ' [reduce-motion page: read from the rule]' : ''));
+A(ca.content === '""' && ca.display === 'inline-block', 'C18-static', 'the cursor stays: content ' + ca.content + ' display ' + ca.display);
+// C19: a log re-read keeps the open runs and the focused count
+setTheme('theme-default');
+function L(s, t) { return { t: '[07-Nov-2026 ' + t + '] ' + s, s: 'warn' }; }
+var rowsA = [L('PHP Warning: ORA-28002 expires', '10:00:01'), L('PHP Warning: ORA-28002 expires', '10:05:01'), L('PHP Warning: ORA-28002 expires', '10:10:01'),
+             { t: '[07-Nov-2026 10:11:00] PHP Notice: other', s: '' },
+             L('PHP Warning: ORA-28002 expires', '10:12:01'), L('PHP Warning: ORA-28002 expires', '10:13:01')];
+function D(rows) { return { rows: rows, file: 'php.log', shown: rows.length }; }
+var lb = document.getElementById('logBody');
+__render(D(rowsA));
+var runs = lb.querySelectorAll('.pnb-llg');
+A(runs.length === 2, 'C19-setup', runs.length + ' folded runs (want 2)');
+runs[1].querySelector('.pnb-ll-n').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+runs[0].querySelector('.pnb-ll-n').focus();
+var before = document.activeElement === runs[0].querySelector('.pnb-ll-n');
+__render(D(rowsA.concat([{ t: '[07-Nov-2026 10:14:00] PHP Notice: new line', s: '' }])));
+runs = lb.querySelectorAll('.pnb-llg');
+A(runs.length === 2 && !runs[0].classList.contains('on') && runs[1].classList.contains('on') && runs[1].querySelector('.pnb-ll-n').getAttribute('aria-expanded') === 'true',
+  'C19-open', 'after a re-read: run 1 on=' + (runs[0] && runs[0].classList.contains('on')) + ', run 2 on=' + (runs[1] && runs[1].classList.contains('on')) + ' expanded=' + (runs[1] && runs[1].querySelector('.pnb-ll-n').getAttribute('aria-expanded')) + ' (want false, true, true)');
+var ae = document.activeElement;
+A(before && ae === runs[0].querySelector('.pnb-ll-n'), 'C19-focus', 'focus before ' + before + ', after: ' + (ae ? (ae.className || ae.tagName) + (ae.closest && ae.closest('.pnb-llg') === runs[0] ? ' (run 1)' : '') : 'none') + ' (want run 1 count)');
+__newest.checked = true; __render(D(rowsA)); __newest.checked = false;
+runs = lb.querySelectorAll('.pnb-llg');   // newest first: the second run now reads first
+A(runs.length === 2 && runs[0].classList.contains('on') && !runs[1].classList.contains('on'), 'C19-newest', 'newest first: run on flags ' + Array.prototype.map.call(runs, function (g) { return g.classList.contains('on'); }).join(',') + ' (want true,false)');
+document.getElementById('outside').focus();
+__render(D(rowsA));
+A(document.activeElement === document.getElementById('outside'), 'C19-nosteal', 'focus outside the log stays outside: ' + (document.activeElement && document.activeElement.id));
+document.getElementById('out').textContent = out.join('\n');
+</script></body></html>

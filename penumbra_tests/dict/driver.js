@@ -425,6 +425,13 @@
     await until(function () { return !!document.querySelector('.pnb-colopt'); }, 3000);
     var l = document.querySelector('.pnb-colopt [data-co="about"]');
     ok('aboutLink', !!l && l.textContent === 'What this column means');
+    // (wcag mod 2026-11-07, M17) the link reads in --brand-text (readable on every theme), not bare --brand-primary
+    if (l) {
+      document.body.style.setProperty('--brand-text', 'rgb(1, 2, 3)');
+      var lc = getComputedStyle(l).color;
+      document.body.style.removeProperty('--brand-text');
+      ok('aboutBrandText', lc === 'rgb(1, 2, 3)');
+    } else ok('aboutBrandText', false);
     if (l) l.click();
     await until(function () { return rows().length > 0; }, 4000);
     ok('linkOpens', !!dlgBody() && !!dlgBody().querySelector('tr.is-focus[data-key="V_AMOUNT"]'));

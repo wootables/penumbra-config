@@ -155,17 +155,17 @@ MUTANTS = {
         '                    if (false) return null;', None),
     'sb2-bk3': ('sb', '                if (bk3) return { colName: bk3, partial: partial };',
         '                if (false) return null;', None),
-    'sb2-prefix': ('sb', '                if (_acBuckets && bucketPrefixClause(clauseCandidate, colMap)) return null;',
+    'sb2-prefix': ('sb', '                if (_acBuckets && bucketPrefixWords(remaining.concat([partial]), colMap)) return null;',
         '                // (mutant)', None),
-    'sb2-dbl': ('sb', '                if ((_bL || _bR) && _isLikelyColumnPosition(fullText, _bS)) sel = _bS;',
+    'sb2-dbl': ('sb', '                if ((_bL || _bR) && _isLikelyColumnPosition(fullText, _bS) && bucketTokenOf(fullText.substring(_bS.start, _bS.end))) sel = _bS;',
         '                // (mutant)', None),
     'sb2-tokorder': ('sb', "                        var labelLower = String(col.tok || col.label || col.value || '').toLowerCase();   // (fbucket 2) a bucket by its token",
         "                        var labelLower = String(col.label || col.value || '').toLowerCase();", None),
-    'sb2-brace': ('sb', "                    var _bh = (_bo !== -1 && _bv.indexOf('}', _bo) === -1) ? _bv.substring(0, _bo) : _bv.replace(/\\S*$/, '');",
+    'sb2-brace': ('sb', "                    var _bh = /^[{'\"]/.test(_bv.substring(_bcl)) ? _bv.substring(0, _bcl) : _bv.replace(/\\S*$/, '');",
         "                    var _bh = _bv.replace(/\\S*$/, '');", None),
     'sb2-render': ('sb', "                    $li.addClass('sb-autocomplete-bucket');",
         '                    // (mutant)', None),
-    'sb2-trail': ('sb', '            if (!found && buckets) found = trailingBucketOf(cand, names);',
+    'sb2-trail': ('sb', "            if (!found && buckets && (found = trailingBucketOf(cand, names, tokens.join(' ').replace(/^\\(+/, '')))) return found;   // its values: read when listed",
         '            // (mutant)', None),
     'sb2-taken': ('sb', '        return vars.filter(function (v) { return !taken[(name + v.sx).toUpperCase()]; }).map(function (v) {',
         '        return vars.map(function (v) {', None),
@@ -179,10 +179,35 @@ MUTANTS = {
         '            // (mutant)', None),
     'sb2-rowlist': ('sb', "                    if ($bIn.is(':visible')) { $bIn.focus(); triggerAutocomplete($bIn, true); }",
         '                    // (mutant)', None),
-    'sb2-empty': ('sb', "            rowCounter = 0;\r\n            $('#sbConditionsContainer').empty();\r\n        }\r\n        addConditionRow({ column: ask.column + ask.sx, operator: 'equals' });",
-        "        }\r\n        addConditionRow({ column: ask.column + ask.sx, operator: 'equals' });", None),
+    'sb2-empty': ('sb', "            rowCounter = 0;\r\n            $('#sbConditionsContainer').empty();\r\n        }\r\n        addConditionRow({ column: ask.column + ask.sx, operator: 'equals', joiner: 'and' });",
+        "        }\r\n        addConditionRow({ column: ask.column + ask.sx, operator: 'equals', joiner: 'and' });", None),
     'sb2-export': ('sb', '        splitColumnToken: splitColumnToken,',
         '        // (mutant)', None),
+    # ---- (2026-11-06, fbucket sweep) one per fix ----
+    'sw-labelwords': ('sb', "            if (re.test(it.col || '')) return true;   // the column's own name: the column and its buckets together",
+        "            if (re.test(it.label || '')) return true;", None),
+    'sw-unbraced': ('sb', "        if (/\\s/.test(base) && !/^[{'\"]/.test(String(raw || ''))) return '';",
+        "        // (mutant) a name with a space bare", None),
+    'sw-guard': ('sb', "        if (typeof _sbGuard === 'string') {",
+        "        if (false) {", None),
+    'sw-emptyop': ('sb', " && ($rows.find('.sb-op-select').val() || 'contains') === 'contains'",
+        "", None),
+    'sw-joiner': ('sb', "addConditionRow({ column: ask.column + ask.sx, operator: 'equals', joiner: 'and' });",
+        "addConditionRow({ column: ask.column + ask.sx, operator: 'equals' });", None),
+    'sw-bracescan': ('sb', "_bcl = /^(?:[\\s\\S]*\\s(?:and|or)\\s+)?\\(*/i.exec(_bv)[0].length;",
+        "_bcl = (_bv.lastIndexOf('{') !== -1 && _bv.indexOf('}', _bv.lastIndexOf('{')) === -1) ? _bv.lastIndexOf('{') : _bv.length;", None),
+    'sw-quotedrev': ('sb', "            if (!resolvedQCol && bucketTokenOf(qColName)) resolvedQCol = bucketTokenOf(qColName);   // (fbucket sweep) 'AWARD DATE:fy' = FY26",
+        "            // (mutant)", None),
+    'sw-trailscan': ('sb', "tokens.join(' ').replace(/^\\(+/, '')))) return found;   // its values: read when listed",
+        "tokens.join(' ').replace(/^\\(+/, '')))) { }", None),
+    'sw-aria': ('sb', "                    $li.attr('aria-label', displayText + (item.ex ? ', ' + item.ex : ''));",
+        "                    // (mutant)", None),
+    'sw-dbltoken': ('sb', " && bucketTokenOf(fullText.substring(_bS.start, _bS.end))) sel = _bS;",
+        ") sel = _bS;", None),
+    'sw-termbrace': ('sb', "up = term.replace(/^[{'\"]+|[}'\"]+$/g, '').toUpperCase();",
+        "up = term.toUpperCase();", None),
+    'sw-apostrophe': ('sb', "            return (val.indexOf(\"'\") !== -1 && val.indexOf('\"') === -1) ? '\"' + val + '\"' : \"'\" + val + \"'\";",
+        "            return \"'\" + val + \"'\";", None),
     'css2-indent': ('css', '.sb-autocomplete-bucket .ui-menu-item-wrapper {\r\n    padding-left: 38px;',
         '.sb-autocomplete-bucket .ui-menu-item-wrapper {\r\n    padding-left: 24px;', None),
 }
@@ -200,7 +225,11 @@ CONTROL_RED = (['B-' + s for s in BKT] + ['Q-' + s for s in BKT] + ['L-parity', 
                + ['U%d' % i for i in [1, 2] + list(range(4, 19)) + [21]]
                # (fbucket 2) the boxes' lists and openBucketRow: all red but D6 (a box of another kind lists none), D12 (Q:fy
                # stays the column) and D16 (a plain column) - none of which needs the round
-               + ['D%d' % i for i in [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 17, 18, 19, 20]] + ['O1', 'O2', 'O3', 'O4'])
+               + ['D%d' % i for i in [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 17, 18, 19, 20]] + ['O1', 'O2', 'O3', 'O4']
+               # (fbucket sweep) red there: no openBucketRow (O5-O8), no bucket list or token (D22 D23 D24 D25 D27, U22),
+               # the old formatValue (D28: single quotes round O'Brien, Pat); green: D21 (no buckets listed at all) and
+               # D26 (a double-click selects the word, as it always did)
+               + ['D%d' % i for i in [22, 23, 24, 25, 27, 28]] + ['O5', 'O6', 'O7', 'O8', 'U22'])
 
 def git_show(rev, rel):
     r = subprocess.run(['git', '--git-dir=' + GIT_DIR, 'show', '%s:%s' % (rev, rel)], capture_output=True)
@@ -357,6 +386,14 @@ def builder_checks(pg):
     def settle(t=0.35): time.sleep(t)
     boot = pg.ev('T.boot()')
     rec('U0', 'builder page booted: hooks, rows, header', boot == 'ok', boot)
+    # O5 (2026-11-06, sweep F1): a Filter COLUMN by... whose builder never opened - its markup load failed, as after an
+    # expired session - leaves nothing behind: the next ordinary open has its one empty row, no bucket row
+    pg.ev("T.failNextMarkup(); T.openBucket('', 'D', ':fy')"); settle(0.5)
+    o5_first = pg.ev('T.isOpen()')
+    pg.ev("T.open('')"); pg.wait('T.isOpen()', 10000); settle(0.5)
+    o5 = pg.ev('T.state(0)') or {}; o5n = pg.ev('T.rows()')
+    rec('O5', "a Filter COLUMN by... whose builder failed to load leaves nothing behind: the next ordinary open has one empty row, no bucket row",
+        not o5_first and o5n == 1 and o5.get('col') == '' and not o5.get('bucketShown'), {'firstOpened': o5_first, 'rows': o5n, 'row0': [o5.get('col'), o5.get('bucket')]})
     pg.ev("T.open('')"); pg.wait('T.isOpen()', 10000); settle(0.5)
     # U1: a day-date column: As is + the registry's date buckets in its order, no Hour (no time); row + dialog marked
     pg.ev("T.setCol(0, 'D')"); settle(); pg.ev('T.hideAc()')
@@ -674,6 +711,55 @@ def box_checks(pg):
         and 'AWARD DATE by Year' in s20 and 'Q by Year' in s20 and 'D by Year' in s20 and isinstance(dt20b, (int, float)) and dt20b < 150,
         {'firstMs': dt20, 'first': [x for x in f20 if ' by ' in x or ' split ' in x][:40], 'laterMs': dt20b, 'laterHasAll': ['AWARD DATE by Year' in s20, 'Q by Year' in s20]})
 
+    # ---- (2026-11-06, fbucket sweep) the reviewers' findings ------------------------------------------------------
+    # D21 (F2): a word of a bucket's label lists no bucket row - Enter would pick one instead of searching
+    i21a = typein(W, 'year'); i21b = typein(W, '500')
+    def bucket_rows(x): return [r for r in (x or []) if ' by ' in r or ' split by ' in r]
+    rec('D21', "a word of a bucket's label (year, 500) lists no bucket row: Enter searches for it; a column's name still lists its buckets (D1)",
+        not bucket_rows(i21a) and not bucket_rows(i21b), {'year': i21a, '500': i21b})
+    # D22 (F3): a name with a space is a bucket only braced or quoted, as the engine reads one
+    i22 = typein(W, 'AWARD DATE:fy = ')
+    a22 = api('getColumnAutocompleteValues', ['AWARD DATE:fy'])
+    t22a = pg.ev('T.trailing(%s, %s)' % (J(W), J('N = alpha and AWARD DATE:fy')))
+    t22b = pg.ev('T.trailing(%s, %s)' % (J(W), J('N = alpha and {AWARD DATE:fy}')))
+    i22c = ctrl_space(W, 'AWARD DATE:f')
+    rec('D22', "a name with a space is a bucket only in braces: AWARD DATE:fy = lists no bucket labels, the arrow names it only braced, Ctrl+Space on AWARD DATE:f lists no buckets",
+        i22 != a22 and t22a == '' and t22b == 'AWARD DATE:fy' and not [x for x in (i22c or []) if x.startswith('AWARD DATE by ')],
+        {'typed': (i22 or [])[:4], 'labels': (a22 or [])[:4], 'arrowBare': t22a, 'arrowBraced': t22b, 'ctrlSpace': (i22c or [])[:4]})
+    # D23 (F6): a brace inside an earlier value is no brace of the token being picked
+    i23 = ctrl_space(W, "N = 'a{b' and D:f")
+    p23 = pick(W, 'D by Fiscal Year'); v23 = val(W)
+    rec('D23', "a brace inside an earlier value ('a{b') is no brace of the token: the pick replaces D:f alone, N = 'a{b' kept",
+        p23 and v23 == "N = 'a{b' and D:fy ", {'listed': i23, 'box': v23})
+    # D24 (F8a): the arrow names a trailing token without building its value list on every keystroke
+    c24 = pg.ev("(function(){var a=window._penumbraSearchAPI, f=a.getColumnAutocompleteValues, n=0; a.getColumnAutocompleteValues=function(){n++; return f.apply(a, arguments);};"
+                " var t=T.trailing('#tableSearch', 'N = alpha and D:fy'); a.getColumnAutocompleteValues=f; return [t, n];})()")
+    rec('D24', "the arrow names a trailing bucket token (D:fy) without building its value list (read when listed)", c24 == ['D:fy', 0], c24)
+    # D25 (F9d): a bucket row reads as its name to a screen reader
+    typein(W, 'AMT')
+    al25 = pg.ev("$('#tableSearch').autocomplete('widget').children('li.sb-autocomplete-bucket').map(function(){return this.getAttribute('aria-label');}).get()")
+    rec('D25', "a bucket row reads as its name to a screen reader (aria-label), its example after it",
+        al25 == ['AMT by Bins of 500,000', 'AMT by Order of Magnitude, 10–99'], al25)
+    # D26 (F9f): a double-click joins the halves of a real bucket token only
+    r26 = pg.ev('T.dbl(%s, %s, 1)' % (J(W), J('ID:123'))); settle(0.3)
+    pg.ev('T.closeMenus()')
+    rec('D26', "a double-click on ID in the global term ID:123 selects ID alone: no bucket token, the halves stay apart", r26 == [0, 2], r26)
+    # D27 (F9g): a closed brace: Ctrl+Space lists the buckets it begins, the pick writes the braced token
+    i27 = ctrl_space(W, '{AWARD DATE:f}')
+    p27 = pick(W, 'AWARD DATE by Fiscal Year'); v27 = val(W)
+    rec('D27', "{AWARD DATE:f} (brace closed) + Ctrl+Space lists AWARD DATE's fiscal buckets; the pick writes {AWARD DATE:fy}",
+        i27 == ['AWARD DATE by ' + x for x in FISCAL3] and p27 and v27 == '{AWARD DATE:fy} ', {'listed': i27, 'box': v27})
+    # D28 (E5): a value holding an apostrophe goes in double quotes - single ones end at the apostrophe
+    pg.ev("(function(){var a=window._penumbraSearchAPI, f=a.getColumnAutocompleteValues; window.__gcav=f;"
+          " a.getColumnAutocompleteValues=function(c){return String(c).toUpperCase()==='N' ? [\"O'Brien, Pat\", 'alpha'] : f.apply(a, arguments);};})(); true")
+    i28 = typein(W, 'N = ')
+    p28 = pick(W, "O'Brien, Pat"); v28 = val(W)
+    pg.ev("window._penumbraSearchAPI.getColumnAutocompleteValues = window.__gcav; true")
+    fv28 = pg.ev("window._penumbraSearchBuilder.formatValue(\"O'Brien, Pat\")")
+    rec('D28', "a value holding an apostrophe is written in double quotes (the box's pick, the builder's formatValue): single ones end at it",
+        p28 and v28 == 'N = "O\'Brien, Pat"' and fv28 == '"O\'Brien, Pat"', {'listed': i28, 'box': v28, 'formatValue': fv28})
+    pg.ev('T.closeMenus()')
+
     # O1..O4: the builder opened on a new row for a column's bucket (the palette's Filter COLUMN by...)
     def st(i): return pg.ev('T.state(%d)' % i) or {}
     ok = pg.ev("T.openBucket('N = alpha', 'D', ':fy')")
@@ -698,6 +784,36 @@ def box_checks(pg):
     sp = [pg.ev('T.sbApi("splitColumnToken", [%s])' % J(t)) for t in ('d:FY', 'Q:fy', 'AWARD DATE:fyq', 'N')]
     rec('O4', "the builder's splitColumnToken export: d:FY -> D + :fy, Q:fy -> the column (Q:FY, the header's name), AWARD DATE:fyq -> AWARD DATE + :fyq, N -> N",
         sp == [{'column': 'D', 'sx': ':fy'}, {'column': 'Q:FY', 'sx': ''}, {'column': 'AWARD DATE', 'sx': ':fyq'}, {'column': 'N', 'sx': ''}], sp)
+    # O6 (sweep F4): a filter the builder holds as text (groups in groups): no row - it would lift the guard and Filter
+    # would replace the whole filter with it; Filter stays off and the notice says where to add the token
+    nested = '((N = alpha or N = beta) and D:fy = FY26) or ID = 3'
+    ok6 = pg.ev("T.openBucket(%s, 'D', ':fy')" % J(nested))
+    pg.wait("$('#searchBuilderLightbox').is(':visible')", 5000); settle(0.6)
+    o6 = pg.ev("({ rows: $('#sbConditionsContainer .sb-condition-row').length, off: $('#sbSubmitBtn').prop('disabled'),"
+               " notice: $('#sbGroupedNotice').is(':visible') ? $('#sbGroupedNotice').text() : '' })") or {}
+    rec('O6', "a filter the builder holds as text (groups in groups): no row added, Filter stays off, the notice says to add D:fy in the filter box",
+        ok6 and o6.get('rows') == 0 and o6.get('off') is True and 'D:fy' in (o6.get('notice') or ''), o6)
+    pg.ev("T.hideAc(); $('#searchBuilderLightbox').hide()"); settle(0.2)
+    # O7 (sweep F4): an Any Column "= empty" row is no empty row: it stays, the bucket row after it
+    ok7 = pg.ev("T.openBucket('= empty', 'L', '')")
+    pg.wait('T.isOpen()', 5000); settle(0.5)
+    n7 = pg.ev('T.rows()'); s70 = st(0); s71 = st(1)
+    rec('O7', "an Any Column = empty row stays: the bucket row follows it", ok7 and n7 == 2 and s70.get('op') == 'is_empty' and s71.get('col') == 'L',
+        {'rows': n7, 'r0': [s70.get('col'), s70.get('op')], 'r1': s71.get('col')})
+    pg.ev("T.hideAc(); $('#searchBuilderLightbox').hide()"); settle(0.2)
+    # O8 (sweep F5): the bucket row joins with and - it narrows the filter - even after an or filter
+    ok8 = pg.ev("T.openBucket('N = alpha or N = beta', 'D', ':fy')")
+    pg.wait('T.isOpen()', 5000); settle(0.5)
+    n8 = pg.ev('T.rows()'); j8 = pg.ev("$('#sbConditionsContainer .sb-condition-row:last .sb-row-joiner').val()")
+    rec('O8', "the bucket row joins with and (it narrows the filter), even after an or filter", ok8 and n8 == 3 and j8 == 'and', {'rows': n8, 'joiner': j8})
+    pg.ev("T.hideAc(); $('#searchBuilderLightbox').hide()"); settle(0.2)
+    # U22 (sweep F7, phase 1): a quoted bucket token reverse-parses, and writes back braced
+    pg.ev("T.open(%s)" % J("'AWARD DATE:fy' = FY26")); pg.wait('T.isOpen()', 5000); settle(0.5)
+    s22 = st(0); pv22 = pg.ev('T.preview()') or ''
+    rec('U22', "a quoted bucket token ('AWARD DATE:fy' = FY26) reopens as AWARD DATE by Fiscal Year = FY26 and writes back {AWARD DATE:fy} = FY26",
+        s22.get('col') == 'AWARD DATE' and s22.get('bucket') == ':fy' and s22.get('op') == 'equals' and s22.get('val') == 'FY26' and '{AWARD DATE:fy} = FY26' in pv22,
+        {'r0': [s22.get('col'), s22.get('bucket'), s22.get('op'), s22.get('val')], 'preview': pv22})
+    pg.ev("T.hideAc(); $('#searchBuilderLightbox').hide()"); settle(0.2)
 
 def checks(E, S):
     rec('H-boot', 'both halves booted without page errors', 'fatal' not in E and 'fatal' not in S and not E.get('pageErrors'),

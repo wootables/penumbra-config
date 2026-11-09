@@ -304,6 +304,22 @@ def _js(v):
     return json.dumps(v)
 
 
+# (wcag mod 2026-11-07) cwmkbd: the keyboard's Fields list on a card's menu (M1), the focus after a redraw (M5), the tokens
+# (M3, M4); cwmmail: the mailed bar's words (M25, cmail's setup); cwmmail2: the bar's field listed; pvwmail: a tile's bar
+# words (three measures, the bar Amt, the big N); pvwmail2: the bar on the big number's measure
+CFG.update({'cwmkbd': {'pill': 'V_STATUS'}, 'cwmmail': dict(CFG['cmail']), 'cwmmail2': {'title': 'V_ID', 'bar': 'H_NUM', 'fields': ['H_NUM', 'V_NAME']},
+            'pvwmail': {'pivot': {'big': 'N', 'bar': 'Amt'}}, 'pvwmail2': {'pivot': {'big': 'Amt', 'bar': 'Amt'}}})
+PREF_CARDS = PREF_CARDS + ['cwmkbd', 'cwmmail', 'cwmmail2', 'pvwmail', 'pvwmail2']
+_build_before_wcagmod = build
+def build(index_src):
+    src = _build_before_wcagmod(index_src)
+    cs = '/^(ctrow|gtrow|ctsel)$/.test('   # the cell selection loaded for cwmkbd too (Show as table: the row's cell, as the app has it)
+    if src.count(cs) != 1: raise SystemExit('wcagmod cellsel anchor x%d' % src.count(cs))
+    src = src.replace(cs, '/^(ctrow|gtrow|ctsel|cwmkbd)$/.test(')
+    old = '    window.__STORED = st;\n'
+    if src.count(old) != 1: raise SystemExit('wcagmod anchor x%d' % src.count(old))
+    return src.replace(old, '    if (S === "pvwmail" || S === "pvwmail2") { st.pivot.agg = ["sum", "count", "avg"]; st.pivot.aggLabels = ["Amt", "N", "Mean"]; st.pivot.aggColOverrides = ["H_AMT", "H_AMT", "H_AMT"]; }   // (wcag mod 2026-11-07) three measures\n' + old)
+
 if __name__ == '__main__':
     APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
     open(os.path.join(HERE, 'harness.html'), 'w', encoding='utf-8', newline='\n').write(build(open(os.path.join(APP, 'index.php'), encoding='utf-8', errors='surrogateescape').read()))

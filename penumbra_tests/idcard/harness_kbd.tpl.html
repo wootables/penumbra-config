@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"><title>RUN</title><script>
+/* idcard keyboard checks (wcag mod 2026-11-07, M2): the card is a non-modal dialog
+   with real buttons; ArrowDown on the focused crumb moves into it; it stays open
+   while the focus is inside; Escape / Tab off either end hand the focus back to the
+   crumb; a pointer leaving the card still closes it as before. */
+window.__errs=[]; window.onerror=function(m){window.__errs.push(String(m));};
+const penumbra_vars = {lastAccess: 90000, isReportOwner:false, canEditReport:false, isGlobalAdmin:false, noadm:false,
+ reportTags:['A'], reportTables:[], journal:{installed:false},
+ reportIdCard:{id:'demoX', created:'2026-01-05 00:07', createdAgo: 90000, updated:'2026-10-30 16:05', updatedAgo: 30, owner:'JDoe'}};
+window.penumbraOpenFeedbackDialog=function(spec,label){window.__fb=[spec,label];};
+try { Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:function(t){ window.__copied=t; return Promise.resolve(); }}}); } catch(e){}
+window.fetch=function(url){ return Promise.resolve({ok:true, json:function(){ return Promise.resolve([]); }}); };
+history.replaceState(null,'','?id=demoX');
+</script></head><body>
+<button id="before">before</button>
+<nav><span class="pnb-crumb-step" id="pnbCrumbReport"><a class="pnb-crumb-item" href="index.php?id=demoX" title="Reload this report">demox</a></span></nav>
+<h2 id="mainReportTitle">My Report</h2>
+<button id="after">after</button>
+<script src="__TARGET__"></script>
+<script>
+window.addEventListener("load", function(){
+ var out=[], pass=0, fail=0;
+ function ok(name, cond){ if(cond){pass++;} else {fail++; out.push('FAIL '+name);} }
+ function finish(){ document.title='DONE pass='+pass+' fail='+fail+' errs='+JSON.stringify(window.__errs)+' '+out.join(' | '); document.body.setAttribute('data-r', document.title); }
+ function key(k, o){ o=o||{}; var ev=new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true,shiftKey:!!o.shift}); (document.activeElement||document.body).dispatchEvent(ev); return ev; }
+ function card(){ return document.getElementById('pnbIdCard'); }
+ function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+ var a=document.querySelector('#pnbCrumbReport .pnb-crumb-item');
+ // each check starts from the same place: card shut, then keyboard focus on the crumb
+ async function reset(){ I.hide(); document.getElementById('before').focus(); await wait(200); a.focus(); }
+ function into(w){ var b=card() && card().querySelector('[data-idc="'+(w||'feedback')+'"]'); if (b) b.focus(); return b; }
+ var I=window.penumbraIdCard;
+ (async function(){
+  try {
+   var ev;
+   // keyboard focus on the crumb shows the card (as before)
+   await reset();
+   var c=card();
+   ok('k-shown-on-focus', !!c);
+   ok('k-role', !!c && c.getAttribute('role')==='dialog' && c.getAttribute('aria-labelledby')==='pnbIdCardTitle'
+      && !!document.getElementById('pnbIdCardTitle') && c.contains(document.getElementById('pnbIdCardTitle')) && !c.hasAttribute('aria-modal'));
+   var bs=c ? c.querySelectorAll('button[type="button"][data-idc]') : [];
+   ok('k-buttons', bs.length===3 && c.querySelectorAll('a').length===0);
+   // ArrowDown on the crumb moves into the card
+   ev=key('ArrowDown');
+   ok('k-arrow-in', ev.defaultPrevented && !!card() && document.activeElement===card().querySelector('[data-idc="feedback"]'));
+   // the focus inside keeps it open (the crumb's blur timer is called off)
+   await reset(); into(); await wait(400);
+   ok('k-stays-open', !!card() && card().contains(document.activeElement));
+   // ArrowUp / ArrowDown step through the buttons, wrapping
+   await reset(); into();
+   key('ArrowDown'); var second=document.activeElement && document.activeElement.getAttribute('data-idc');
+   key('ArrowUp'); key('ArrowUp'); var wrapped=document.activeElement && document.activeElement.getAttribute('data-idc');
+   ok('k-arrows', second==='copylink' && wrapped==='copyid');
+   // a button pressed from the keyboard runs its action
+   await reset(); var cb=into('copyid'); if (cb) cb.click(); await wait(50);
+   ok('k-copy-runs', !!card() && card().querySelector('[data-idc="copyid"]').textContent==='Copied' && window.__copied==='demoX');
+   // Escape inside: closed, focus back on the crumb
+   await reset(); into(); ev=key('Escape');
+   ok('k-esc', !card() && document.activeElement===a && ev.defaultPrevented);
+   // ... and the focus handed back does not bring the card straight back
+   await wait(200);
+   ok('k-esc-stays-shut', !card());
+   // Tab off the last button / Shift+Tab off the first: back to the crumb, closed
+   await reset(); into('copyid'); ev=key('Tab');
+   ok('k-tab-out', ev.defaultPrevented && !card() && document.activeElement===a);
+   await reset(); into('feedback'); ev=key('Tab', {shift:true});
+   ok('k-shifttab-out', ev.defaultPrevented && !card() && document.activeElement===a);
+   // the focus going elsewhere closes it
+   await reset(); var had=!!into(); document.getElementById('after').focus(); await wait(300);
+   ok('k-focus-away', had && !card());
+   // the keyboard working in the card: a stray pointerleave does not shut it under the focus
+   await reset(); into(); card().dispatchEvent(new PointerEvent('pointerleave')); await wait(300);
+   ok('k-kbd-pointerleave', !!card() && card().contains(document.activeElement));
+   // the mouse: a pointer leaving the card still closes it (focus not inside)
+   I.hide(); document.getElementById('after').focus(); await wait(200);
+   I.show(a); card().dispatchEvent(new PointerEvent('pointerleave')); await wait(300);
+   ok('k-pointerleave', !card());
+   // not a new Tab stop: nothing of the card is in the page until it opens
+   ok('k-no-tabstop', !card() && a.tabIndex===0);
+  } catch(e){ fail++; out.push('THREW '+e.message); }
+  finish();
+ })();
+});
+</script></body></html>

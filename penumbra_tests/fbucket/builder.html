@@ -229,6 +229,18 @@ window.T = (function () {
       var t = performance.now(); window._penumbraSearchBuilder.showColumnList(sel); return Math.round(performance.now() - t);
     },
     // the palette's Filter COLUMN by...: the builder on the box's conditions plus a row for the column's bucket
+    // (sweep F1) the builder's next markup load fails as an expired session's would (status 500: no redirect), once
+    failNextMarkup: function () {
+      var orig = jQuery.get;
+      jQuery.get = function (url) {
+        if (String(url).indexOf('search_builder_content.php') === 0) {
+          jQuery.get = orig;
+          var d = jQuery.Deferred(); d.reject({ status: 500 }); return d.promise();
+        }
+        return orig.apply(this, arguments);
+      };
+      return true;
+    },
     openBucket: function (q, col, sx) {
       $('#tableSearch').val(q || '');
       var b = window._penumbraSearchBuilder;

@@ -37,7 +37,7 @@ window.addEventListener("load", function(){
   penumbra_vars.lastAccess=-1; ok('firstvisit', I.html('demoX').indexOf('This is your first visit')>=0);
   ok('ago', I.ago(59)==='just now' && I.ago(3600)==='1 hour ago' && I.ago(86400*3)==='3 days ago' && I.ago(86400*400)==='1 year ago');
   var a=document.querySelector('#pnbCrumbReport .pnb-crumb-item'); ok('titledropped', !a.hasAttribute('title') && /reload/.test(a.getAttribute('aria-label')||''));
-  I.show(a); var c=document.getElementById('pnbIdCard'); ok('show', !!c && c.getAttribute('role')==='tooltip' && a.getAttribute('aria-describedby')==='pnbIdCard');
+  I.show(a); var c=document.getElementById('pnbIdCard'); ok('show', !!c && c.getAttribute('role')==='dialog' && a.getAttribute('aria-describedby')==='pnbIdCard');
   ok('fetch-once', window.__fetches.length===1 && window.__fetches[0]==='get_email_recipients.php?term=jdoe');
   setTimeout(function(){
    try {

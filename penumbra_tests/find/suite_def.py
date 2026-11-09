@@ -54,7 +54,7 @@ CHK = {
     'off': ['saneOffNoApi', 'saneOffNotTaken'],
     'sel': ['prefill'],
     # round 3
-    'busy3': ['busyShown', 'busyText', 'busyGone'],
+    'busy3': ['busyShown', 'busyText', 'busyGone', 'liveQuiet', 'filterBrandText'],   # +2 (wcag mod 2026-11-07: M9, M10)
     'textnode3': ['sameNodes', 'staticRanges'],
     'grp_churn': ['churnIgnored', 'closeTaken'],
     'big_dirty': ['noRestart', 'dirtyRight'],
@@ -250,6 +250,12 @@ MUTANTS = {
                ['L-busy3-busyShown'], ['busy3']),
     'nospin': ([('css', ".pnb-find-bar.pnb-find-busy .pnb-find-spin { visibility: visible; }", ".pnb-find-bar.pnb-find-busy .pnb-find-spin { }")],
                ['L-busy3-busyShown'], ['busy3']),
+    # (wcag mod 2026-11-07, M9) the status region speaks every "Searching... N%" tick again
+    'm9tick': ([('mod', "        if (!scanning) { setText(liveEl, say); } else if (!rereading) { setText(liveEl, ''); }\n", "        setText(liveEl, say);\n")],
+               ['L-busy3-liveQuiet'], ['busy3']),
+    # (wcag mod 2026-11-07, M10) "Filter to N rows" back to bare --brand-primary text
+    'm10color': ([('css', "font: inherit; color: var(--brand-text, var(--brand-primary, #336699)); background: none;", "font: inherit; color: var(--brand-primary, #336699); background: none;")],
+                 ['L-busy3-filterBrandText'], ['busy3']),
     # the count's words replace its text node (the a11y layer's page-wide sweep follows every change)
     'textreplace': ([('mod', "        if (t && t.nodeType === 3 && !t.nextSibling) { if (t.data !== s) { t.data = s; } return; }\n", "")],
                     ['L-textnode3-sameNodes'], ['textnode3']),

@@ -173,6 +173,13 @@
   //   N12 a mousedown outside closes it
   //   N13 popped out: the menu opens in the console window and inserts there
   //   N14 no page errors
+  //   (wcag mod 2026-11-07, M15) How to use's card for screen readers and the keyboard:
+  //   N20 pinned by the mouse: the row is described by the card while it is up (and not after);
+  //       the card stays a plain tooltip, never focused (pointer use unchanged)
+  //   N21 picked by Enter: the card takes the focus as a named non-modal dialog whose text
+  //       describes it, its help link reachable
+  //   N22 Escape in the card closes it with the focus back on the row
+  //   N23 Tab off the card's last stop closes it with the focus back on the row
   var COLS = ['ID', 'AWARD_AMT', 'START_DT', 'DEPT_NAME', 'STATUS_CD', 'NOTES'];
   var KINDS = {
     ID: { num: true, date: false, samples: ['1', '2'] },
@@ -349,6 +356,56 @@
     var i9 = popInfo();
     rec(tag + '9 How to use opens the row\'s card in the ' + whereWant + ' (its help and its link)',
         i9.open && i9.where === whereWant && i9.anchor === 'sum' && i9.text.length > 40, fmtPop(i9));
+    // N20 (wcag mod 2026-11-07)
+    var p20 = pop(), d20 = sumRow.getAttribute('aria-describedby'), role20 = p20 ? p20.getAttribute('role') : '',
+        tab20 = p20 ? p20.hasAttribute('tabindex') : true, foc20 = p20 ? p20.ownerDocument.activeElement === p20 : true;
+    await closeCard();
+    var d20b = sumRow.getAttribute('aria-describedby');
+    rec(tag + '20 pinned by the mouse: the row is described by its card while it is up, the card stays a tooltip and takes no focus',
+        d20 === 'snipCardPop' && !d20b && role20 === 'tooltip' && !tab20 && !foc20,
+        'describedby ' + d20 + ' -> ' + d20b + '; role ' + role20 + ', tabindex ' + tab20 + ', focused ' + foc20);
+    // N21 (wcag mod 2026-11-07): How to use by Enter
+    async function kbdHelp() {
+      sumRow.focus();
+      ctx(sumRow, { kbd: true });
+      var dk = sumRow.ownerDocument;
+      key(dk.activeElement, 'End');
+      var on = dk.activeElement ? dk.activeElement.getAttribute('data-act') : '';
+      key(dk.activeElement, 'Enter');
+      await sleep(80);
+      return on;
+    }
+    var on21 = await kbdHelp();
+    var p21 = pop(), d21 = p21 ? p21.ownerDocument : document, desc21 = p21 ? p21.getAttribute('aria-describedby') : '';
+    var dEl21 = desc21 ? d21.getElementById(desc21) : null, link21 = p21 ? p21.querySelector('a[data-help-anchor][href]') : null;
+    rec(tag + '21 How to use by Enter: the card takes the focus as a named non-modal dialog, its text describes it, the row is described, the link reachable',
+        on21 === 'help' && isOpen() && d21.activeElement === p21 && p21.getAttribute('role') === 'dialog' && /^How to use sum/.test(p21.getAttribute('aria-label') || '') &&
+        !p21.hasAttribute('aria-modal') && !!dEl21 && p21.contains(dEl21) && (dEl21.textContent || '').length > 40 &&
+        sumRow.getAttribute('aria-describedby') === 'snipCardPop' && !!link21 && link21.tabIndex === 0,
+        'item ' + on21 + '; open ' + isOpen() + '; focused ' + (d21.activeElement === p21) + '; role ' + (p21 && p21.getAttribute('role')) +
+        '; label ' + (p21 && p21.getAttribute('aria-label')) + '; describedby ' + desc21 + ' (' + (dEl21 ? (dEl21.textContent || '').length : 'none') + ' chars); row ' +
+        sumRow.getAttribute('aria-describedby') + '; link ' + !!link21);
+    // N22 Escape
+    var w22 = d21.defaultView, in22 = !!p21 && d21.activeElement === p21;
+    var ev22 = new w22.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true, view: w22 });
+    (d21.activeElement || d21.body).dispatchEvent(ev22);
+    await sleep(30);
+    rec(tag + '22 Escape in the focused card closes it, the focus back on the row, the card a tooltip again',
+        in22 && !isOpen() && sumRow.ownerDocument.activeElement === sumRow && ev22.defaultPrevented && !sumRow.hasAttribute('aria-describedby') &&
+        p21 && p21.getAttribute('role') === 'tooltip' && !p21.hasAttribute('tabindex'),
+        'was in the card ' + in22 + '; open ' + isOpen() + '; focus on row ' + (sumRow.ownerDocument.activeElement === sumRow) + '; prevented ' + ev22.defaultPrevented +
+        '; role ' + (p21 && p21.getAttribute('role')));
+    // N23 Tab off the last stop (the link)
+    await kbdHelp();
+    var p23 = pop(), l23 = p23 ? p23.querySelector('a[data-help-anchor]') : null;
+    if (l23) l23.focus();
+    var w23 = p23 ? p23.ownerDocument.defaultView : window;
+    var ev23 = new w23.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, view: w23 });
+    if (l23) l23.dispatchEvent(ev23);
+    await sleep(30);
+    rec(tag + '23 Tab off the focused card\'s last stop closes it with the focus back on the row',
+        !!l23 && !isOpen() && ev23.defaultPrevented && sumRow.ownerDocument.activeElement === sumRow,
+        'link ' + !!l23 + '; open ' + isOpen() + '; prevented ' + ev23.defaultPrevented + '; focus on row ' + (sumRow.ownerDocument.activeElement === sumRow));
     await closeCard();
 
     // N10

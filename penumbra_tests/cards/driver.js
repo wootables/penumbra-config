@@ -1788,11 +1788,11 @@
     R.chk.oneLine = !!a11 && !!t11 && !!w11 && Math.abs(topOf(a11) - topOf(t11)) < 4 && Math.abs(topOf(a11) - topOf(w11)) < 6 && !!q('.journal-rownote-meta', i11)
       && !!a12 && rs12.length > 2 && Math.abs(rs12[0].top - topOf(a12)) < 4 && rs12[rs12.length - 1].left < a12.getBoundingClientRect().left + 4;
     R.info.oneLine = { a: a11 ? topOf(a11) : null, t: t11 ? topOf(t11) : null, w: w11 ? topOf(w11) : null, rects: rs12.length, lastLeft: rs12.length ? Math.round(rs12[rs12.length - 1].left) : null, authLeft: a12 ? Math.round(a12.getBoundingClientRect().left) : null };
-    // ...its Reply / Edit / x quiet icons: no frame, no fill, faint until pointed at
+    // ...its Reply / Edit / x quiet icons: no frame, no fill (wcag mod 2026-11-07: no longer faint at rest)
     document.body.classList.add('theme-light-sepia');
     var rb = i12 ? q('.journal-rownote-reply-btn', i12) : null, rcs = rb ? getComputedStyle(rb) : null, act12 = i12 ? q('.journal-rownote-act', i12) : null;
     R.chk.quietIcons = !!rb && !!q('svg', rb) && !text(rb) && /Reply/.test(rb.getAttribute('aria-label') || '') && parseFloat(rcs.borderTopWidth) === 0
-      && (rcs.backgroundColor === 'rgba(0, 0, 0, 0)' || rcs.backgroundColor === 'transparent') && !!act12 && parseFloat(getComputedStyle(act12).opacity) < 1;
+      && (rcs.backgroundColor === 'rgba(0, 0, 0, 0)' || rcs.backgroundColor === 'transparent') && !!act12 && parseFloat(getComputedStyle(act12).opacity) === 1;   // (wcag mod 2026-11-07, M3) full opacity at rest now (dimmed they fell under 3:1)
     R.info.icons = rcs ? { border: rcs.borderTopWidth, bg: rcs.backgroundColor, op: act12 ? getComputedStyle(act12).opacity : null } : null;
     document.body.classList.remove('theme-light-sepia');
     // (round I) Consistent Row Height on (the Settings switch; the harness starts with it off): the tall card kept to the
@@ -5367,6 +5367,115 @@
     var opened = !!m && m.contains(document.activeElement) && text(q('.pnb-hm-name', m)) === gname(gs[0]) && a.indexOf('gToggle') >= 0 && a.indexOf('cardSize') >= 0;
     if (m) { keyOn(document.activeElement, 'Escape'); await sleep(100); }
     R.chk.nameMenu = opened && !menu() && document.activeElement === n0;
+  };
+  // (wcag mod 2026-11-07) M1: a card's Shift+F10 menu lists its Fields, each field's own menu (Filter to, Exclude, Sort,
+  // Hide this field, Show only) as a right-click on its value opens it; the mouse's menu unchanged. M5: Show as table from
+  // the keyboard's menu puts the focus on the row's cell; Hide this field keeps it on the row's card. M3 / M4: the note
+  // icons at full opacity at rest, the tiles' total title and three hovers on --brand-text.
+  function wmItem(sub, name) { return sub ? qa('.pnb-hm-item', sub).filter(function (i) { return text(q('.pnb-hm-label', i)) === thName(name); })[0] || null : null; }
+  async function wmFieldMenu(card, name) {
+    card.focus(); keyOn(card, 'F10', true); await sleep(100);
+    var sub = menu() && q('.pnb-hm-item[data-act="cardFields"]', menu()) ? await openSub('cardFields') : null, it = wmItem(sub, name);
+    if (!it) { if (menu()) window.Penumbra.colMenu.close(); return false; }
+    it.focus(); keyOn(it, 'Enter');
+    return await until(function () { return !!menu() && !q('.pnb-hm-item[data-act="cardFields"]', menu()) && text(q('.pnb-hm-name', menu())) === thName(name); }, 3000);
+  }
+  function wmRuleColor(sel) {
+    var out = null;
+    Array.prototype.forEach.call(document.styleSheets, function (s) { var rs; try { rs = s.cssRules; } catch (e) { return; } Array.prototype.forEach.call(rs || [], function (r) { if (r.selectorText === sel) { var c = r.style.getPropertyValue('color'); if (c) out = c; } }); });
+    return out;
+  }
+  function wmBarLine(c) { return qa(':scope > div', c).filter(function (x) { return /margin:0 0 6px/.test(x.getAttribute('style') || ''); })[0] || null; }
+  S.cwmkbd = async function () {
+    await until(function () { return on() && cards().length > 3; }, 8000); await sleep(300);
+    var box = document.createElement('div');
+    box.innerHTML = '<div class="journal-rownote-inline"><div class="journal-rownote-item"><span class="journal-rownote-act"><button type="button">x</button></span></div></div>'
+      + '<div class="pnb-card-pv is-total" style="--brand-text: rgb(1, 2, 3); --brand-primary: rgb(200, 100, 50);"><div class="pnb-card-title">T</div></div>';
+    document.body.appendChild(box);
+    var act = q('.journal-rownote-act', box), ttl = q('.pnb-card-title', box);
+    R.info.css = { op: getComputedStyle(act).opacity, ttl: getComputedStyle(ttl).color };
+    R.chk.restOpacity = getComputedStyle(act).opacity === '1';
+    R.chk.totalTitle = getComputedStyle(ttl).color === 'rgb(1, 2, 3)';
+    box.parentNode.removeChild(box);
+    var hv = ['#pnbCardsHost .pnb-card .pnb-card-more:hover, #pnbCardsHost .pnb-card .pnb-card-more:focus-visible', '.pnb-cards-grptoggle:hover', '.pnb-cards-lane > .pnb-cards-lanehead:hover .pnb-cards-grptoggle'].map(wmRuleColor);
+    R.info.hover = hv;
+    R.chk.hoverTokens = hv.every(function (c) { return !!c && /^var\(--brand-text\b/.test(c.trim()); });
+    var card = cards()[2], row = card.getAttribute('data-row'), tr = shownRows().filter(function (r) { return String(rowIdx(r)) === row; })[0];
+    rclickWhite(card); await sleep(100);
+    var ma = menu() ? acts() : null; R.info.mouseActs = ma;
+    if (menu()) window.Penumbra.colMenu.close(); await sleep(50);
+    R.chk.mouseSame = !!ma && ma.indexOf('cardFields') < 0 && ma.indexOf('cardsTable') >= 0;
+    card.focus(); keyOn(card, 'F10', true); await sleep(100);
+    var ka = menu() ? acts() : []; R.info.kbdActs = ka;
+    R.chk.kbdFields = ka.indexOf('cardFields') >= 0 && ka.indexOf('cardsTable') >= 0 && !!menu() && menu().contains(document.activeElement);
+    var sub = ka.indexOf('cardFields') >= 0 ? await openSub('cardFields') : null, want = [];
+    var items = sub ? qa('.pnb-hm-item', sub).map(function (i) { return text(q('.pnb-hm-label', i)); }) : [];
+    qa('[data-col]', card).forEach(function (v) { var n = thName(v.getAttribute('data-col')); if (!v.closest('.journal-rownote-inline') && want.indexOf(n) < 0) want.push(n); });
+    R.info.fields = { items: items, want: want };
+    R.chk.fieldList = items.length > 2 && same(items, want) && items.indexOf(thName('V_STATUS')) >= 0;
+    if (menu()) window.Penumbra.colMenu.close(); await sleep(50);
+    // V_STATUS's own menu, from the keyboard: its cell marked, the focus in it; Escape: the card
+    var opened = await wmFieldMenu(card, 'V_STATUS'), m = menu(), a = m ? acts() : [];
+    R.info.fieldActs = a;
+    R.chk.fieldMenu = !!opened && m.contains(document.activeElement) && (a.indexOf('filterMenu') >= 0 || a.indexOf('cellFilter') >= 0) && a.indexOf('sortAsc') >= 0 && a.indexOf('hide') >= 0 && !!tr && td(tr, 'V_STATUS').classList.contains('pnb-hm-cell');
+    if (m) { keyOn(document.activeElement, 'Escape'); await sleep(100); }
+    R.chk.fieldEscBack = !!opened && !menu() && document.activeElement === card;
+    // Filter to, by Enter: the table filters to the value, the cards follow
+    var v = tr ? tdText(tr, 'V_STATUS') : null, fi = null;
+    if (await wmFieldMenu(cards()[2], 'V_STATUS')) {
+      fi = q('.pnb-hm-item[data-act="cellFilter"]', menu());
+      if (!fi) { var fsub = await openSub('filterMenu'); fi = fsub ? q('.pnb-hm-item[data-act="cellFilter"]', fsub) : null; }
+      if (fi) { fi.focus(); keyOn(fi, 'Enter'); }
+    }
+    function filtered() { var rs = shownRows(); return rs.length > 0 && rs.length < 200 && rs.every(function (r) { return tdText(r, 'V_STATUS') === v; }) && same(cardRows(), rs.map(rowIdx)); }
+    await until(function () { return !menu() && filtered(); }, 6000);
+    R.chk.fieldFilter = !!fi && !!v && filtered();
+    R.info.filtered = [v, shownRows().length, cards().length];
+    await runSearch(''); await until(function () { return shownRows().length === 200 && cards().length === 200; }, 6000); await sleep(200);
+    // Hide this field, by Enter: off the cards, the focus on the row's card
+    var c3 = cards()[3], r3 = c3.getAttribute('data-row'), hi = null;
+    if (await wmFieldMenu(c3, 'V_NAME')) { hi = q('.pnb-hm-item[data-act="hide"]', menu()); if (hi) { hi.focus(); keyOn(hi, 'Enter'); } }
+    await until(function () { var s = slots(); return !!s && s.fields.indexOf('V_NAME') < 0; }, 3000); await sleep(200);
+    var ae = document.activeElement;
+    R.info.hide = { fields: slots() && slots().fields, ae: ae && ae.className, row: ae && ae.getAttribute && ae.getAttribute('data-row'), want: r3 };
+    R.chk.hideFocusRow = !!hi && slots().fields.indexOf('V_NAME') < 0 && !!ae && ae.classList.contains('pnb-card') && ae.getAttribute('data-row') === r3;
+    var ub = qa('button.pnb-hm-undo').filter(function (b) { return !b.disabled; }).pop(); if (ub) { ub.click(); await sleep(500); }
+    // Show as table, by Enter: the focus on the row's cell in the table
+    var c1 = cards()[1], r1 = c1.getAttribute('data-row');
+    c1.focus(); keyOn(c1, 'F10', true); await sleep(100);
+    var stb = menu() ? q('.pnb-hm-item[data-act="cardsTable"]', menu()) : null;
+    if (stb) { stb.focus(); keyOn(stb, 'Enter'); }
+    await until(function () { return !on(); }, 4000); await sleep(250);
+    var fe = document.activeElement, ftr = fe && fe.closest ? fe.closest('#resultsTable > tbody > tr') : null;
+    R.info.tableFocus = { tag: fe && fe.tagName, cls: fe && fe.className, row: ftr ? rowIdx(ftr) : null, want: r1 };
+    R.chk.tableFocusRow = !on() && !!stb && !!ftr && fe.tagName === 'TD' && String(rowIdx(ftr)) === r1;
+  };
+  // (wcag mod 2026-11-07) M25: the mailed card's bar has its words, as the card on screen labels it ("Field: value"); none
+  // when the field is listed; a tile's as its bar's label, none when the big number shows that measure
+  async function wmMail(n) {
+    await until(function () { return on() && cards().length > n; }, 8000); await sleep(400);
+    var b = mailBox(window.Penumbra.cards.emailHtml({ size: 'standard' })), cs = mailCards(b), sc = cards(), k = Math.min(10, cs.length, sc.length);
+    var got = cs.slice(0, k).map(function (c) { var d = wmBarLine(c); return d ? text(d) : null; });
+    var want = sc.slice(0, k).map(function (c) { var mt = q('.pnb-card-meter', c); return mt ? mt.getAttribute('aria-label') : null; });
+    R.info.bar = { n: [cs.length, sc.length], got: got.slice(0, 4), want: want.slice(0, 4) };
+    return { cs: cs, got: got, want: want };
+  }
+  S.cwmmail = async function () {
+    var o = await wmMail(3), d0 = o.cs[0] ? wmBarLine(o.cs[0]) : null;
+    R.chk.barWords = o.want.filter(Boolean).length > 3 && same(o.got, o.want);
+    R.chk.barStyled = !!d0 && d0.style.fontSize === '11px' && !!d0.style.color && !!d0.previousElementSibling && d0.previousElementSibling.tagName === 'TABLE';
+  };
+  S.cwmmail2 = async function () {
+    var o = await wmMail(3);
+    R.chk.barListedSkip = o.want.filter(Boolean).length > 3 && o.cs.length > 3 && o.cs.every(function (c) { return !wmBarLine(c); });
+  };
+  S.pvwmail = async function () {
+    var o = await wmMail(2);
+    R.chk.tileWords = o.want.filter(Boolean).length > 1 && same(o.got, o.want);
+  };
+  S.pvwmail2 = async function () {
+    var o = await wmMail(2);
+    R.chk.tileSameSkip = o.want.filter(Boolean).length > 1 && o.cs.length > 2 && o.cs.every(function (c) { return !wmBarLine(c); });
   };
   try { await boot(); if (S[SCN]) await S[SCN](); else throw new Error('no scenario ' + SCN); }
     catch (e) { R.fail = String(e && e.stack || e); }

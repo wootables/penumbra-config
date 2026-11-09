@@ -118,6 +118,34 @@
               && $('#pnbAskEcho').text() === 'Where are pivot presets saved?',
               'during=' + JSON.stringify(b) + ' after: busy=' + $('#pnbAskStatus .pnb-ask-busy').length + ' disabled=' + $('#pnbAskGo').prop('disabled') + ' stale=' + $('#pnbAskAnswer').hasClass('is-stale') + ' echo=' + JSON.stringify($('#pnbAskEcho').text()));
        }); })
+  // (wcag mod 2026-11-07) T9 M13: an answer is announced in the polite status ("Answer ready below.", screen-reader only) and
+  // focus stays in the question box; T10 M14: the vote buttons carry aria-pressed in step with .is-mine;
+  // T11a-c M11: the Ask button, your vote and the empty-search button take --on-brand ink; T12 M12: source links take --brand-text
+       .then(function () { return step(function () { $('#pnbAskQ').val('How do I pin a column?').trigger('focus'); $('#pnbAskForm').trigger('submit'); }); })
+       .then(function () { return step(function () {
+          var $r = $('#pnbAskStatus .pnb-ask-ready');
+          record('T9 answer announced', $r.length === 1 && $r.text() === 'Answer ready below.' && $r.hasClass('sr-only') && $('#pnbAskStatus').attr('aria-live') === 'polite'
+              && document.activeElement && document.activeElement.id === 'pnbAskQ',
+              'ready=' + $r.length + ' text=' + JSON.stringify($('#pnbAskStatus').text()) + ' focus=' + (document.activeElement && document.activeElement.id));
+       }); })
+       .then(function () { return step(function () {
+          window.__ap0 = [$('#pnbAskAnswer .pnb-ask-vote[data-v="up"]').attr('aria-pressed'), $('#pnbAskAnswer .pnb-ask-vote[data-v="down"]').attr('aria-pressed')];
+          $('#pnbAskAnswer .pnb-ask-vote[data-v="down"]').trigger('click');
+       }); })
+       .then(function () { return step(function () {
+          var ap1 = [$('#pnbAskAnswer .pnb-ask-vote[data-v="up"]').attr('aria-pressed'), $('#pnbAskAnswer .pnb-ask-vote[data-v="down"]').attr('aria-pressed')];
+          record('T10 vote aria-pressed', JSON.stringify(window.__ap0) === '["false","false"]' && JSON.stringify(ap1) === '["false","true"]' && $('#pnbAskAnswer .pnb-ask-vote[data-v="down"]').hasClass('is-mine'),
+              'before=' + JSON.stringify(window.__ap0) + ' afterNo=' + JSON.stringify(ap1));
+          var de = document.documentElement.style;
+          de.setProperty('--brand-primary', '#ff9e1b'); de.setProperty('--on-brand', '#1c1611'); de.setProperty('--brand-text', '#123456');
+          function col(sel) { var el = $(sel)[0]; return el ? getComputedStyle(el).color : 'missing'; }
+          var go = col('#pnbAskGo'), mine = col('#pnbAskAnswer .pnb-ask-vote.is-mine'), fs = col('#pnbAskFromSearch'), src = col('#pnbAskSources a.pnb-ask-source');
+          de.removeProperty('--brand-primary'); de.removeProperty('--on-brand'); de.removeProperty('--brand-text');
+          record('T11a Ask button ink', go === 'rgb(28, 22, 17)', 'color=' + go);
+          record('T11b own vote ink', mine === 'rgb(28, 22, 17)', 'color=' + mine);
+          record('T11c empty-search button ink', fs === 'rgb(28, 22, 17)', 'color=' + fs);
+          record('T12 source link ink', src === 'rgb(18, 52, 86)', 'color=' + src);
+       }); })
        .then(function () { document.getElementById('out').textContent = JSON.stringify(results, null, 1); document.title = 'HARNESS-DONE'; });
 })();
 </script>

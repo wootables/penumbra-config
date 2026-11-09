@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<!-- gantt_a11y_test (wcag mod 2026-11-07, M22): the REAL js/penumbra_a11y.js (copied in by run.ps1, -A11yJs for a stage)
+     builds the screen-reader table for a Gantt; a builder's note (data._a11yNote, set by applyGanttChartConfig when the
+     Limit cut bars) must reach the table's caption, and a chart without a note keeps the caption it had. -->
+<div id="host"></div>
+<script src="penumbra_a11y.js"></script>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+try {
+  ok('a11y: enhanceChartA11y loaded', typeof window.enhanceChartA11y === 'function');
+  function chart(id, note) {
+    var cv = document.createElement('canvas'); cv.id = id; document.getElementById('host').appendChild(cv);
+    var data = { labels: ['A', 'B'], datasets: [{ data: [[1, 2], [3, 4]] }], _chartType: 'gantt',
+                 _a11yRows: { columns: ['Task', 'Start', 'End'], rows: [['A', '1 Jan', '2 Jan'], ['B', '3 Jan', '4 Jan']] } };
+    if (note) data._a11yNote = note;
+    return { canvas: cv, config: { type: 'bar', data: data, options: { plugins: { title: { text: 'Timeline' } } } } };
+  }
+  var c1 = chart('gnA', 'Showing 40 of 112 bars. 3 rows with no start or end date are not shown.');
+  window.enhanceChartA11y(c1);
+  var cap1 = document.querySelector('#gnA-a11y-table caption');
+  eq('wcagmod gcaption: the note is in the caption', cap1 ? cap1.textContent : null, 'Timeline - chart data. Showing 40 of 112 bars. 3 rows with no start or end date are not shown.');
+  ok('wcagmod gcaption: the canvas points at the table', c1.canvas.getAttribute('aria-describedby') === 'gnA-a11y-table');
+  var c2 = chart('gnB', '');
+  window.enhanceChartA11y(c2);
+  var cap2 = document.querySelector('#gnB-a11y-table caption');
+  eq('wcagmod gcaption: no note, the caption is unchanged', cap2 ? cap2.textContent : null, 'Timeline - chart data');
+  var c3 = chart('gnC', 'Rows <b>x</b> & more');
+  window.enhanceChartA11y(c3);
+  var cap3 = document.querySelector('#gnC-a11y-table caption');
+  ok('wcagmod gcaption: the note is escaped', !!cap3 && !cap3.querySelector('b') && cap3.textContent.indexOf('Rows <b>x</b> & more') > -1, cap3 ? cap3.innerHTML : 'none');
+  document.getElementById('out').textContent = 'RESULT '+(FAIL===0?'ALL-PASS':'HAS-FAILURES')+'  pass='+PASS+' fail='+FAIL+'\n'+LOG.join('\n');
+} catch (e) {
+  document.getElementById('out').textContent = 'HARNESS-ERROR: '+e.name+': '+e.message+'\n'+(e.stack||'');
+}
+</script>

@@ -35,7 +35,7 @@ CHK = {
     # (2026-10-24, dictstat) Column stats starts with the column's meaning; the dialog opens at the entry's name
     'dstats': ['meanShown', 'meanEscaped', 'meanFirst', 'meanAria', 'meanFocused', 'meanOpens', 'draftTag', 'noMeanWithoutEntry', 'longCut', 'meanWraps',
                'avoidBlank', 'hardCut', 'cutTidy', 'byLabel', 'opensAtEntry', 'keyboard'],
-    'dopts': ['aboutLink', 'linkOpens', 'popoverClosed', 'noLinkWithoutEntry'],
+    'dopts': ['aboutLink', 'aboutBrandText', 'linkOpens', 'popoverClosed', 'noLinkWithoutEntry'],   # +aboutBrandText (wcag mod 2026-11-07, M17)
     'dview': ['viewerRows', 'noMissing', 'noGoneTag', 'noAuthorBar', 'draftStillShown', 'cannotGenerate', 'noEditViewer'],
     'dblank': ['noLink', 'stillHas', 'menuItem', 'defaultTitle'],
     'dsub': ['subLink', 'notFromSnippet', 'subPayload', 'subNoEdit'],
@@ -83,6 +83,8 @@ NEW = ({"L-%s-%s" % (s, c) for s in ("desc", "dgen2") for c in CHK[s]} | {"L-dun
 GUARDS.discard("S-email")
 NEW -= {"L-desc-xAsks"}
 GUARDS |= {"L-desc-xAsks"}   # live asks before the X drops changes too
+# (wcag mod 2026-11-07, M17) this round: the What this column means link in --brand-text
+NEW = {"L-dopts-aboutBrandText"}
 
 MUTANTS = {
     'd-noflags': ([('dict', "var text2 = rest.join('|').trim(), m = /^([?!]{1,2})\\s*/.exec(text2)", "var text2 = rest.join('|').trim(), m = null && /^([?!]{1,2})\\s*/.exec(text2)")],
@@ -172,6 +174,8 @@ MUTANTS = {
     'x-meancol': ([('menu', "run: function () { window.Penumbra.openDataDictionary(e.name); } },\n            '-'].concat(body);", "run: function () { window.Penumbra.openDataDictionary(col); } },\n            '-'].concat(body);")], ['L-dstats-opensAtEntry'], ['dstats']),
     'x-aboutcol': ([('menu', "        if (ent) { look.push(aboutItem(ent)); }\n", "        if (ent) { look.push({ act: 'about', label: 'What this column means', run: function () { window.Penumbra.openDataDictionary(col); } }); }\n")], ['L-dstats-opensAtEntry'], ['dstats']),
     'x-nodraft': ([('menu', "(e.draft ? ' <span class=\"pnb-hm-tag pnb-hm-tag-draft\"", "(false ? ' <span class=\"pnb-hm-tag pnb-hm-tag-draft\"")], ['L-dstats-draftTag'], ['dstats']),
+    # (wcag mod 2026-11-07, M17) the link back to bare --brand-primary text
+    'm17color': ([('dcss', "color: var(--brand-text, var(--brand-primary, #2a6ebb)); text-decoration: underline;", "color: var(--brand-primary, #2a6ebb); text-decoration: underline;")], ['L-dopts-aboutBrandText'], ['dopts']),
     'x-noavoid': ([('menu', "(e.avoid ? '<span class=\"pnb-hm-tag pnb-hm-tag-avoid\">Do not use</span> ' : '')", "''")], ['L-dstats-avoidBlank'], ['dstats']),
     # (the review) the hard cut splitting an emoji; the dots after an opening bracket; the heading's label never asked
     'x-halfemoji': ([('menu', "            if (hi >= 0xD800 && hi <= 0xDBFF) { at--; }\n", "")], ['L-dstats-hardCut'], ['dstats']),
