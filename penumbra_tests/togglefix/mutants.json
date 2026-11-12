@@ -70,8 +70,8 @@
   "edits": [
    [
     "js/main.js",
-    "                $('#journalRowNotesEnable').prop('checked', !!window._penumbraJournalRowNotes);\n                $('#journalToggleWhoEnable').prop('checked', !!window._penumbraJournalToggleWho);\n                populateKeyPicker();",
-    "                $('#journalToggleWhoEnable').prop('checked', !!window._penumbraJournalToggleWho);\n                populateKeyPicker();"
+    "                $('#journalRowNotesEnable').prop('checked', !!window._penumbraJournalRowNotes);\n                $('#journalToggleWhoEnable').prop('checked', !!window._penumbraJournalToggleWho);\n                syncNotesExportUI();\n                populateKeyPicker(); renderToggleDefs();",
+    "                $('#journalToggleWhoEnable').prop('checked', !!window._penumbraJournalToggleWho);\n                syncNotesExportUI();\n                populateKeyPicker(); renderToggleDefs();"
    ]
   ],
   "must": [
@@ -1571,7 +1571,7 @@
   "edits": [
    [
     "js/main.js",
-    "            if ($('body').hasClass('snapshot-comparison-active')) { bulkFail('Close the snapshot comparison to mark rows or add notes.'); return; }\n",
+    "            if ($(document.body).hasClass('snapshot-comparison-active')) { bulkFail('Close the snapshot comparison to mark rows or add notes.'); return; }\n",
     ""
    ]
   ],
@@ -2874,6 +2874,7 @@
   ],
   "must": [
    "I-who-cols",
+   "I-who-flip",
    "I-who-sort",
    "I-who-tpl",
    "I-who-off"
@@ -3226,7 +3227,7 @@
   "edits": [
    [
     "schedule_runner.php",
-    "    $processed = apply_state_logic($flat_rows, $state, array_merge($journal_toggle_cols, $journal_who_cols));\n",
+    "    $processed = apply_state_logic($flat_rows, $state, $journal_screen_cols);\n",
     "    $processed = apply_state_logic($flat_rows, $state, $journal_toggle_cols);\n"
    ]
   ],
@@ -4115,8 +4116,8 @@
   "edits": [
    [
     "js/main.js",
-    "                            sig = n + '|' + rowKey + (keyDirty() ? '|d' : '');\n",
-    "                            sig = n + '|' + rowKey;\n"
+    "sig = n + '|' + rowKey + (keyDirty() ? '|d' : '') + '|' + pvw;\n",
+    "sig = n + '|' + rowKey + '|' + pvw;\n"
    ]
   ],
   "must": [
@@ -4543,8 +4544,8 @@
   "edits": [
    [
     "manage_journal.php",
-    "                    AND (SCOPE = 'pivot' OR SUBSTR(ROW_KEY, 1, 1) <> \" . JOURNAL_PARK_OPEN_SQL . \")\n",
-    ""
+    "\"REPORT_ID = :rid AND SCOPE IN ('row', 'pivot', 'chart') AND ROW_KEY IS NOT NULL\"\n         . \" AND (SCOPE = 'pivot' OR SUBSTR(ROW_KEY, 1, 1) <> \" . JOURNAL_PARK_OPEN_SQL . \")\";\n",
+    "\"REPORT_ID = :rid AND SCOPE IN ('row', 'pivot', 'chart') AND ROW_KEY IS NOT NULL\";\n"
    ]
   ],
   "must": [
@@ -4559,8 +4560,8 @@
   "edits": [
    [
     "manage_journal.php",
-    "'pivot_notes' => utf8ize($pnotes), 'parked' => utf8ize($parkedNotes)));",
-    "'pivot_notes' => utf8ize($pnotes), 'parked' => array()));"
+    "'parked' => utf8ize($parkedNotes),",
+    "'parked' => array(),"
    ]
   ],
   "must": [
@@ -6006,7 +6007,7 @@
   "edits": [
    [
     "journal_export.php",
-    "        if (!is_array($rows) || !is_array($res) || empty($res['whoNames']) || !is_array($res['whoNames'])) return $rows;\n",
+    "        if (!is_array($rows) || !is_array($res)) return $rows;\n",
     "        return $rows;\n"
    ]
   ],
@@ -6714,8 +6715,8 @@
   "edits": [
    [
     "schedule_runner.php",
-    "        if (evaluate_format_condition($jtRead ? _snippet_toggle_eval_row($row, $jt) : $row, $parsed)) {\n            $filtered[] = $row;",
-    "        if (evaluate_format_condition($jt ? _snippet_toggle_eval_row($row, $jt) : $row, $parsed)) {\n            $filtered[] = $row;"
+    "$evalRow = _snippet_rownum_row($jtRead ? _snippet_toggle_eval_row($row, $jt) : $row, $row);",
+    "$evalRow = _snippet_rownum_row($jt ? _snippet_toggle_eval_row($row, $jt) : $row, $row);"
    ]
   ],
   "must": [
@@ -6729,8 +6730,8 @@
   "edits": [
    [
     "schedule_runner.php",
-    "        if (evaluate_format_condition($jtRead ? _snippet_toggle_eval_row($row, $jt) : $row, $parsed)) {\n            // \\x02-guarded",
-    "        if (evaluate_format_condition($jt ? _snippet_toggle_eval_row($row, $jt) : $row, $parsed)) {\n            // \\x02-guarded"
+    "if (evaluate_format_condition(_snippet_rownum_row($jtRead ? _snippet_toggle_eval_row($row, $jt) : $row, $row), $parsed)) {   // (hashc) # too\n            // \\x02-guarded",
+    "if (evaluate_format_condition(_snippet_rownum_row($jt ? _snippet_toggle_eval_row($row, $jt) : $row, $row), $parsed)) {   // (hashc) # too\n            // \\x02-guarded"
    ]
   ],
   "must": [
@@ -6820,8 +6821,8 @@
   "edits": [
    [
     "js/penumbra_journal.js",
-    "            status('<strong>Error:</strong> ' + esc(failText(xhr, 'Could not save the note. Please try again.')), 'error');\n",
-    "            status('<strong>Error:</strong> Could not save the note. Please try again.', 'error');\n"
+    "        }).fail(function (xhr) {\n            status('<strong>Error:</strong> ' + esc(failText(xhr, 'Could not save the note. Please try again.')), 'error');\n",
+    "        }).fail(function (xhr) {\n            status('<strong>Error:</strong> Could not save the note. Please try again.', 'error');\n"
    ]
   ],
   "must": [
@@ -6835,8 +6836,8 @@
   "edits": [
    [
     "js/penumbra_journal.js",
-    "        if (noteChars(text) > NOTE_MAX_CHARS) {\n",
-    "        if (false) {\n"
+    "        if (file && file.size > 5 * 1024 * 1024) { status('The file is too large (max 5 MB).', 'error'); return; }\n        if (noteChars(text) > NOTE_MAX_CHARS) {\n",
+    "        if (file && file.size > 5 * 1024 * 1024) { status('The file is too large (max 5 MB).', 'error'); return; }\n        if (false) {\n"
    ]
   ],
   "must": [
@@ -6880,8 +6881,8 @@
   "edits": [
    [
     "js/main.js",
-    "                $status.attr('data-kind', 'error').text(journalFailText(xhr, 'Could not save the note. Please try again.'));\n",
-    "                $status.attr('data-kind', 'error').text('Could not save the note. Please try again.');\n"
+    "                $status.attr('data-kind', 'error').text(journalFailText(xhr, 'Could not save the note. Please try again.'));\n            }).always(function () {\n                $panel.removeData('postInFlight');\n",
+    "                $status.attr('data-kind', 'error').text('Could not save the note. Please try again.');\n            }).always(function () {\n                $panel.removeData('postInFlight');\n"
    ]
   ],
   "must": [
@@ -7138,6 +7139,11 @@
     "js/main.js",
     "            var pops = ['pnbMentionPop', 'pnbRowRefPop', 'pnbAttachPreviewPop'];\n",
     "            var pops = [];\n"
+   ],
+   [
+    "js/penumbra_journal.js",
+    "            if ((e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) && _$rrPop && _$rrPop.is(':visible')) {\n",
+    "            if (false) {\n"
    ]
   ],
   "must": [
@@ -7166,8 +7172,8 @@
   "edits": [
    [
     "js/penumbra_journal.js",
-    "        $a.text(text || '');\n",
-    ""
+    "        var $a = $('#jHistAnnounce');\n        if (!$a.length && $('#jHistResults').length) $a = $('<div id=\"jHistAnnounce\" class=\"sr-only\" role=\"status\" aria-live=\"polite\"></div>').insertBefore('#jHistResults');\n        $a.text(text || '');\n",
+    "        var $a = $('#jHistAnnounce');\n        if (!$a.length && $('#jHistResults').length) $a = $('<div id=\"jHistAnnounce\" class=\"sr-only\" role=\"status\" aria-live=\"polite\"></div>').insertBefore('#jHistResults');\n"
    ]
   ],
   "must": [

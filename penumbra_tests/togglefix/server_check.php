@@ -1129,9 +1129,11 @@ if (!function_exists('penumbra_compute_summary')) {
     }
 }
 if (!function_exists('penumbra_is_toggle_column')) { function penumbra_is_toggle_column($n) { return strtoupper((string)$n) === 'COMPLETE'; } }
+// _snippet_rownum_row (2026-11-11): the runner's (hashc) # helper, which _snippet_filter_rows and lookup() now call
+// (a build before it lifts nothing).
 foreach (array('_snippet_journal_toggles', '_snippet_merge_journal_cols', '_snippet_normalize_toggle_tree', '_snippet_toggle_eval_row',
                '_snippet_filter_rows', '_snippet_notes_available', '_snippet_notes_tree', '_snippet_lookup', '_cf_clean_raw_value', 'prepare_format_rules', 'prepare_rewrite_rules',
-               'penumbra_sched_toggle_group_by', '_cf_compute_group_agg_raw') as $fn) {
+               'penumbra_sched_toggle_group_by', '_cf_compute_group_agg_raw', '_snippet_rownum_row') as $fn) {
     if (!function_exists($fn)) defineLifted($sr, $fn);
 }
 $mQ = function ($sql, $binds) {
@@ -2582,7 +2584,7 @@ if (!function_exists('penumbra_compute_summary')) {
 if (!function_exists('penumbra_is_toggle_column')) { function penumbra_is_toggle_column($n) { return in_array(strtoupper((string)$n), array('RÉVISÉ', 'ÉTÉ RÉVISÉ'), true); } }
 foreach (array('_snippet_journal_toggles', '_snippet_merge_journal_cols', '_snippet_normalize_toggle_tree', '_snippet_toggle_eval_row',
                '_snippet_filter_rows', '_snippet_notes_available', '_snippet_notes_tree', '_snippet_lookup', '_cf_clean_raw_value', 'prepare_format_rules', 'prepare_rewrite_rules',
-               'penumbra_sched_toggle_group_by', '_cf_compute_group_agg_raw') as $fn) {
+               'penumbra_sched_toggle_group_by', '_cf_compute_group_agg_raw', '_snippet_rownum_row') as $fn) {   // _snippet_rownum_row: as mode m's
     if (!function_exists($fn)) defineLifted($sr, $fn);
 }
 $oQ = function ($sql, $binds) {

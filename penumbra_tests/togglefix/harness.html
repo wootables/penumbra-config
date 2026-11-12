@@ -367,6 +367,9 @@
     if (window.__PV_EXTRA) { for (var pvk in window.__PV_EXTRA) window.penumbra_vars[pvk] = window.__PV_EXTRA[pvk]; }
     window.__queryResponse = { data: rows };
   })();
+  // (2026-11-11) index.php defines this inline (themes_config.php, "Surprise Me"); main.js's
+  // state restore calls it, so without it no table renders. The fixture never saves 'random'.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.__T = {};
   window.__queryDone = 0;
   window.__ajaxLog = [];

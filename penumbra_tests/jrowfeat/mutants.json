@@ -34,8 +34,8 @@
  "nogroupcontent": {
   "edits": [
    [
-    "                if (heads[k]) paintJournalTable(heads[k], tables[k], toggles, notesOn, false);",
-    "                if (false) paintJournalTable(heads[k], tables[k], toggles, notesOn, false);"
+    "                if (heads[k]) paintJournalTable(heads[k], tables[k], toggles, notesOn, false, fields);",
+    "                if (false) paintJournalTable(heads[k], tables[k], toggles, notesOn, false, fields);"
    ]
   ],
   "must": [
@@ -105,6 +105,10 @@
    [
     "            function paintBtn($b, on) { syncToggleButtons(tk, rowKey); }",
     "            function paintBtn($b, on) { $b.toggleClass('is-on', on).attr('aria-checked', on ? 'true' : 'false'); }"
+   ],
+   [
+    "            _jSumDirty = true;\r\n            scheduleApply();\r\n",
+    "            _jSumDirty = true;\r\n"
    ]
   ],
   "must": [
@@ -222,8 +226,8 @@
  "nofreshkey": {
   "edits": [
    [
-    "            if (v.ok) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }",
-    "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }"
+    "            if (v.ok) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); stripFieldColumns(); }",
+    "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); stripFieldColumns(); }"
    ],
    [
     "            if (!_jToggleStateLoaded) base = base + 'x' + Date.now().toString(36);",
@@ -240,8 +244,8 @@
  "eq-nostatefetch": {
   "edits": [
    [
-    "            if (v.ok) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }",
-    "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }"
+    "            if (v.ok) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); stripFieldColumns(); }",
+    "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); stripFieldColumns(); }"
    ]
   ],
   "must": [],
@@ -400,7 +404,7 @@
  "grp-nocheck": {
   "edits": [
    [
-    "            if (toggles.length) checkToggleBands();",
+    "            if (toggles.length || (fields && fields.length)) checkToggleBands();",
     "            void 0;"
    ]
   ],
@@ -418,6 +422,10 @@
    [
     "            noteToggleFlip(this); // grouped BY this toggle: the row changes band once the clicks settle",
     "            void 0;"
+   ],
+   [
+    "            _jSumDirty = true;\r\n            scheduleApply();\r\n",
+    "            _jSumDirty = true;\r\n"
    ]
   ],
   "must": [
@@ -487,8 +495,8 @@
  "grp-noanchor": {
   "edits": [
    [
-    "                if (keep) {\r\n                    // The band's box back where it was on the page (a band",
-    "                if (false) {\r\n                    // The band's box back where it was on the page (a band"
+    "                    if (keep) {\r\n                        // The band's box back where it was on the page (a band",
+    "                    if (false) {\r\n                        // The band's box back where it was on the page (a band"
    ]
   ],
   "must": [
@@ -515,8 +523,8 @@
  "grp-nosort": {
   "edits": [
    [
-    "            if (Array.isArray(sortCriteria) && sortCriteria.length && typeof penumbraSortTbodyInPlace === 'function') {\r\n                $('#groupedResultsContainer .group-content > table > tbody').each(",
-    "            if (false) {\r\n                $('#groupedResultsContainer .group-content > table > tbody').each("
+    "                // as the report-load path does for a saved sort.\r\n                if (Array.isArray(sortCriteria) && sortCriteria.length && typeof penumbraSortTbodyInPlace === 'function') {\r\n                    $('#groupedResultsContainer .group-content > table > tbody').each(",
+    "                // as the report-load path does for a saved sort.\r\n                if (false) {\r\n                    $('#groupedResultsContainer .group-content > table > tbody').each("
    ]
   ],
   "must": [
@@ -530,8 +538,8 @@
  "grp-nosearch": {
   "edits": [
    [
-    "\r\n            if ($.trim($('#tableSearch').val() || '') && typeof runTableSearch === 'function') {\r\n                try { runTableSearch(); } catch (e) { /* the groups stand unfiltered */ }",
-    "\r\n            if (false) {\r\n                try { runTableSearch(); } catch (e) { /* the groups stand unfiltered */ }"
+    "            if ($.trim($('#tableSearch').val() || '') && typeof runTableSearch === 'function') {\r\n                var _rgDone = false, _rgTimer = null;",
+    "            if (false) {\r\n                var _rgDone = false, _rgTimer = null;"
    ]
   ],
   "must": [
@@ -609,8 +617,8 @@
  "grp3-noreveal": {
   "edits": [
    [
-    "            if (reveal) {\r\n                revealVertically(reveal.tr, sc);",
-    "            if (false) {\r\n                revealVertically(reveal.tr, sc);"
+    "                if (reveal) {\r\n                    revealVertically(reveal.tr, sc);",
+    "                if (false) {\r\n                    revealVertically(reveal.tr, sc);"
    ]
   ],
   "must": [
