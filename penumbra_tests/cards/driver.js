@@ -2918,36 +2918,45 @@
   // count, the Cards segment then shown; the line reads cards and Switch to table layout, back to the table. What cards are
   // for: the switch's two options, the link, the table's Show as cards
   function cv() { return q('#sbColsView'); }
-  function cvBtn() { return q('#sbColsViewSwitch'); }
+  // (2026-11-12) the Layout line's Table / Cards switch (round P's link went)
+  function cvOpt(view) { return q('#sbColsViewSeg .pnb-cseg-opt[data-view="' + view + '"]'); }
+  function cvSel() { var s = q('#sbColsViewSeg .pnb-cseg-opt.is-selected'); return s ? s.getAttribute('data-view') : null; }
   function colsOpen() { return q('#sbColsSeg').classList.contains('sb-cl-open'); }
   S.ccolsview = async function () {
+    // (2026-11-12, suite catch-up) the Layout line is a Table / Cards switch (#sbColsViewSeg, the Cards card's shape,
+    // painted by paintSwitch), not round P's "Switch to cards layout" link: a pick keeps the Cols card open (the switch
+    // answers on its own node), the arrow keys move along it, the focus on the picked option. The check ids are round
+    // P's; what they check is the switch's.
     await until(function () { return !!C() && !!window.Penumbra.cardsHost && window.Penumbra.cardsHost.loaded(); }, 8000); C().sync(); await sleep(150);
     var pu = C().purpose();
-    R.info.cv = { disp: cv() && cv().style.display, now: text(q('#sbColsViewNow')), btn: text(cvBtn()), seg: segEl() && segEl().style.display };
+    R.info.cv = { disp: cv() && cv().style.display, sel: cvSel(), opts: qa('#sbColsViewSeg .pnb-cseg-opt').map(function (o) { return [o.getAttribute('data-view'), o.getAttribute('aria-checked'), o.tabIndex]; }), seg: segEl() && segEl().style.display };
     R.chk.lineShown = !!cv() && cv().style.display === '' && !!q('#sbColsPop') && q('#sbColsPop').contains(cv()) && cv().previousElementSibling === q('#sbColsList')
-      && text(q('#sbColsView dt')) === 'Layout' && text(q('#sbColsViewNow')) === 'table' && text(cvBtn()) === 'Switch to cards layout' && q('#sbColsView .sb-cl-row').classList.contains('sb-cl-off');
+      && text(q('#sbColsView dt')) === 'Layout' && !!q('#sbColsViewSeg[role="radiogroup"]') && qa('#sbColsViewSeg .pnb-cseg-opt').length === 2
+      && cvSel() === 'table' && cvOpt('table').getAttribute('aria-checked') === 'true' && cvOpt('table').tabIndex === 0 && cvOpt('cards').tabIndex === -1;
     R.chk.segHiddenBefore = !on() && !!segEl() && segEl().style.display === 'none' && !C().switchShown();
     R.chk.purposeWords = /more detail than reads well across one line/.test(pu.cards) && /smaller/.test(pu.cards) && /any size works/.test(pu.cards) && /scanning and comparing many rows/.test(pu.table);
-    // the table's Show as cards and the link say what cards are for (the switch's options: read once it shows, below)
-    var ti = C().tableItems({ th: fth('V_NAME') }), tc = ti && ti[0], linkTitle = cvBtn() && cvBtn().title;
+    var ti = C().tableItems({ th: fth('V_NAME') }), tc = ti && ti[0];
     // the count opens the card (main.js); the line is in it, on screen
     q('#sbColsOpen').click(); await sleep(120);
-    R.chk.opensCols = colsOpen() && vis(cv()) && vis(cvBtn());
+    R.chk.opensCols = colsOpen() && vis(cv()) && vis(cvOpt('cards'));
     R.info.open = { open: colsOpen(), ready: q('#sbColsSeg').classList.contains('sb-cl-ready') };
-    // the link: cards, the card closed, the focus on the count, the Cards segment shown, the pick kept
-    cvBtn().click(); await until(function () { return on() && cards().length > 0; }, 6000); await sleep(150);
-    R.info.sw = { on: on(), open: colsOpen(), act: document.activeElement && (document.activeElement.id || document.activeElement.tagName), seg: segEl().style.display, pref: prefs().lrfix };
-    R.chk.linkSwitches = on() && cards().length > 0 && !colsOpen() && segEl().style.display === '' && (prefs().lrfix || {}).view === 'cards';
-    R.chk.focusBack = document.activeElement === q('#sbColsOpen');
-    R.info.titles = { cards: opt('cards') && opt('cards').title, table: opt('table') && opt('table').title, link: linkTitle, menu: tc && tc.title };
+    // a pick: cards, the Cols card kept open, the switch on Cards, the Cards segment shown, the pick kept
+    cvOpt('cards').click(); await until(function () { return on() && cards().length > 0; }, 6000); await sleep(150);
+    R.info.sw = { on: on(), open: colsOpen(), sel: cvSel(), seg: segEl().style.display, pref: prefs().lrfix };
+    R.chk.linkSwitches = on() && cards().length > 0 && colsOpen() && cvSel() === 'cards' && segEl().style.display === '' && (prefs().lrfix || {}).view === 'cards';
+    R.info.titles = { cards: opt('cards') && opt('cards').title, table: opt('table') && opt('table').title, cvCards: cvOpt('cards').title, cvTable: cvOpt('table').title, menu: tc && tc.title };
     R.chk.purposeTitles = !!opt('cards') && opt('cards').title === 'Each row as a card. ' + pu.cards && opt('table').title === pu.table
-      && linkTitle === 'Each row as a card. ' + pu.cards && !!tc && tc.act === 'showCards' && tc.title === 'The same rows drawn as cards. ' + pu.cards;
-    q('#sbColsOpen').click(); await sleep(120);
-    R.chk.cardsWords = colsOpen() && text(q('#sbColsViewNow')) === 'cards' && text(cvBtn()) === 'Switch to table layout' && cvBtn().title === pu.table
-      && q('#sbColsView .sb-cl-row').classList.contains('sb-cl-on') && text(q('#sbColsPopHead')) === 'Fields';
-    cvBtn().click(); await until(function () { return !on(); }, 6000); await sleep(150);
-    R.chk.backToTable = !on() && !colsOpen() && (prefs().lrfix || {}).view === 'table' && text(q('#sbColsViewNow')) === 'table' && text(cvBtn()) === 'Switch to cards layout' && document.activeElement === q('#sbColsOpen');
-    if (P.get('shot')) { var cp = q('#sbCardsPop'); if (cp) cp.style.setProperty('display', 'none', 'important'); q('#sbColsOpen').click(); await sleep(250); }   // (the harness draws the Cards card open: hidden for the picture)
+      && cvOpt('cards').title === 'Each row as a card. ' + pu.cards && cvOpt('table').title === pu.table && !!tc && tc.act === 'showCards' && tc.title === 'The same rows drawn as cards. ' + pu.cards;
+    R.chk.cardsWords = colsOpen() && cvOpt('cards').getAttribute('aria-checked') === 'true' && cvOpt('table').getAttribute('aria-checked') === 'false' && text(q('#sbColsPopHead')) === 'Fields';
+    // the keyboard: an arrow moves along the switch (back to Table), the focus on the option it picked
+    cvOpt('cards').focus(); keyOn(cvOpt('cards'), 'ArrowLeft'); await until(function () { return !on(); }, 6000); await sleep(150);
+    R.info.key = { on: on(), act: document.activeElement && document.activeElement.getAttribute('data-view'), sel: cvSel() };
+    R.chk.focusBack = !on() && cvSel() === 'table' && document.activeElement === cvOpt('table');
+    // and by clicks: Cards, then Table - the table, the pick kept, the card still open, its head no longer Fields
+    cvOpt('cards').click(); await until(function () { return on(); }, 6000); await sleep(150);
+    cvOpt('table').click(); await until(function () { return !on(); }, 6000); await sleep(150);
+    R.chk.backToTable = !on() && colsOpen() && (prefs().lrfix || {}).view === 'table' && cvSel() === 'table' && text(q('#sbColsPopHead')) !== 'Fields';
+    if (P.get('shot')) { var cp = q('#sbCardsPop'); if (cp) cp.style.setProperty('display', 'none', 'important'); if (!colsOpen()) q('#sbColsOpen').click(); await sleep(250); }   // (the harness draws the Cards card open: hidden for the picture)
   };
   // (round Q) a pivot on link-valued fields (H_GROUP > H_GROUP2 down, V_STATUS across, each value an @@HTML link, as
   // ?id=int-col-mat's colleges and awards): no tile, details window or menu shows the marker or markup - a tile's
@@ -4004,10 +4013,12 @@
   S.gbcols = async function () {
     await until(function () { return on() && !!q('#pnbCardsHost .pnb-cards-lane'); }, 10000); await sleep(300);
     C().sync(); await sleep(150);
-    var b = cvBtn(), reason = /Layout in Configure Grouping/.test((b && b.title) || '');
-    R.info.bcols = { has: !!b, dis: b && b.disabled, title: b && b.title, txt: text(b) };
+    // (2026-11-12, suite catch-up) the Layout line's switch, not round P's link: a board greys its Table (aria-disabled,
+    // the reason in its title), Cards stays picked, and a click on Table leaves the board as it is
+    var b = cvOpt('table'), reason = /Layout in Configure Grouping/.test((b && b.title) || '');
+    R.info.bcols = { has: !!b, off: b && b.classList.contains('is-off'), aria: b && b.getAttribute('aria-disabled'), title: b && b.title, sel: cvSel() };
     if (b) b.click(); await sleep(300);
-    R.chk.boardColsGreyed = !!b && b.disabled === true && reason && on() && !!q('#pnbCardsHost .pnb-cards-lane');
+    R.chk.boardColsGreyed = !!b && b.classList.contains('is-off') && b.getAttribute('aria-disabled') === 'true' && reason && cvSel() === 'cards' && on() && !!q('#pnbCardsHost .pnb-cards-lane');
   };
   S.cpct = async function () {
     await until(function () { return on() && cards().length > 2; }, 8000); await sleep(200);

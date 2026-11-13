@@ -698,7 +698,7 @@ MUTANTS = {
     'cs-altdet': ([('cards', "(e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.altKey && !e.ctrlKey && !e.metaKey && !/^", "(e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !/^")], ['L-csweep-altKeys'], ['csweep']),
     'cs-f10': ([('cards', "            if (openMenu(e.target, null)) { e.preventDefault(); e.stopPropagation(); }", "            e.preventDefault(); e.stopPropagation(); openMenu(e.target, null);")], ['L-csweep-menuKeyOnButton'], ['csweep']),
     'cs-cut': ([('cards', "            if (cut && !cells.length && sec.rows.length) continue;   // (cnest sweep)", "            // (cnest sweep)")], ['L-gsweep-cutNoHeads'], ['gsweep']),
-    'cs-cols': ([('cards', "            var bd = c && boardOn();", "            var bd = false;")], ['L-gbcols-boardColsGreyed'], ['gbcols']),
+    'cs-cols': ([('cards', "var opts = s.querySelectorAll('.pnb-cseg-opt'), at = 0, bd = boardOn();", "var opts = s.querySelectorAll('.pnb-cseg-opt'), at = 0, bd = false;")], ['L-gbcols-boardColsGreyed'], ['gbcols']),   # (2026-11-12) the switch's paint
     'cs-pct': ([('cards', "pv = /%\\s*$/.test(st) ? num(st) : null;", "pv = null;")], ['L-cpct-pctBar'], ['cpct']),
     'cs-pctlab': ([('cards', "(td.textContent.trim() || textOf(td));   // (cnest sweep)", "textOf(td);   // (cnest sweep)")], ['L-cpct-pctLabel'], ['cpct']),
     'cs-find': ([('cards', "        if (findWanted && (!findWanted.isConnected || (P.find", "        if (false && (!findWanted.isConnected || (P.find")], ['L-cfindgo-findLetGo'], ['cfindgo']),
@@ -978,12 +978,12 @@ MUTANTS = {
     'm-splitink': ([('cards', "        return hi > lo ? hi - lo : 0;\n", "        return box.getBoundingClientRect().width;\n")], ['L-cxl2-splitShort'], ['cxl2']),
     'm-cvshow': ([('cards', "        if (row.style.display !== (ok ? '' : 'none')) row.style.display = ok ? '' : 'none';", "        row.style.display = 'none';")], ['L-ccolsview-lineShown'], ['ccolsview']),
     'm-cvsync': ([('cards', "        paintColsView();   // (colsview) the Cols card's Layout line\n", "")], ['L-ccolsview-lineShown'], ['ccolsview']),
-    'm-cvbind': ([('cards', "        if (cvs) cvs.addEventListener('click', colsViewSwitch);\n", "")], ['L-ccolsview-linkSwitches'], ['ccolsview']),
-    'm-cvclose': ([('cards', "        if (seg && op && seg.classList.contains('sb-cl-open')) op.click();   // the card closes first (main.js's own toggle)\n", "")], ['L-ccolsview-linkSwitches'], ['ccolsview']),
-    'm-cvfocus': ([('cards', "        if (op) { try { op.focus({ preventScroll: true }); } catch (err) { op.focus(); } }\n", "")], ['L-ccolsview-focusBack'], ['ccolsview']),
-    'm-cvwords': ([('cards', "            var t = c ? 'Switch to table layout' : 'Switch to cards layout',", "            var t = 'Switch to cards layout',")], ['L-ccolsview-cardsWords'], ['ccolsview']),
-    'm-cvback': ([('cards', "        if (wasCards) set('table'); else showAs(null, null);", "        showAs(null, null);")], ['L-ccolsview-backToTable'], ['ccolsview']),
-    'm-cvtitle': ([('cards', "            if (btn.title !== tt) btn.title = tt;\n", "")], ['L-ccolsview-purposeTitles', 'L-ccolsview-cardsWords'], ['ccolsview']),
+    # (2026-11-12, suite catch-up) the link's mutants (m-cvclose: the card no longer closes; m-cvwords / m-cvtitle: no
+    # words or title of its own) retired with it; the others re-anchored to the switch
+    'm-cvbind': ([('cards', "        if (cvs) cvs.addEventListener('click', colsViewPick);\n", "")], ['L-ccolsview-linkSwitches'], ['ccolsview']),
+    'm-cvfocus': ([('cards', "            if (nowSel) nowSel.focus();\n", "")], ['L-ccolsview-focusBack'], ['ccolsview']),
+    'm-cvpaint': ([('cards', "        if (ok) paintSwitch(document.getElementById('sbColsViewSeg'));\n", "")], ['L-ccolsview-linkSwitches', 'L-ccolsview-cardsWords'], ['ccolsview']),
+    'm-cvback': ([('cards', "        if (opt) { e.preventDefault(); set(opt.getAttribute('data-view')); }", "        if (opt) { e.preventDefault(); set('cards'); }")], ['L-ccolsview-backToTable'], ['ccolsview']),
     'm-purpose': ([('cards', "            if (opts[i].title !== tip) opts[i].title = tip;\n", "")], ['L-ccolsview-purposeTitles'], ['ccolsview']),
     'm-purposemenu': ([('cards', "title: 'The same rows drawn as cards. ' + CARDS_FOR, items: function () {", "title: 'The same rows drawn as cards (the Table / Cards switch)', items: function () {")], ['L-ccolsview-purposeTitles'], ['ccolsview']),
     'm-secback': ([('index', '        <div class="sp-section sp-columns-section">\n', '        <div class="sp-section sp-cards-section" id="spCardsSection"><button type="button" id="spCardConfigBtn">Configure cards...</button></div>\n        <div class="sp-section sp-columns-section">\n')], ['L-cauth-sectionGone', 'L-clayout-sectionGone', 'S-roundP'], ['cauth', 'clayout']),
@@ -1417,12 +1417,12 @@ def static_checks(t):
     out.append(('S-roundP', 'Round P (2026-10-30' in t['readme'] and 'spCardsSection' not in idx and 'spCardConfigBtn' not in idx and 'us-tip-card-layout' not in idx + t['tip']
                 and 'spCardsSection' not in css and 'spCardConfigBtn' not in cards and 'paintCfgSection' not in cards
                 and bool(clm) and bool(cvm) and cvm.group(0) in clm.group(0) and clm.group(0).find('id="sbColsList"') < clm.group(0).find('id="sbColsView"')
-                and '<?php' not in cvm.group(0) and '<button type="button" class="sb-cl-view-switch" id="sbColsViewSwitch">Switch to cards layout</button>' in cvm.group(0)
+                and '<?php' not in cvm.group(0) and 'id="sbColsViewSeg"' in cvm.group(0) and 'role="radiogroup"' in cvm.group(0) and 'data-view="table"' in cvm.group(0) and 'data-view="cards"' in cvm.group(0)
                 and 'function splitFields(' in cards and 'function paintColsView(' in cards and "var CARDS_FOR = '" in cards
                 and mq > 0 and '.pnb-card-fields.is-2col' in css[mq:mq + 900] and 'dt.is-cf2' in css[mq:mq + 900]
-                and 'more detail than reads well on one line' in pal and 'When cards help' in t['ustopic'] and 'Switch to cards layout' in t['ustopic']
+                and 'more detail than reads well on one line' in pal and 'When cards help' in t['ustopic'] and 'The Table / Cards switch is on the <em>Layout</em> line' in t['ustopic']
                 and 'two columns' in t['ustopic'] and 'Cards</strong> section of this panel' not in t['ustopic'],
-                "Settings > Cards gone; the Cols card's Layout line; two columns at Extra large; what cards are for (module, palette, help, tip); README"))
+                "Settings > Cards gone; the Cols card's Layout line (a Table / Cards switch since 2026-11-07..10); two columns at Extra large; what cards are for (module, palette, help, tip); README"))
     # (clbar) the card setup in the view link (cleaned, captured, from Open as cards, applied as the session entry, dropped
     # first, listed, described); the rank-scaled brand bar; help, tip, README
     # (cmsize) the Open as cards path's setup line went with Open as cards

@@ -132,7 +132,8 @@ def mutate(src, name, which='js'):
     for e in MUTANTS[name][0]:
         old, new = e[0], e[1]
         if (e[2] if len(e) > 2 else 'js') != which: continue
-        old = old.replace('\n', '\r\n'); new = new.replace('\n', '\r\n')
+        # (2026-11-12) only a CRLF file takes CRLF anchors: main.css went LF in e65935d (main.js is still CRLF)
+        if '\r\n' in src: old = old.replace('\n', '\r\n'); new = new.replace('\n', '\r\n')
         if src.count(old) != 1: raise SystemExit("mutant '%s': anchor found %d times: %r" % (name, src.count(old), old[:90]))
         src = src.replace(old, new)
     return src

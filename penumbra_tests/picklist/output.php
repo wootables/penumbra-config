@@ -36,26 +36,35 @@ if ($args) { fwrite(STDERR, 'unknown arguments: ' . implode(' ', $args) . "\n");
 
 // --- mutants: [file, old (the change's text), new (as before / broken), must-red] ---------------------------------
 $MUTANTS = array(
+    // (2026-11-12, DATE_SPEC.md) date columns
+    'd-gbsfx'     => array('journal_export.php', "            \$levels[\$i] = \$to . \$sfx;\n", "            \$levels[\$i] = \$to;\n", array('D-group')),
+    'd-gbparse'   => array('journal_export.php', "            if (!isset(\$byWho[strtoupper(\$t)]) && preg_match(", "            if (false && preg_match(", array('D-group')),
+    'd-type'      => array('journal_export.php', "(\$fd['type'] !== 'pick' && \$fd['type'] !== 'date')) continue;\n                if (\$fPer", "\$fd['type'] !== 'pick') continue;\n                if (\$fPer",
+                           array('D-names', 'D-values', 'D-alias', 'D-alone', 'D-filter', 'D-caps', 'D-group', 'D-bucket')),
+    'd-pass'      => array('journal_export.php', "                if (\$fieldDefs[\$fk]['type'] === 'date') {   // (2026-11-12)", "                if (false) {   // (2026-11-12)",
+                           array('D-values', 'D-filter', 'D-bucket')),
+    'd-sfx'       => array('journal_export.php', "\$fSfx = \$fIsDate ? array('by' => ' SET BY', 'on' => ' SET ON') : array('by' => ' BY', 'on' => ' ON');", "\$fSfx = array('by' => ' BY', 'on' => ' ON');",
+                           array('D-names', 'D-values', 'D-alias')),
     'alone-gate'  => array('journal_export.php', 'if ((empty($toggles) && !$notesRead && !$fieldDefs) || empty($keyCols)) return null;', 'if ((empty($toggles) && !$notesRead) || empty($keyCols)) return null;',
-                           array('R-alone', 'S-sort-alone', 'S-group-alone', 'F-alone', 'H-sum-alone', 'H-snipcols', 'H-sniptree')),
+                           array('R-alone', 'S-sort-alone', 'S-group-alone', 'F-alone', 'H-sum-alone', 'H-snipcols', 'H-sniptree', 'D-alone', 'D-filter', 'D-group', 'D-bucket')),
     'alone-ret'   => array('journal_export.php', 'if (empty($colMeta) && empty($whoMeta) && $notesSearch === null) return null;', 'if (empty($colMeta) && $notesSearch === null) return null;',
-                           array('R-alone', 'S-sort-alone', 'S-group-alone', 'F-alone', 'H-sum-alone', 'H-snipcols', 'H-sniptree')),
+                           array('R-alone', 'S-sort-alone', 'S-group-alone', 'F-alone', 'H-sum-alone', 'H-snipcols', 'H-sniptree', 'D-alone', 'D-filter', 'D-group', 'D-bucket')),
     'label'       => array('journal_export.php', 'if ($fo[\'id\'] === $fv) { $flbl = $fo[\'label\']; break; }', 'if (false) { $flbl = $fo[\'label\']; break; }',
                            array('R-values', 'R-alone', 'X-columns', 'F-label', 'F-old', 'F-old-not', 'F-current-wins', 'F-oldname', 'F-retired', 'F-alone', 'F-grouped', 'F-other')),
     'unknown'     => array('journal_export.php', '$flbl = \'(unknown option)\';', '$flbl = $fv;',
                            array('R-values', 'R-alone', 'X-columns')),
-    'parked'      => array('journal_export.php', "                if (defined('JOURNAL_PARK_OPEN') && strpos(\$rk, JOURNAL_PARK_OPEN) === 0) continue;   // filed under another key\n                \$flbl", "                \$flbl",
+    'parked'      => array('journal_export.php', "                if (defined('JOURNAL_PARK_OPEN') && strpos(\$rk, JOURNAL_PARK_OPEN) === 0) continue;   // filed under another key\n                if (\$fieldDefs", "                if (\$fieldDefs",   // (2026-11-12) the date branch follows it now
                            array('R-parked')),
     'readfail'    => array('journal_export.php', 'if (!is_array($fr)) $fieldDefs = array();', 'if (!is_array($fr)) $fr = array();',
                            array('R-readfail')),
-    'who'         => array('journal_export.php', "            if (\$who) {\n                foreach (array('by' => ' BY', 'on' => ' ON') as \$fkind => \$fsfx) {", "            if (true) {\n                foreach (array('by' => ' BY', 'on' => ' ON') as \$fkind => \$fsfx) {",
-                           array('R-nowho', 'R-alone')),
+    'who'         => array('journal_export.php', "            if (\$who) {\n                foreach (\$fSfx as \$fkind => \$fsfx) {", "            if (true) {\n                foreach (\$fSfx as \$fkind => \$fsfx) {",   // (2026-11-12) re-anchored
+                           array('R-nowho', 'R-alone', 'D-alone')),
     'clean-tk'    => array('journal_export.php', '|| isset($fTk[$fk]) ||', '||',
                            array('R-clean')),
-    'clean-4'     => array('journal_export.php', 'if (count($fieldDefs) >= 4) break;', '',
-                           array('R-clean')),
+    'clean-4'     => array('journal_export.php', "                if (\$fPer[\$fd['type']] >= 4) continue;\n", "",   // (2026-11-12) the cap is per type now
+                           array('R-clean', 'D-caps')),
     'alias'       => array('journal_export.php', 'foreach ($fd[\'oldLabels\'] as $fol) {', 'foreach (array() as $fol) {',
-                           array('R-alias', 'S-sort', 'S-group', 'F-oldname', 'H-snipcols', 'H-sniptree')),
+                           array('R-alias', 'S-sort', 'S-group', 'F-oldname', 'H-snipcols', 'H-sniptree', 'D-alias', 'D-filter', 'D-group')),
     'order'       => array('journal_export.php', "'order' => array_merge(\$fLive, \$fRet)", "'order' => array_merge(\$fRet, \$fLive)",
                            array('R-clean', 'S-orders', 'S-orders-sort')),
     'orders-own'  => array('journal_export.php', 'if (isset($have[$own])) { $out[$name] = $out[$have[$own]]; continue; }', '',
@@ -66,9 +75,9 @@ $MUTANTS = array(
     'sort-gate'   => array('journal_export.php', 'if (!is_array($criteria) || !is_array($resolver) || (empty($resolver[\'colMeta\']) && empty($resolver[\'whoMeta\']))) return $criteria;', 'if (!is_array($criteria) || !is_array($resolver) || empty($resolver[\'colMeta\'])) return $criteria;',
                            array('S-sort-alone')),
     'group-map'   => array('journal_export.php', "\$byWho[strtoupper((\$wm['kind'] === 'field' ? '__JOURNAL_FIELD__' : (\$wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__')) . \$wm['key'])]", "\$byWho[strtoupper((\$wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__') . \$wm['key'])]",
-                           array('S-group', 'S-group-alone')),
+                           array('S-group', 'S-group-alone', 'D-group')),
     'group-gate'  => array('journal_export.php', 'if (!is_array($resolver) || (empty($resolver[\'colMeta\']) && empty($resolver[\'whoMeta\'])) || !is_string($groupBy)) return $groupBy;', 'if (!is_array($resolver) || empty($resolver[\'colMeta\']) || !is_string($groupBy)) return $groupBy;',
-                           array('S-group-alone')),
+                           array('S-group-alone', 'D-group')),
     'opt-call'    => array('penumbra_search.php', "    \$parsedQuery = _journal_field_option_conditions(\$parsedQuery, \$toggleResolver);\n", '',
                            array('F-old', 'F-old-not', 'F-oldname', 'F-alone', 'F-grouped')),
     'opt-cur'     => array('penumbra_search.php', "isset(\$fo['cur'][\$want]) || ", '',
@@ -76,7 +85,7 @@ $MUTANTS = array(
     'opt-ops'     => array('penumbra_search.php', "        if (!in_array(\$op, array('=', '==', '!=', '<>', \"\\xE2\\x89\\xA0\"), true)) continue;\n        \$bare", "        \$bare",
                            array('F-contains')),
     'filter-gate' => array('penumbra_search.php', "if (\$toggleResolver && (!empty(\$toggleResolver['colNames']) || !empty(\$toggleResolver['whoNames']))) {", "if (\$toggleResolver && !empty(\$toggleResolver['colNames'])) {",
-                           array('F-alone')),
+                           array('F-alone', 'D-filter', 'D-bucket')),
     'sum-gate'    => array('schedule_runner.php', "if (!is_array(\$resolver) || (empty(\$resolver['colMeta']) && empty(\$resolver['whoMeta'])) || !is_array(\$state)) return \$state;", "if (!is_array(\$resolver) || empty(\$resolver['colMeta']) || !is_array(\$state)) return \$state;",
                            array('H-sum-alone')),
     'sum-map'     => array('schedule_runner.php', "\$from = strtoupper((\$wm['kind'] === 'field' ? '__JOURNAL_FIELD__' : (\$wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__')) . \$wm['key']);", "\$from = strtoupper((\$wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__') . \$wm['key']);",
@@ -100,7 +109,8 @@ $MUTANTS = array(
 $CONTROL_RED = array('R-names', 'R-values', 'R-parked', 'R-nowho', 'R-alone', 'R-clean', 'R-alias', 'X-columns',
     'S-sort', 'S-sort-alone', 'S-group', 'S-group-alone', 'S-orders', 'S-orders-own', 'S-orders-sort',
     'F-label', 'F-old', 'F-old-not', 'F-current-wins', 'F-oldname', 'F-retired', 'F-empty', 'F-alone', 'F-other', 'F-grouped',
-    'H-sum', 'H-sum-alone', 'H-hl', 'H-order', 'H-places', 'H-places-hidden', 'H-snipcols', 'H-sniptree', 'H-wired');
+    'H-sum', 'H-sum-alone', 'H-hl', 'H-order', 'H-places', 'H-places-hidden', 'H-snipcols', 'H-sniptree', 'H-wired',
+    'D-names', 'D-values', 'D-alias', 'D-noorder', 'D-alone', 'D-filter', 'D-caps', 'D-group', 'D-bucket');   // (2026-11-12) the build before pick lists reads no date column either
 // ...every "as before" assert (R-toggles, R-alone-nokey, R-none, R-noquery, R-readfail, X-snapshot, X-strip, F-regex,
 // F-contains, F-bare, F-clean) PASSES on the old build.
 
@@ -109,7 +119,8 @@ $EXPECT = array('P-loaded', 'P-lifted',
     'X-snapshot', 'X-strip', 'X-columns',
     'S-sort', 'S-sort-alone', 'S-group', 'S-group-alone', 'S-orders', 'S-orders-own', 'S-orders-sort',
     'F-label', 'F-old', 'F-old-not', 'F-current-wins', 'F-regex', 'F-contains', 'F-oldname', 'F-retired', 'F-empty', 'F-alone', 'F-bare', 'F-other', 'F-grouped', 'F-clean',
-    'H-sum', 'H-sum-alone', 'H-hl', 'H-order', 'H-places', 'H-places-hidden', 'H-snipcols', 'H-sniptree', 'H-wired');
+    'H-sum', 'H-sum-alone', 'H-hl', 'H-order', 'H-places', 'H-places-hidden', 'H-snipcols', 'H-sniptree', 'H-wired',
+    'D-names', 'D-values', 'D-alias', 'D-noorder', 'D-alone', 'D-filter', 'D-caps', 'D-group', 'D-bucket');   // (2026-11-12) date columns
 
 function plo_files($app, $APP) {
     $files = array();
@@ -315,7 +326,7 @@ function plo_child($dir) {
     plo_db_reset();
     $f = plo_fields();
     $messy = array(
-        array('key' => 'd1', 'type' => 'date', 'label' => 'When', 'options' => array()),
+        array('key' => 'd1', 'type' => 'lookup', 'label' => 'When', 'options' => array()),   // (2026-11-12) 'date' is a type now: D-*
         array('key' => 'REV', 'type' => 'pick', 'label' => 'Clash', 'options' => array()),
         array('key' => '__x', 'type' => 'pick', 'label' => 'Reserved', 'options' => array()),
         array('key' => 'F1', 'type' => 'pick', 'label' => 'Progress', 'oldLabels' => array('Stage'), 'options' => array_merge(
@@ -447,6 +458,60 @@ function plo_child($dir) {
         substr_count($runner, "journalExportFieldSortOrders(isset(\$state['customSortOrders'])"),
         substr_count($runner, "if (\$_jfOrders) \$state['customSortOrders'] = \$_jfOrders;"));
     $A('H-wired', $w === array(1, 1, 1, 1), 'the runner\'s group-summary filter and its sort orders: ' . json_encode($w));
+
+
+    // ---- D: date columns (2026-11-12, DATE_SPEC.md) ---------------------------------------------------------------
+    // A field of type 'date': its value is a day, passed through as stored (anything that is not one day shows as
+    // "(not a date)"); its who / when columns are "<LABEL> SET BY" / "SET ON"; no custom order (its days sort as
+    // text); TODAY in a task filter is the day the task runs; four of each type.
+    $dd = function ($n) { return date('Y-m-d', strtotime(($n >= 0 ? '+' : '') . $n . ' days')); };
+    $dateDef = array('key' => 'due', 'type' => 'date', 'label' => 'Due', 'oldLabels' => array('Deadline'));
+    plo_db_reset();
+    $GLOBALS['DB']['fields'][] = array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'P-1', 'FIELD_VALUE' => '2026-11-21', 'UPDATED_BY' => 'kim', 'UPDATED_ON' => '2026-11-12');
+    $GLOBALS['DB']['fields'][] = array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'P-2', 'FIELD_VALUE' => '2026-02-30', 'UPDATED_BY' => 'lee', 'UPDATED_ON' => '2026-11-11');
+    $GLOBALS['DB']['fields'][] = array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'P-4', 'FIELD_VALUE' => 'o2', 'UPDATED_BY' => 'pat', 'UPDATED_ON' => '2026-11-10');
+    $dres = plo_res(array('journalFields' => array_merge(plo_fields(), array($dateDef))));
+    $A('D-names', is_array($dres) && isset($dres['fieldNames']) && $dres['fieldNames'] === array('PROGRESS', 'STATUS_2', 'DUE')
+        && array_slice($dres['whoNames'], -3) === array('DUE', 'DUE SET BY', 'DUE SET ON') && !isset($dres['fieldOpts']['DUE']),
+        is_array($dres) ? array($dres['whoNames'], isset($dres['fieldNames']) ? $dres['fieldNames'] : null, isset($dres['fieldOpts']) ? array_keys($dres['fieldOpts']) : null) : 'no resolver');
+    $A('D-values', is_array($dres) && $vals($dres, 'DUE') === '2026-11-21,(not a date),,(not a date),'
+        && $vals($dres, 'DUE SET BY') === 'kim,lee,,pat,' && $vals($dres, 'DUE SET ON') === '2026-11-12,2026-11-11,,2026-11-10,',
+        is_array($dres) ? array($vals($dres, 'DUE'), $vals($dres, 'DUE SET BY'), $vals($dres, 'DUE SET ON')) : 'no resolver');
+    $A('D-alias', is_array($dres) && isset($dres['aliasMap']['DEADLINE'], $dres['aliasMap']['DEADLINE SET ON']) && $dres['aliasMap']['DEADLINE'] === 'DUE'
+        && $dres['aliasMap']['DEADLINE SET ON'] === 'DUE SET ON' && !isset($dres['aliasMap']['DEADLINE ON']),
+        is_array($dres) ? array_intersect_key($dres['aliasMap'], array('DEADLINE' => 1, 'DEADLINE SET ON' => 1, 'DEADLINE SET BY' => 1, 'DEADLINE ON' => 1)) : 'no resolver');
+    $so = (function_exists('journalExportFieldSortOrders') && is_array($dres)) ? journalExportFieldSortOrders(array(), $dres) : null;
+    $A('D-noorder', is_array($so) && isset($so['PROGRESS']) && !isset($so['DUE']), is_array($so) ? array_keys($so) : $so);
+    plo_db_reset();
+    $GLOBALS['DB']['fields'] = array(
+        array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'P-1', 'FIELD_VALUE' => $dd(9), 'UPDATED_BY' => 'kim', 'UPDATED_ON' => '2026-11-12'),
+        array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'P-2', 'FIELD_VALUE' => $dd(0), 'UPDATED_BY' => 'kim', 'UPDATED_ON' => '2026-11-12'),
+        array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'P-4', 'FIELD_VALUE' => $dd(-3), 'UPDATED_BY' => 'kim', 'UPDATED_ON' => '2026-11-12'),
+        array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'P-5', 'FIELD_VALUE' => $dd(2), 'UPDATED_BY' => 'kim', 'UPDATED_ON' => '2026-11-12'));
+    $fres = plo_res(array('journalFields' => array($dateDef), 'journalToggles' => null, 'journalToggleWho' => null));
+    $A('D-alone', is_array($fres) && isset($fres['fieldNames']) && $fres['fieldNames'] === array('DUE') && $fres['whoNames'] === array('DUE'),
+        is_array($fres) ? array($fres['whoNames'], isset($fres['fieldNames']) ? $fres['fieldNames'] : null) : 'no resolver');
+    $dq = array('Due < TODAY', 'Due >= TODAY and Due <= TODAY+3', 'Due = empty', 'Deadline < TODAY', 'Due > TODAY+7');
+    $dgot = array(); foreach ($dq as $q) $dgot[$q] = is_array($fres) ? $ids($q, $fres) : '-';
+    $A('D-filter', $dgot === array('Due < TODAY' => 'P-4', 'Due >= TODAY and Due <= TODAY+3' => 'P-2,P-5', 'Due = empty' => 'P-3',
+        'Deadline < TODAY' => 'P-4', 'Due > TODAY+7' => 'P-1'), $dgot);
+    // (3b, 2026-11-12) a date column by a period: a grouping level keeps its period on the column's output name (the
+    // runner's level spec then reads DUE:ym as it reads a data date column's); a task's filter by a period
+    $gb = is_array($fres) ? array(journalExportToggleGroupBy('__JOURNAL_FIELD__due:ym,TITLE', $fres), journalExportToggleGroupBy('Deadline:YM', $fres),
+        journalExportToggleGroupBy('Due:year', $fres), journalExportToggleGroupBy('__JOURNAL_FIELD__due', $fres)) : null;
+    $A('D-group', is_array($gb) && $gb[0] === 'DUE:ym,TITLE' && $gb[1] === 'DUE:ym' && strtoupper($gb[2]) === 'DUE:YEAR' && $gb[3] === 'DUE', $gb);
+    $ml = date('M Y', strtotime('+2 days'));
+    $bw = array();
+    foreach (array('P-1' => 9, 'P-2' => 0, 'P-4' => -3, 'P-5' => 2) as $pid => $n) if (date('M Y', strtotime(($n >= 0 ? '+' : '') . $n . ' days')) === $ml) $bw[] = $pid;
+    $bgot = is_array($fres) ? $ids("Due:ym = '" . $ml . "'", $fres) : '-';
+    $A('D-bucket', $bgot === implode(',', $bw), array($ml, $bgot, $bw));
+    $many = plo_fields();
+    for ($di = 1; $di <= 5; $di++) $many[] = array('key' => 'd' . $di, 'type' => 'date', 'label' => 'Date ' . $di);
+    $many[] = array('key' => 'lk', 'type' => 'lookup', 'label' => 'Who');
+    plo_db_reset();
+    $cres = plo_res(array('journalFields' => $many));
+    $A('D-caps', is_array($cres) && isset($cres['fieldNames']) && $cres['fieldNames'] === array('PROGRESS', 'STATUS_2', 'DATE 1', 'DATE 2', 'DATE 3', 'DATE 4'),
+        is_array($cres) && isset($cres['fieldNames']) ? $cres['fieldNames'] : 'no resolver');
 
     echo json_encode($R, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
 }

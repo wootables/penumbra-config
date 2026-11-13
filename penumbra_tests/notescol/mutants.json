@@ -210,8 +210,8 @@
  "htmlbr": {
   "edits": [
    [
-    "                    $tdClone.html(escapeHtml(_jtv).replace(/\\n/g, '<br>'));",
-    "                    $tdClone.text(_jtv);"
+    "                $tdClone.html(escapeHtml(_jtv).replace(/\\n/g, '<br>'));",
+    "                $tdClone.text(_jtv);"
    ]
   ],
   "must": [

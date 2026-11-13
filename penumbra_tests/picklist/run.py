@@ -29,6 +29,8 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_colmenu.js']
 ALL_SCN = ['flat', 'pick', 'conflict', 'failure', 'filter', 'group', 'sort', 'hist', 'kbd', 'who', 'notready', 'nofields', 'setup',
            'rowmenu', 'bulk', 'cards']   # (phase 2, 2026-11-11) the row's menu, a heading's bulk set, cards
+ALL_SCN = ALL_SCN + ['date', 'datebox', 'datefilter', 'dategroup', 'datesetup', 'datewho']   # (2026-11-12) date columns, DATE_SPEC.md 3a
+ALL_SCN = ALL_SCN + ['datebulk', 'datebands', 'datenest', 'datecards']   # (2026-11-12) 3b: the heading's bulk set, period bands, cards
 EXPECT = {
     'flat': ['F-head', 'F-cells', 'F-pill', 'F-toggles', 'F-resolver', 'F-labeller', 'F-values', 'F-friendly', 'F-export', 'F-isolation'],
     'pick': ['P-menu', 'P-save', 'P-shows', 'P-clear', 'P-checked', 'P-same'],
@@ -48,7 +50,20 @@ EXPECT = {
     # and a field are the cell's button (the picker), the card's menu and the details window carry it
     'rowmenu': ['R-item', 'R-sub', 'R-save', 'R-head'],
     'bulk': ['B-item', 'B-sub', 'B-confirm', 'B-post', 'B-toast', 'B-undo', 'B-filtered', 'B-escape'],
-    'cards': ['D-pill', 'D-pick', 'D-shows', 'D-field', 'D-empty', 'D-menu', 'D-details'],
+    'cards': ['D-pill', 'D-pick', 'D-shows', 'D-field', 'D-empty', 'D-menu', 'D-details', 'D-label'],
+    # (2026-11-12, DATE_SPEC.md 3a) a "Due" date column: the cell, its menu and save; the date box; the filters' date
+    # rules and the sort; day bands; the editor, the save by type, the caps, the kept unknown type; "Due set by / on"
+    'date': ['T-head', 'T-cells', 'T-resolver', 'T-hlkind', 'T-resolve', 'T-menu', 'T-save', 'T-shows', 'T-checked', 'T-clear', 'T-headbulk', 'T-rowmenu'],
+    'datebox': ['X-opens', 'X-keys', 'X-phrase', 'X-bad', 'X-nextfri', 'X-save', 'X-current', 'X-escape', 'X-clear', 'X-outside', 'X-calendar', 'X-centred'],
+    'datefilter': ['Y-overdue', 'Y-soon', 'Y-oldname', 'Y-later', 'Y-empty', 'Y-month', 'Y-bucket', 'Y-bucketvars', 'Y-calendar', 'Y-bucketlist', 'Y-sort'],
+    'dategroup': ['Q-bands', 'Q-moves'],
+    'datesetup': ['V-render', 'V-add', 'V-rename', 'V-save', 'V-caps', 'V-kept', 'V-remove', 'V-cap-btn'],
+    'datewho': ['W2-heads', 'W2-search'],
+    # (3b) the heading's bulk set; grouped by Due:ym; a card's pill, field and menu
+    'datebulk': ['L-item', 'L-sub', 'L-confirm', 'L-post', 'L-toast', 'L-undo', 'L-box', 'L-already', 'L-clear'],
+    'datebands': ['M-variants', 'M-bands', 'M-rows', 'M-moves'],
+    'datenest': ['N-nested'],
+    'datecards': ['DC-pill', 'DC-pick', 'DC-menu'],
 }
 # The build before pick lists: only the toggle-only checks pass - the toggles' marks, the toggle's who column, no
 # field column on a report without one. (Every E-* is red there: the hook cannot find penumbraCleanJournalFields.)
@@ -94,7 +109,8 @@ def hook(src):
     anchor = '$(document).ready(function () {'
     i = src.find(anchor)
     if i < 0 or i > 400: raise SystemExit('closure anchor not found')
-    names = ['runTableSearch', 'rebuildTableFromMasterData', 'removeGrouping', 'applyPagination', 'buildStateObject', 'penumbraCleanJournalFields']
+    names = ['runTableSearch', 'rebuildTableFromMasterData', 'removeGrouping', 'applyPagination', 'buildStateObject', 'penumbraCleanJournalFields',
+             '_pnbHlKind', 'penumbraKeptJournalFields']   # (2026-11-12) date columns
     h = ('\r\n;try { window.__JR = { master: function () { try { return eval("masterRowData"); } catch (e) { return null; } } }; } catch (e) { window.__JR_ERR = String(e); }\r\n'
          'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__JR[k] = eval(k); } catch (e) { (window.__JR_MISSING = window.__JR_MISSING || []).push(k); } }); } catch (e) { window.__JR_ERR2 = String(e); }\r\n')
     out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
@@ -123,6 +139,24 @@ FIELDS_JS = r"""
     if (S === 'group') { st.groupBy = 'Progress'; st.visibleColumns = [1, 0, 2, 3, 4]; }
     if (S === 'who') st.viewOptions.journalToggleWho = true;
     if (S === 'notready') window.__FIELD_READY = false;
+    // (2026-11-12, DATE_SPEC.md) the date scenarios: a "Due" date column (once "Deadline") beside the pick list; K3 three
+    // days ago, K23 in two days, K7 in nine, K10 a value that is not a day
+    if (/^date/.test(S)) {
+      var dIso = function (n) { var d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); var p = function (x) { return (x < 10 ? '0' : '') + x; };
+                                return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+      window.__dIso = dIso;
+      st.viewOptions.journalFields.push({ key: 'due', type: 'date', label: 'Due', oldLabels: ['Deadline'] });
+      window.__J.fields.due = {};
+      window.__J.fields.due[K(2)] = { v: dIso(-3), by: 'lee', at: '2026-11-11 09:00:00' };
+      window.__J.fields.due[K(22)] = { v: dIso(2), by: 'kim', at: '2026-11-11 09:30:00' };
+      window.__J.fields.due[K(6)] = { v: dIso(9), by: 'pat', at: '2026-11-10 15:00:00' };
+      window.__J.fields.due[K(9)] = { v: '2026-02-30', by: 'odd', at: '2026-11-10 15:00:00' };
+      if (S === 'datesetup') st.viewOptions.journalFields.push({ key: 'owner', type: 'lookup', label: 'Owner', autofill: 'PEOPLE.NAME' });
+      if (S === 'dategroup') { st.groupBy = 'Due'; st.visibleColumns = [1, 0, 2, 3, 4]; }
+      if (S === 'datebands') { st.groupBy = 'Due:ym'; st.visibleColumns = [1, 0, 2, 3, 4]; }
+      if (S === 'datenest') { st.groupBy = 'PROTOCOL TYPE,Due:ym'; st.visibleColumns = [1, 0, 2, 3, 4]; }
+      if (S === 'datewho') st.viewOptions.journalToggleWho = true;
+    }
   })();
 """.replace('%PICK%', PICK)
 SERVER_JS = r"""
@@ -167,7 +201,7 @@ def build_harness(panel, index_text=''):
          " fields: JSON.parse(JSON.stringify(J.fields || {})), field_ready: window.__FIELD_READY === false ? false : true };" + SERVER_JS),
         # (phase 2) the card view for the cards scenario alone, before the menu engine, as index.php loads them
         ('<script src="main_jr.js"></script>', '<script src="main_jr.js"></script>\n'
-         '<script>if (window.__SCN === "cards") document.write(\'<link rel="stylesheet" href="penumbra_cards.css"><script src="penumbra_cards.js"></scr\' + \'ipt>\');</script>\n'
+         '<script>if (/^(cards|datecards)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_cards.css"><script src="penumbra_cards.js"></scr\' + \'ipt>\');</script>\n'
          '<script src="penumbra_colmenu.js"></script>\n<script src="penumbra_fields.js"></script>'),
         ('<div id="groupedResultsContainer" style="display:none"></div>', '<div id="groupedResultsContainer" style="display:none"></div>' + host),
         ('<!--JR_VIEW_OPTIONS-->', panel),

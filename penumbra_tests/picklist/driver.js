@@ -312,7 +312,7 @@
     } else rec('E-save', false, 'buildStateObject not hooked');
     var clean = JR.penumbraCleanJournalFields ? JR.penumbraCleanJournalFields([
         { key: 'toggle1', type: 'pick', label: 'Clash' }, { key: 'Stage!', type: 'pick', label: '', options: [{ id: 'o1', label: 'A', color: 'pink' }, { id: 'x', label: 'B' }, { id: 'o1', label: 'dup' }] },
-        { key: 'later', type: 'date', label: 'Later' }], [{ key: 'toggle1' }]) : null;
+        { key: 'later', type: 'lookup', label: 'Later' }], [{ key: 'toggle1' }]) : null;   // (2026-11-12) 'date' is a type now
     rec('E-clean', clean && clean.length === 1 && clean[0].key === 'stage' && clean[0].label === 'Status' && clean[0].options.length === 1 && clean[0].options[0].color === '',
         JSON.stringify(clean));
   };
@@ -448,6 +448,406 @@
     await until(function () { return !!document.querySelector('#pnbCardDetails .pnb-cdet-fields dd .journal-field-cell'); }, 3000);
     var db = document.querySelector('#pnbCardDetails .pnb-cdet-fields dd .journal-field-cell');
     rec('D-details', db && db.getAttribute('data-row-key') === K[1] && db.textContent.trim() === 'Done', db ? db.outerHTML.slice(0, 160) : 'none');
+    // (2026-11-12) its label: the list's name, not the internal one (the card's options, chips and fields share it)
+    var ddt = db ? db.closest('dd') : null; ddt = ddt ? ddt.previousElementSibling : null;
+    rec('D-label', !!ddt && ddt.textContent.trim() === 'Progress', ddt ? ddt.outerHTML.slice(0, 160) : 'no dt');
+  };
+
+  // ---- date columns (2026-11-12, DATE_SPEC.md phase 3a) --------------------------------------------------------------
+  // The fixture's "Due" (once "Deadline"): K3 three days ago (lee), K23 in two days (kim), K7 in nine (pat), K10 a value
+  // that is not a day; every other row empty.
+  var DSENT = '__JOURNAL_FIELD__due', K10 = keyOf(9);
+  function dIso(n) { return window.__dIso(n); }
+  function dLong(iso) { return window.moment(iso, 'YYYY-MM-DD').format('ddd, MMM D, YYYY'); }
+  function dCell(rk, scope) {
+    var bs = (scope || document).querySelectorAll('.journal-field-cell[data-toggle-key="due"]');
+    for (var i = 0; i < bs.length; i++) if (bs[i].getAttribute('data-row-key') === rk && bs[i].getClientRects().length) return bs[i];
+    return null;
+  }
+  function dServer(rk) { var m = (window.__J.fields || {}).due || {}; return m[rk] ? m[rk].v : null; }
+  function box() { return document.getElementById('pnbDateBox'); }
+  function boxIn() { return document.getElementById('pnbDateBoxIn'); }
+  function boxSays() { var s = document.getElementById('pnbDateBoxSays'); return s ? s.textContent : ''; }
+  function typeBox(v) { var i = boxIn(); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); }
+  function posts() { return (window.__J.fieldPosts || []).length; }
+  S.date = async function () {
+    var th = document.querySelector('#tableHeader th[data-column="' + DSENT + '"]');
+    rec('T-head', !!th && th.textContent.trim().indexOf('Due') === 0 && /date column/.test(th.getAttribute('title') || ''), th ? th.outerHTML.slice(0, 200) : 'no head');
+    var c3 = dCell(K[3]), c10 = dCell(K10), c1 = dCell(K[1]), al3 = c3 ? c3.getAttribute('aria-label') : '';
+    rec('T-cells', !!c3 && c3.classList.contains('is-date') && c3.textContent.trim() === dIso(-3) && al3.indexOf(dLong(dIso(-3)) + ' (3 days ago)') >= 0 && /set by lee/.test(al3)
+        && !!c10 && c10.textContent.trim() === '(not a date)' && c10.classList.contains('is-unknown') && !!c1 && c1.classList.contains('is-empty') && c1.textContent.trim() === '',
+        [c3 && c3.outerHTML.slice(0, 300), c10 && c10.textContent, c1 && c1.className].join(' | '));
+    var F = window.Penumbra.fields;
+    rec('T-resolver', F.labelOf('due', K[3]) === dIso(-3) && F.optionOrder('Due') === null && F.valuesFor('Due') === null && F.mapWant('due') === null
+        && F.isDateCol('Due') && F.isDateCol(DSENT) && !F.isDateCol('Progress') && F.typeOf('due') === 'date' && F.typeOf('status') === 'pick',
+        JSON.stringify([F.labelOf('due', K[3]), F.optionOrder('Due'), F.valuesFor('Due'), F.isDateCol('Due'), F.typeOf('due')]));
+    var hk = JR._pnbHlKind;
+    rec('T-hlkind', !!hk && hk('Due') === 'date' && hk(DSENT) === 'date' && hk('Progress') === 'text', hk ? [hk('Due'), hk(DSENT), hk('Progress')].join(',') : 'not hooked');
+    var H = window.Penumbra.journalHost, rv = function (s) { return (H && H.resolveDate) ? H.resolveDate(s) : 'no resolveDate'; };
+    var want = [['2026-11-21', '2026-11-21'], ['11/21/2026', '2026-11-21'], ['21-Nov-26', '2026-11-21'], ['TODAY+14', dIso(14)], ['today', dIso(0)], ['tomorrow', dIso(1)],
+                ['2 weeks from now', dIso(14)], ['2026-11', null], ['2026', null], ['this fiscal year', null], ['banana', null], ['1899-12-31', null], ['', null]];
+    var bad = want.filter(function (w) { return rv(w[0]) !== w[1]; }).map(function (w) { return w[0] + ' -> ' + rv(w[0]); });
+    rec('T-resolve', !bad.length, bad.join('; ') || 'all ' + want.length + ' as expected');
+    clickEl(c1);
+    await until(function () { return !!actItem('date-pick'); }, 3000);
+    var labels = menuLabels(), today = actItem('date-today'), clr = actItem('pick-clear');
+    var note = today && today.querySelector('.pnb-hm-note') ? today.querySelector('.pnb-hm-note').textContent : '';
+    rec('T-menu', JSON.stringify(labels) === JSON.stringify(['Today', 'Tomorrow', 'In a week', 'Pick a date…', 'Clear']) && !!clr && clr.getAttribute('aria-disabled') === 'true'
+        && note === window.moment().format('ddd, MMM D') && today.getAttribute('role') === 'menuitemradio' && today.getAttribute('aria-checked') === 'false',
+        JSON.stringify(labels) + ' note ' + note);
+    if (today) clickEl(today);
+    await until(function () { return posts() > 0; }, 3000);
+    await sleep(300);
+    var p = lastPost();
+    rec('T-save', !!p && p.toggle_key === 'due' && p.row_key === K[1] && p.value === dIso(0) && p.prev === null && dServer(K[1]) === dIso(0), JSON.stringify(p));
+    c1 = dCell(K[1]);
+    rec('T-shows', !!c1 && c1.textContent.trim() === dIso(0) && /\(today\)/.test(c1.getAttribute('aria-label') || ''), c1 ? c1.outerHTML.slice(0, 300) : 'no cell');
+    clickEl(c1);
+    await until(function () { return !!actItem('date-today'); }, 3000);
+    var nm = menuEl() && menuEl().querySelector('.pnb-hm-name') ? menuEl().querySelector('.pnb-hm-name').textContent : '';
+    rec('T-checked', !!actItem('date-today') && actItem('date-today').getAttribute('aria-checked') === 'true' && nm === 'Due: ' + window.moment().format('MMM D, YYYY')
+        && actItem('pick-clear').getAttribute('aria-disabled') !== 'true', nm);
+    if (actItem('pick-clear')) clickEl(actItem('pick-clear'));
+    await until(function () { return posts() > 1; }, 3000);
+    await sleep(300);
+    p = lastPost(); c1 = dCell(K[1]);
+    rec('T-clear', !!p && p.value === null && p.prev === dIso(0) && !!c1 && c1.classList.contains('is-empty'), JSON.stringify(p));
+    var hi = window.Penumbra.fields.headerItem(th);
+    rec('T-headbulk', !!hi && hi.act === 'fieldBulk' && /^Set Due for \d+ shown rows$/.test(hi.label) && !hi.disabled, 'phase 3b: the heading sets many rows: ' + JSON.stringify(hi));
+    // a row's right-click: Due > the cell's items; a pick saves the row's day
+    closeMenu();
+    await sleep(100);
+    var rtr = dCell(K[5]).closest('tr'), rtd = null;
+    Array.prototype.forEach.call(rtr.cells, function (cc) { var dc = cc.getAttribute('data-column') || ''; if (!rtd && dc && dc !== '#' && dc.indexOf('__JOURNAL') !== 0) rtd = cc; });
+    rclick(rtd);
+    await until(function () { return !!actItem('field-due'); }, 3000);
+    var di = actItem('field-due');
+    if (di) { clickEl(di); await until(function () { return !!subItem('Tomorrow'); }, 3000); }
+    var sl = subLabels(), rn0 = posts();
+    if (subItem('Tomorrow')) clickEl(subItem('Tomorrow'));
+    await until(function () { return posts() > rn0; }, 3000);
+    await sleep(250);
+    var rp = lastPost();
+    rec('T-rowmenu', !!di && itemLabel(di) === 'Due' && JSON.stringify(sl) === JSON.stringify(['Today', 'Tomorrow', 'In a week', 'Pick a date…', 'Clear'])
+        && !!rp && rp.row_key === K[5] && rp.value === dIso(1) && rp.prev === dIso(2), JSON.stringify([sl, rp]));
+  };
+  S.datebox = async function () {
+    clickEl(dCell(K[1]));
+    await until(function () { return !!actItem('date-pick'); }, 3000);
+    clickEl(actItem('date-pick'));
+    await until(function () { return !!box(); }, 3000);
+    await sleep(100);
+    rec('X-opens', !!box() && document.activeElement === boxIn() && boxIn().value === '' && /Empty: Save clears Due on this row/.test(boxSays())
+        && box().getAttribute('role') === 'dialog' && !!document.querySelector('#pnbDateBox label[for="pnbDateBoxIn"]'),
+        boxSays() + ' | active ' + (document.activeElement && (document.activeElement.id || document.activeElement.className)));
+    if (!box()) return;
+    // the keys a phrase needs reach the box: a handler that cancels a keypress (the datepicker's constrainInput) eats the key
+    var blocked = 'TODAY+14 next/'.split('').filter(function (ch) {
+      var ev = new KeyboardEvent('keypress', { key: ch, charCode: ch.charCodeAt(0), keyCode: ch.charCodeAt(0), which: ch.charCodeAt(0), bubbles: true, cancelable: true });
+      return !boxIn().dispatchEvent(ev);
+    });
+    rec('X-keys', blocked.length === 0, 'blocked: ' + JSON.stringify(blocked.join('')));
+    var saveB = box().querySelector('.pnb-datebox-save');
+    typeBox('TODAY+14'); await sleep(50);
+    rec('X-phrase', boxSays() === dLong(dIso(14)) + ' (in 14 days)' && !saveB.disabled, boxSays());
+    typeBox('banana'); await sleep(50);
+    var n0 = posts();
+    keyEl(boxIn(), 'Enter'); await sleep(200);
+    rec('X-bad', boxSays() === 'Not a date' && saveB.disabled && !!box() && posts() === n0, boxSays());
+    typeBox('next friday'); await sleep(50);
+    var nf = window.moment().add(1, 'week').day(5).format('YYYY-MM-DD');
+    rec('X-nextfri', boxSays().indexOf(dLong(nf)) === 0, boxSays() + ' | the grammar\'s next friday ' + nf);
+    typeBox('TODAY+14'); await sleep(50);   // a phrase is saved as its day (DD4)
+    keyEl(boxIn(), 'Enter');
+    await until(function () { return posts() > n0; }, 3000); await sleep(300);
+    var p = lastPost();
+    rec('X-save', !!p && p.toggle_key === 'due' && p.row_key === K[1] && p.value === dIso(14) && !box() && document.activeElement === dCell(K[1])
+        && dCell(K[1]).textContent.trim() === dIso(14), JSON.stringify(p) + ' | active ' + (document.activeElement && document.activeElement.className));
+    var n1 = posts();
+    window.Penumbra.fields.openDateBox('due', K[3], dCell(K[3]));
+    await until(function () { return !!box(); }, 2000);
+    rec('X-current', !!boxIn() && boxIn().value === dIso(-3) && boxSays() === dLong(dIso(-3)) + ' (3 days ago)', boxIn() ? boxIn().value + ' | ' + boxSays() : 'no box');
+    if (boxIn()) keyEl(boxIn(), 'Escape');
+    await sleep(150);
+    rec('X-escape', !box() && posts() === n1 && document.activeElement === dCell(K[3]), 'active ' + (document.activeElement && document.activeElement.outerHTML.slice(0, 120)));
+    window.Penumbra.fields.openDateBox('due', K[3], dCell(K[3]));
+    await until(function () { return !!box(); }, 2000);
+    typeBox(''); await sleep(50);
+    clickEl(box().querySelector('.pnb-datebox-save'));
+    await until(function () { return posts() > n1; }, 3000); await sleep(300);
+    p = lastPost();
+    rec('X-clear', !!p && p.row_key === K[3] && p.value === null && p.prev === dIso(-3) && !box(), JSON.stringify(p));
+    window.Penumbra.fields.openDateBox('due', K[5], dCell(K[5]));
+    await until(function () { return !!box(); }, 2000);
+    var cal = box() ? box().querySelector('.pnb-datebox-cal') : null;
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await sleep(100);
+    rec('X-outside', !box(), box() ? 'still open' : 'closed');
+    rec('X-calendar', !!cal && cal.getAttribute('aria-label') === 'Open the calendar', cal ? cal.outerHTML.slice(0, 160) : 'no calendar button');
+    window.Penumbra.fields.openDateBox('due', K[5], null);
+    await until(function () { return !!box(); }, 2000);
+    var r = box() ? box().getBoundingClientRect() : { left: -1, top: -1, right: 0 };
+    rec('X-centred', r.left > 50 && r.top > 8 && r.right < window.innerWidth - 8, JSON.stringify([r.left, r.top, r.right, window.innerWidth]));
+    if (boxIn()) keyEl(boxIn(), 'Escape');
+  };
+  S.datefilter = async function () {
+    var a = await search('Due < TODAY'), b = await search('Due >= TODAY and Due <= TODAY+3'), c = await search('Deadline < TODAY');
+    var d = await search('Due > TODAY+7'), e = await search('Due = empty');
+    var mon = dIso(2).slice(0, 7), mWant = [[2, dIso(-3)], [22, dIso(2)], [6, dIso(9)]].filter(function (x) { return x[1].slice(0, 7) === mon; })
+        .map(function (x) { return x[0]; }).sort(function (x, y) { return x - y; });
+    var mGot = (await search('Due = ' + mon)).sort(function (x, y) { return x - y; });
+    rec('Y-month', JSON.stringify(mGot) === JSON.stringify(mWant), JSON.stringify([mon, mGot, mWant]));
+    // (3b) a period of the column: Due:ym = 'Nov 2026'; the builder's buckets, its value list and its calendar
+    var mlab = window.moment(dIso(2), 'YYYY-MM-DD').format('MMM YYYY');
+    var bWant = [[2, dIso(-3)], [22, dIso(2)], [6, dIso(9)]].filter(function (x) { return window.moment(x[1], 'YYYY-MM-DD').format('MMM YYYY') === mlab; })
+        .map(function (x) { return x[0]; }).sort(function (x, y) { return x - y; });
+    var bGot = (await search("Due:ym = '" + mlab + "'")).sort(function (x, y) { return x - y; });
+    rec('Y-bucket', JSON.stringify(bGot) === JSON.stringify(bWant), JSON.stringify([mlab, bGot, bWant]));
+    var API = window._penumbraSearchAPI, bv = (API.getBucketVariants('Due') || []).map(function (v) { return v.sx; });
+    rec('Y-bucketvars', bv.indexOf(':ym') >= 0 && bv.indexOf(':fy') >= 0 && bv.indexOf(':hour') < 0 && (API.getBucketVariants('PROTOCOL NO.') || []).every(function (v) { return v.sx !== ':ym'; }), JSON.stringify(bv));
+    var di = API.getColumnDateInfo('Due'), dx = API.getColumnDateInfo('__JOURNAL_FIELD__due'), dn = API.getColumnDateInfo('Progress');
+    rec('Y-calendar', !!di && di.isDate && di.jqFormat === 'yy-mm-dd' && !!dx && dx.isDate && !!dn && !dn.isDate, JSON.stringify([di, dx, dn]));
+    var bl = API._computeColumnAutocompleteValues('Due:ym') || [];
+    rec('Y-bucketlist', [dIso(-3), dIso(2), dIso(9)].every(function (d) { return bl.indexOf(window.moment(d, 'YYYY-MM-DD').format('MMM YYYY')) >= 0; }), JSON.stringify(bl));
+    await search('');
+    rec('Y-overdue', JSON.stringify(a) === '[2]', JSON.stringify(a));
+    rec('Y-soon', JSON.stringify(b) === '[22]', JSON.stringify(b));
+    rec('Y-oldname', JSON.stringify(c) === '[2]', JSON.stringify(c));
+    rec('Y-later', JSON.stringify(d) === '[6]', JSON.stringify(d));
+    rec('Y-empty', e.length === FX.length - 4 && e.indexOf(2) < 0 && e.indexOf(9) < 0, e.length + ' rows');
+    clickEl(document.querySelector('#tableHeader th[data-column="' + DSENT + '"]'));
+    await sleep(600);
+    var seq = flatRows().map(function (tr) { var cc = tr.querySelector('td[data-column="' + DSENT + '"]'); return cc ? cc.textContent.trim() : '?'; });
+    var days = seq.filter(function (t) { return /^\d{4}-\d{2}-\d{2}$/.test(t); });
+    rec('Y-sort', JSON.stringify(days) === JSON.stringify([dIso(-3), dIso(2), dIso(9)]), JSON.stringify(seq.slice(0, 8)) + ' ... ' + JSON.stringify(seq.slice(-3)));
+  };
+  S.dategroup = async function () {
+    await until(function () { return bandNames().length >= 4; }, 5000);
+    var names = bandNames(), i3 = names.indexOf(dIso(-3)), i2 = names.indexOf(dIso(2)), i9 = names.indexOf(dIso(9));
+    rec('Q-bands', i3 >= 0 && i3 < i2 && i2 < i9 && names.indexOf('(not a date)') >= 0 && names[names.length - 1] === '[Blank]', JSON.stringify(names));
+    var blank = bandOf('[Blank]'), c1 = dCell(K[1], blank);
+    if (!c1) { var cnt = blank && blank.querySelector('.group-header'); if (cnt) clickEl(cnt); await sleep(300); c1 = dCell(K[1], bandOf('[Blank]')); }
+    if (c1) { clickEl(c1); await until(function () { return !!actItem('date-tomorrow'); }, 3000); if (actItem('date-tomorrow')) clickEl(actItem('date-tomorrow')); }
+    await until(function () { return bandRowIdx(dIso(1)).indexOf(0) >= 0; }, 4000);
+    rec('Q-moves', bandRowIdx(dIso(1)).indexOf(0) >= 0 && bandRowIdx('[Blank]').indexOf(0) < 0, JSON.stringify(bandNames()));
+  };
+  S.datesetup = async function () {
+    if (window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(200);
+    var lst = document.getElementById('journalFieldList'), addD = document.getElementById('journalAddDateBtn');
+    var dd = lst ? lst.querySelector('.journal-field-def.is-date[data-key="due"]') : null, kept = lst ? lst.querySelector('.journal-field-def.is-kept[data-kept-key="owner"]') : null;
+    rec('V-render', !!dd && /Date/.test(dd.textContent) && dd.querySelector('.journal-field-def-label').value === 'Due' && !!kept && /lookup column this page cannot edit/.test(kept.textContent)
+        && !!addD && addD.previousElementSibling === document.getElementById('journalAddFieldBtn') && !addD.disabled,
+        (lst ? lst.textContent.replace(/\s+/g, ' ').slice(0, 300) : 'no list') + ' | button ' + (addD ? addD.outerHTML : 'none'));
+    if (!addD) return;
+    clickEl(addD);
+    await until(function () { return (window._penumbraJournalFields || []).length === 3; }, 3000);
+    await sleep(300);
+    var f3 = (window._penumbraJournalFields || [])[2];
+    rec('V-add', !!f3 && f3.type === 'date' && f3.label === 'Due 2' && !f3.options && f3.key !== 'due' && f3.key !== 'owner'
+        && !!document.querySelector('#tableHeader th[data-column="__JOURNAL_FIELD__' + (f3 && f3.key) + '"]'), JSON.stringify(f3));
+    if (!f3) return;
+    var in3 = lst.querySelector('.journal-field-def[data-key="' + f3.key + '"] .journal-field-def-label');
+    in3.value = 'Follow-up';
+    $(in3).trigger('change');
+    await sleep(200);
+    f3 = window._penumbraJournalFields[2];
+    rec('V-rename', f3.label === 'Follow-up' && JSON.stringify(f3.oldLabels) === '["Due 2"]', JSON.stringify(f3));
+    var cm = document.querySelector('.CodeMirror');
+    if (cm && cm.CodeMirror) cm.CodeMirror.setValue('SELECT * FROM JR_FIXTURE'); else $('#sqlQuery').val('SELECT * FROM JR_FIXTURE');
+    var st = JR.buildStateObject ? JR.buildStateObject() : null, jf = st && st.viewOptions && st.viewOptions.journalFields, byKey = {};
+    (jf || []).forEach(function (f) { byKey[f.key] = f; });
+    rec('V-save', !!jf && jf.length === 4 && !!byKey.status && byKey.status.type === 'pick' && byKey.status.options.length === 4
+        && JSON.stringify(byKey.due) === JSON.stringify({ key: 'due', type: 'date', label: 'Due', oldLabels: ['Deadline'] })
+        && !!byKey[f3.key] && byKey[f3.key].type === 'date' && !byKey[f3.key].options
+        && JSON.stringify(byKey.owner) === JSON.stringify({ key: 'owner', type: 'lookup', label: 'Owner', autofill: 'PEOPLE.NAME' }),
+        String(JSON.stringify(jf)).slice(0, 500));
+    var C = JR.penumbraCleanJournalFields, KP = JR.penumbraKeptJournalFields, many = [];
+    for (var i = 1; i <= 5; i++) { many.push({ key: 'p' + i, type: 'pick', label: 'P' + i, options: [] }); many.push({ key: 'd' + i, type: 'date', label: 'D' + i }); }
+    var cl = C ? C(many, []) : null;
+    rec('V-caps', !!cl && cl.filter(function (f) { return f.type === 'pick'; }).length === 4 && cl.filter(function (f) { return f.type === 'date'; }).length === 4
+        && cl.every(function (f) { return f.type !== 'date' || (f.label && !f.options); }), cl ? cl.map(function (f) { return f.key; }).join(',') : 'not hooked');
+    var kp = KP ? KP([{ key: 'a', type: 'lookup', label: 'A' }, { key: 'due', type: 'lookup' }, { key: 'toggle1', type: 'multi' }, { key: '__x', type: 'lookup' },
+                      { key: 'Bad Key', type: 'lookup' }, { key: 'p', type: 'pick' }, { key: 'd', type: 'date' }, { key: 'b', type: 7 }, { key: 'c', type: 'multi', options: [1, 2] }],
+                     [{ key: 'due' }], [{ key: 'toggle1' }]) : null;
+    rec('V-kept', !!kp && JSON.stringify(kp.map(function (f) { return f.key; })) === '["a","c"]' && JSON.stringify(kp[1].options) === '[1,2]', JSON.stringify(kp));
+    clickEl(lst.querySelector('.journal-field-def[data-key="due"] .journal-field-def-remove'));
+    await until(function () { return !document.querySelector('#tableHeader th[data-column="' + DSENT + '"]'); }, 3000);
+    var gone = !(window._penumbraJournalFields || []).some(function (f) { return f.key === 'due'; }) && !document.querySelector('#tableHeader th[data-column="' + DSENT + '"]');
+    var undo = document.querySelector('#journalFieldStatus .journal-field-undo');
+    if (undo) clickEl(undo);
+    await until(function () { return !!dCell(K[3]); }, 3000);
+    var back = (window._penumbraJournalFields || []).filter(function (f) { return f.key === 'due'; })[0];
+    rec('V-remove', gone && !!back && back.type === 'date' && JSON.stringify(back.oldLabels) === '["Deadline"]' && !!dCell(K[3]) && dCell(K[3]).textContent.trim() === dIso(-3),
+        JSON.stringify(back) + ' gone=' + gone);
+    for (var k = 0; k < 3; k++) { if (!addD.disabled) { clickEl(addD); await sleep(400); } }
+    var nd = (window._penumbraJournalFields || []).filter(function (f) { return f.type === 'date'; }).length;
+    rec('V-cap-btn', nd === 4 && addD.disabled && !document.getElementById('journalAddFieldBtn').disabled, nd + ' date columns; button ' + (addD.disabled ? 'off' : 'on'));
+  };
+  S.datewho = async function () {
+    var heads = Array.prototype.map.call(document.querySelectorAll('#tableHeader th'), function (h) { return h.textContent.replace(/[▲▼]/g, '').trim(); });
+    rec('W2-heads', heads.indexOf('Due set by') >= 0 && heads.indexOf('Due set on') >= 0 && heads.indexOf('Progress by') >= 0 && heads.indexOf('Due by') < 0, JSON.stringify(heads));
+    var a = await search('Due set by = lee'), b = await search('Due set on = 2026-11-11');
+    await search('');
+    rec('W2-search', JSON.stringify(a) === '[2]' && JSON.stringify(b.slice().sort(function (x, y) { return x - y; })) === '[2,22]', JSON.stringify([a, b]));
+  };
+
+  // ---- date columns, phase 3b (2026-11-12, DATE_SPEC.md 7) -------------------------------------------------------------
+  function dHead() { return document.querySelector('#tableHeader th[data-column="' + DSENT + '"]'); }
+  function mon(iso) { return window.moment(iso, 'YYYY-MM-DD').format('MMM YYYY'); }
+  // The heading's "Set Due for N shown rows >": the cell's quick days, Pick a date... and Clear, each asked first
+  S.datebulk = async function () {
+    var asked = [];
+    window.confirm = function (m) { asked.push(m); return true; };
+    var n = keptRows().length;
+    async function openBulk() {
+      closeMenu(); await sleep(100);
+      rclick(dHead());
+      await until(function () { return !!actItem('fieldBulk'); }, 3000);
+      var it = actItem('fieldBulk');
+      if (it) { clickEl(it); await until(function () { return !!subItem('Tomorrow'); }, 3000); }
+      return it;
+    }
+    var it = await openBulk();
+    rec('L-item', !!it && itemLabel(it) === 'Set Due for ' + n + ' shown rows' && it.getAttribute('aria-disabled') !== 'true',
+        it ? itemLabel(it) + ' | ' + it.outerHTML.slice(0, 160) : JSON.stringify(menuLabels()));
+    if (!it) return;
+    rec('L-sub', JSON.stringify(subLabels()) === JSON.stringify(['Today', 'Tomorrow', 'In a week', 'Pick a date…', 'Clear']), JSON.stringify(subLabels()));
+    var b0 = bulkPosts().length;
+    clickEl(subItem('Tomorrow'));
+    await until(function () { return bulkPosts().length > b0; }, 3000);
+    await sleep(300);
+    var bp = bulkPosts()[b0], ks = bp ? Object.keys(bp.values) : [];
+    rec('L-confirm', asked.length === 1 && asked[0].indexOf('Set Due to ' + dLong(dIso(1)) + ' on ' + n + ' rows?') === 0
+        && asked[0].indexOf('This replaces dates set by ') > 0 && ['lee', 'kim', 'pat', 'odd'].every(function (w) { return asked[0].indexOf(w) > 0; }), JSON.stringify(asked));
+    rec('L-post', !!bp && bp.toggle_key === 'due' && ks.length === n && ks.every(function (k) { return bp.values[k] === dIso(1); }), bp ? ks.length + ' keys, ' + JSON.stringify(bp.values[K[1]]) : 'no post');
+    await until(function () { return /DONE:/.test(toastText()); }, 3000);
+    var tt = toastText();
+    rec('L-toast', tt.indexOf('DONE: ' + n + ' rows set to ' + dLong(dIso(1)) + '.') >= 0 && dServer(K[3]) === dIso(1) && !!dCell(K[3]) && dCell(K[3]).textContent.trim() === dIso(1), tt);
+    var undo = document.querySelector('#action_overlay .pnb-field-anyway');
+    if (undo) clickEl(undo);
+    await until(function () { return bulkPosts().length > b0 + 1; }, 3000);
+    await sleep(300);
+    var up = bulkPosts()[b0 + 1];
+    rec('L-undo', !!up && up.values[K[3]] === dIso(-3) && up.values[K[5]] === dIso(2) && up.values[K[1]] === null && dServer(K[3]) === dIso(-3) && dServer(K[1]) === null,
+        up ? JSON.stringify({ k3: up.values[K[3]], k5: up.values[K[5]], k1: up.values[K[1]] }) : 'no undo post');
+    // Pick a date... for every row: the box names the rows, a phrase is fixed, the save asks first
+    await openBulk();
+    var a0 = asked.length, b1 = bulkPosts().length;
+    if (subItem('Pick a date…')) clickEl(subItem('Pick a date…'));
+    await until(function () { return !!box(); }, 3000);
+    await sleep(100);
+    var lbl = box() ? box().querySelector('#pnbDateBoxLbl').textContent : '', says0 = boxSays();
+    if (boxIn()) { typeBox('TODAY+14'); await sleep(50); keyEl(boxIn(), 'Enter'); }
+    await until(function () { return bulkPosts().length > b1; }, 3000);
+    await sleep(300);
+    var bx = bulkPosts()[b1], bxk = bx ? Object.keys(bx.values) : [];
+    rec('L-box', lbl === 'Due for ' + n + ' rows' && says0 === 'Empty: Save clears Due on these ' + n + ' rows.' && !box()
+        && asked.length === a0 + 1 && asked[a0].indexOf('Set Due to ' + dLong(dIso(14)) + ' on ' + n + ' rows?') === 0
+        && !!bx && bxk.length === n && bxk.every(function (k) { return bx.values[k] === dIso(14); }), JSON.stringify([lbl, says0, asked.slice(a0), bx ? bxk.length : 'no post']));
+    // the same day again: nothing to change, nothing asked (the toasts so far closed first: three show at once)
+    Array.prototype.forEach.call(document.querySelectorAll('#action_overlay .pnb-toast-x'), function (x) { clickEl(x); });
+    await sleep(400);
+    await openBulk();
+    var a1 = asked.length, b2 = bulkPosts().length;
+    if (subItem('Pick a date…')) clickEl(subItem('Pick a date…'));
+    await until(function () { return !!box(); }, 3000);
+    if (boxIn()) { typeBox(dIso(14)); await sleep(50); keyEl(boxIn(), 'Enter'); }
+    await until(function () { return /already have/.test(toastText()); }, 3000);
+    rec('L-already', asked.length === a1 && bulkPosts().length === b2 && toastText().indexOf('All ' + n + ' rows already have Due ' + dLong(dIso(14)) + '.') >= 0, toastText() + ' | asked ' + (asked.length - a1));
+    await openBulk();
+    var a2 = asked.length, b3 = bulkPosts().length;
+    if (subItem('Clear')) clickEl(subItem('Clear'));
+    await until(function () { return bulkPosts().length > b3; }, 3000);
+    await sleep(300);
+    var cp = bulkPosts()[b3], cpk = cp ? Object.keys(cp.values) : [];
+    rec('L-clear', asked.length === a2 + 1 && asked[a2].indexOf('Clear Due on ' + n + ' rows?') === 0 && !!cp && cpk.length === n && cpk.every(function (k) { return cp.values[k] === null; })
+        && !!dCell(K[3]) && dCell(K[3]).classList.contains('is-empty'), JSON.stringify([asked.slice(a2), cp ? cpk.length : 'no post']));
+    closeMenu();
+  };
+  // Grouped by Due:ym (Year > Month): the periods a day allows, a band per month in order, a row moving band
+  S.datebands = async function () {
+    var gv = (window.Penumbra.headerMenu.groupVariants('Due') || []).map(function (v) { return v.token; });
+    var bv = (window._penumbraSearchAPI.getBucketVariants('Due') || []).map(function (v) { return v.sx; });
+    rec('M-variants', JSON.stringify(gv) === JSON.stringify(['Due:year', 'Due:fy', 'Due:yq', 'Due:fyq', 'Due:ym', 'Due:quarter', 'Due:fquarter', 'Due:month', 'Due:monthnum', 'Due:dow'])
+        && bv.indexOf(':ym') >= 0 && bv.indexOf(':year') >= 0 && bv.indexOf(':hour') < 0, JSON.stringify([gv, bv]));
+    await until(function () { return bandNames().length >= 3; }, 5000);
+    var names = bandNames(), want = [];
+    [dIso(-3), dIso(2), dIso(9)].forEach(function (d) { if (want.indexOf(mon(d)) < 0) want.push(mon(d)); });
+    var at = want.map(function (m) { return names.indexOf(m); });
+    rec('M-bands', at.every(function (x, i) { return x >= 0 && (i === 0 || x > at[i - 1]); }) && names.indexOf('(not a date)') >= 0 && names[names.length - 1] === '[Blank]'
+        && names.length === want.length + 2, JSON.stringify([names, want]));
+    rec('M-rows', bandRowIdx(mon(dIso(-3))).indexOf(2) >= 0 && bandRowIdx(mon(dIso(9))).indexOf(6) >= 0 && bandRowIdx('(not a date)').indexOf(9) >= 0
+        && bandRowIdx('[Blank]').indexOf(0) >= 0, JSON.stringify([bandRowIdx(mon(dIso(-3))), bandRowIdx(mon(dIso(9))), bandRowIdx('(not a date)')]));
+    // K1 (no day) set to a day 40 days on: its month's band, a moment later
+    var far = dIso(40);
+    window.Penumbra.fields.setField(K[1], 'due', far);
+    await until(function () { return bandRowIdx(mon(far)).indexOf(0) >= 0; }, 5000);
+    rec('M-moves', bandRowIdx(mon(far)).indexOf(0) >= 0 && bandRowIdx('[Blank]').indexOf(0) < 0, JSON.stringify(bandNames()));
+  };
+  // Due:ym as a second level (PROTOCOL TYPE, then the month): its bands are months
+  S.datenest = async function () {
+    var sel = '#groupedResultsContainer .group-wrapper[data-group-depth="1"]';
+    await until(function () { return document.querySelectorAll(sel).length > 0; }, 5000);
+    var names = [];
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function (w) {
+      var n = w.querySelector(':scope > .group-header .group-name'), t = n ? n.textContent.trim() : '';
+      if (names.indexOf(t) < 0) names.push(t);
+    });
+    var ok = [dIso(-3), dIso(2), dIso(9)].map(mon).concat(['(not a date)', '[Blank]']);
+    rec('N-nested', names.length > 1 && names.indexOf(mon(dIso(-3))) >= 0 && names.indexOf('[Blank]') >= 0 && names.every(function (t) { return ok.indexOf(t) >= 0; }), JSON.stringify(names));
+  };
+  // A card's pill and field are the cell's button; the card's menu has Due >
+  S.datecards = async function () {
+    var C = window.Penumbra.cards, PS = DSENT.toUpperCase();
+    if (!C) { rec('DC-pill', false, 'no card view in the page'); return; }
+    // The harness writes the card view in with document.write, so the journal's first answer can land before
+    // penumbra_fields.js runs (index.php's defer order rules that out): asked once more
+    if (!window.Penumbra.fields.loaded()) {
+      window.Penumbra.journalHost.reload({ quiet: true });
+      await until(function () { return window.Penumbra.fields.loaded(); }, 5000);
+      await sleep(300);
+    }
+    C.setReport({ title: 'PROTOCOL NO.', pill: PS, fields: [PS, 'PROTOCOL TYPE'] });
+    C.set('cards');
+    await until(function () { return document.querySelectorAll('#pnbCardsHost .pnb-card').length > 0; }, 6000);
+    await sleep(300);
+    function cardOf(rk) {
+      var b = document.querySelector('#pnbCardsHost .pnb-card-pill .journal-field-cell[data-toggle-key="due"][data-row-key="' + CSS.escape(rk) + '"]');
+      return b ? b.closest('.pnb-card') : null;
+    }
+    function pillOf(rk) { var c = cardOf(rk); return c ? c.querySelector('.pnb-card-pill.has-field > .journal-field-cell') : null; }
+    var p1 = pillOf(K[1]), p3 = pillOf(K[3]), after = p1 ? getComputedStyle(p1, '::after').content : '';
+    rec('DC-pill', !!p1 && p1.classList.contains('is-empty') && after.indexOf('+ Due') >= 0 && !!p3 && p3.textContent.trim() === dIso(-3),
+        (p1 ? p1.outerHTML.slice(0, 160) : 'no pill') + ' | ' + after + ' | ' + (p3 ? p3.textContent : 'no K3 pill'));
+    if (!p1) return;
+    clickEl(p1);
+    await until(function () { return !!menuItem('Tomorrow'); }, 3000);
+    var labs = menuLabels(), n0 = posts();
+    if (menuItem('Tomorrow')) clickEl(menuItem('Tomorrow'));
+    await until(function () { return posts() > n0; }, 3000);
+    await sleep(500);
+    var post = lastPost(), p1b = pillOf(K[1]), c1 = cardOf(K[1]);
+    var fb = c1 ? c1.querySelector('.pnb-card-fields dd .journal-field-cell') : null;
+    rec('DC-pick', JSON.stringify(labs) === JSON.stringify(['Today', 'Tomorrow', 'In a week', 'Pick a date…', 'Clear']) && !!post && post.row_key === K[1] && post.value === dIso(1)
+        && !!p1b && p1b.textContent.trim() === dIso(1) && !!fb && fb.textContent.trim() === dIso(1), JSON.stringify([labs, post, p1b ? p1b.textContent : null, fb ? fb.textContent : null]));
+    c1.scrollIntoView({ block: 'center' });
+    await sleep(250);
+    rclick(c1);
+    await until(function () { return !!actItem('field-due'); }, 3000);
+    var di = actItem('field-due');
+    if (di) { clickEl(di); await until(function () { return !!subItem('Pick a date…'); }, 3000); }
+    if (subItem('Pick a date…')) clickEl(subItem('Pick a date…'));
+    await until(function () { return !!box(); }, 3000);
+    await sleep(100);
+    // the box sits at the card's own button (the table's cell is laid out of sight), and Escape gives it the focus back
+    var r = box() ? box().getBoundingClientRect() : null, v = boxIn() ? boxIn().value : null, pb = pillOf(K[1]), pr = pb ? pb.getBoundingClientRect() : null;
+    var atPill = !!r && !!pr && Math.abs(r.left - Math.max(8, Math.min(pr.left, window.innerWidth - r.width - 8))) < 2
+        && (Math.abs(r.top - (pr.bottom + 4)) < 2 || Math.abs(r.bottom - (pr.top - 4)) < 2);
+    if (boxIn()) keyEl(boxIn(), 'Escape');
+    await sleep(150);
+    rec('DC-menu', !!di && itemLabel(di) === 'Due' && v === dIso(1) && atPill && !box() && document.activeElement === pillOf(K[1]),
+        JSON.stringify([di ? itemLabel(di) : null, v, r && [r.left, r.top, r.bottom], pr && [pr.left, pr.top, pr.bottom], !!box(), document.activeElement && document.activeElement.className]));
   };
 
   (async function () {

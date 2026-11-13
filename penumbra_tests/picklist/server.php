@@ -37,16 +37,30 @@ $FILES = array('manage_journal.php', 'purge_report_data.php');
 
 // --- mutants: name => [file, old, new, must-red] ------------------------------
 $MUTANTS = array(
+    // (2026-11-12, DATE_SPEC.md) date columns
+    'd-decode'     => array('manage_journal.php', "(\$fd['type'] !== 'pick' && \$fd['type'] !== 'date')) continue;\n                        if (!isset(\$fd['key'])",
+                            "\$fd['type'] !== 'pick') continue;\n                        if (!isset(\$fd['key'])",
+                            array('D-fields', 'D-label-default', 'D-write-reader', 'D-write-shape', 'D-write-editor', 'D-set', 'D-set-wrongtype', 'D-conflict', 'D-bulk', 'D-read')),
+    'd-value'      => array('manage_journal.php', "    if (preg_match(JOURNAL_FIELD_DATE_RE, \$v, \$dm) && checkdate((int)\$dm[2], (int)\$dm[3], (int)\$dm[1])) return \$v;\n", "",
+                            array('D-values', 'D-set', 'D-conflict', 'D-bulk')),
+    'd-checkdate'  => array('manage_journal.php', "preg_match(JOURNAL_FIELD_DATE_RE, \$v, \$dm) && checkdate((int)\$dm[2], (int)\$dm[3], (int)\$dm[1])",
+                            "preg_match(JOURNAL_FIELD_DATE_RE, \$v, \$dm)", array('D-values', 'D-set-bad')),
+    'd-shape'      => array('manage_journal.php', "            if (\$isDate && !preg_match(JOURNAL_FIELD_DATE_RE, (string)\$v)) return", "            if (false) return",
+                            array('D-write-shape', 'D-write-editor', 'D-set-wrongtype')),
+    'd-pickshape'  => array('manage_journal.php', "            if (!\$isDate && !preg_match(JOURNAL_FIELD_VALUE_RE, (string)\$v)) return", "            if (false) return",
+                            array('D-write-editor')),
+    'd-anyday'     => array('manage_journal.php', "    if (\$def['type'] === 'date') return null;   // any day (its shape is checked above)\n", "",
+                            array('D-write-reader', 'D-set', 'D-conflict', 'D-bulk')),
     'noconflict'   => array('manage_journal.php', "if (\$now !== \$prev) return array_merge(array('status' => 'success', 'conflict' => true), \$held);",
                             "if (false) return array_merge(array('status' => 'success', 'conflict' => true), \$held);",
-                            array('S-conflict', 'S-dup-conflict')),
+                            array('S-conflict', 'S-dup-conflict', 'D-conflict')),
     'nounchanged'  => array('manage_journal.php', "if (\$now === \$value) return array_merge(array('status' => 'success', 'unchanged' => true), \$held);",
                             "if (false) return array_merge(array('status' => 'success', 'unchanged' => true), \$held);",
                             array('S-unchanged')),
     'nolock'       => array('manage_journal.php', "(\$lock ? \" FOR UPDATE WAIT 10\" : '')", "''",
                             array('S-lock')),
     'state1'       => array('manage_journal.php', "define('JOURNAL_FIELD_STATE', 2);", "define('JOURNAL_FIELD_STATE', 1);",
-                            array('S-ok', 'S-clear', 'S-conflict', 'S-unchanged', 'S-cap', 'S-dup-conflict', 'S-dup-retry', 'B-ok', 'B-undo', 'T-fields', 'X-state2')),
+                            array('S-ok', 'S-clear', 'S-conflict', 'S-unchanged', 'S-cap', 'S-dup-conflict', 'S-dup-retry', 'B-ok', 'B-undo', 'T-fields', 'X-state2', 'D-set', 'D-conflict', 'D-bulk')),
     'toggleguard'  => array('manage_journal.php', "if (\$cur !== null && \$cur['state'] === 1) return array('status' => 'error'",
                             "if (false) return array('status' => 'error'",
                             array('S-toggle-row')),
@@ -54,14 +68,14 @@ $MUTANTS = array(
                             "            if (false) {\n                oci_rollback(\$oci);",
                             array('B-toggle')),
     'bulkskip'     => array('manage_journal.php', "            if (\$now === \$vv) continue;   // already so: no write, no event\n", "",
-                            array('B-ok')),
+                            array('B-ok', 'D-bulk')),
     'retired'      => array('manage_journal.php', "        if (\$def['options'][\$v]['retired']) return", "        if (false) return",
                             array('W-reader-retired', 'B-refused')),
     'decodetoggle' => array('manage_journal.php', " || in_array(\$fkey, \$keys, true)", "",
                             array('F-toggle-wins')),
     'editorbypass' => array('manage_journal.php', "    if (journalCallerCanEditReport(\$report, \$uid, \$isAdmin)) return null;\n    if (!is_array(\$f['fields'])) return null;",
                             "    if (!is_array(\$f['fields'])) return null;",
-                            array('W-editor')),
+                            array('W-editor', 'D-write-editor')),
     'histaction'   => array('manage_journal.php', "\$histAction = \$histField ? 'JOURNAL_FIELD' : 'JOURNAL_TOGGLE';", "\$histAction = 'JOURNAL_TOGGLE';",
                             array('H-field-sql', 'H-field-single', 'H-field-bulk')),
     'histroute'    => array('manage_journal.php', "    if (\$fieldHistory) \$action = 'toggle_history';
@@ -71,7 +85,7 @@ $MUTANTS = array(
                             "                }",
                             array('H-field-bulk', 'H-field-single')),
     'fieldsread'   => array('manage_journal.php', "if (\$sfT['enc'] || (is_array(\$sfT['fields']) && \$sfT['fields'])) {", "if (false) {",
-                            array('T-fields', 'T-nocolumn')),
+                            array('T-fields', 'T-nocolumn', 'D-read')),
     'nocolready'   => array('manage_journal.php', "                if (journalIsMissingColumnError(\$e->getMessage())) \$fieldReady = false;\n                else error_log",
                             "                error_log",
                             array('T-nocolumn')),
@@ -189,11 +203,12 @@ function lift_tokens($src, $anchor, $whole) {
     return $out;
 }
 // The constants the lifted code needs, from the build's own define() lines (a mutant of one is seen).
-foreach (array('JOURNAL_FIELD_STATE', 'JOURNAL_FIELD_VALUE_RE', 'JOURNAL_MAX_TOGGLE_ROWS', 'JOURNAL_BULK_MAX_ROWS', 'JOURNAL_ROW_KEY_BYTES') as $cn) {
+foreach (array('JOURNAL_FIELD_STATE', 'JOURNAL_FIELD_VALUE_RE', 'JOURNAL_FIELD_DATE_RE', 'JOURNAL_MAX_TOGGLE_ROWS', 'JOURNAL_BULK_MAX_ROWS', 'JOURNAL_ROW_KEY_BYTES') as $cn) {
     if (preg_match('/^define\(\'' . $cn . '\',[^\n]*\);$/m', $mj, $m)) eval($m[0]);
 }
 if (!defined('JOURNAL_FIELD_STATE')) define('JOURNAL_FIELD_STATE', -1);          // the control: none of it
 if (!defined('JOURNAL_FIELD_VALUE_RE')) define('JOURNAL_FIELD_VALUE_RE', '/^$/');
+if (!defined('JOURNAL_FIELD_DATE_RE')) define('JOURNAL_FIELD_DATE_RE', '/^$/');   // (2026-11-12) a build before date columns
 if (!defined('JOURNAL_MAX_TOGGLE_ROWS')) define('JOURNAL_MAX_TOGGLE_ROWS', 250000);
 if (!defined('JOURNAL_BULK_MAX_ROWS')) define('JOURNAL_BULK_MAX_ROWS', 5000);
 define('JOURNAL_PARK_OPEN_SQL', "UNISTR('\\2402')");
@@ -318,7 +333,7 @@ A('F-fields', is_array($st) && $st['type'] === 'pick' && $st['label'] === 'Statu
 $f = $flagsOf(vo_with(array('journalFields' => array(array('key' => 'done', 'type' => 'pick', 'label' => 'Clash', 'options' => array())))));
 A('F-toggle-wins', isset($f['fields']) && is_array($f['fields']) && !isset($f['fields']['done']), 'a toggle\'s key stays the toggle\'s: ' . json_encode(isset($f['fields']) ? $f['fields'] : null));
 $f = $flagsOf(vo_with(array('journalFields' => array(
-    array('key' => 'kind', 'type' => 'date', 'label' => 'Later type'),
+    array('key' => 'kind', 'type' => 'lookup', 'label' => 'Later type'),   // (2026-11-12) 'date' is a type now: D-*
     array('key' => '__keyfile', 'type' => 'pick', 'label' => 'Reserved'),
     array('type' => 'pick', 'label' => 'No key'),
     array('key' => 'stage', 'type' => 'pick', 'options' => array(array('id' => 'x1', 'label' => 'Bad id'), array('id' => 7), array('id' => 'o5', 'label' => 'Fine')))))));
@@ -597,3 +612,63 @@ A('K-left', strpos($kb, "STATE = \" . JOURNAL_FIELD_STATE . \" AND SUBSTR(ROW_KE
 A('P-purge', strpos($pr, "DELETE FROM PENUMBRA_AUDIT WHERE REPORT_ID = :id AND ACTION IN ('JOURNAL_TOGGLE', 'JOURNAL_FIELD')") !== false, 'clearing toggles clears the fields\' history');
 A('X-no-ne0', !preg_match('/STATE\s*(<>|!=|>)\s*0/', $mj), 'no read takes STATE <> 0 (the filing marker is STATE 9)');
 A('X-state2', JOURNAL_FIELD_STATE === 2 && strpos($mj, "define('JOURNAL_FIELD_STATE', 2);") !== false, 'a field row is STATE 2');
+
+// --- D: date columns (2026-11-12, DATE_SPEC.md) -----------------------------------------------------------------
+// A date column is a field of type 'date': a label, no options, a value that is one calendar day (ISO). Its saved
+// type holds for everyone (an editor too); a pick list keeps its option ids.
+$DATE = array('key' => 'due', 'type' => 'date', 'label' => 'Due', 'oldLabels' => array('Deadline'));
+$vod = function ($extra = array()) use ($DATE) { $vo = vo_with($extra); $vo['journalFields'][] = $DATE; return $vo; };
+$f = $flagsOf($vod());
+A('D-fields', isset($f['fields']['due'], $f['fields']['status']) && $f['fields']['due'] === array('type' => 'date', 'label' => 'Due', 'options' => array())
+    && $f['fields']['status']['type'] === 'pick', json_encode(isset($f['fields']) ? $f['fields'] : null));
+$f = $flagsOf(vo_with(array('journalFields' => array(array('key' => 'due', 'type' => 'date')))));
+A('D-label-default', isset($f['fields']['due']['label']) && $f['fields']['due']['label'] === 'Due', json_encode(isset($f['fields']) ? $f['fields'] : null));
+$dv = array(array('2026-11-21', '2026-11-21'), array('2024-02-29', '2024-02-29'), array('1900-01-01', '1900-01-01'), array('2100-12-31', '2100-12-31'),
+            array('2026-02-29', false), array('2026-02-30', false), array('2026-04-31', false), array('2026-13-01', false), array('2026-00-10', false),
+            array('1899-12-31', false), array('2101-01-01', false), array('2026-1-5', false), array('26-11-21', false), array('2026-11-21 ', false),
+            array('21-NOV-26', false), array('2026-11-21T00:00', false), array('o3', 'o3'));
+$bad = array();
+foreach ($dv as $vv) { $got = journalFieldValueOf($vv[0]); if ($got !== $vv[1]) $bad[] = json_encode($vv[0]) . ' -> ' . json_encode($got); }
+A('D-values', !$bad, $bad ? implode('; ', $bad) : 'all ' . count($dv) . ' as expected');
+$w1 = $refuse($vod(), 'due', array('2026-11-21'));
+$w7 = $refuse($vod(), 'due', array(null, '2026-11-28'));
+A('D-write-reader', $w1 === null && $w7 === null, 'a reader sets and clears a saved date column: ' . json_encode(array($w1, $w7)));
+$w2 = $refuse($vod(), 'due', array('o1'));
+$w3 = $refuse($vod(), 'status', array('2026-11-21'));
+A('D-write-shape', is_string($w2) && strpos($w2, 'not a date') !== false && is_string($w3) && strpos($w3, 'options') !== false,
+    'an option id on a date column, a day on a pick list: ' . json_encode(array($w2, $w3)));
+$w4 = $refuse($vod(), 'status', array('2026-11-21'), true);
+$w5 = $refuse($vod(), 'due', array('o1'), true);
+$w6 = $refuse($vod(), 'next', array('2026-11-21'), true);
+A('D-write-editor', is_string($w4) && is_string($w5) && $w6 === null,
+    'an editor too is held to a SAVED field\'s type; a column added on screen is open: ' . json_encode(array($w4, $w5, $w6)));
+$w = $refuse($vod(array('journalEnabled' => false)), 'due', array('o1'), false, true);
+A('D-write-enc', $w === null, 'an encrypted state: the shape alone, checked before: ' . json_encode($w));
+
+$oneD = array_merge($one, array('toggle_key' => 'due', 'value' => '2026-11-21'));
+$r = $run($SF, $oneD, array('vo' => $vod(), 'cur' => array(null), 'after' => $cur(2, '2026-11-21', 'kim', '2026-11-12 10:00:00')));
+$m = $merges($r);
+$b = $m ? $m[0]['binds'] : array();
+$au = $r['audit'] ? $r['audit'][0] : null;
+A('D-set', count($m) === 1 && $b[':v'] === '2026-11-21' && $b[':v4'] === '2026-11-21' && $b[':st'] === 2 && $b[':tk'] === 'due'
+    && $r['tx'] === array('commit') && $r['j']['status'] === 'success' && $r['j']['v'] === '2026-11-21'
+    && $au && $au['action'] === 'JOURNAL_FIELD' && $au['after']['to'] === '2026-11-21' && $au['after']['from'] === null
+    && $au['after']['label'] === 'Due' && !isset($au['after']['option_labels']), json_encode($b) . ' ' . $brief($r));
+$r = $run($SF, array_merge($oneD, array('value' => '2026-02-30')), array('vo' => $vod(), 'cur' => array(null)));
+A('D-set-bad', !$merges($r) && isset($r['j']['status']) && $r['j']['status'] === 'error' && strpos((string)$r['j']['message'], 'not valid') !== false, $brief($r));
+$r = $run($SF, array_merge($oneD, array('value' => 'o2')), array('vo' => $vod(), 'cur' => array(null)));
+A('D-set-wrongtype', !$merges($r) && isset($r['j']['status']) && $r['j']['status'] === 'error' && strpos((string)$r['j']['message'], 'not a date') !== false, $brief($r));
+$r = $run($SF, array_merge($oneD, array('value' => '2026-11-28', 'prev' => '2026-11-21')), array('vo' => $vod(), 'cur' => array($cur(2, '2026-11-14', 'lee', '2026-11-12 09:00:00'))));
+A('D-conflict', !$merges($r) && !empty($r['j']['conflict']) && $r['j']['v'] === '2026-11-14' && $r['j']['by'] === 'lee', $brief($r));
+$bulkD = array('report_id' => 'rpt', 'toggle_key' => 'due', 'values' => array('A' => '2026-11-21', 'B' => '2026-11-21', 'C' => null), 'key_cols' => array('ID'));
+$r = $run($SB, $bulkD, array('vo' => $vod(), 'curRows' => array(array('ROW_KEY' => 'A', 'STATE' => 2, 'FIELD_VALUE' => '2026-11-21'),
+    array('ROW_KEY' => 'B', 'STATE' => 2, 'FIELD_VALUE' => '2026-11-14'), array('ROW_KEY' => 'C', 'STATE' => 2, 'FIELD_VALUE' => '2026-12-01'))));
+$m = $merges($r);
+$keys = array(); foreach ($m as $x) $keys[] = $x['binds'][':rk'] . '=' . $x['binds'][':v'];
+A('D-bulk', $keys === array('B=2026-11-21', 'C=') && $r['tx'] === array('commit') && $r['j']['count'] === 2 && $r['j']['skipped'] === 1
+    && $r['j']['changed'] === array(array('row_key' => 'B', 'prev' => '2026-11-14'), array('row_key' => 'C', 'prev' => '2026-12-01')), json_encode($keys) . ' ' . $brief($r));
+$TGd = $bodies['toggles'];
+$r = $run($TGd, null, array('get' => array('report_id' => 'rpt'), 'vo' => vo_with(array('journalFields' => array($DATE))),
+    'fieldRows' => array(array('TOGGLE_KEY' => 'due', 'ROW_KEY' => 'A', 'FIELD_VALUE' => '2026-11-21', 'UPDATED_BY' => 'kim', 'UPDATED_AT' => '2026-11-12 09:30:00'))));
+A('D-read', isset($r['j']['fields']['due']['A']) && $r['j']['fields']['due']['A']['v'] === '2026-11-21',
+    'a report whose only field is a date column reads its values: ' . json_encode(isset($r['j']['fields']) ? $r['j']['fields'] : $r['j']));

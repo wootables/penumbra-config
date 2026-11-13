@@ -18,7 +18,7 @@ _a = sys.argv[1:]
 if '--dir' not in _a: sys.exit('usage: mutants_p2.py --dir DIR [NAME,NAME]')
 _i = _a.index('--dir'); STAGE = _a[_i + 1]; del _a[_i:_i + 2]
 FILES = ['js/penumbra_fields.js', 'css/penumbra_fields.css', 'js/penumbra_colmenu.js', 'js/penumbra_cards.js', 'js/main.js']
-D_ALL = ['D-pill', 'D-pick', 'D-shows', 'D-field', 'D-empty', 'D-menu', 'D-details']
+D_ALL = ['D-pill', 'D-pick', 'D-shows', 'D-field', 'D-empty', 'D-menu', 'D-details', 'D-label']
 B_ALL = ['B-item', 'B-sub', 'B-confirm', 'B-post', 'B-toast', 'B-undo', 'B-filtered', 'B-escape']
 
 M = {
@@ -40,7 +40,8 @@ M = {
     'fieldslot': ('js/penumbra_cards.js', "        if ((cfg.fields || []).some(function (n) { return by[n] && by[n].field; })) {", "        if (false) {", 'cards', ['D-field', 'D-empty']),
     'settable': ('js/penumbra_cards.js', "if (filled(tf) || fieldSettable(tf, r.fields[i])) fh += ", "if (filled(tf)) fh += ", 'cards', ['D-field', 'D-empty']),
     'cardmenu': ('js/penumbra_cards.js', "            if (/^field-/.test(it.act)) { out.push(it); return; }   // (picklist phase 2) the row's pick lists: Status >\n", '', 'cards', ['D-menu']),
-    'details': ('js/penumbra_cards.js', "            if (c.field && (!c.hidden || onCard[c.name])) { var tcf = cellOf(tr, c);", "            if (false) { var tcf = cellOf(tr, c);", 'cards', ['D-details']),
+    'details': ('js/penumbra_cards.js', "            if (c.field && (!c.hidden || onCard[c.name])) { var tcf = cellOf(tr, c);", "            if (false) { var tcf = cellOf(tr, c);", 'cards', ['D-details', 'D-label']),
+    'friendly': ('js/penumbra_cards.js', "t = H.friendly(th.getAttribute('data-colname') || name) || t;", "t = H.friendly(name) || t;", 'cards', ['D-label']),
     'emptycss': ('css/penumbra_fields.css', "    content: '+ ' attr(data-field-label); opacity: .65; font-size: .92em; }", "    opacity: .65; font-size: .92em; }", 'cards', ['D-pill']),
     'labelattr': ('js/penumbra_fields.js', "            + ' data-field-label=\"' + esc(def.label) + '\"'   // (phase 2) a card's empty pill says what it sets (css)\n", '', 'cards', ['D-pill']),
 }

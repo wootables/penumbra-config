@@ -417,7 +417,7 @@
    ]
   ],
   "must": [
-   "C-layout-card"
+   "C-layout-card", "C-layout-medium"
   ],
   "scn": [
    "layout"
