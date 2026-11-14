@@ -49,8 +49,12 @@ $MUTANTS = array(
                         array('X-keepcols', 'S-on-names', 'S-with-toggles', 'J-fixture')),
     'parked'   => array('journal_export.php', "if (\$rk === '' || (defined('JOURNAL_PARK_OPEN') && strpos(\$rk, JOURNAL_PARK_OPEN) === 0)) continue;", "if (\$rk === '') continue;",
                         array('S-parked')),
-    'latest'   => array('manage_journal.php', "if (!empty(\$later) && (int)\$later[0]['CNT'] > 0) {", "if (false) {",
-                        array('E-notlatest', 'E-scope-latest')),
+    // (2026-11-13) re-pointed: e0fcd22 (2026-10-29, the user) lets the author edit ANY of their notes and took the
+    // not_latest check out, so the old anchor was gone (and --mutants died on it). The mutant now puts that check
+    // back where it stood: E-older / E-scope-older must go red.
+    'latest'   => array('manage_journal.php', "// can still be corrected. The clients still read a 409 'not_latest' should one ever come back.",
+                        "\$later = queryViaOci8(\"SELECT COUNT(*) AS CNT FROM PENUMBRA_JOURNAL o, PENUMBRA_JOURNAL n WHERE n.ID = :nid AND o.REPORT_ID = :rid AND o.SCOPE = n.SCOPE AND o.ID <> n.ID AND (o.CREATED_AT > n.CREATED_AT OR (o.CREATED_AT = n.CREATED_AT AND o.ID > n.ID))\", array(':nid' => \$note_id, ':rid' => \$report_id)); if (!empty(\$later) && (int)\$later[0]['CNT'] > 0) { http_response_code(409); echo json_encode(array('status' => 'error', 'code' => 'not_latest', 'message' => 'Someone has written on this row since: only the newest note can be edited. Reply instead.')); exit; }",
+                        array('E-older', 'E-scope-older')),
     'author'   => array('manage_journal.php', "if (strcasecmp((string)\$note['CREATED_BY'], (string)\$currentUserKey) !== 0) {", "if (false) {",
                         array('E-author', 'E-author-admin')),
     'newonly'  => array('manage_journal.php', "\$new_uids = array_values(array_diff(\$mention_uids, \$old_uids));", "\$new_uids = \$mention_uids;",
@@ -84,7 +88,7 @@ $MUTANTS = array(
 // What the build before the change gets wrong (frozen from its first control run).
 $CONTROL_RED = array('O-lifted', 'O-order', 'O-order-null', 'O-lead', 'O-wired', 'M-lifted', 'M-br', 'M-cleared', 'M-wired', 'P-flatten-fn', 'P-edit-lifted', 'S-flatten', 'S-flatten-orphan', 'S-flatten-empty', 'S-on-value', 'S-on-blank',
     'S-on-numkey', 'S-on-last', 'S-on-names', 'S-parked', 'S-with-toggles', 'S-collide', 'S-fallback', 'S-fail-notesonly', 'X-keepcols',
-    'X-rowvalues', 'E-ok', 'E-mentions-csv', 'E-mail-newonly', 'E-audit', 'E-author', 'E-author-admin', 'E-notlatest', 'E-scope',
+    'X-rowvalues', 'E-ok', 'E-mentions-csv', 'E-mail-newonly', 'E-audit', 'E-author', 'E-author-admin', 'E-older', 'E-scope',
     'E-empty', 'E-empty-file', 'E-unchanged', 'E-long', 'E-journal-off', 'E-noview', 'E-gone', 'E-noid');
 // ...every "switch off = as before" assert (S-off-*, S-rownotes-off, S-journal-off, S-on-notoggleq, S-fail-toggles,
 // X-strip*, X-decorate, X-rowvalues-nowho) PASSES on the old build: the fixture reads the same.
@@ -437,9 +441,11 @@ if ($mode) {
         penumbra_sched_notes_col('');
         $A('M-cleared', penumbra_notes_cell_html("x\ny", 'NOTES') === "x\ny", 'a task with no Notes column changes nothing');
     }
-    $A('M-wired', substr_count($runner, 'penumbra_notes_cell_html(formatCellContent(') === 2 && substr_count($runner, 'penumbra_notes_cell_html(formatCellContentPdf(') === 4
+    // (2026-11-13) three email sites since 4bb5714 (2026-11-01, csched): the table's two and the saved cards' cell
+    // (penumbra_cards_email.php's values, $_cardsCell), each wrapped as the table's are.
+    $A('M-wired', substr_count($runner, 'penumbra_notes_cell_html(formatCellContent(') === 3 && substr_count($runner, 'penumbra_notes_cell_html(formatCellContentPdf(') === 4
         && substr_count($runner, "penumbra_sched_notes_col((\$journal_toggle_resolver") === 1,
-        'email x2 + PDF x4 + set per task: ' . substr_count($runner, 'penumbra_notes_cell_html(formatCellContent(') . ' / ' . substr_count($runner, 'penumbra_notes_cell_html(formatCellContentPdf('));
+        'email x3 (the table x2, the cards) + PDF x4 + set per task: ' . substr_count($runner, 'penumbra_notes_cell_html(formatCellContent(') . ' / ' . substr_count($runner, 'penumbra_notes_cell_html(formatCellContentPdf('));
     // O: the scheduled output's journal columns LEAD each row in the page's order (round 5)
     $f3 = $lift($runner, 'penumbra_sched_journal_screen_order'); $f4 = $lift($runner, 'apply_state_logic');
     if ($f3) eval($f3);
@@ -684,14 +690,16 @@ if ($mode) {
 }
 
 // ===== PARENT =====
+// (2026-11-13) E-older / E-scope-older here too: e0fcd22 (2026-10-29) renamed the checks from E-notlatest /
+// E-scope-latest but not this list, so all four read red (NOT RECORDED / UNEXPECTED) from that day.
 $EXPECT = array('P-flatten-fn', 'P-edit-lifted', 'S-flatten', 'S-flatten-orphan', 'S-flatten-empty', 'S-off-toggles', 'S-off-notesonly',
     'S-off-noquery', 'S-rownotes-off', 'S-journal-off', 'S-on-value', 'S-on-blank', 'S-on-numkey', 'S-on-last', 'S-on-names',
     'S-on-notoggleq', 'S-parked', 'S-with-toggles', 'S-collide', 'S-fallback', 'S-fail-notesonly', 'S-fail-toggles',
     'X-strip', 'X-strip-grouped', 'X-decorate', 'X-keepcols', 'X-strip-notesonly', 'X-rowvalues', 'X-rowvalues-nowho',
-    'E-ok', 'E-mentions-csv', 'E-mail-newonly', 'E-audit', 'E-author', 'E-author-admin', 'E-notlatest', 'E-scope', 'E-empty',
+    'E-ok', 'E-mentions-csv', 'E-mail-newonly', 'E-audit', 'E-author', 'E-author-admin', 'E-older', 'E-scope', 'E-empty',
     'E-empty-file', 'E-unchanged', 'E-long', 'E-journal-off', 'E-noview', 'E-gone', 'E-noid',
     'Q-loaded', 'Q-word', 'Q-word-not', 'Q-col', 'Q-col-not', 'Q-col-regex', 'Q-count', 'Q-empty', 'Q-and', 'Q-clean', 'Q-grouped', 'Q-shadow', 'Q-off', 'Q-wired',
-    'E-scope-latest', 'E-scope-bad',
+    'E-scope-older', 'E-scope-bad',
     'M-lifted', 'M-br', 'M-cleared', 'M-wired', 'O-lifted', 'O-order', 'O-order-null', 'O-lead', 'O-none', 'O-wired',
     'J-lifted', 'J-fixture', 'J-end', 'J-state', 'J-nores', 'J-mid', 'J-hidden', 'J-who-first', 'J-hidden-anchor', 'J-hidden-prev',
     'J-old-hash', 'J-lead', 'J-vc-empty', 'J-names', 'J-tag', 'J-page', 'J-model');

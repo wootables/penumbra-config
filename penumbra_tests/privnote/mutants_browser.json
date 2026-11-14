@@ -1,0 +1,259 @@
+{
+ "b-output": {
+  "edits": [
+   [
+    "return journalNotesFlatten(rowNotesOf(rowKey).filter(function (x) { return !noteIsPrivate(x); }));",
+    "return journalNotesFlatten(rowNotesOf(rowKey));"
+   ]
+  ],
+  "must": [
+   "PV-out-text",
+   "PV-out-cell"
+  ],
+  "scn": [
+   "output"
+  ]
+ },
+ "b-newest": {
+  "edits": [
+   [
+    "            if (outputOnly) notes = notes.filter(function (x) { return !noteIsPrivate(x); });   // (privnote) what may leave the page\n",
+    ""
+   ]
+  ],
+  "must": [
+   "PV-newest",
+   "PV-cell-copy"
+  ],
+  "scn": [
+   "output",
+   "cellcopy"
+  ]
+ },
+ "b-shared": {
+  "edits": [
+   [
+    "String(pid) === '0') && !noteIsPrivate(n)) best = n;",
+    "String(pid) === '0')) best = n;"
+   ]
+  ],
+  "must": [
+   "PV-shared-of"
+  ],
+  "scn": [
+   "shared"
+  ]
+ },
+ "b-want": {
+  "edits": [
+   [
+    "                if (wantPrivate) _nb['private'] = 1;   // (privnote)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "PV-post"
+  ],
+  "scn": [
+   "card"
+  ]
+ },
+ "b-replyline": {
+  "edits": [
+   [
+    "            updatePrivLine($panel);   // (privnote) a private thread says who reads the reply\n",
+    ""
+   ]
+  ],
+  "must": [
+   "PV-reply"
+  ],
+  "scn": [
+   "card"
+  ]
+ },
+ "b-flipask": {
+  "edits": [
+   [
+    "            if (!window.confirm(privacyQuestion(noteStore(kind)[rowKey] || [], noteId, want))) return;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "PV-flip-ask",
+   "PV-unflip-ask"
+  ],
+  "scn": [
+   "flip"
+  ]
+ },
+ "b-delq": {
+  "edits": [
+   [
+    "            return journalDeleteConfirmText(r.count, r.byOthers, noteIsPrivate(self));",
+    "            return journalDeleteConfirmText(r.count, r.byOthers, false);"
+   ]
+  ],
+  "must": [
+   "PV-del-private"
+  ],
+  "scn": [
+   "delete"
+  ]
+ },
+ "b-ready": {
+  "edits": [
+   [
+    "                    _jPrivateReady = !!resp.private_ready;   // (privnote) the composer's Private box\n",
+    "                    _jPrivateReady = true;\n"
+   ]
+  ],
+  "must": [
+   "PV-noready"
+  ],
+  "scn": [
+   "noready"
+  ]
+ },
+ "b-panelwant": {
+  "edits": [
+   [
+    "            if (wantPrivate) body['private'] = 1;   // (privnote)\n",
+    "",
+    "journal"
+   ]
+  ],
+  "must": [
+   "PV-panel-post"
+  ],
+  "scn": [
+   "panel"
+  ]
+ },
+ "b-tip": {
+  "edits": [
+   [
+    "                if (nPriv) tip = tip.replace(/^(\\d+ notes?)/, '$1 (' + nPriv + ' private)');\n",
+    ""
+   ]
+  ],
+  "must": [
+   "PV-tip"
+  ],
+  "scn": [
+   "output"
+  ]
+ },
+ "b-prefread": {
+  "edits": [
+   [
+    "'<input type=\"checkbox\" class=\"journal-rownote-private\"' + (privPrefGet() ? ' checked' : '') + '>'",
+    "'<input type=\"checkbox\" class=\"journal-rownote-private\">'"
+   ]
+  ],
+  "must": [
+   "PV-sticky-open"
+  ],
+  "scn": [
+   "card",
+   "sticky"
+  ]
+ },
+ "b-prefsave": {
+  "edits": [
+   [
+    "function () { privPrefSet(this.checked); updatePrivLine(",
+    "function () { updatePrivLine("
+   ]
+  ],
+  "must": [
+   "PV-post-keep",
+   "PV-reply-after",
+   "PV-sticky-store",
+   "PV-sticky-open",
+   "PV-sticky-panel"
+  ],
+  "scn": [
+   "card",
+   "sticky"
+  ]
+ },
+ "b-prefpost": {
+  "edits": [
+   [
+    "prop('checked', privPrefGet());   // (privbox) the next note starts as the box was left",
+    "prop('checked', false);"
+   ]
+  ],
+  "must": [
+   "PV-post-keep",
+   "PV-reply-after"
+  ],
+  "scn": [
+   "card"
+  ]
+ },
+ "b-prefopen": {
+  "edits": [
+   [
+    "            updatePrivLine($el.find('.journal-rownote-panel'));   // (privbox) a box left ticked says who will see the note from the start\n",
+    ""
+   ]
+  ],
+  "must": [
+   "PV-sticky-open"
+  ],
+  "scn": [
+   "sticky"
+  ]
+ },
+ "b-prefguard": {
+  "edits": [
+   [
+    "try { var m = JSON.parse(localStorage.getItem(PRIV_PREF_KEY) || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; } catch (e) { return {}; }",
+    "var m = JSON.parse(localStorage.getItem(PRIV_PREF_KEY) || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};"
+   ]
+  ],
+  "must": [
+   "PV-sticky-nostorage",
+   "E-sticky"
+  ],
+  "scn": [
+   "sticky"
+  ]
+ },
+ "b-panelpref": {
+  "edits": [
+   [
+    "        if (!editTarget && !replyTo) $('#journalPrivateBox').prop('checked', !!(JP.pref && JP.pref()));\n",
+    "",
+    "journal"
+   ]
+  ],
+  "must": [
+   "PV-sticky-panel"
+  ],
+  "scn": [
+   "sticky",
+   "panel"
+  ]
+ },
+ "b-panelsave": {
+  "edits": [
+   [
+    "            if (P.journalPrivate && P.journalPrivate.setPref) P.journalPrivate.setPref(this.checked);\n",
+    "",
+    "journal"
+   ]
+  ],
+  "must": [
+   "PV-sticky-clear",
+   "PV-sticky-off-again",
+   "PV-panel-keep"
+  ],
+  "scn": [
+   "sticky",
+   "panel"
+  ]
+ }
+}

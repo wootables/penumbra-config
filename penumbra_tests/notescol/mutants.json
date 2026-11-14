@@ -56,7 +56,6 @@
   "must": [
    "P-row-preview",
    "E-panel",
-   "K-cell-off",
    "K-hover",
    "E-hovercol",
    "V-preview",
@@ -71,6 +70,8 @@
    "R-hover",
    "R-grow",
    "R-grow-narrow",
+   "R-grow-hide",
+   "R-grow-unhide",
    "R-back",
    "E-wrap",
    "D-preview"
@@ -89,6 +90,7 @@
    "R-compact",
    "R-hover",
    "R-grow",
+   "R-grow-hide",
    "R-back",
    "D-preview"
   ],
@@ -260,7 +262,8 @@
   "must": [
    "W-clip",
    "W-ellipsis",
-   "R-grow-narrow"
+   "R-grow-narrow",
+   "R-grow-hide"
   ],
   "scn": [
    "resize",
@@ -294,7 +297,7 @@
   ],
   "must": [
    "R-grow",
-   "R-grow-narrow"
+   "R-grow-unhide"
   ],
   "scn": [
    "wrap"
@@ -303,7 +306,7 @@
  "hoverpv": {
   "edits": [
    [
-    "                if (notePv && notePv.scrollWidth > notePv.clientWidth) hasOverflow = true;",
+    "                if (notePv && notePv.scrollWidth > notePv.clientWidth && !cell.closest('.pnb-notes-narrow')) hasOverflow = true;",
     "                if (false) hasOverflow = true;"
    ]
   ],
@@ -474,6 +477,49 @@
   ],
   "scn": [
    "panelnone"
+  ]
+ },
+ "narrowcss": {
+  "edits": [
+   [
+    "table.pnb-notes-narrow > tbody > tr > td.journal-notes-col .journal-notes-preview {",
+    "table.pnb-notes-narrow-x > tbody > tr > td.journal-notes-col .journal-notes-preview {",
+    "css"
+   ]
+  ],
+  "must": [
+   "R-grow-hide"
+  ],
+  "scn": [
+   "wrap"
+  ]
+ },
+ "narrowmark": {
+  "edits": [
+   [
+    "if (want[i] !== null && tables[i].classList.contains(NOTES_NARROW) !== want[i]) tables[i].classList.toggle(NOTES_NARROW, want[i]);",
+    ""
+   ]
+  ],
+  "must": [
+   "R-grow-hide"
+  ],
+  "scn": [
+   "wrap"
+  ]
+ },
+ "narrowstick": {
+  "edits": [
+   [
+    "tables[i].classList.toggle(NOTES_NARROW, want[i]);",
+    "tables[i].classList.add(NOTES_NARROW);"
+   ]
+  ],
+  "must": [
+   "R-grow-unhide"
+  ],
+  "scn": [
+   "wrap"
   ]
  }
 }

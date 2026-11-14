@@ -95,6 +95,7 @@
   window.PENUMBRA_THEME_IDS = ['theme-default'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   (function () {
     var q = new URLSearchParams(location.search);
     window.__MODE = q.get('mode') || 'lz';

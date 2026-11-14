@@ -8,19 +8,15 @@
    ]
   ],
   "must": [
-   "V-rownote-err",
-   "V-rownote-pref",
-   "V-rownote-push",
    "V-body-err",
    "V-body-pref",
    "V-body-push",
    "V-double-err",
    "V-double-pref",
    "V-double-push",
+   "V-drop-err",
    "V-drop-pref",
    "V-drop-push",
-   "V-drop-caught",
-   "V-drop-toast",
    "H-home-err",
    "H-home-pref",
    "H-home-push",
@@ -34,7 +30,8 @@
    "home",
    "editor",
    "popout"
-  ]
+  ],
+  "note": "2026-11-13: V-rownote-* out (since 2026-10-10 an open note card takes the Escape first, main.js A0.9, so the rownote Escape never reaches this guard); V-drop-caught / V-drop-toast -> V-drop-err (since addrows 0e48dd7 the import runs from the dialog button, outside the FileReader try/catch, so the TypeError is uncaught)"
  },
  "lateguard": {
   "why": "the guard moved down to the drawer's $wrapper[0] read: no exception any more, but the preference, the home cards and the report blocks still move - why the guard sits at the top",
@@ -49,8 +46,6 @@
    ]
   ],
   "must": [
-   "V-rownote-pref",
-   "V-rownote-push",
    "V-body-pref",
    "V-body-push",
    "V-double-pref",
@@ -67,7 +62,8 @@
    "double",
    "drop",
    "home"
-  ]
+  ],
+  "note": "2026-11-13: V-rownote-* out (an open note card takes the Escape first, main.js A0.9, 2026-10-10)"
  },
  "invguard": {
   "why": "the guard inverted: the REAL console never opens or comes home - the C-* asserts must catch a guard that kills it",

@@ -1,0 +1,124 @@
+{
+ "addflag": [
+  "A-add-flag",
+  "A-add-inherit",
+  "A-add-pivot-shared"
+ ],
+ "addhidden": [
+  "A-add-hidden"
+ ],
+ "addshared": [
+  "A-add-shared"
+ ],
+ "attach": [
+  "R-attach-hidden"
+ ],
+ "auditadd": [
+  "A-add-audit"
+ ],
+ "badge": [
+  "R-badge"
+ ],
+ "bulkmsg": [
+  "M-bulk-msg"
+ ],
+ "delaudit": [
+  "D-del-audit"
+ ],
+ "delhidden": [
+  "D-del-admin",
+  "D-del-hidden"
+ ],
+ "editaudit": [
+  "E-edit-audit"
+ ],
+ "edithidden": [
+  "E-edit-hidden"
+ ],
+ "editshared": [
+  "E-shared-never"
+ ],
+ "export-php": [
+  "X-export",
+  "X-search"
+ ],
+ "export-sql": [
+  "X-export-sql"
+ ],
+ "inherit": [
+  "A-add-inherit"
+ ],
+ "install-alter": [
+  "I-run"
+ ],
+ "install-early": [
+  "I-early"
+ ],
+ "list": [
+  "R-list"
+ ],
+ "mail": [
+  "A-add-mail"
+ ],
+ "parked": [
+  "R-parked"
+ ],
+ "rownotes": [
+  "R-row-notes"
+ ],
+ "rowone": [
+  "R-row-one"
+ ],
+ "rule-anon": [
+  "V-anon"
+ ],
+ "rule-mentions": [
+  "R-attach-member",
+  "R-summary",
+  "V-case",
+  "V-reply-mention",
+  "V-root-mention"
+ ],
+ "rule-writers": [
+  "D-del-audit",
+  "E-edit-audit",
+  "E-edit-mail",
+  "R-badge",
+  "R-list",
+  "R-parked",
+  "R-row-notes",
+  "R-row-one",
+  "R-summary",
+  "R-version-member",
+  "S-set-pivot-shared",
+  "S-set-same",
+  "S-set-unmake",
+  "V-author",
+  "V-case",
+  "V-mixed",
+  "V-orphan",
+  "V-writer"
+ ],
+ "setauthor": [
+  "S-set-notauthor"
+ ],
+ "sethidden": [
+  "S-set-hidden"
+ ],
+ "setshared": [
+  "S-set-shared"
+ ],
+ "sharedof": [
+  "H-shared-of"
+ ],
+ "summary": [
+  "R-summary"
+ ],
+ "version": [
+  "R-version-flip",
+  "R-version-outsider"
+ ],
+ "version-flag": [
+  "R-version-flip"
+ ]
+}

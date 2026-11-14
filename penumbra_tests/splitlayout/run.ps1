@@ -131,7 +131,7 @@ $mutantDefs = [ordered]@{
   'nobareload'   = @{ target = 'js';  pass = 'load';   edits = @(,@("                applyBareHeader(_bareOn);", "")); red = @('L1') }
   'nobareviewer' = @{ target = 'js';  pass = 'wide';   edits = @(,@("                            applyBareHeader(optionsToApply && optionsToApply.bareHeader);", "")); red = @('X9') }
   'baretransparent' = @{ target = 'css'; pass = 'wide'; edits = @(,@("    background: var(--bg-body) !important;$NL    border: 0 !important;", "    background: transparent !important;$NL    border: 0 !important;")); red = @('X1') }
-  'bareshadow'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("    box-shadow: none !important;$NL    padding: 8px 0 !important;", "    padding: 8px 0 !important;")); red = @('X1') }
+  'bareshadow'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("    border-radius: 0 !important;$NL    box-shadow: none !important;$NL    outline: none !important;", "    border-radius: 0 !important;$NL    outline: none !important;")); red = @('X1') }   # (2026-11-13) re-anchored: fd302eb's outline line sits between
   'barecollapse' = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #reportHeaderContainer:not(.is-collapsed) {", "body.pnb-bare-header #reportHeaderContainer {")); red = @('X7') }
   'baretabnone'  = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #headerToggleHandle:not(.is-collapsed) {$NL    visibility: hidden;", "body.pnb-bare-header #headerToggleHandle:not(.is-collapsed) {$NL    display: none;")); red = @('X7') }
   'baretabgone'  = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #headerToggleHandle:not(.is-collapsed) {", "body.pnb-bare-header #headerToggleHandle {")); red = @('X7') }
@@ -142,10 +142,15 @@ $mutantDefs = [ordered]@{
 }
 
 function Apply-Mutant([string]$text, [string]$name) {
+  # (2026-11-13) the anchors are written with $NL (CRLF); main.css is LF since e65935d (main.js still CRLF),
+  # so an LF target takes them without their CRs.
+  $lfOnly = -not $text.Contains("`r`n")
   foreach ($e in $mutantDefs[$name].edits) {
-    $n = ([regex]::Matches($text, [regex]::Escape($e[0]))).Count
-    if ($n -ne 1) { throw "mutant '$name' anchor found $n times, expected 1 (needs the FEATURE build): $($e[0])" }
-    $text = $text.Replace($e[0], $e[1])
+    $old = $e[0]; $new = $e[1]
+    if ($lfOnly) { $old = $old.Replace("`r`n", "`n"); $new = $new.Replace("`r`n", "`n") }
+    $n = ([regex]::Matches($text, [regex]::Escape($old))).Count
+    if ($n -ne 1) { throw "mutant '$name' anchor found $n times, expected 1 (needs the FEATURE build): $old" }
+    $text = $text.Replace($old, $new)
   }
   return $text
 }

@@ -551,7 +551,9 @@
   }
   async function scnTheme() {
     await waitBoot();
-    var themes = [['light', 'theme-default'], ['dark-blue', 'theme-dark-blue is-dark'], ['charcoal-gold', 'theme-charcoal-gold is-dark']];
+    // (2026-11-13) Charcoal & Gold is theme-graphite-brass since 2026-11-07 (themes_config.php keeps the old id as an alias only;
+    // main.css has no theme-charcoal-gold rules, so painting the old class gave an unthemed box). Check id T-charcoal-gold kept.
+    var themes = [['light', 'theme-default'], ['dark-blue', 'theme-dark-blue is-dark'], ['charcoal-gold', 'theme-graphite-brass is-dark']];
     for (var i = 0; i < themes.length; i++) {
       document.body.className = themes[i][1];
       var why = await openBox(mainCell('AMOUNT'));

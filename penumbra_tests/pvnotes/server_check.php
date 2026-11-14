@@ -48,6 +48,10 @@ if ($mode === 'r6') {
     }
     $GLOBALS['FK'] = array();
     function journalHasParentColumn() { return true; }
+    // (2026-11-13, privnote) the delete asks whether the note is private (journal_export.php's helpers, loaded beside
+    // manage_journal.php on the server): this fixture has no IS_PRIVATE column, so every note is public, as before.
+    if (!function_exists('journalHasPrivateColumn')) { function journalHasPrivateColumn() { return false; } }
+    if (!function_exists('journalNoteIsPrivate')) { function journalNoteIsPrivate($n) { return false; } }
     function journalGetReport($c, $id) { return array('ID' => $id, 'SHORT_ID' => 'fixture'); }
     function journalCallerCanView() { return true; }
     function utf8ize($x) { return $x; }
@@ -273,16 +277,17 @@ if ($mode === 'r3') {
         rec($out, 'S-row-line', $ok, $ok ? 'pivot / row wording, escaped, empty for a report note or no text' : 'pivot: ' . $lp . ' | row: ' . $lr);
     }
     $need = array(
-        "function journalSendMentionEmail(\$toUid, \$toName, \$authorUid, \$authorName, \$report, \$noteText, \$isAuthorized, \$rowLine = '') {",
+        // (2026-11-13) prefixes: privnote appended \$isPrivate to both e-mails and \$is_private to the reply's call
+        "function journalSendMentionEmail(\$toUid, \$toName, \$authorUid, \$authorName, \$report, \$noteText, \$isAuthorized, \$rowLine = ''",
         "mentioned you in a journal note on the report <strong>' . \$safeTitle . '</strong>:</p>'\n          . \$rowLine",
-        "function journalSendReplyEmail(\$toUid, \$toName, \$authorUid, \$authorName, \$report, \$noteText, \$rowLine = '') {",
+        "function journalSendReplyEmail(\$toUid, \$toName, \$authorUid, \$authorName, \$report, \$noteText, \$rowLine = ''",
         "replied in a journal thread you are part of on the report <strong>' . \$safeTitle . '</strong>:</p>'\n          . \$rowLine",
         "            if (\$ref_snap === null && \$reply_root !== null) {",
         "SELECT ROW_SNAPSHOT FROM PENUMBRA_JOURNAL WHERE ID = :root AND REPORT_ID = :rid",
         // (Round P, 2026-10-09: a filed thread's row named by its key's value; the line only to a mention who may view)
         "\$row_line = journalRowRefLine(\$scope, journalRowRefText(\$scope, \$refKey[0], \$ref_snap));",
         "                    \$authorized,\n                    \$authorized ? \$row_line : ''",
-        "journalSendReplyEmail(\$u, \$pName, \$currentUserKey, \$author_name, \$report, \$note_text, \$row_line);",
+        "journalSendReplyEmail(\$u, \$pName, \$currentUserKey, \$author_name, \$report, \$note_text, \$row_line",
     );
     $miss = array();
     foreach ($need as $n) { if (strpos($src, $n) === false) $miss[] = substr(str_replace("\n", ' ', $n), 0, 60); }

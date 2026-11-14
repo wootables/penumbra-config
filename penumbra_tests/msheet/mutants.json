@@ -112,8 +112,8 @@
   "why": "the import's grouping inherits the previous grouping's sort, start depth and top-N limit",
   "edits": [
    [
-    "            currentGroupSort = { key: 'label', dir: 'asc' };\r\n            currentGroupStartDepth = 0;\r\n            currentGroupLimit = null;\r\n            pendingImportSheetGroup = null;\r\n",
-    "            pendingImportSheetGroup = null;\r\n"
+    "            currentGroupSort = { key: 'label', dir: 'asc' };\r\n            currentGroupStartDepth = 0;\r\n            currentGroupLayout = 'stacked';\r\n            $('#groupLayout').val('stacked');   // grplist2: the dialog's field follows\r\n            _groupLayoutChosen = false;   // (grpauto)\r\n            currentGroupLimit = null;\r\n            pendingImportSheetGroup = null;\r\n",
+    "            currentGroupLayout = 'stacked';\r\n            $('#groupLayout').val('stacked');   // grplist2: the dialog's field follows\r\n            _groupLayoutChosen = false;   // (grpauto)\r\n            pendingImportSheetGroup = null;\r\n"
    ]
   ],
   "must": [
@@ -121,7 +121,8 @@
    "V-reset",
    "V-collapsed"
   ],
-  "scn": null
+  "scn": null,
+  "note": "2026-11-13: re-anchored (the group layout resets landed between these lines); same revert"
  },
  "noaggnull": {
   "why": "the previous grouping's summary rides onto the import's grouping",
@@ -173,6 +174,10 @@
    [
     "        if (parsedData.length > PENUMBRA_IMPORT_MAX_ROWS) {\r\n",
     "        if (false) {\r\n"
+   ],
+   [
+    "        if (mode === 'view') { _pnbScratchShowPlan(rows); return; }\r\n        if (rows.length > PENUMBRA_IMPORT_MAX_ROWS) {\r\n",
+    "        if (mode === 'view') { _pnbScratchShowPlan(rows); return; }\r\n        if (false) {\r\n"
    ]
   ],
   "must": [
@@ -180,20 +185,23 @@
    "Z-toast",
    "Z-next"
   ],
-  "scn": null
+  "scn": null,
+  "note": "2026-11-13: also cuts the Add rows dialog's own cap check (_pnbRowsRefresh, addrows 0e48dd7), which refuses first"
  },
  "confirmtext": {
-  "why": "the overwrite prompt no longer says the new data is stacked",
+  "why": "the Add rows dialog no longer says the new data is stacked (it replaced the overwrite confirm)",
   "edits": [
    [
-    "            var newDesc = parsedData.length + ' rows' + (book\r\n",
-    "            var newDesc = parsedData.length + ' rows' + (false && book\r\n"
+    "        var stacked = book ? ' from ' + book.sheets.length + ' worksheets, stacked with a <code>' + esc(book.sheetColumn) + '</code> column' : '';\r\n",
+    "        var stacked = (false && book) ? ' from ' + book.sheets.length + ' worksheets, stacked with a <code>' + esc(book.sheetColumn) + '</code> column' : '';\r\n"
    ]
   ],
   "must": [
-   "O-confirm"
+   "O-confirm",
+   "Z-toast"
   ],
-  "scn": null
+  "scn": null,
+  "note": "2026-11-13: re-anchored from importFileData's confirm text (removed by addrows) to _pnbRowsPreviewHtml's summary"
  },
  "noskipped": {
   "why": "the notice no longer names the tabs it skipped",

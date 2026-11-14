@@ -5,7 +5,7 @@
 //   xflat   a flat table with a data bar + a color scale (&shade=), paged 200 of 300:
 //           bars and fills print, plain cells white / black, auto layout, the help
 //           icons and the chart cog gone, the stamp filled on beforeprint
-//   pdark   the pivot in a dark theme (theme-charcoal-gold): the Grand Total label
+//   pdark   the pivot in a dark theme (theme-graphite-brass, Charcoal & Gold's id since 2026-11-07): the Grand Total label
 //           cell prints light with black text; a canvas prints on the dark card
 (function () {
   var SCN = window.__SCN;
@@ -48,7 +48,7 @@
       R.info = { stamp: stamp, bar0: bar[0] && getComputedStyle(bar[0]).backgroundImage.slice(0, 90), pca: bar[0] && getComputedStyle(bar[0]).printColorAdjust };
     },
     pdark: async function () {
-      document.body.classList.add('is-dark', 'theme-charcoal-gold');
+      document.body.classList.add('is-dark', 'theme-graphite-brass');   // (2026-11-13) was theme-charcoal-gold: an alias only now, no CSS rules
       await sleep(200);
       await toPrint();
       var gt = Array.prototype.slice.call(document.querySelectorAll('#pivotResultTable td, #pivotResultTable th')).filter(function (x) { return /^Grand Total$/i.test(x.textContent.trim()); })[0];

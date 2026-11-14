@@ -246,7 +246,7 @@
     rec('K1 Split parks the breadcrumb in the header\'s UPPER RIGHT corner: out of the title panel, at the right edge, at the top, the prompts to its left',
       !!cr && cr.parentNode === hdr() && !!cr.querySelector('.safe-home-link') && !panel.querySelector('.safe-home-link') &&
       panel.firstElementChild === el('mainReportTitle') && crb.height > 5 &&
-      near(crb.right, rightEdge, 2) && near(crb.top, topEdge, 2) && crb.left >= qb.right - 1 && crb.left >= pb.right - 1 && near(hSplit, Math.max(pb.height, qb.height) + 2 * (topEdge - box(hdr()).top), 3),
+      near(crb.right, rightEdge, 2) && near(crb.top, topEdge, 2) && crb.left >= qb.right - 1 && crb.left >= pb.right - 1 && near(hSplit, Math.max(pb.height, qb.height) + (topEdge - box(hdr()).top) + (parseFloat(cs(hdr()).paddingBottom) || 0) + (parseFloat(cs(hdr()).borderBottomWidth) || 0), 3),   // (2026-11-13) top and bottom frame apart: Low Shade has a top rule, no bottom border
       cr ? ('parent=' + cr.parentNode.id + ' crumbRight=' + r1(crb.right) + '/' + r1(rightEdge) + ' crumbTop=' + r1(crb.top) + '/' + r1(topEdge) + ' crumbBottom=' + r1(crb.bottom) + ' promptsTop=' + r1(qb.top) + ' crumbLeft=' + r1(crb.left) + ' titleRight=' + r1(pb.right)) : 'no #dashboardBreadcrumb');
     layout('default');
     var backStrip = document.querySelector('#reportInfoPanel > div:first-child');
@@ -590,9 +590,9 @@
     if (window.stackHeaders) window.stackHeaders();
     if (H.updateContainerHeight) H.updateContainerHeight();
     var b = bareBox(), c0 = card(), strip0 = crumbStrip();
-    rec('X0 control: the Default header is a card (accent stripe, shadow, watermark, crumb strip), and the Bare header box ships unchecked, OUTSIDE the layout radio group',
-      !!b && !b.checked && !$(b).closest('.header-layout-radios').length && !isBare() && c0.l >= 3 && c0.shadow !== 'none' && !pseudoGone('::after') && !!strip0 && box(strip0).height > 5,
-      'box=' + !!b + ' checked=' + (b && b.checked) + ' accent=' + c0.l + ' shadow=' + String(c0.shadow).slice(0, 24) + ' after=' + getComputedStyle(hdr(), '::after').content + ' strip=' + (strip0 && r1(box(strip0).height)));
+    rec('X0 control: the Default header is a card (accent stripe or top rule, shadow, watermark, crumb strip), and the Bare header box ships unchecked, OUTSIDE the layout radio group',
+      !!b && !b.checked && !$(b).closest('.header-layout-radios').length && !isBare() && (c0.l >= 3 || c0.t >= 3) && c0.shadow !== 'none' && !pseudoGone('::after') && !!strip0 && box(strip0).height > 5,
+      'box=' + !!b + ' checked=' + (b && b.checked) + ' accent=' + c0.l + '/' + c0.t + ' (left/top) shadow=' + String(c0.shadow).slice(0, 24) + ' after=' + getComputedStyle(hdr(), '::after').content + ' strip=' + (strip0 && r1(box(strip0).height)));
     if (!b) return;
 
     var bar = el('resultsHeader');

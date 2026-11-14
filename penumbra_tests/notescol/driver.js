@@ -142,13 +142,39 @@
     var hdr = document.getElementById('tableHeader');
     var idx = Array.prototype.indexOf.call(hdr.children, hdr.querySelector('th[data-column="__JOURNAL_NOTES"]')) + 1;
     var st = document.head.appendChild(document.createElement('style'));
-    st.textContent = '#resultsTable > thead > tr > th:nth-child(' + idx + '),#resultsTable > tbody > tr > td:nth-child(' + idx + '):not([colspan])'
-      + '{box-sizing:border-box!important;width:120px!important;min-width:120px!important;max-width:120px!important}';
+    // (2026-11-13, ee1ff03) A Notes column that leaves the note under 6em of room, and cuts or wraps it, marks its
+    // table pnb-notes-narrow (main.js watchNotesNarrow, a ResizeObserver on the Notes heading): the cells show the
+    // icon and count alone, the note in the button's label; from 7em the note comes back. A fixed 120 px column
+    // now falls under that line, so the squeezes are set in the note's own ems over what the cell spends beside it
+    // at full width: about 9em still wraps (R-grow-narrow), about 3em hides (R-grow-hide), full width shows it again.
+    var fs = parseFloat(getComputedStyle(pv).fontSize), side = tw - pv.getBoundingClientRect().width;
+    var squeeze = function (w) {
+      st.textContent = '#resultsTable > thead > tr > th:nth-child(' + idx + '),#resultsTable > tbody > tr > td:nth-child(' + idx + '):not([colspan])'
+        + '{box-sizing:border-box!important;width:' + w + 'px!important;min-width:' + w + 'px!important;max-width:' + w + 'px!important}';
+    };
+    var tbl = document.getElementById('resultsTable'), narrow = function () { return tbl.classList.contains('pnb-notes-narrow'); };
+    var ems = function () { return (pv.getBoundingClientRect().width / fs).toFixed(1) + 'em'; };
+    var w9 = Math.round(side + fs * 9);
+    squeeze(w9);
     await sleep(150);
     var nh = pv.getBoundingClientRect().height, nw = td.getBoundingClientRect().width;
-    rec('R-grow-narrow', Math.round(nw) === 120 && nh > gh && inCell() && pv.scrollWidth <= pv.clientWidth + 1,
-        'a 120 px column: ' + Math.round(nh) + ' px tall, inside the cell ' + inCell());
+    rec('R-grow-narrow', Math.round(nw) === w9 && nh > gh && inCell() && pv.scrollWidth <= pv.clientWidth + 1 && !narrow(),
+        'a ' + w9 + ' px column (the note ' + ems() + '): ' + Math.round(nh) + ' px tall, inside the cell ' + inCell() + ', marked narrow ' + narrow());
+    var w3 = Math.round(side + fs * 3);
+    squeeze(w3);
+    await until(narrow, 1500);
+    await sleep(50);
+    var nb = td.querySelector('.journal-notes-btn'), nbr = nb.getBoundingClientRect(), ncr = td.getBoundingClientRect();
+    var nlab = nb.getAttribute('aria-label') || '';
+    rec('R-grow-hide', narrow() && getComputedStyle(pv).visibility === 'hidden' && pv.getBoundingClientRect().height === 0
+        && nbr.right <= ncr.right + 0.5 && nbr.height < lh() * 2 && nlab.indexOf('no-cost extension') >= 0,
+        'a ' + w3 + ' px column: marked narrow ' + narrow() + ', the note ' + getComputedStyle(pv).visibility + ' (' + Math.round(pv.getBoundingClientRect().height)
+        + ' px), button ' + Math.round(nbr.height) + ' px tall, right ' + Math.round(nbr.right) + ' of ' + Math.round(ncr.right) + ', the note in its label ' + (nlab.indexOf('no-cost extension') >= 0));
     st.remove();
+    await until(function () { return !narrow(); }, 1500);
+    await sleep(50);
+    rec('R-grow-unhide', !narrow() && getComputedStyle(pv).visibility === 'visible' && pv.getBoundingClientRect().height > 0 && inCell(),
+        'its room back: marked narrow ' + narrow() + ', the note ' + getComputedStyle(pv).visibility + ', ' + Math.round(pv.getBoundingClientRect().height) + ' px tall');
     document.body.classList.remove('disable-auto-expand');
     await sleep(150);
     rec('R-back', pv.getBoundingClientRect().height < lh() * 1.4 && pv.scrollWidth > pv.clientWidth, 'back to one line');

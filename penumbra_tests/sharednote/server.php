@@ -256,6 +256,9 @@ if (!defined('JOURNAL_MAX_MENTIONS')) define('JOURNAL_MAX_MENTIONS', 20);
 if (!defined('JOURNAL_ATTACH_MAX_BYTES')) define('JOURNAL_ATTACH_MAX_BYTES', 5242880);
 if (!defined('JOURNAL_MAX_NOTES_PER_REPORT')) define('JOURNAL_MAX_NOTES_PER_REPORT', 1000);   // (sharedfiles) the add path's cap
 foreach ($fns as $fn => $code) { if ($code !== '' && !function_exists($fn)) eval($code); }
+// (2026-11-13, privnote) the lifted add / edit actions call journal_export.php's private-note helpers
+// (journalHasPrivateColumn, journalNoteIsPrivate...): the build's own, loaded before the actions run
+require_once $child . '/journal_export.php';
 // the control has none of the new helpers: the actions it lifts must still run
 if (!function_exists('journalReportStateFlags')) { function journalReportStateFlags($r) { return array('on' => true, 'enc' => false, 'shared' => false); } }
 if (!function_exists('journalSharedNoteOf')) { function journalSharedNoteOf($a, $b) { return null; } }

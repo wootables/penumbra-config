@@ -136,6 +136,10 @@
       var dt = new DataTransfer();
       dt.items.add(new File(['NAME,AMOUNT\r\nAlpha,10\r\nBravo,20\r\n'], 'viewer_drop.csv', { type: 'text/csv' }));
       document.getElementById('resultsHeader').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      // (2026-11-13) addrows: the drop opens the Add rows dialog; its primary button makes the import
+      var dlgUp = await until(function () { return !!document.getElementById('pnbPasteGo'); }, 8000);
+      R.obs.dropDialog = dlgUp ? (document.getElementById('pnbPasteGo').textContent + ' / ' + ((document.querySelector('#pnbPasteOverlay input[name="pnbPasteMode"]:checked') || {}).value || 'no mode')) : 'no dialog';
+      if (dlgUp) document.getElementById('pnbPasteGo').click();
       var saved = await until(function () { return window.__ajaxLog.some(function (u) { return /manage_imports\.php/.test(u); }); }, 8000);
       await until(function () { return window.__queryDone > q0; }, 8000);
       await sleep(1200);

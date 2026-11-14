@@ -91,6 +91,7 @@
   window.PENUMBRA_THEME_IDS = ['theme-default'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   (function () {
     // 120 rows x 24 columns of long-ish text: far wider than the 1500px window.
     var COLS = [];

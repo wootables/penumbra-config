@@ -81,16 +81,17 @@ CONTROL_RED = ['M-all', 'M-fits', 'X-open', 'X-place', 'X-labels', 'V-quiet', 'V
                'C-apply', 'C-focus', 'T-light', 'T-dark-blue', 'T-charcoal-gold']
 
 # --- mutants: name -> (file, edits on the build under test, asserts that MUST go red, scenarios) ---
-# Every anchor must occur exactly once. Lines end CRLF (main.js and main.css both).
+# (2026-11-13) nofx, noresetbridge, menuheight re-anchored to today's main.js / main.css; same reverts.
+# Every anchor must occur exactly once. Written CRLF; mutate() drops the CR for an LF file (main.css since 2026-11-11).
 N = '\r\n'
 MUTANTS = {
     # the old menu: Custom Formula only for a column that already has a formula
-    'nofx': ('js', [("            if (!def) return;" + N + "            html += '<button type=\"button\" role=\"menuitemradio\" class=\"sp-sumtype-opt' +" + N +
+    'nofx': ('js', [("            if (!def) return;" + N + "            html += '<button type=\"button\" role=\"menuitemradio\" aria-checked=\"' + (key === current ? 'true' : 'false') + '\" class=\"sp-sumtype-opt' +" + N +
                      "                    (key === current ? ' is-current' : '') +" + N +
                      "                    (def.numeric && !looksNumeric ? ' is-nonnumeric' : '') + '\"' +" + N +
                      "                    ' data-type=\"' + escapeHtml(key) + '\">' +",
                      "            if (!def) return;" + N + "            if (key === 'formula' && !penumbraResolveSummaryFormula(colName)) return;" + N +
-                     "            html += '<button type=\"button\" role=\"menuitemradio\" class=\"sp-sumtype-opt' +" + N +
+                     "            html += '<button type=\"button\" role=\"menuitemradio\" aria-checked=\"' + (key === current ? 'true' : 'false') + '\" class=\"sp-sumtype-opt' +" + N +
                      "                    (key === current ? ' is-current' : '') +" + N +
                      "                    (def.numeric && !looksNumeric ? ' is-nonnumeric' : '') + '\"' +" + N +
                      "                    ' data-type=\"' + escapeHtml(key) + '\">' +")],
@@ -107,8 +108,8 @@ MUTANTS = {
                          "            : penumbraResolveSummaryFormula(colName);", "        return penumbraResolveSummaryFormulaPersisted(colName);")],
                  ['S-chip', 'S-pick', 'S-reset'], ['panel']),
     # Reset empties a hidden box
-    'noresetbridge': ('js', [("                    (isFixed || item.summary === 'formula') ? item.formula : _spFormulaBoxText(item.colName, item.summary)));",
-                              "                    item.formula));")], ['S-reset'], ['panel']),
+    'noresetbridge': ('js', [("                    (isFixed || item.summary === 'formula') ? item.formula : _spFormulaBoxText(item.colName, item.summary), item.colName));",
+                              "                    item.formula, item.colName));")], ['S-reset'], ['panel']),
     # a report change keeps the old report's formula
     'nohydrate': ('js', [("        transientColumnSummaries = {};" + N + "        transientColumnSummaryFormulas = {};" + N + "        // Fresh budget",
                           "        transientColumnSummaries = {};" + N + "        // Fresh budget")], ['H-cleared'], ['hydrate']),
@@ -150,7 +151,7 @@ MUTANTS = {
     'noinvalidring': ('css', [(".sp-sumfx .sp-sumfx-input[aria-invalid=\"true\"] {" + N + "    box-shadow: 0 0 0 1px var(--accent-danger, #cc0000);" + N + "}",
                                ".sp-sumfx .sp-sumfx-input[aria-invalid=\"true\"] {" + N + "}")], ['T-light', 'T-dark-blue', 'T-charcoal-gold'], ['theme']),
     # main.css: the menu's old 320px cap - the list scrolls and Custom Formula is below the fold
-    'menuheight': ('css', [("    max-height: min(380px, calc(100vh - 16px));", "    max-height: 320px;")], ['M-fits'], ['flat']),
+    'menuheight': ('css', [("    max-height: min(420px, calc(100vh - 16px));", "    max-height: 320px;")], ['M-fits'], ['flat']),
     # main.css: the global button margin back between the items (414px of list)
     'menumargin': ('css', [("    gap: 8px;" + N + "    width: 100%;" + N + "    /* The global `button { margin-top: 5px }` put a 5px gap above every item. */" + N + "    margin: 0;" + N,
                             "    gap: 8px;" + N + "    width: 100%;" + N)], ['M-fits'], ['flat']),
@@ -210,6 +211,8 @@ def mutate(js, css, name):
     target, edits, _, _ = MUTANTS[name]
     src = js if target == 'js' else css
     for old, new in edits:
+        # (2026-11-13) main.css went LF in e65935d (main.js is still CRLF): an LF target takes LF anchors
+        if '\r\n' not in src: old = old.replace('\r\n', '\n'); new = new.replace('\r\n', '\n')
         n = src.count(old)
         if n != 1: raise SystemExit("mutant '%s': anchor found %d times (needs the build under test): %r" % (name, n, old[:120]))
         src = src.replace(old, new)

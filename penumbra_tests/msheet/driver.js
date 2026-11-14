@@ -92,12 +92,39 @@
     dt.items.add(file);
     document.getElementById('resultsHeader').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
   }
+  // (2026-11-13) Since addrows (0e48dd7, 2026-10-30) every drop opens the Add rows dialog
+  // (#pnbPasteOverlay): the rows' summary (a stacked workbook says "from N worksheets, stacked
+  // with a WORKSHEET column"), an existing import of the name ("NAME already exists (n rows)",
+  // the button then reads "Replace the import" - this replaced the window.confirm overwrite
+  // prompt), and a refusal in the footer (the row cap: the button stays disabled). dialog()
+  // records what it said in window.__dlgs, then presses the primary button - or Cancel when
+  // that is disabled. A build from before addrows (--control) opens no dialog: dialog() returns
+  // { up: false } once that build's own import gets going, and the asserts read its old prompt.
+  window.__dlgs = [];
+  function dlgText(sel) { var e = document.querySelector(sel); return e ? e.textContent.replace(/\s+/g, ' ').trim() : ''; }
+  function dlgReady() { var g = document.getElementById('pnbPasteGo'), st = document.getElementById('pnbPasteStatus');
+    return !!g && (!g.disabled || (!!st && st.style.display !== 'none' && !!st.textContent)); }
+  async function dialog() {
+    var s0 = window.__saves.length, q0 = window.__queryDone, c0 = window.__confirms.length;
+    await until(function () { return dlgReady() || window.__saves.length > s0 || window.__queryDone > q0 || window.__confirms.length > c0 || toasts().indexOf('import limit') !== -1; }, 30000);
+    var up = dlgReady();
+    var g = document.getElementById('pnbPasteGo'), st = document.getElementById('pnbPasteStatus');
+    var mode = document.querySelector('#pnbPasteOverlay input[name="pnbPasteMode"]:checked');
+    var d = { up: up, go: g ? g.textContent : null, disabled: g ? g.disabled : null, mode: mode ? mode.value : null,
+              summary: dlgText('#pnbPasteOverlay .pnb-paste-summary'), existing: dlgText('#pnbRowsExisting'),
+              status: (st && st.style.display !== 'none') ? st.textContent.replace(/\s+/g, ' ').trim() : '' };
+    window.__dlgs.push(d);
+    if (up && g && !g.disabled) g.click();
+    else if (up) { var c = document.querySelector('#pnbPasteOverlay .modal-btn-secondary.pnb-paste-cancel'); if (c) c.click(); }
+    return d;
+  }
   // parse -> save -> query -> render. Waits for the query the import starts and
   // then for the view it should land in (a timeout here just means the asserts
   // will say what it did instead).
   async function dropAndSettle(file, want) {
     var q0 = window.__queryDone, s0 = window.__saves.length;
     drop(file);
+    await dialog();
     await until(function () { return window.__queryDone > q0; }, 20000);
     await until(want || function () { return false; }, want ? 8000 : 1500);
     await sleep(700);
@@ -262,13 +289,18 @@
       await boot();
       var m = mark();
       await dropAndSettle(await fixture('three_tabs.xlsx'), grouped);
-      var c1 = window.__confirms.length;
+      var c1 = window.__confirms.length, d1 = window.__dlgs[window.__dlgs.length - 1] || {};
       $('#groupedResultsContainer').empty().hide();   // so the second wait sees ITS render
       await dropAndSettle(await fixture('three_tabs.xlsx'), grouped);
-      var asked = window.__confirms.slice(c1);
-      rec('O-first', c1 === 0, 'confirms after the first drop: ' + c1);
-      rec('O-confirm', asked.length === 1 && asked[0].indexOf('Overwrite with new data (7 rows from 3 worksheets, stacked with a WORKSHEET column)?') !== -1,
-          J(asked));
+      var asked = window.__confirms.slice(c1), d2 = window.__dlgs[window.__dlgs.length - 1] || {};
+      // (2026-11-13, addrows) the overwrite question is the dialog's now: "already exists" + "Replace the import";
+      // a build without the dialog (--control) still asks with window.confirm
+      rec('O-first', c1 === 0 && (!d1.up || (d1.go === 'Import' && !d1.existing)), 'confirms after the first drop: ' + c1 + ', its dialog ' + J({ up: d1.up, go: d1.go, existing: d1.existing }));
+      rec('O-confirm', d2.up
+          ? (asked.length === 0 && d2.go === 'Replace the import' && /^THREE_TABS already exists \(7 rows\)/.test(d2.existing)
+             && d2.summary.indexOf('7 rows') === 0 && d2.summary.indexOf('from 3 worksheets, stacked with a WORKSHEET column') !== -1)
+          : (asked.length === 1 && asked[0].indexOf('Overwrite with new data (7 rows from 3 worksheets, stacked with a WORKSHEET column)?') !== -1),
+          J({ confirms: asked, go: d2.go, existing: (d2.existing || '').slice(0, 120), summary: d2.summary }));
       rec('O-again', grouped() && same(bands().map(function (x) { return x.name; }), ['Jan', 'Feb', 'Mar']), 'bands ' + J(bands().map(function (x) { return x.name; })));
       var e = errsFrom.apply(null, m);
       rec('O-err', !e.length, e.join(' | ') || 'no error');
@@ -296,13 +328,18 @@
       var file = new File([bookFrom([{ name: 'Left', aoa: mk('L') }, { name: 'Right', aoa: mk('R') }])], 'big.xlsx');
       var m = mark(), q0 = window.__queryDone, s0 = window.__saves.length;
       drop(file);
-      await until(function () { return toasts().indexOf('import limit') !== -1 || window.__queryDone > q0; }, 30000);
+      var dz = await dialog();   // (2026-11-13, addrows) the dialog refuses it up front: Import stays disabled
+      await until(function () { return toasts().indexOf('import limit') !== -1 || window.__queryDone > q0; }, dz.up ? 3000 : 30000);
       await sleep(1500);
       var t = toasts();
       rec('Z-nosave', window.__saves.length === s0, 'saves posted: ' + (window.__saves.length - s0));
       rec('Z-noquery', window.__queryDone === q0, 'queries run: ' + (window.__queryDone - q0));
-      rec('Z-toast', t.indexOf('big.xlsx has ' + total.toLocaleString() + ' rows across 2 worksheets, over the ' + max.toLocaleString() + '-row import limit.') !== -1,
-          t.slice(0, 400));
+      // (2026-11-13, addrows) the refusal is the dialog's footer now, the worksheets in its summary; before it, a toast
+      rec('Z-toast', dz.up
+          ? (dz.disabled === true && dz.status.indexOf(total.toLocaleString() + ' rows is over the ' + max.toLocaleString() + '-row import limit.') === 0
+             && dz.summary.indexOf(total.toLocaleString() + ' rows') === 0 && dz.summary.indexOf('from 2 worksheets') !== -1)
+          : t.indexOf('big.xlsx has ' + total.toLocaleString() + ' rows across 2 worksheets, over the ' + max.toLocaleString() + '-row import limit.') !== -1,
+          J({ dialog: dz.up, disabled: dz.disabled, status: dz.status, summary: dz.summary, toasts: t.slice(0, 300) }));
       rec('Z-pending', st().pendingSheet === null, 'pendingImportSheetGroup ' + J(st().pendingSheet));
       // The next ordinary run must come back as it went in: flat, and no notice
       // about a grouping that "was removed from the query".
@@ -342,14 +379,16 @@
           'save ' + J(R.obs.first.save) + ', query ' + J(R.obs.first.query) + ', NAME column ' + J(colShown('NAME')) + ', error toasts ' + J(errToasts()));
       // 2. A DIFFERENT file under the same name, whose save the server refuses.
       window.__saveFail = { status: 500, message: 'Action=save: ORA-03113: end-of-file on communication channel' };
-      var c0 = window.__confirms.length, q2 = window.__queries.length;
+      var c0 = window.__confirms.length, dl0 = window.__dlgs.length, q2 = window.__queries.length;
       var r2 = await dropAndSettle(new File([csv('ID,NAME,EXTRA', ['7,New-X,x', '8,New-Y,y', '9,New-Z,z'])], 'same_name.csv'),
                                    function () { return same(colShown('NAME'), ['New-X', 'New-Y', 'New-Z']); });
       var sv2 = window.__saves[window.__saves.length - 1] || {}, qb = lastImportQuery(q2);
       var g2 = grid(), et = errToasts();
       R.obs.refused = { save: { name: sv2.name, failed: sv2.failed, id: sv2.id, rows: sv2.rows }, query: qb, grid: g2, toasts: toasts(), errToasts: et };
-      rec('P-savefail-refused', r2.saved && r2.queried && sv2.name === NAME && sv2.failed === 500 && window.__confirms.length - c0 === 1,
-          'save ' + J({ name: sv2.name, failed: sv2.failed }) + ', queried ' + r2.queried + ', overwrite prompts ' + (window.__confirms.length - c0));
+      var dr = window.__dlgs.slice(dl0).filter(function (d) { return d.go === 'Replace the import'; }).length;   // (2026-11-13, addrows) the overwrite prompt
+      var asked2 = dr + (window.__confirms.length - c0);
+      rec('P-savefail-refused', r2.saved && r2.queried && sv2.name === NAME && sv2.failed === 500 && asked2 === 1,
+          'save ' + J({ name: sv2.name, failed: sv2.failed }) + ', queried ' + r2.queried + ', overwrite prompts ' + asked2 + ' (dialog ' + dr + ', confirm ' + (window.__confirms.length - c0) + ')');
       rec('S-rows', flatRows() === 3 && same(colShown('NAME'), ['New-X', 'New-Y', 'New-Z']) && same(colShown('ID'), ['7', '8', '9'])
           && g2.cols.indexOf('EXTRA') !== -1,
           'rows ' + flatRows() + ', NAME column ' + J(colShown('NAME')) + ', columns ' + J(g2.cols));

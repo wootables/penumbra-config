@@ -42,7 +42,7 @@ QS = {'panelreopen': '&me=lee', 'panel': '&me=lee', 'panelnone': '&me=pat', 'car
 EXPECT = {
     'preview': ['V-preview', 'V-tip', 'V-preview-file', 'V-nopreview', 'V-oneline', 'V-switch', 'V-off-out', 'V-off-skipfn', 'V-off-cell', 'V-off-csv', 'V-off-html'],
     'resize': ['W-clip', 'W-ellipsis', 'W-icon', 'W-wide'],
-    'wrap': ['R-compact', 'R-hover', 'R-grow', 'R-grow-narrow', 'R-back'],
+    'wrap': ['R-compact', 'R-hover', 'R-grow', 'R-grow-narrow', 'R-grow-hide', 'R-grow-unhide', 'R-back'],
     'search': ['S-word', 'S-word-not', 'S-col-text', 'S-col-not', 'S-col-regex', 'S-col-count', 'S-col-empty', 'S-hidden'],
     'copycol': ['C-off'],
     'copycolon': ['C-on'],
@@ -65,7 +65,7 @@ EXPECT = {
 # The build before the change (frozen from its first control run): everything new fails; the
 # "switch off = as before" asserts (V-nopreview, V-off-csv, V-off-html) pass, which is what
 # proves the fixture and the read-out are not the change.
-CONTROL_RED = ['P-reopen', 'E-panelreopen', 'P-buttons', 'P-hint', 'P-up', 'P-save', 'P-after', 'P-up-typed', 'P-row', 'P-row-preview', 'E-panel', 'U-hint', 'U-up', 'U-typed', 'E-cardup', 'K-xlsx-on', 'E-xlsx', 'K-cell-on', 'K-cell-off', 'K-hover', 'E-hovercol', 'S-word', 'S-word-not', 'S-col-text', 'S-col-not', 'S-col-regex', 'S-hidden', 'C-on', 'R-compact', 'R-hover', 'R-grow', 'R-grow-narrow', 'R-back', 'E-wrap', 'E-resize', 'W-clip', 'W-ellipsis', 'W-icon', 'W-wide', 'V-preview', 'V-tip', 'V-preview-file', 'V-oneline', 'V-switch', 'V-off-out', 'V-off-skipfn', 'E-preview', 'X-out', 'X-skipfn', 'X-cell', 'X-csv-head', 'X-csv-cell', 'X-json', 'X-html', 'X-html-nobtn', 'X-parity', 'E-exportcsv', 'T-default', 'T-on', 'T-on-live', 'T-rownotes-off', 'T-rownotes-back', 'T-off', 'E-setup', 'T-restore', 'E-restore', 'D-button', 'D-mode', 'D-post', 'D-after', 'D-preview', 'D-count', 'E-edit', 'E-editnone', 'P-own', 'D-own', 'D-409', 'E-edit409', 'D-cancel', 'E-editcancel']
+CONTROL_RED = ['P-reopen', 'E-panelreopen', 'P-buttons', 'P-hint', 'P-up', 'P-save', 'P-after', 'P-up-typed', 'P-row', 'P-row-preview', 'E-panel', 'U-hint', 'U-up', 'U-typed', 'E-cardup', 'K-xlsx-on', 'E-xlsx', 'K-cell-on', 'K-cell-off', 'K-hover', 'E-hovercol', 'S-word', 'S-word-not', 'S-col-text', 'S-col-not', 'S-col-regex', 'S-hidden', 'C-on', 'R-compact', 'R-hover', 'R-grow', 'R-grow-narrow', 'R-grow-hide', 'R-grow-unhide', 'R-back', 'E-wrap', 'E-resize', 'W-clip', 'W-ellipsis', 'W-icon', 'W-wide', 'V-preview', 'V-tip', 'V-preview-file', 'V-oneline', 'V-switch', 'V-off-out', 'V-off-skipfn', 'E-preview', 'X-out', 'X-skipfn', 'X-cell', 'X-csv-head', 'X-csv-cell', 'X-json', 'X-html', 'X-html-nobtn', 'X-parity', 'E-exportcsv', 'T-default', 'T-on', 'T-on-live', 'T-rownotes-off', 'T-rownotes-back', 'T-off', 'E-setup', 'T-restore', 'E-restore', 'D-button', 'D-mode', 'D-post', 'D-after', 'D-preview', 'D-count', 'E-edit', 'E-editnone', 'P-own', 'D-own', 'D-409', 'E-edit409', 'D-cancel', 'E-editcancel']
 # (the E-* rows: the old build has no penumbraNotesColSkipped for the hook to export)
 
 args = sys.argv[1:]

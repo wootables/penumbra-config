@@ -65,6 +65,7 @@
   window.PENUMBRA_THEME_IDS = ['theme-default'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   (function () {
     var P = new URLSearchParams(location.search);
     var PAGE = window.__PAGE = P.get('page') || 'viewer';
@@ -149,6 +150,10 @@
       journalAccess: true,
       preloadedState: PAGE === 'home' ? null : st
     };
+    // (2026-11-13) since addrows (2026-10-30) a drop opens the Add rows dialog, and only a global admin or an
+    // imports grant of '*' may make a NEW import from it (_pnbPasteCanCreate); a plain viewer's drop adds rows to
+    // the view instead. The drop scenario keeps its point - an import made on a console-less page - with the grant.
+    if (window.__SCN === 'drop') window.penumbra_vars.importGrant = '*';
     window.__queryResponse = { data: rows };
   })();
   window.__queryDone = 0;
