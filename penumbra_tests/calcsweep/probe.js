@@ -52,7 +52,10 @@
     ] }));
     var rows = C.applyRows([{ S: '10', B: '100', A: '1' }]);
     eq('chain-bool', rows[0].MSG, 'ok', 'OVER = FALSE, so MSG must be ok');
-    eq('chain-currency', rows[0].BACK, '0.99', 'reads the displayed $0.33 (as a real column would)');
+    // (2026-11-15) 7c207fc (2026-11-14, calcraw) changed this on purpose: a calculated NUMBER column another one
+    // reads gives its value, not the text it shows (a Percent one read back 100 times too large; a Currency one
+    // read back rounded to cents, which is what this case used to pin as 0.99). run.py --control still takes 0.99.
+    eq('chain-currency', rows[0].BACK, '1', 'reads the VALUE 0.3333..., not the displayed $0.33 (calcraw, 7c207fc)');
     // ---- the dialog: editing a column that another depends on --------------------
     localStorage.setItem('penumbra_calc_columns', JSON.stringify({ zzprobe: [
       { name: 'BASE', formula: '{A} * 2', format: 'number' },

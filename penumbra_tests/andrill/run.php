@@ -476,7 +476,9 @@ section('9. the report page: family theme when reached from Platform, the report
 $anchorsTheme = array(
     "\$anFamilyTheme = !\$anReportScope || (isset(\$_GET['platform']) && (string)\$_GET['platform'] === '1');" => 'platform=1 (and nothing else) selects the family theme at report scope; Platform is always the family',
     "if (!\$anFamilyTheme) {\n    try {\n        \$anStateJson = readClobViaOci8(" => 'the report\'s own theme is not even read then',
-    "<body>\n<?php /* Family theme, applied before anything paints" => 'the theme script sits right after <body>, like Platform\'s',
+    // (2026-11-15) the <body> tag gained the family density class (4ab318d, 2026-10-09, "admin tools follow density"):
+    // the tag now carries an inline PHP echo of class="pnb-adm-dz". The theme script still opens the next line.
+    "<body<?php if (\$anFamilyTheme) echo ' class=\"pnb-adm-dz\"'; /* follows the family density, see density.css */ ?>>\n<?php /* Family theme, applied before anything paints" => 'the theme script sits right after <body>, like Platform\'s',
     "   if (\$anFamilyTheme) penumbra_admin_theme_script();\n   else penumbra_an_report_theme_script(\$anRptTheme);" => 'the SAME family resolver Platform calls - otherwise the report\'s own resolution',
 );
 foreach ($anchorsTheme as $a => $l) t_eq(substr_count($allSrc, $a), 1, $l);

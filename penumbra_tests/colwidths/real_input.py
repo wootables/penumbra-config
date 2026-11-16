@@ -164,7 +164,11 @@ try:
     time.sleep(0.3)
     fit = ev("({w: %s.getBoundingClientRect().width, sort: __drv.sortState('TITLE'), stored: __drv.entry('rreal')})" % TH)
     rec('X4 a REAL double-click on the edge fits the column to its content, and does not sort',
-        abs(fit['w'] - w0) <= 1.5 and fit['sort'] == 'none' and not fit['stored'], json.dumps(fit))
+        # (2026-11-15, drift) 82b3abc (2026-10-18): a grip's double press FITS the column to its content (the menu's Fit:
+        # a width of this browser's own, stored) - it used to reset it to the natural width with nothing stored. As
+        # driver.js D6 / D6b: off the dragged width, and the fitted width is the one stored.
+        abs(fit['w'] - want) > 5 and fit['sort'] == 'none' and isinstance(((fit['stored'] or {}).get('widths') or {}).get('TITLE'), (int, float))
+        and abs(fit['stored']['widths']['TITLE'] - fit['w']) <= 1.5, json.dumps(fit) + ' dragged %d natural %.1f' % (want, w0))
 
     # A real click in the middle of the header still sorts.
     time.sleep(0.8)
@@ -244,7 +248,9 @@ try:
     time.sleep(0.3)
     gf = ev("({w: %s.getBoundingClientRect().width, sorts: __CWH.getSort().length, stored: window.Penumbra.colWidthsHost.widthFor('NAME')})" % GTH)
     rec('X11 a REAL double-click on a grouped-view header edge fits the column again, and does not sort',
-        abs(gf['w'] - g0['w']) <= 1.5 and gf['stored'] is None and gf['sorts'] == 0, json.dumps(gf) + ' natural %.1f' % g0['w'])
+        # (2026-11-15, drift) 82b3abc: the double press fits (see X4) - off the dragged width, the fitted width stored
+        abs(gf['w'] - want_g) > 5 and isinstance(gf['stored'], (int, float)) and abs(gf['stored'] - gf['w']) <= 1.5 and gf['sorts'] == 0,
+        json.dumps(gf) + ' dragged %d natural %.1f' % (want_g, g0['w']))
     ev("document.getElementById('groupedResultsContainer').style.display = 'none'; true")
     time.sleep(0.6)
 
@@ -400,7 +406,7 @@ try:
     ev("window.Penumbra.colWidthsHost.setUser('TITLE', 250); true")
     time.sleep(0.2)
     pill = ev("(function(){var c=document.getElementById('sbCustomCols');c.scrollIntoView();return getComputedStyle(c).display;})()")
-    txt = ev("document.getElementById('sbCustomColsDiff').textContent")
+    txt = ev("(function(){var r=document.querySelectorAll('#sbCustomColsDiff .sb-cc-diff-row');if(!r.length)return document.getElementById('sbCustomColsDiff').textContent.replace(/Column widths set here: /g,'Column widths: ');return Array.prototype.map.call(r,function(e){return e.querySelector('.sb-cc-k').textContent+': '+e.querySelector('.sb-cc-v').textContent;}).join(' | ');})()")
     pr = rect("document.getElementById('sbCustomCols')")
     mouse('mouseMoved', (pr['l'] + pr['r']) / 2, (pr['t'] + pr['b']) / 2)
     mouse('mousePressed', (pr['l'] + pr['r']) / 2, (pr['t'] + pr['b']) / 2, buttons=1)
@@ -415,7 +421,7 @@ try:
     reloaded = load()
     stored = ev("localStorage.getItem('penumbra_column_prefs')")
     rec('X8 the pill names the width; its Reset reloads the page with the width gone from storage',
-        pill != 'none' and 'Column widths set here: TITLE' in (txt or '') and '250' in (before or '') and reloaded and (not stored or '"widths"' not in stored),
+        pill != 'none' and 'Column widths: TITLE' in (txt or '') and '250' in (before or '') and reloaded and (not stored or '"widths"' not in stored),
         'pill=%s text=%s before=%s reloaded=%s stored=%s' % (pill, txt, before, reloaded, stored))
     errors = ev("window.__errors.concat(window.__rejections).slice(0,5)")
     rec('X9 no page errors', not errors, json.dumps(errors))

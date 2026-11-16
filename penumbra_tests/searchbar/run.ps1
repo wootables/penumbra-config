@@ -65,9 +65,13 @@ $src0 = @{}; foreach ($k in @($paths.Keys)) { $src0[$k] = [IO.File]::ReadAllText
 
 # --- mutants. main.css / main.js / help CRLF, index.php LF.
 $C = "`r`n"; $L = "`n"
+# (2026-11-15) main.css went LF in e65935d (main.js / help stay CRLF): CSS anchors use the EOL of the file under test.
+$CC = $(if ($src0.css.Contains("`r`n")) { $C } else { $L })
+# (2026-11-15) 68221c5 (2026-11-11, page-wide lookups) spells the body lookup $(document.body); older builds (-Control) $('body').
+$BODY = $(if ($src0.js.Contains("`$(document.body).addClass('restrict-search');")) { '$(document.body)' } else { "`$('body')" })
 $mActive  = 'body.restrict-search #tableSearchContainer:not(.has-text) .search-wrapper {'
 $mActive0 = 'body.restrict-search #tableSearchContainer .search-wrapper {'
-$mBarCss  = 'body.pnb-no-controlbar #resultsHeader {' + $C + '    display: none !important;' + $C + '}' + $C
+$mBarCss  = 'body.pnb-no-controlbar #resultsHeader {' + $CC + '    display: none !important;' + $CC + '}' + $CC
 $mFlags   = 'if ((!penumbra_vars.isAdmin || isNoAdmView) && _pnbBarAllOff) {'
 $mFlags0  = 'if (!penumbra_vars.isAdmin || isNoAdmView) {'
 $mAdmin0  = 'if (_pnbBarAllOff) {'
@@ -76,19 +80,21 @@ $mRet     = "        if (!`$('#resultsHeader').is(':visible') && !barGone)"
 $mRet0    = "        if (!`$('#resultsHeader').is(':visible'))"
 $mHeight  = '(barGone ? 0 : $resultsHeader.outerHeight())'
 $mHeight0 = '$resultsHeader.outerHeight()'
-$mClass   = "            `$('body').addClass('restrict-search');" + $C
-$mReanchor = '        updateStickyHeaderOffset();' + $C + '        updateContainerHeight();' + $C + '    }' + $C + '    // Every control-bar option unchecked'
+$mClass   = "            $($BODY).addClass('restrict-search');" + $C
+# (2026-11-15) the 2026-11-14 readerrows work put _pnbPaginationShown between the re-anchor's close and the old comment: anchor on what follows today.
+$mReTail  = $(if ($src0.js.Contains('    }' + $C + '    // (2026-11-14, readerrows) Does this report show its pager?')) { '    // (2026-11-14, readerrows) Does this report show its pager?' } else { '    // Every control-bar option unchecked' })
+$mReanchor = '        updateStickyHeaderOffset();' + $C + '        updateContainerHeight();' + $C + '    }' + $C + $mReTail
 $mMarker  = "        viewOptionSearch:     '#tableSearchContainer .search-wrapper'," + $C
-$mSlash   = "            if (`$('body').hasClass('restrict-search') && !`$('#tableSearchContainer').hasClass('has-text')) return;" + $C
+$mSlash   = "            if ($($BODY).hasClass('restrict-search') && !`$('#tableSearchContainer').hasClass('has-text')) return;" + $C
 $mSave    = "        if (!`$('#viewOptionSearch').is(':checked')) {" + $C + '            viewOptions.hideSearch = true;' + $C + '        }' + $C
-$mRing    = '#tableSearchContainer .search-wrapper.pnb-user-hidden {' + $C + '    outline: 1px dashed var(--pnb-user-hidden);' + $C + '    outline-offset: 3px;' + $C + '    border-radius: 4px;' + $C + '}' + $C
+$mRing    = '#tableSearchContainer .search-wrapper.pnb-user-hidden {' + $CC + '    outline: 1px dashed var(--pnb-user-hidden);' + $CC + '    outline-offset: 3px;' + $CC + '    border-radius: 4px;' + $CC + '}' + $CC
 $mPreview  = '                if (isNoAdmView) penumbraPreviewViewerOption(optionId, isChecked);' + $C + '                else penumbraMarkUserHidden'
 $mPreview0 = '                penumbraMarkUserHidden'
 $mLiveFlags = "        if (isNoAdmView && document.getElementById('viewOptionSearch')) _pnbBarAllOff = _pnbBarFlagsFromCheckboxes();" + $C
 # (the card reads "Search Bar", or "Filter Bar" since penumbra_tests\filterword 2026-10-19: the anchor stops before the name)
 $mCard    = '                <div class="view-option-item"><label><input type="checkbox" id="viewOptionSearch" checked><div class="view-option-text"><strong>'
-$mPageBtn  = '.page-nav-btn {' + $C + '    padding: 5px 10px;' + $C + '    font-size: 11px;' + $C + '    margin-top: 0;' + $C + '    cursor: pointer;' + $C + '}' + $C
-$mPageBtn0 = '.page-nav-btn {' + $C + '    padding: 5px 10px;' + $C + '    font-size: 11px;' + $C + '    margin-top: 0;' + $C + '}' + $C
+$mPageBtn  = '.page-nav-btn {' + $CC + '    padding: 5px 10px;' + $CC + '    font-size: 11px;' + $CC + '    margin-top: 0;' + $CC + '    cursor: pointer;' + $CC + '}' + $CC
+$mPageBtn0 = '.page-nav-btn {' + $CC + '    padding: 5px 10px;' + $CC + '    font-size: 11px;' + $CC + '    margin-top: 0;' + $CC + '}' + $CC
 $mutantDefs = [ordered]@{
   'noactive'      = @{ t = 'css'; edits = @(,@($mActive, $mActive0)); red = @('S5', 'V5') }
   'nobarcss'      = @{ t = 'css'; edits = @(,@($mBarCss, '')); red = @('S5', 'V1', 'V9') }
@@ -98,7 +104,7 @@ $mutantDefs = [ordered]@{
   'stickyreturn'  = @{ t = 'js';  edits = @(,@($mRet, $mRet0)); red = @('V10') }
   'barheight'     = @{ t = 'js';  edits = @(,@($mHeight, $mHeight0)); red = @('V10') }
   'nosearchclass' = @{ t = 'js';  edits = @(,@($mClass, '')); red = @('V1', 'V4') }
-  'noreanchor'    = @{ t = 'js';  edits = @(,@($mReanchor, ('    }' + $C + '    // Every control-bar option unchecked'))); red = @('V2', 'V10') }
+  'noreanchor'    = @{ t = 'js';  edits = @(,@($mReanchor, ('    }' + $C + $mReTail))); red = @('V2', 'V10') }
   'nomarker'      = @{ t = 'js';  edits = @(,@($mMarker, '')); red = @('S3', 'V8') }
   'noslash'       = @{ t = 'js';  edits = @(,@($mSlash, '')); red = @('S4') }
   'nosave'        = @{ t = 'js';  edits = @(,@($mSave, '')); red = @('S2') }
@@ -109,8 +115,8 @@ $mutantDefs = [ordered]@{
   # The arrows' cursor: the declaration gone; a pointer that outranks .page-nav-btn:disabled
   # (an id in the selector); the pointer put on the whole pager, counter text included.
   'nopagecursor'  = @{ t = 'css'; edits = @(,@($mPageBtn, $mPageBtn0)); red = @('V13', 'V15', 'V16', 'V17', 'V19') }
-  'pagecursorrank' = @{ t = 'css'; edits = @(,@($mPageBtn, ($mPageBtn + $C + '#paginationControls .page-nav-btn {' + $C + '    cursor: pointer;' + $C + '}' + $C))); red = @('V14', 'V15', 'V16', 'V17', 'V19') }
-  'pagerwide'     = @{ t = 'css'; edits = @(,@($mPageBtn, ($mPageBtn + $C + '#paginationControls {' + $C + '    cursor: pointer;' + $C + '}' + $C))); red = @('V18') }
+  'pagecursorrank' = @{ t = 'css'; edits = @(,@($mPageBtn, ($mPageBtn + $CC + '#paginationControls .page-nav-btn {' + $CC + '    cursor: pointer;' + $CC + '}' + $CC))); red = @('V14', 'V15', 'V16', 'V17', 'V19') }
+  'pagerwide'     = @{ t = 'css'; edits = @(,@($mPageBtn, ($mPageBtn + $CC + '#paginationControls {' + $CC + '    cursor: pointer;' + $CC + '}' + $CC))); red = @('V18') }
 }
 function Apply-Mutant([string]$text, [string]$name) {
   foreach ($e in $mutantDefs[$name].edits) {
@@ -133,12 +139,13 @@ function Get-Static($s) {
   $mk = $js.Contains("viewOptionSearch:     '#tableSearchContainer .search-wrapper',")
   $tg = $js.Contains("            case 'viewOptionSearch':" + $C + "            case 'viewOptionSnapshots':")
   $out += [pscustomobject]@{ id = 'S3'; name = 'admins: the "hidden from users" marker covers the box, and the live toggle paints it'; pass = $mk -and $tg; detail = "marker=$mk toggle=$tg" }
-  $sl = $js.Contains("            if (`$('body').hasClass('restrict-search') && !`$('#tableSearchContainer').hasClass('has-text')) return;" + $C + "            const searchInput = `$('#tableSearch');")
+  $sl = $js.Contains("            if ($($BODY).hasClass('restrict-search') && !`$('#tableSearchContainer').hasClass('has-text')) return;" + $C + "            const searchInput = `$('#tableSearch');")
   $out += [pscustomobject]@{ id = 'S4'; name = '"/" does not reach for a hidden search box'; pass = $sl; detail = "guard=$sl" }
-  $c1 = $css.Contains('body.restrict-search #tableSearchContainer:not(.has-text) .search-wrapper {' + $C + '    display: none !important;')
-  $c2 = $css.Contains('body.pnb-no-controlbar #resultsHeader {' + $C + '    display: none !important;')
-  $c3 = $css.Contains('@container pnb-vo-eu (max-width: 1623px) {')
-  $out += [pscustomobject]@{ id = 'S5'; name = 'CSS: an active search keeps its box, the empty bar goes, the grid''s 12-card step (1623px)'; pass = $c1 -and $c2 -and $c3; detail = "restrict-search=$c1 no-controlbar=$c2 step1623=$c3" }
+  $c1 = $css.Contains('body.restrict-search #tableSearchContainer:not(.has-text) .search-wrapper {' + $CC + '    display: none !important;')
+  $c2 = $css.Contains('body.pnb-no-controlbar #resultsHeader {' + $CC + '    display: none !important;')
+  # (2026-11-15) 862d72c (2026-10-22, Preset Sharing) made it thirteen cards: the top step moved 1623px -> 1759px (13 x 128 + 12 x 8 - 1).
+  $c3 = $css.Contains('@container pnb-vo-eu (max-width: 1759px) {') -or ($Control -and $css.Contains('@container pnb-vo-eu (max-width: 1623px) {'))
+  $out += [pscustomobject]@{ id = 'S5'; name = 'CSS: an active search keeps its box, the empty bar goes, the grid''s top step (1759px, 13 cards; 1623px for 12 before 862d72c)'; pass = $c1 -and $c2 -and $c3; detail = "restrict-search=$c1 no-controlbar=$c2 step1623=$c3" }
   $hp = ($help.Contains('<strong>Search Bar</strong></td>') -or $help.Contains('<strong>Filter Bar</strong></td>')) -and $help.Contains('viewers get the table without the control bar at all')
   $out += [pscustomobject]@{ id = 'S6'; name = 'the help documents the option and the reclaimed bar'; pass = $hp; detail = "help=$hp" }
   return ,$out

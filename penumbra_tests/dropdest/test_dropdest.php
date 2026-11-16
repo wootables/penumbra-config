@@ -122,6 +122,10 @@ ok($E('sftp', array('drop_host' => 'gosparcs.oit.ncsu.edu/../x'), array(), $host
 ok($E('s3',   array('drop_s3_endpoint' => 'https://s3.us-east-1.amazonaws.com'), array(), $hosts) === null, 's3: listed endpoint host');
 ok($E('s3',   array('drop_s3_region' => 'us-east-1'), array(), $hosts) === null,               's3: the AWS default endpoint for the region counts');
 ok($E('s3',   array('drop_s3_endpoint' => 'https://minio.internal:9000'), array(), $hosts) !== null, 's3: unlisted endpoint host refused');
+// (2026-11-15) the bucket and region build the request's host: a slash in either sent the file off the approved host
+ok($E('s3',   array('drop_s3_region' => 'us-east-1', 'drop_s3_bucket' => 'evil.example/'), array(), $hosts) !== null, 's3: a bucket that changes the host is refused');
+ok($E('s3',   array('drop_s3_region' => 'evil.example/', 'drop_s3_bucket' => 'reports'), array(), $hosts) !== null, 's3: a region that changes the host is refused');
+ok($E('s3',   array('drop_s3_region' => 'us-east-1', 'drop_s3_bucket' => 'Legacy_Bucket'), array(), $hosts) === null, 's3: a legacy bucket name (capitals, _) still passes');
 ok($E('s3',   array('drop_s3_endpoint' => 'https://s3.us-east-1.amazonaws.com@evil.example.net/'), array(), $hosts) !== null, 's3: user-info trick (allowed-host@evil) refused');
 ok($E('s3',   array('drop_s3_endpoint' => 'gopher://s3.us-east-1.amazonaws.com'), array(), $hosts) !== null, 's3: a non-http scheme is refused');
 ok($E('smb',  array('drop_path' => '\\\\srv\\share\\drops'), $roots, $hosts) !== null,          'an unknown protocol is refused');

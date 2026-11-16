@@ -8,7 +8,7 @@
 # The split code (SPLIT_* vars .. watchSplitResize) is CUT from the
 # penumbra_repository.js under test and run on a docked repository.php layout
 # styled by the main.css + penumbra_repository.css under test, in headless Edge.
-#  D. no saved divider: the details pane opens at the 520px default.
+#  D. no saved divider: the details pane opens at the 600px default (520 until 2026-11-03).
 #  N. the viewport narrows 1600 -> 1000: the details pane stays inside the layout
 #     and keeps its 400px floor; widening again restores the default split.
 #  S. a SAVED divider survives a narrow + widen round trip (resize never saves).
@@ -37,7 +37,7 @@ F = {'repo': rd('js/penumbra_repository.js'), 'css': rd('css/main.css'), 'rcss':
 MUTANTS = {
     'noobserve':  ('repo', '        _srSplitRO.observe(el);\n', '\n'),
     'noshrink':   ('repo', "$list.css('flex', '0 1 ' + Math.round(px) + 'px');", "$list.css('flex', '0 0 ' + Math.round(px) + 'px');"),
-    'default420': ('repo', 'var SPLIT_PAGE_DETAILS = 520;', 'var SPLIT_PAGE_DETAILS = 420;'),
+    'default420': ('repo', 'var SPLIT_PAGE_DETAILS = 600;', 'var SPLIT_PAGE_DETAILS = 420;'),
     'nomanage':   ('repo', "if (manageOn()) { setListWidth(clampSplit(Number.MAX_SAFE_INTEGER, w)); }\n                else { applySavedSplit(); }", "applySavedSplit();"),
 }
 if MUTANT:
@@ -93,12 +93,12 @@ try:
         b.load('page.html'); b.ev("localStorage.clear()"); b.load('page.html')
         g = vp(1600)
         print('== D. default  %s' % g)
-        ok(abs(g['det'] - 520) <= 2, 'D the details pane opens at the 520px default  [%d]' % g['det'])
+        ok(abs(g['det'] - 600) <= 2, 'D the details pane opens at the 600px default  [%d]' % g['det'])
         g = vp(1000); print('== N. narrowed to 1000  %s' % g)
         ok(g['detR'] <= g['lay'] + 1, 'N the details pane stays inside the layout  [right %d vs %d]' % (g['detR'], g['lay']))
-        ok(g['det'] >= 398, 'N the details pane keeps its 400px floor  [%d]' % g['det'])
+        ok(g['det'] >= 458, 'N the details pane keeps its 460px floor (400 until 2026-11-03)  [%d]' % g['det'])
         g = vp(1600)
-        ok(abs(g['det'] - 520) <= 2, 'N widening again restores the default split  [%d]' % g['det'])
+        ok(abs(g['det'] - 600) <= 2, 'N widening again restores the default split  [%d]' % g['det'])
         print('== S. a saved divider')
         b.ev("localStorage.setItem('penumbra_repo_split_page', '900')"); b.load('page.html')
         g0 = json.loads(b.ev(GEOM)); vp(1000); g1 = vp(1600)
@@ -109,7 +109,7 @@ try:
         # same 400px by coincidence and a Manage-blind resize went GREEN.
         b.ev("localStorage.clear()"); b.load('page.html'); vp(1600)
         b.ev("manage(true)"); g = vp(1400)
-        ok(abs(g['det'] - 400) <= 2, 'M Manage Mode keeps the list at the maximum through a resize  [details %d]' % g['det'])
+        ok(abs(g['det'] - 460) <= 2, 'M Manage Mode keeps the list at the maximum through a resize  [details %d]' % g['det'])
         b.ev("manage(false)"); vp(1600)
         print('== R. no ResizeObserver')
         b.ev("localStorage.clear()"); b.load('noro.html', ready="window.ready && !window.ResizeObserver")

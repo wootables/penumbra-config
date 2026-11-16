@@ -165,7 +165,10 @@ until(function () { return stat('d1') !== '' && tile('d2').find('tbody tr').leng
   eq('Enter writes the bound into the dashboard filter', box(), 'AMOUNT >= 100');
   eq('... applies it: the stat sums what is left (100 + 1,250.50 + 2,000 + 300)', stat('d1'), '3,650.50');
   eq('... and the table tile of repB follows (250, 150)', tile('d2').find('tbody tr').length, 2);
-  ok('... and the tile is drawn again at once, focus still in the box: the range shows its clear, the strip a Clear all', G('AMOUNT').find('.pnb-fs-clear').length === 1 && tile('c1').find('.pnb-fs-clearall').length === 1,
+  // (2026-11-15) fsclearall (2026-11-10, in catch-up commit e65935d): the strip draws Clear all only when two or more
+  // groups are pressed (with one it does no more than that group's x). One range here, so its clear and NO Clear all;
+  // section F below clicks Clear all with a range and a chip group pressed.
+  ok('... and the tile is drawn again at once, focus still in the box: the range shows its clear, the strip a Clear all', G('AMOUNT').find('.pnb-fs-clear').length === 1 && tile('c1').find('.pnb-fs-clearall').length === 0,
      'clear=' + G('AMOUNT').find('.pnb-fs-clear').length + ' clearall=' + tile('c1').find('.pnb-fs-clearall').length);
   ok('focus stays on the box through the redraw', document.activeElement === B('AMOUNT', 'min')[0] && B('AMOUNT', 'min').val() === '100', document.activeElement && (document.activeElement.outerHTML || '').substring(0, 90));
   // ══════ C. the pair commits together ══════

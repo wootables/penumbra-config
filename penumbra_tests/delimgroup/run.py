@@ -48,6 +48,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 ALL_SCN = ['unit', 'render', 'nested', 'menu', 'snippet', 'bucket', 'json', 'detect', 'chart', 'lists', 'copy']
 ALL_SCN = ALL_SCN + ['active']   # (dtpick C, 2026-11-05) Group by a start/end pair's active grouping
 ALL_SCN = ALL_SCN + ['pvactive']   # (dtpick D2, 2026-11-05) the pivot builder's Active per period
+ALL_SCN = ALL_SCN + ['pvdelim']   # (pvdelim, 2026-11-15) a pivot field split by a delimiter
 # (splitviz) main.js loads these on demand from js/ beside the page: the chart scenario draws a real vis() chart
 CHART_LIBS = ['chart-4.5.1.min.js', 'chartjs-plugin-datalabels-2.0.0.min.js', 'chartjs-chart-treemap-3.1.0.min.js',
               'chartjs-chart-sankey-0.19.1.min.js', 'penumbra_charts.js', 'penumbra_geo_us.js']
@@ -154,7 +155,7 @@ CONTROL_REV = '0d19cfd^'   # LIVE since 0d19cfd (2026-10-27, copymenu 2): the co
 def scn_of(aid):
     pre = aid.split('-')[0]
     return {'U': 'unit', 'C': 'render', 'N': 'nested', 'H': 'menu', 'X': 'php', 'J': 'json', 'B': 'nested', 'A': 'active',
-            'D': 'detect', 'V': 'chart', 'L': 'lists', 'Q': 'copy', 'Y': 'pvactive'}.get(pre) or \
+            'D': 'detect', 'V': 'chart', 'L': 'lists', 'Q': 'copy', 'Y': 'pvactive', 'W': 'pvdelim'}.get(pre) or \
         {'K-count': 'render', 'K-snippet': 'snippet', 'K-bucket': 'bucket', 'K-jcount': 'json', 'P-jbands': 'json',
          'G-reopen': 'bucket', 'G-reopenbin': 'bucket'}.get(aid) or \
         ('render' if pre == 'G' else aid.split('-', 1)[1] if pre in ('P', 'E', 'F') else '?')
@@ -478,7 +479,9 @@ def hook(src):
              # (splitviz) the chart split, its drill and the builder's lists; the strip and Column stats
              'vizBucketRowsForAxis', 'generateChartDataFromMaps', '_buildChartClickCriteria', '_chartDrillKeep', '_chartDrillProbe',
              '_chartDrillSearchPart', '_vizBucketVariantsFor', 'populateVisualizationColumns', '_vizEnsureXOption', '_cnTok',
-             'parseAdvancedQuery', 'evaluateParsedQuery', '_pnbFsGroups', 'liveUpdateChartFromFilters']
+             'parseAdvancedQuery', 'evaluateParsedQuery', '_pnbFsGroups', 'liveUpdateChartFromFilters',
+             # (pvdelim fix) the pivot split's search and row count
+             '_pnbPvDrillSearch', 'penumbraPivotShownRowCount', '_pnbDelimBlankSearch']
     h = ('\r\n;try { window.__JG = { master: function () { try { return eval("masterRowData"); } catch (e) { return null; } },'
          ' setCso: function (v) { customSortOrders = v; try { _csInvalidateComparators(); } catch (e) {} } }; } catch (e) { window.__JG_ERR = String(e); }\r\n'
          'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__JG[k] = eval(k); } catch (e) { (window.__JG_MISSING = window.__JG_MISSING || []).push(k); } }); } catch (e) { window.__JG_ERR2 = String(e); }\r\n')

@@ -1686,7 +1686,11 @@ def evaluate(O):
     # The layout. FLOOR5 = the operator select / each between box width the build before
     # round 5 gave at these window widths (Edge 154: 149.3/112.2, 162.2/120.8, 173.3/128.2,
     # 189.1/138.7), less 2px: the wider column cell must not have squeezed them.
-    FLOOR5 = {1024: (100, 80), 1280: (147, 110), 1366: (160, 118), 1440: (171, 126), 1920: (187, 136)}
+    # (2026-11-15) 751eec3 (2026-10-30, parentheses phase 2) gave every row a 26px ( ) toggle + its 6px gap beside the
+    # joiner, on purpose; measured on 751eec3 and on live the operator / between boxes are 100/80, 139.8/105.9,
+    # 162.7/121.1, 182.3/134.2, 185.4/136.3 (its parent 778acc9: 153.5/115 at 1280, 199.1/145.4 at 1920). The two
+    # floors that slot pushed under (1280: 147/110, 1920: 187/136) are now today's widths less 2px; the rest stand.
+    FLOOR5 = {1024: (100, 80), 1280: (137, 103), 1366: (160, 118), 1440: (171, 126), 1920: (183, 134)}
     def tips(lay):
         return [r for r in ((lay or {}).get('rows') or []) if r.get('tip')]
     def tip_ok(lay):

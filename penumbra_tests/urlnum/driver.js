@@ -214,7 +214,7 @@
       clickTh(fTh('2021')); await settle();
       var a = sortNow();
       R.obs.afterClick = a;
-      rec('R-nextClick', S(a) === S([['V_NAME', 'string', 'asc', 3]]) && S(fMarks()) === S(['V_NAME:ascending']), 'after a click on 2021: ' + S(a) + '; marks ' + S(fMarks()));
+      rec('R-nextClick', S(a) === '[]' && fMarks().length === 0,   /* (2026-11-15) sortoff (2026-11-14): every level goes */ 'after a click on 2021: ' + S(a) + '; marks ' + S(fMarks()));
     },
     uC: async function () {
       premise();

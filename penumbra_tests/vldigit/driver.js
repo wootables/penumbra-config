@@ -117,7 +117,7 @@
     // GUARD: the next click on 2021 takes its level off (what gB's click must do too)
     clickTh(gThs('2021')[0]); await settle();
     R.obs.afterClick = sortNow();
-    rec('A-nextClick', S(R.obs.afterClick) === S([['V_NAME', 'string', 'asc', 3]]) && S(gMarks()) === S(['V_NAME:ascending']),
+    rec('A-nextClick', S(R.obs.afterClick) === '[]' && gMarks().length === 0,   // (2026-11-15) sortoff (2026-11-14): the third plain click takes off every level, the Shift+click's too
       'after a click on 2021: ' + S(R.obs.afterClick) + '; marks ' + S(gMarks()));
   }
 
@@ -145,7 +145,7 @@
     // NEW: the next click on 2021 finds its level (the same value) and takes it off, as on gA
     clickTh(gThs('2021')[0]); await settle();
     R.obs.afterClick = sortNow();
-    rec('B-nextClick', S(R.obs.afterClick) === S([['V_NAME', 'string', 'asc', 3]]) && S(gMarks()) === S(['V_NAME:ascending']),
+    rec('B-nextClick', S(R.obs.afterClick) === '[]' && gMarks().length === 0,   // (2026-11-15) sortoff (2026-11-14): the third plain click takes off every level, the Shift+click's too
       'after a click on 2021: ' + S(R.obs.afterClick) + '; marks ' + S(gMarks()));
   }
 

@@ -192,8 +192,7 @@ def build(index_src):
     vo = _lift(index_src, r'<div class="view-option-item pnb-cards-vo">.*?pnb-cards-note.*?</p>\s*</div>\s*</div>', 'the Cards card')
     vo = re.sub(r'<span class="tab-help-icon"[^>]*>\?</span>', '', vo)
     rep('<div id="pnbStatusBar">', '<script>if (/print$/.test(new URLSearchParams(location.search).get("scn") || "")) document.write(\'<p id="dataLoadedTimestamp">Data retrieved on: Oct 31, 2026 9:00 AM</p>'
-        '<div id="downloadActionsLightbox" class="help-lightbox" style="display:none"><div class="lightbox-content"><label style="display: block;"><input type="radio" name="downloadFormat" value="print"> <strong>Print</strong>'
-        '<small style="display: block; margin-left: 22px;">Opens your browser print dialog for what is on screen.</small></label>'
+        '<div id="downloadActionsLightbox" class="help-lightbox" style="display:none"><div class="lightbox-content">'   # (2026-11-15) the Print row is gone from the real dialog
         '<label style="display: block;"><input type="radio" name="downloadFormat" value="pdf"> <strong>PDF</strong></label></div></div>\');</script>\n<div id="pnbStatusBar">')   # (cprint)
     # (crow) the cell selection (the table's active cell) for the row window's scenarios
     rep('<div id="pnbStatusBar">', '<script>if (/^(ctrow|gtrow|ctsel)$/.test(new URLSearchParams(location.search).get("scn") || "")) document.write(\'<link rel="stylesheet" href="penumbra_cellsel.css"><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');</script>\n<div id="pnbStatusBar">')

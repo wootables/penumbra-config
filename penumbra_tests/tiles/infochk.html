@@ -30,6 +30,8 @@
 <script>
   // Same boot as the parity / auditfixes harnesses: enough shape that the ready
   // closure runs to completion (consts past an early death stay in the TDZ).
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's theme apply calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.penumbra_vars = {
     isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
     tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },

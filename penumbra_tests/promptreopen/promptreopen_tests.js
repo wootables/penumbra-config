@@ -79,6 +79,11 @@
             + grabLine(/\n    const _isRangeKeyword = [^\n]+\n/, '_isRangeKeyword')
             + 'var _promptRangeCache = new Map();\n'
             + 'var _forceDefaultApplied = new Set();\n'
+            // (2026-11-15) vlprompt (2026-11-12): the chip bar, the chip's dialog and the re-run read a stored answer
+            // through _pnbPromptStored (a view-link visit's own first, else localStorage). The real one-liner is lifted
+            // when the main.js under test has it; there is no link visit here.
+            + 'var _pnbViewLink = null; var _pnbVlPromptSaves = {};\n'
+            + ((/\n    function _pnbPromptStored\([^\n]*\}\n/.exec(code) || [''])[0])
             + names.map(grabFn).join('\n')
             + '\nreturn {'
             + names.map(function (n) { return n + ':' + n; }).join(',')

@@ -27,6 +27,16 @@
                 <h3 class="pnb-dlg-title">Data Visualization Builder <span class="tab-help-icon" data-target="#visualizationBuilderHelpLightbox" title="Visualization Builder Help">?</span></h3>
                 <p class="pnb-dlg-sub">Chart the current result set</p>
             </div>
+            
+            <!-- Describe a chart (vizdesc, 2026-11-13): words in, a chart out, through viz_describe.php and
+                 Auto-build's own rules; any failure falls back to plain Auto-build. In the title bar, not the
+                 docked button bar, which is already at its one-line limit when the admin group shows.
+                 viz_describe.off beside index.php leaves it out. -->
+            <div class="pnb-dlg-action viz-describe" role="group" aria-label="Describe a chart">
+                <input type="text" id="vizDescribeInput" maxlength="300" autocomplete="off" spellcheck="false" placeholder="Describe a chart, e.g. amount by sponsor per fiscal year" aria-label="Describe the chart you want" title="Say what to chart in your own words - columns, a period, top 10, stacked - and press Enter. Only the column names on this report are sent to the AI, never the data. If it cannot help, Auto-build draws the chart instead.">
+                <button type="button" id="vizDescribeBtn" class="pnb-btn pnb-btn-sm pnb-btn-primary" title="Build the chart you described (Enter)">&#x2728; Build</button>
+            </div>
+            
             <span class="pnb-dlg-action" id="vizPresetMount"></span>
             <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
         </div>
@@ -68,31 +78,50 @@
                         <strong>Doughnut</strong>
                         <div class="viz-option-desc">Proportions</div>
                     </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="scatter">
-                        <svg viewBox="0 0 36 28"><circle class="viz-icon-fill" cx="6" cy="18" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="13" cy="7" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="19" cy="20" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="26" cy="10" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="31" cy="14" r="2.5" fill="#336699" opacity="0.7"/></svg>
-                        <strong>Scatter</strong>
-                        <div class="viz-option-desc">X/Y + Bubble</div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="gantt">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="3" width="16" height="4" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="8" y="9" width="18" height="4" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="14" y="15" width="12" height="4" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="20" y="21" width="14" height="4" rx="1.5" fill="#336699" opacity="0.5"/><line x1="24" y1="1" x2="24" y2="27" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3,2"/></svg>
+                        <strong>Gantt</strong>
+                        <div class="viz-option-desc">Timeline</div>
                     </div>
-
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="radar">
-                        <svg viewBox="0 0 32 32"><polygon points="16,4 27,12 24,26 8,26 5,12" fill="none" class="viz-icon-mute-stroke" stroke="#e5e7eb" stroke-width="1"/><polygon class="viz-icon-fill" points="16,8 23,13 21,23 11,23 9,13" fill="#336699" opacity="0.25" stroke="#336699" stroke-width="1.5"/></svg>
-                        <strong>Radar</strong>
-                        <div class="viz-option-desc">Multi-axis</div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="map">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.25"/><rect class="viz-icon-fill" x="8" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.5"/><rect class="viz-icon-fill" x="15" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.85"/><rect class="viz-icon-fill" x="22" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.4"/><rect class="viz-icon-fill" x="29" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="1" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="8" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="15" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.75"/><rect class="viz-icon-fill" x="22" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.95"/><rect class="viz-icon-fill" x="29" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.35"/><rect class="viz-icon-fill" x="8" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="15" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.7"/><rect class="viz-icon-fill" x="22" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.2"/><rect class="viz-icon-fill" x="15" y="23" width="6" height="4" rx="1" fill="#336699" opacity="0.55"/></svg>
+                        <strong>Map</strong>
+                        <div class="viz-option-desc">By State</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="sankey">
+                        <svg viewBox="0 0 36 28"><path class="viz-icon-fill" d="M5 3 C17 3 17 4 31 4 L31 12 C17 12 17 9 5 9 Z" fill="#336699" opacity="0.45"/><path class="viz-icon-fill" d="M5 11 C17 11 17 21 31 21 L31 25 C17 25 17 15 5 15 Z" fill="#336699" opacity="0.3"/><path class="viz-icon-fill" d="M5 18 C17 18 17 13 31 13 L31 19 C17 19 17 25 5 25 Z" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="2" y="2" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="11" width="3" height="5" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="18" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="3" width="3" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="14" width="3" height="12" rx="1" fill="#336699"/></svg>
+                        <strong>Sankey</strong>
+                        <div class="viz-option-desc">Flows</div>
                     </div>
                     <div class="viz-type-option" role="option" aria-selected="false" data-type="treemap">
                         <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="1" width="20" height="16" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="22" y="1" width="13" height="16" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="1" y="18" width="12" height="9" rx="1.5" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="14" y="18" width="10" height="9" rx="1.5" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="25" y="18" width="10" height="9" rx="1.5" fill="#336699" opacity="0.55"/></svg>
                         <strong>Treemap</strong>
                         <div class="viz-option-desc">Hierarchy</div>
                     </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="histogram">
-                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="16" width="5" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="8" y="8" width="5" height="18" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="14" y="3" width="5" height="23" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="20" y="6" width="5" height="20" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="26" y="13" width="5" height="13" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="32" y="21" width="3" height="5" rx="1" fill="#336699"/></svg>
-                        <strong>Histogram</strong>
-                        <div class="viz-option-desc">Distribution</div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="box">
+                        <svg viewBox="0 0 36 28"><line x1="7" y1="3" x2="7" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="3" x2="10" y2="3" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="25" x2="10" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="3" y="9" width="8" height="10" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="3" y1="14" x2="11" y2="14" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><line x1="19" y1="6" x2="19" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="6" x2="22" y2="6" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="27" x2="22" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="15" y="12" width="8" height="9" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="15" y1="17" x2="23" y2="17" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><circle cx="19" cy="2" r="1.6" fill="none" class="viz-icon-line" stroke="#888"/><line x1="31" y1="8" x2="31" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="8" x2="34" y2="8" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="24" x2="34" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="27" y="12" width="8" height="8" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="27" y1="16" x2="35" y2="16" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/></svg>
+                        <strong>Box Plot</strong>
+                        <div class="viz-option-desc">Spread</div>
                     </div>
                     <div class="viz-type-option" role="option" aria-selected="false" data-type="waterfall">
                         <svg viewBox="0 0 36 28"><rect x="2" y="16" width="5" height="10" rx="1" fill="#4CAF50"/><rect x="9" y="10" width="5" height="6" rx="1" fill="#4CAF50"/><rect x="16" y="6" width="5" height="4" rx="1" fill="#4CAF50"/><rect x="23" y="8" width="5" height="4" rx="1" fill="#c0392b" opacity="0.8"/><rect class="viz-icon-fill" x="30" y="2" width="5" height="24" rx="1" fill="#336699" opacity="0.6"/></svg>
                         <strong>Waterfall</strong>
                         <div class="viz-option-desc">Build-up</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="scatter">
+                        <svg viewBox="0 0 36 28"><circle class="viz-icon-fill" cx="6" cy="18" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="13" cy="7" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="19" cy="20" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="26" cy="10" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="31" cy="14" r="2.5" fill="#336699" opacity="0.7"/></svg>
+                        <strong>Scatter</strong>
+                        <div class="viz-option-desc">X/Y + Bubble</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="radar">
+                        <svg viewBox="0 0 32 32"><polygon points="16,4 27,12 24,26 8,26 5,12" fill="none" class="viz-icon-mute-stroke" stroke="#e5e7eb" stroke-width="1"/><polygon class="viz-icon-fill" points="16,8 23,13 21,23 11,23 9,13" fill="#336699" opacity="0.25" stroke="#336699" stroke-width="1.5"/></svg>
+                        <strong>Radar</strong>
+                        <div class="viz-option-desc">Multi-axis</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="histogram">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="16" width="5" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="8" y="8" width="5" height="18" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="14" y="3" width="5" height="23" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="20" y="6" width="5" height="20" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="26" y="13" width="5" height="13" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="32" y="21" width="3" height="5" rx="1" fill="#336699"/></svg>
+                        <strong>Histogram</strong>
+                        <div class="viz-option-desc">Distribution</div>
                     </div>
                     <div class="viz-type-option" role="option" aria-selected="false" data-type="funnel">
                         <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="2" width="32" height="5" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="6" y="9" width="24" height="5" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="10" y="16" width="16" height="5" rx="1.5" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="14" y="23" width="8" height="4" rx="1.5" fill="#336699" opacity="0.45"/></svg>
@@ -108,26 +137,6 @@
                         <svg viewBox="0 0 36 28"><rect x="2" y="3" width="32" height="6" rx="1" class="viz-icon-mute" fill="#e5e7eb"/><rect x="2" y="3" width="21" height="6" rx="1" class="viz-icon-mute" fill="#d1d5db"/><rect class="viz-icon-fill" x="2" y="4.5" width="17" height="3" rx="1" fill="#336699"/><line x1="25" y1="2" x2="25" y2="10" stroke="#c0392b" stroke-width="2"/><rect x="2" y="14" width="32" height="6" rx="1" class="viz-icon-mute" fill="#e5e7eb"/><rect x="2" y="14" width="21" height="6" rx="1" class="viz-icon-mute" fill="#d1d5db"/><rect class="viz-icon-fill" x="2" y="15.5" width="26" height="3" rx="1" fill="#336699"/><line x1="20" y1="13" x2="20" y2="21" stroke="#c0392b" stroke-width="2"/></svg>
                         <strong>Bullet</strong>
                         <div class="viz-option-desc">vs Target</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="box">
-                        <svg viewBox="0 0 36 28"><line x1="7" y1="3" x2="7" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="3" x2="10" y2="3" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="25" x2="10" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="3" y="9" width="8" height="10" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="3" y1="14" x2="11" y2="14" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><line x1="19" y1="6" x2="19" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="6" x2="22" y2="6" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="27" x2="22" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="15" y="12" width="8" height="9" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="15" y1="17" x2="23" y2="17" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><circle cx="19" cy="2" r="1.6" fill="none" class="viz-icon-line" stroke="#888"/><line x1="31" y1="8" x2="31" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="8" x2="34" y2="8" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="24" x2="34" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="27" y="12" width="8" height="8" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="27" y1="16" x2="35" y2="16" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/></svg>
-                        <strong>Box Plot</strong>
-                        <div class="viz-option-desc">Spread</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="gantt">
-                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="3" width="16" height="4" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="8" y="9" width="18" height="4" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="14" y="15" width="12" height="4" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="20" y="21" width="14" height="4" rx="1.5" fill="#336699" opacity="0.5"/><line x1="24" y1="1" x2="24" y2="27" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3,2"/></svg>
-                        <strong>Gantt</strong>
-                        <div class="viz-option-desc">Timeline</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="map">
-                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.25"/><rect class="viz-icon-fill" x="8" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.5"/><rect class="viz-icon-fill" x="15" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.85"/><rect class="viz-icon-fill" x="22" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.4"/><rect class="viz-icon-fill" x="29" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="1" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="8" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="15" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.75"/><rect class="viz-icon-fill" x="22" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.95"/><rect class="viz-icon-fill" x="29" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.35"/><rect class="viz-icon-fill" x="8" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="15" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.7"/><rect class="viz-icon-fill" x="22" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.2"/><rect class="viz-icon-fill" x="15" y="23" width="6" height="4" rx="1" fill="#336699" opacity="0.55"/></svg>
-                        <strong>Map</strong>
-                        <div class="viz-option-desc">By State</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="sankey">
-                        <svg viewBox="0 0 36 28"><path class="viz-icon-fill" d="M5 3 C17 3 17 4 31 4 L31 12 C17 12 17 9 5 9 Z" fill="#336699" opacity="0.45"/><path class="viz-icon-fill" d="M5 11 C17 11 17 21 31 21 L31 25 C17 25 17 15 5 15 Z" fill="#336699" opacity="0.3"/><path class="viz-icon-fill" d="M5 18 C17 18 17 13 31 13 L31 19 C17 19 17 25 5 25 Z" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="2" y="2" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="11" width="3" height="5" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="18" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="3" width="3" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="14" width="3" height="12" rx="1" fill="#336699"/></svg>
-                        <strong>Sankey</strong>
-                        <div class="viz-option-desc">Flows</div>
                     </div>
                 </div>
                 <!-- Position rail: with only 8 of the 17 tiles in view, this is
@@ -231,6 +240,10 @@
                                  with sortBy=duration always has an option to land on -
                                  .val() on a missing option is a silent no-op. -->
                             <option value="duration" style="display:none">Duration</option>
+                            <!-- Gantt only, the same way (gsortend, 2026-11-02): End Date, Asc = what ends soonest. -->
+                            <option value="end" style="display:none">End Date</option>
+                            <!-- Gantt only (gsortcolor, 2026-11-02): each Color By value's bars together, by start date. -->
+                            <option value="color" style="display:none">Color By group</option>
                         </select>
                     </div>
                     <div class="viz-fld" id="vizSortDirFld">
@@ -383,11 +396,11 @@
                     </div>
                     <div class="viz-fld" style="width:90px">
                         <span class="viz-lbl"><span class="viz-lbl-text" id="vizWidthLt">Width</span> <span class="bld-help-icon" data-tip="viz-width"></span></span>
-                        <input type="text" id="vizWidth" aria-labelledby="vizWidthLt" value="100%" title="Pixels (e.g. 800) or a responsive percentage of the space the snippet is given (e.g. 100%). No unit = pixels. New charts default to 100%.">
+                        <input type="text" id="vizWidth" aria-labelledby="vizWidthLt" value="100%" title="Pixels (e.g. 800) or a responsive percentage of the space the chart is given (e.g. 100%). No unit = pixels. New charts default to 100%.">
                     </div>
                     <div class="viz-fld" style="width:92px">
                         <span class="viz-lbl"><span class="viz-lbl-text" id="vizHeightLt">Height</span> <span class="bld-help-icon" data-tip="viz-height"></span></span>
-                        <input type="text" id="vizHeight" aria-labelledby="vizHeightLt" value="420" title="Pixels. Applies to snippet output, not the preview below. New charts get a height proportional to their width, which varies by chart type.">
+                        <input type="text" id="vizHeight" aria-labelledby="vizHeightLt" value="420" title="Pixels. Applies to the chart where the report shows it, not the preview below. New charts get a height proportional to their width, which varies by chart type.">
                     </div>
                 </div>
                 <div class="viz-chip-row">
@@ -417,6 +430,9 @@
                     <div id="vizShowSettingsWrap">
                         <label class="viz-chip" data-tip="Show the settings cog icon on this chart. When unchecked, the cog is hidden so viewers see a cleaner chart - power users can still right-click the chart to access sort, filter, drill, fullscreen, and download options.">
                             <input type="checkbox" id="vizShowSettings" checked> Show Settings
+                        </label>
+                        <label class="viz-chip" data-tip="Open this chart minimized: it shows as a small chip naming it, and anyone viewing the report can click the chip to show it (their own choice is kept in their browser). Saved with the chart as &quot;min&quot;: true in its options.">
+                            <input type="checkbox" id="vizStartMin"> Start minimized
                         </label>
                     </div>
                 </div>
@@ -556,11 +572,18 @@
                 <div id="vizGanttRow" style="display:none" class="viz-combo-strip">
                     <span class="viz-combo-badge">Gantt<br>only</span>
                     <div class="viz-fld" style="flex:1; min-width:0">
-                        <span class="viz-lbl"><span class="viz-lbl-text" id="vizGanttEndLt">End Date Column</span> <span class="bld-help-icon" data-tip="viz-gantt-end"></span></span>
+                        <span class="viz-lbl"><span class="viz-lbl-text" id="vizGanttEndLt">End Date</span> <span class="bld-help-icon" data-tip="viz-gantt-end"></span></span>
                         <select id="vizGanttEnd" aria-labelledby="vizGanttEndLt"><option value="">Select column...</option></select>
+                        <!-- (gone, 2026-11-03) shown only while End Date = "A fixed date..." -->
+                        <input type="date" id="vizGanttEndDate" aria-label="Fixed end date" style="display:none; margin-top:4px; width:100%">
+                    </div>
+                    <!-- (gcolor, 2026-11-02) one color per value of a column; rides the options object -->
+                    <div class="viz-fld" style="flex:1; min-width:0">
+                        <span class="viz-lbl"><span class="viz-lbl-text" id="vizGanttColorLt">Color By</span> <span class="bld-help-icon" data-tip="viz-gantt-color"></span></span>
+                        <select id="vizGanttColor" aria-labelledby="vizGanttColorLt"><option value="">None (each bar its own color)</option></select>
                     </div>
                     <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
-                        <span class="viz-funnel-hint" id="vizGanttHint">Y-Axis is the <b>start</b> date and this is the <b>end</b> date. Put <code>today</code> in <b>Marker Date</b> on the <b>Axes &amp; Scale</b> tab to mark today.</span>
+                        <span class="viz-funnel-hint" id="vizGanttHint">Y-Axis is the <b>start</b> date; the <b>end</b> is a column, <b>Today</b>, or <b>A fixed date&hellip;</b> (bars then run from each start to that day). On the <b>Axes &amp; Scale</b> tab, <code>today</code> in <b>Marker Date</b> marks today, and <b>Show From</b> / <b>Show To</b> set a window: a date, <code>today+90d</code> or <code>fy27</code>.</span>
                     </div>
                 </div>
                 <!-- ── SANKEY STRIP - shown only for Sankey. Stage 1 is the X-Axis;
@@ -580,7 +603,7 @@
                         <select id="vizSankeyStage4" aria-labelledby="vizSankeyStage4Lt"><option value="">None</option></select>
                     </div>
                     <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
-                        <span class="viz-funnel-hint" id="vizSankeyHint">Each row flows from its <b>X-Axis</b> value through each stage. Bands add up, so <b>Aggregation</b> must be Count or Sum; <b>Boxes per Stage</b> keeps the largest and folds the rest into Other.</span>
+                        <span class="viz-funnel-hint" id="vizSankeyHint">Each row flows from its <b>Stage 1</b> value through each stage. Bands add up, so <b>Aggregation</b> must be Count or Sum; <b>Boxes per Stage</b> keeps the largest and folds the rest into Other.</span>
                     </div>
                 </div>
                 <!-- ── BOX PLOT STRIP - shown only for Box Plot ── -->

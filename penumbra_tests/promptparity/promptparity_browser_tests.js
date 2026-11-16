@@ -62,8 +62,20 @@
          'penumbraParseRangeEnd', 'penumbraFormatRangeEnd', 'penumbraRangeKeywordDate', 'penumbraApplyDateRangeTemplate', 'penumbraDateRangeLabel',
          'penumbraDateRangePresetFor', 'penumbraDateRangePresets', 'penumbraDateRangeRawDefault'].forEach(function (n) { if (has(n)) names.push(n); });
         var kw = new RegExp(BS + 'n    const _isRangeKeyword = [^' + BS + 'n]+' + BS + 'n').exec(code);
+        // (2026-11-15) view links (viewstrict 2026-11-05, vlprompt 2026-11-12): processPrompts resets and notes the
+        // answers a view link carries (_pnbViewPromptReset / _pnbViewPromptNote) and reads a stored answer through
+        // _pnbPromptStored (a link visit's own first). The real helpers are lifted when the main.js under test has
+        // them (the two one-liners by their line); there is no link visit here, so a stored answer is localStorage's.
+        if (has('_pnbViewPromptNote')) names.push('_pnbViewPromptNote');
+        var viewLinkLines = ['_pnbViewPromptReset', '_pnbPromptStored'].map(function (n) {
+            var m1 = new RegExp(BS + 'n    function ' + n + BS + '([^' + BS + 'n]*' + BS + '}' + BS + 'n').exec(code);
+            return m1 ? m1[0] : '';
+        }).join('');
         var src = "var PNB_DATE_RANGE_SEP = '..';\n" + (kw ? kw[0] : '') +
             'var _forceDefaultApplied = new Set(); var allResolvedPrompts = [];\n' +
+            'var _pnbViewPrompts = Object.create(null); var _pnbViewLink = null; var _pnbVlPromptSaves = {};' +
+            ' var _pnbPromptRanByName = Object.create(null);\n' +   // what each prompt ran with (a const at the top of main.js's closure)
+            viewLinkLines +
             names.map(grabFn).join('\n') +
             '\nreturn { processPrompts: processPrompts, forced: _forceDefaultApplied };';
         var dialogOpened = function () { return Promise.reject(new Error('a DIALOG opened - the case was not answered through the URL')); };

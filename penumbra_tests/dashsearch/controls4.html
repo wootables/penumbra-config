@@ -190,6 +190,11 @@ until(function () { return stat('d1') === '233' && tile('d2').find('tbody tr').l
   return wait(400);
 }).then(function () {
   eq('Escape puts the filter in force back, and the chips with it', [box(), pressed('STATUS'), pressed('NAME')], ['STATUS = /^(?:Closed|)$/', ['Closed', ''], []]);
+  // (2026-11-15) fsclearall (2026-11-10, in catch-up commit e65935d): Clear all is drawn only when two or more groups
+  // are pressed, so a second group (College: Sci) is pressed first; Clear all then releases the blank chip with it.
+  chip('COLLEGE', 'Sci').trigger('click');
+  return until(function () { return pressed('COLLEGE').length === 1 && tile('c1').find('.pnb-fs-clearall').length === 1; }, 5000);
+}).then(function () {
   tile('c1').find('.pnb-fs-clearall').trigger('click');
   return until(function () { return box() === '' && stat('d1') === '233'; }, 5000);
 }).then(function () {

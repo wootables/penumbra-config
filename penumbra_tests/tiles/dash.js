@@ -1153,7 +1153,10 @@
             $(this).removeAttr('aria-invalid');
             rg[$(this).attr('data-fs-bound')] = b;
         });
-        if (bad) { return; }
+        // ...and so is a from past its to, which matches no row; either way a note says why (2026-11-03)
+        var why = T.strip.rangeProblem(rg, kind, bad);
+        T.strip.rangeMark(grp, why);
+        if (why) { return; }
         var cur = st.range[col] || { min: '', max: '' };
         if (cur.min === rg.min && cur.max === rg.max) { return; }   // nothing changed
         st.range[col] = rg;
@@ -2983,20 +2986,25 @@
                         '</div>';
             });
             html += '</div>';
+            html += '<div class="dash-tile-err" id="dashHomeNoMatch" hidden>No dashboard matches this filter.</div>';   // (2026-11-14, homefilter)
             $main.html(html);
             // Filter (2026-10-09): title / id / owner text, or tag:NAME for exactly one tag;
             // a pill click fills it; ?search= on the address runs it first (the Tags tool's link).
             function applyHomeFilter() {
-                var q = $.trim($('#dashHomeFilter').val()).toLowerCase(), m = /^tag:\s*([a-z0-9_]+)$/i.exec(q);
+                var q = $.trim($('#dashHomeFilter').val()).toLowerCase(), m = /^tag:\s*([a-z0-9_]+)$/i.exec(q), any = false;
                 $('.dash-home-item').each(function () {
                     var ok = !q || (m ? String($(this).attr('data-tags')).indexOf('|' + m[1].toUpperCase() + '|') !== -1 : String($(this).attr('data-hay')).indexOf(q) !== -1);
                     $(this).toggle(ok);
+                    if (ok) { any = true; }
                 });
+                $('#dashHomeNoMatch').prop('hidden', any || !q);   // (2026-11-14, homefilter) an empty grid said nothing
             }
             $('#dashHomeFilter').on('input', applyHomeFilter);
             $main.off('click.dashTag').on('click.dashTag', '.dash-home-tag', function (e) { e.preventDefault(); e.stopPropagation(); $('#dashHomeFilter').val('tag:' + $(this).attr('data-tag')).trigger('input'); });
             var deep = ''; try { deep = new URLSearchParams(window.location.search).get('search') || ''; } catch (eU) { }
             if (deep) { $('#dashHomeFilter').val(deep).trigger('input'); }
+            else if (window._dashHomeFilterKept) { $('#dashHomeFilter').val(window._dashHomeFilterKept).trigger('input'); }   // (2026-11-14, homefilter)
+            window._dashHomeFilterKept = '';
         }).fail(function () {
             $main.html('<div class="dash-tile-err">Could not load dashboards.</div>');
         });
@@ -3491,6 +3499,7 @@
                 'in place - fullscreen survives. Leave empty for a single-dashboard kiosk.') +
             '<div class="dash-panel-actions">' +
             (IS_NEW ? '' : '<button type="button" class="dash-btn dash-btn-danger" id="dsDelete">Delete dashboard</button>') +
+            (IS_NEW ? '' : '<button type="button" class="dash-btn" id="dsHistory" title="The saves of this dashboard, and putting an earlier layout back">Version history&hellip;</button>') +   // (2026-11-14, dashhistory)
             (IS_NEW ? '' : '<button type="button" class="dash-btn" id="dsDuplicate" title="Create a copy of this dashboard (layout and tiles; the copy is yours to reshare)">Duplicate&hellip;</button>') +
             '<button type="button" class="dash-btn dash-btn-primary" id="dsApply">Apply</button></div>';
 
@@ -3542,6 +3551,49 @@
             });
             $ov.on('click', '#dsDuplicate', function () {
                 openDuplicate();
+            });
+            // (2026-11-14, dashhistory) The dashboard's saves, newest first. "Restore" puts the layout and title back as
+            // they were BEFORE that save (the same rule as a report's Version History); the restore is itself a save
+            // that keeps a copy, so it can be put back too. Saves made before today kept no copy.
+            $ov.on('click', '#dsHistory', function () {
+                var hE = function (s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+                $('#dsHistoryBox').remove();
+                var $box = $('<div id="dsHistoryBox" role="dialog" aria-modal="true" aria-label="Dashboard version history" style="position:fixed; left:0; top:0; right:0; bottom:0; z-index:100600; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center;">' +
+                    '<div style="background:var(--bg-surface, #fff); color:inherit; border:1px solid var(--border-color, #ccc); border-radius:6px; padding:16px 18px; width:640px; max-width:94vw; max-height:84vh; overflow:auto; box-shadow:0 8px 30px rgba(0,0,0,.35); text-align:left;">' +
+                    '<div style="font-weight:600; margin-bottom:6px;">Version history of this dashboard</div>' +
+                    '<div style="font-size:12px; opacity:.8; margin-bottom:10px;">Restore puts the layout and title back as they were <b>before</b> that save. The access list and the tags stay as they are now.</div>' +
+                    '<div class="ds-hist-body" style="font-size:13px;">Loading&hellip;</div>' +
+                    '<div style="text-align:right; margin-top:12px;"><button type="button" class="dash-btn ds-hist-close">Close</button></div></div></div>');
+                $('body').append($box);
+                $box.on('click', '.ds-hist-close', function () { $box.remove(); });
+                $box.on('keydown', function (e) { if (e.keyCode === 27) { e.preventDefault(); e.stopPropagation(); $box.remove(); } });
+                var $body = $box.find('.ds-hist-body');
+                $.getJSON('manage_dashboard.php', { action: 'history', id: META.short_id }).done(function (r) {
+                    var rows = (r && r.status === 'success' && r.data) ? r.data : [];
+                    if (!rows.length) { $body.text('No saves are recorded for this dashboard yet.'); return; }
+                    var h = '<table style="width:100%; border-collapse:collapse;"><thead><tr style="text-align:left;"><th style="padding:4px 6px;">Saved</th><th style="padding:4px 6px;">By</th><th style="padding:4px 6px;">Tiles after</th><th style="padding:4px 6px;"></th></tr></thead><tbody>';
+                    rows.forEach(function (x) {
+                        h += '<tr style="border-top:1px solid var(--border-color, #ddd);"><td style="padding:4px 6px;">' + hE(x.AT_TXT) + (x.SAVE_MODE === 'restore' ? ' <em>(a restore)</em>' : '') + '</td>' +
+                             '<td style="padding:4px 6px;">' + hE(x.USER_ID) + '</td><td style="padding:4px 6px;">' + hE(x.TILES) + '</td><td style="padding:4px 6px; text-align:right;">' +
+                             (String(x.HAS_COPY) === '1'
+                                ? '<button type="button" class="dash-btn ds-hist-restore" data-aid="' + hE(x.ID) + '" data-at="' + hE(x.AT_TXT) + '" title="Put the layout and title back as they were before this save">Restore what was there before</button>'
+                                : '<span style="opacity:.7;" title="Saves made before 2026-11-14 kept no copy of what they replaced">no copy kept</span>') + '</td></tr>';
+                    });
+                    $body.html(h + '</tbody></table>');
+                }).fail(function (x) { $body.text((x.responseJSON && x.responseJSON.message) || 'The history could not be loaded.'); });
+                $box.on('click', '.ds-hist-restore', function () {
+                    var $b = $(this), aid = $b.attr('data-aid');
+                    if (!confirm('Put this dashboard back as it was BEFORE the save of ' + $b.attr('data-at') + '?\n\nThe layout and title are replaced for everyone it is shared with. The access list and tags are not changed.\nThe current layout is kept in this history, so this can be put back too.' +
+                                 (dirty ? '\n\nYou have unsaved changes on this page: they will be lost.' : ''))) { return; }
+                    $b.prop('disabled', true).text('Restoring...');
+                    $.ajax({ url: 'manage_dashboard.php?action=restore', type: 'POST', contentType: 'application/json',
+                             data: JSON.stringify({ short_id: META.short_id, audit_id: aid }), dataType: 'json' })
+                        .done(function (r) {
+                            if (r && r.status === 'success') { dirty = false; window.location.reload(); }
+                            else { $b.prop('disabled', false).text('Restore what was there before'); alert((r && r.message) || 'Restore failed.'); }
+                        })
+                        .fail(function (x) { $b.prop('disabled', false).text('Restore what was there before'); alert((x.responseJSON && x.responseJSON.message) || 'Restore failed.'); });
+                });
             });
             $ov.on('click', '#dsDelete', function () {
                 if (!confirm('Delete this dashboard?\n\nThe layout is removed for everyone it is shared with. Source reports and their data are not touched.')) { return; }
@@ -3846,11 +3898,12 @@
                         // (cdash, 2026-11-01) the report's table or its cards, for the whole report or the table alone
                         '<div id="teViewField"' + (t.show === 'header' || t.show === 'chart' ? ' style="display:none;"' : '') + '>' +
                         fieldRow('View', '<select id="teView">' +
-                            '<option value="table"' + (t.view === 'cards' ? '' : ' selected') + '>Table</option>' +
+                            '<option value=""' + (t.view === 'cards' || t.view === 'table' ? '' : ' selected') + '>The report&#39;s view</option>' +   // (cnest sweep) a tile with no view follows the report, as before the choice
+                            '<option value="table"' + (t.view === 'table' ? ' selected' : '') + '>Table</option>' +
                             '<option value="cards"' + (t.view === 'cards' ? ' selected' : '') + '>Cards</option></select> ' +
                             '<select id="teCardSize" aria-label="Card size"' + (t.view === 'cards' ? '' : ' style="display:none;"') + '>' +
                             '<option value=""' + (t.cardSize ? '' : ' selected') + '>The report&#39;s card size</option>' +
-                            [['compact', 'Compact'], ['standard', 'Standard'], ['large', 'Large'], ['xl', 'Extra large']].map(function (z) {
+                            [['compact', 'Small'], ['standard', 'Medium'], ['large', 'Large'], ['xl', 'Extra large']].map(function (z) {
                                 return '<option value="' + z[0] + '"' + (t.cardSize === z[0] ? ' selected' : '') + '>' + z[1] + '</option>';
                             }).join('') + '</select>',
                         'Cards draw each row as a card, with the fields, colours and grouping the report set up for its cards. Viewers can switch back to the table inside the tile.') +
@@ -4256,7 +4309,8 @@
                         next.search = $.trim($('#teSearch').val());
                         next.show = $('#teShow').val();
                         if (next.show === 'both' || next.show === 'table') {   // (cdash) the View, for the whole report or the table alone
-                            next.view = $('#teView').val() === 'cards' ? 'cards' : 'table';
+                            var tv = $('#teView').val();   // (cnest sweep) The report's view: none saved (it forced the table on every edit)
+                            if (tv === 'cards' || tv === 'table') { next.view = tv; } else { delete next.view; }
                             if (next.view === 'cards' && $('#teCardSize').val()) { next.cardSize = $('#teCardSize').val(); }
                         }
                         if (next.show === 'chart') {
@@ -4529,6 +4583,15 @@
             '<span class="dash-save-conflict-acts" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">' +
             '<button type="button" class="dash-btn dash-save-conflict-force">Save anyway</button>' +
             '<button type="button" class="dash-btn dash-save-conflict-open">Open the latest in a new tab</button></span>', 600000);
+        // the toast holds the only fix and sits at the end of the page: when focus is still on Save (or nowhere), move
+        // it to the toast's message, which does nothing on a stray Enter; Tab then reaches its two actions. Focus the
+        // user has moved elsewhere (typing in a tile) stays put; the toast is announced either way (wcag mod 2026-11-07)
+        var ae = document.activeElement, msg = $('#action_overlay .dash-save-conflict-acts').last().parent().find('#undo_text')[0];
+        if (!msg) { msg = $('#action_overlay #undo_text').last()[0]; }
+        if (msg && (!ae || ae === document.body || ae.id === 'dashSaveBtn')) {
+            msg.setAttribute('tabindex', '-1');
+            try { msg.focus({ preventScroll: true }); } catch (eF) { msg.focus(); }
+        }
     }
     $(document).on('click', '.dash-save-conflict-force', function (e) {
         e.preventDefault();
@@ -4808,6 +4871,8 @@
         var i = pins.indexOf(sid);
         if (i > -1) { pins.splice(i, 1); } else { pins.push(sid); }
         savePins(pins);
+        // (2026-11-14, homefilter) the list is drawn again from scratch, filter box and all: what the box held is kept
+        try { window._dashHomeFilterKept = String($('#dashHomeFilter').val() || ''); } catch (eHf) { }
         renderHome();   // re-sorts pinned-first and refreshes star states
     });
 
@@ -5162,7 +5227,9 @@
             // Coming back to a visible tab: catch up any tile whose effective
             // interval elapsed while hidden. Per-tile, same rules as the
             // ticker (Never/-1 and Off/0 resolve to eff < 30 = untouched).
-            if (document.hidden || editMode) { return; }
+            // (2026-11-14, pausehold) ...nor while the reader has paused the refresh: back from a tile's report (it
+            // opens in another tab) every due tile refreshed all the same
+            if (document.hidden || editMode || _refreshPaused) { return; }
             var now = Date.now();
             for (var i = 0; i < DASH.tiles.length; i++) {
                 var t = DASH.tiles[i];

@@ -323,6 +323,218 @@
     $('#copyPivotSnippetBtn').trigger('click');
     await sleep(200);
     rec('Y-snippet', /alone in Rows/.test($('#pivotErrorBox').text()), $('#pivotErrorBox').text());
+    // (pvactfix, 2026-11-15) the cumulative % and running totals by direction, % of parent, the rank
+    var TA = 'AWARD_DATE:fy@END_DATE';
+    async function yGen(s, okFn) {
+      $('#pivotErrorBox').hide().empty();
+      pm.rebuild(s);
+      await sleep(300);
+      if (okFn) await until(okFn, 15000); else await sleep(700);
+      await sleep(150);
+    }
+    function yRef() { var b = $.trim($('#pivotErrorBox').text()); if (b) return b; var r = document.querySelector('.pivot-active-refusal'); return r ? r.textContent : ''; }
+    var yd = [];
+    var ycase = async function (rows, cols, agg) { await yGen({ rows: rows, cols: cols, vals: 'AMT', agg: agg }); yd.push(!!yRef()); };
+    await ycase(['STATUS'], [TA], ['sum', 'pct_cum']);
+    await ycase(['STATUS'], [TA], ['sum', 'pct_cum:down']);
+    await ycase([TA], ['STATUS'], ['sum', 'pct_cum']);
+    await ycase([TA], ['STATUS'], ['sum', 'pct_cum:down']);
+    await ycase([TA], ['STATUS'], ['sum', 'running_total:down']);
+    await ycase(['STATUS'], [TA], ['sum', 'running_count']);
+    await ycase([TA], ['STATUS'], ['sum', 'pct_parent_row']);
+    rec('Y-gatedir', S(yd) === S([true, false, false, true, true, true, true]), S(yd));
+    await yGen({ rows: [TA], cols: ['STATUS'], vals: 'AMT', agg: ['count'], rankDir: 'top', rankN: 2, rankAgg: 'count' },
+      function () { var s = pm.settings(); return pm.on() && s && s.rankN === 2 && s.rows[0] === TA; });
+    var yRows = Array.prototype.map.call(document.querySelectorAll('#pivotResultTable tbody tr'), function (tr) { var c = tr.querySelector('th, td'); return c ? $.trim(c.textContent) : ''; });
+    var yNote = $('.pivot-active-note').text();
+    rec('Y-rankother', yRows.length === 2 && !yRows.some(function (x) { return /\(Other\)/.test(x); }) && /The \(Other\) row is off too/.test(yNote), S({ rows: yRows, note: yNote }));
+    await yGen({ rows: ['STATUS'], cols: [TA], vals: 'AMT', agg: ['count'], rankDir: 'top', rankN: 2, rankAgg: 'count' });
+    rec('Y-rankcols', /Rank is not offered with AWARD_DATE to END_DATE in Columns/.test(yRef()), yRef());
+  }
+
+  // (pvdelim, 2026-11-15) a pivot field split by a delimiter: PI_LIST:dsemi, one row per value its cell lists
+  async function scnPvDelim() {
+    var pm = window.Penumbra.pivotMenu;
+    var want = expectBands(FX);
+    function lblOf(tr) { var c = tr.querySelector('th, td'); return c ? c.textContent.replace(/\s+/g, ' ').trim() : ''; }
+    function bodyRows() { var t = document.getElementById('pivotResultTable'); return t ? Array.prototype.slice.call(t.querySelectorAll('tbody tr')) : []; }
+    function num(s) { var n = parseFloat(String(s).replace(/[$,\s]/g, '')); return isNaN(n) ? null : n; }
+    // a saved split (a snippet's settings) through the builder's pills and Generate: still split
+    pm.rebuild({ rows: ['PI_LIST:dsemi'], cols: ['STATUS'], vals: 'AMT', agg: ['count'] });
+    await sleep(300);
+    await until(function () { return pm.on() && !$('#pivotLightbox').is(':visible'); }, 15000);
+    var s0 = pm.settings() || {};
+    rec('W-saved', S(s0.rows) === S(['PI_LIST:dsemi']), S({ rows: s0.rows, box: $('#pivotErrorBox').text() }));
+    // a row per value, each counting the rows that list it (the Grand Total column stays: a value is one row)
+    var got = {}, bad = [];
+    bodyRows().forEach(function (tr) {
+      var gt = tr.querySelector('td.pivot-grand-total');
+      got[lblOf(tr)] = gt ? num(gt.textContent) : null;
+    });
+    Object.keys(want).forEach(function (k) { if (got[k] !== want[k].length) bad.push(k + ' ' + got[k] + ' want ' + want[k].length); });
+    Object.keys(got).forEach(function (k) { if (!(k in want)) bad.push('extra row ' + k); });
+    R.obs.pvdRows = got;
+    rec('W-rows', !bad.length && Object.keys(got).length === Object.keys(want).length, bad.join(' | ') || Object.keys(got).length + ' rows');
+    var tbl = document.getElementById('pivotResultTable');
+    var note = $('.pivot-active-note').text();
+    rec('W-totals', !!tbl && !tbl.querySelector('tfoot') && /Totals across PI_LIST are off/.test(note), S({ tfoot: !!(tbl && tbl.querySelector('tfoot')), note: note }));
+    // the drill: the rows whose list holds the value
+    var kimTr = bodyRows().filter(function (tr) { return lblOf(tr) === 'Kim, Di'; })[0];
+    var kimTd = kimTr ? kimTr.querySelector('td.pivot-grand-total') : null;
+    var nOv0 = $('.infobox-overlay').length, drillN = null;
+    if (kimTd) {
+      try { pm.drill(kimTd); } catch (e) { R.obs.pvdDrillErr = String(e.message); }
+      await until(function () { return $('.infobox-overlay').length > nOv0; }, 5000);
+      var $ov = $('.infobox-overlay').last();
+      drillN = $ov.find('table.pnb-breakdown tbody tr').length;
+      R.obs.pvdDrillLink = $ov.find('.infobox-drill-to-table').length;
+      $ov.find('button').filter(function () { return /close|ok/i.test($(this).text()); }).first().trigger('click');
+      $ov.remove();
+    }
+    rec('W-drill', drillN === (want['Kim, Di'] || []).length, S({ got: drillN, want: (want['Kim, Di'] || []).length, link: R.obs.pvdDrillLink }));
+    // in Columns: the footer stays, no Grand Total column
+    pm.rebuild({ rows: ['STATUS'], cols: ['PI_LIST:dsemi'], vals: 'AMT', agg: ['sum'] });
+    await sleep(300);
+    await until(function () { var s = pm.settings(); return pm.on() && s && s.cols && s.cols[0] === 'PI_LIST:dsemi'; }, 15000);
+    var t2 = document.getElementById('pivotResultTable');
+    rec('W-cols', !!t2 && !!t2.querySelector('tfoot') && !t2.querySelector('th.pivot-grand-total'),
+      S({ tfoot: !!(t2 && t2.querySelector('tfoot')), gt: !!(t2 && t2.querySelector('th.pivot-grand-total')) }));
+    // the builder: the pill's chip and caret; the menu's Split by ; ticked; Raw values clears it, the pick sets it again
+    pm.rebuild({ rows: ['PI_LIST:dsemi'], cols: ['STATUS'], vals: 'AMT', agg: ['count'] });
+    await sleep(300);
+    await until(function () { return pm.on() && !$('#pivotLightbox').is(':visible'); }, 15000);
+    pm.edit();
+    await until(function () { return $('#pivotLightbox').is(':visible') && $('#pivot-rows .pivot-column-item .pivot-split-caret').length > 0; }, 5000);
+    var pill = $('#pivot-rows .pivot-column-item').first();
+    var stPill = $('#pivot-cols .pivot-column-item').filter(function () { return $(this).attr('data-field') === 'STATUS'; }).first();
+    rec('W-chip', pill.attr('data-delim') === 'dsemi' && $.trim(pill.children('.pivot-split-chip').text()) === 'Split ;' && stPill.length === 1 && !stPill.children('.pivot-split-caret').length,
+      S({ dl: pill.attr('data-delim'), chip: pill.children('.pivot-split-chip').text(), stCaret: stPill.children('.pivot-split-caret').length }));
+    var caretOf = function () { return $('#pivot-rows .pivot-column-item').first().children('.pivot-split-caret')[0]; };
+    clickEl(caretOf());
+    await until(function () { return !!document.getElementById('pivotSplitMenu'); }, 3000);
+    var dItems = Array.prototype.map.call(document.querySelectorAll('#pivotSplitMenu [data-delim-pick]'), function (b) { return b.getAttribute('data-delim-pick') + (b.getAttribute('aria-checked') === 'true' ? '*' : ''); });
+    var raw = document.querySelector('#pivotSplitMenu [data-split-pick=""]');
+    var rawCk = raw ? raw.getAttribute('aria-checked') : null;
+    if (raw) clickEl(raw);
+    await sleep(100);
+    var p1 = $('#pivot-rows .pivot-column-item').first();
+    var clearedOk = !p1.attr('data-delim') && !p1.children('.pivot-split-chip').length && p1.children('.pivot-split-caret').length === 1;
+    clickEl(caretOf());
+    await until(function () { return !!document.getElementById('pivotSplitMenu'); }, 3000);
+    var dp = document.querySelector('#pivotSplitMenu [data-delim-pick="dsemi"]'); if (dp) clickEl(dp);
+    await sleep(100);
+    var p2 = $('#pivot-rows .pivot-column-item').first();
+    rec('W-menu', S(dItems) === S(['dsemi*']) && rawCk === 'false' && clearedOk && p2.attr('data-delim') === 'dsemi' && !document.getElementById('pivotSplitMenu'),
+      S({ items: dItems, rawCk: rawCk, cleared: clearedOk, dl: p2.attr('data-delim') }));
+    // Generate from the builder: the token through the pill
+    $('#generatePivotBtn').trigger('click');
+    await sleep(300);
+    await until(function () { return pm.on() && !$('#pivotLightbox').is(':visible'); }, 15000);
+    rec('W-generate', S((pm.settings() || {}).rows) === S(['PI_LIST:dsemi']), S((pm.settings() || {}).rows));
+    // refused up front: STATUS before it in Rows - Generate keeps the builder open with the reason
+    pm.edit();
+    await until(function () { return $('#pivotLightbox').is(':visible') && $('#pivot-rows .pivot-column-item').length > 0; }, 5000);
+    var $st = $('#pivot-cols .pivot-column-item').filter(function () { return $(this).attr('data-field') === 'STATUS'; }).first();
+    if ($st.length) $st.detach().prependTo('#pivot-rows');
+    $('#pivotErrorBox').hide().empty();
+    $('#generatePivotBtn').trigger('click');
+    await sleep(400);
+    var box = $('#pivotErrorBox').text();
+    rec('W-refuse', $('#pivotLightbox').is(':visible') && /Put PI_LIST \(split by ;\) first in Rows/.test(box), S({ open: $('#pivotLightbox').is(':visible'), box: box }));
+    // ...and after it: allowed, the values subtotal within each
+    var $st2 = $('#pivot-rows .pivot-column-item').filter(function () { return $(this).attr('data-field') === 'STATUS'; }).first();
+    if ($st2.length) $st2.detach().appendTo('#pivot-rows');
+    $('#pivotErrorBox').hide().empty();
+    $('#generatePivotBtn').trigger('click');
+    await sleep(300);
+    await until(function () { var s = pm.settings(); return pm.on() && s && s.rows && s.rows.length === 2; }, 15000);
+    rec('W-nested', S((pm.settings() || {}).rows) === S(['PI_LIST:dsemi', 'STATUS']) && !$('#pivotErrorBox').text().trim(), S({ rows: (pm.settings() || {}).rows, box: $('#pivotErrorBox').text() }));
+    // ---- (pvdelim fix, 2026-11-15) the bug sweep's findings ----
+    async function pvGen(s, okFn) {
+      $('#pivotErrorBox').hide().empty();
+      pm.rebuild(s);
+      await sleep(300);
+      if (okFn) await until(okFn, 15000); else await sleep(700);
+      await sleep(150);
+    }
+    // a refusal: Generate's pre-check puts the reason in the builder's error box, or the table says it
+    function refusal() {
+      var box = $.trim($('#pivotErrorBox').text());
+      if (box) return box;
+      var r = document.querySelector('.pivot-active-refusal'); return r ? r.textContent : '';
+    }
+    // 1. markup in a split value prints as text (XL: query.php's escaped form, with "x <img onerror>", "a<b", O'Brien)
+    window.__pvXss = 0;
+    await pvGen({ rows: ['XL:dsemi'], cols: [], vals: 'AMT', agg: ['count'] }, function () { var s = pm.settings(); return pm.on() && s && s.rows[0] === 'XL:dsemi'; });
+    await sleep(300);
+    var tx = document.getElementById('pivotResultTable');
+    var labels = bodyRows().map(lblOf);
+    rec('W-escape', !!tx && !tx.querySelector('img') && !window.__pvXss && labels.indexOf('x <img src=x onerror=window.__pvXss=1//') >= 0
+      && labels.indexOf('a<b') >= 0 && labels.indexOf("O'Brien") >= 0 && tx.querySelectorAll('tbody tr').length === labels.length,
+      S({ img: !!(tx && tx.querySelector('img')), xss: window.__pvXss, labels: labels }));
+    var obTd = bodyRows().filter(function (tr) { return lblOf(tr) === "O'Brien"; })[0];
+    obTd = obTd ? obTd.querySelector('td[data-row-key]') : null;
+    var nOv1 = $('.infobox-overlay').length, obN = null, obWant = FX.filter(function (r) { return /O&#039;Brien/.test(r.XL); }).length;
+    if (obTd) {
+      try { pm.drill(obTd); } catch (e) { R.obs.obErr = String(e.message); }
+      await until(function () { return $('.infobox-overlay').length > nOv1; }, 5000);
+      obN = $('.infobox-overlay').last().find('table.pnb-breakdown tbody tr').length;
+      $('.infobox-overlay').last().remove();
+    }
+    rec('W-escdrill', obN === obWant && obWant > 0, S({ got: obN, want: obWant }));
+    // 2. the gate by direction: pct_cum runs across the columns, pct_cum:down down the rows; an index stays
+    var gs = [];
+    var gcase = async function (rows, cols, agg) {
+      await pvGen({ rows: rows, cols: cols, vals: 'AMT', agg: agg });
+      gs.push(!!refusal());
+    };
+    await gcase(['STATUS'], ['PI_LIST:dsemi'], ['sum', 'pct_cum']);          // refused
+    await gcase(['STATUS'], ['PI_LIST:dsemi'], ['sum', 'pct_cum:down']);     // kept
+    await gcase(['PI_LIST:dsemi'], ['STATUS'], ['sum', 'pct_cum']);          // kept
+    await gcase(['PI_LIST:dsemi'], ['STATUS'], ['sum', 'pct_cum:down']);     // refused
+    await gcase(['PI_LIST:dsemi'], ['STATUS'], ['sum', 'running_total:down']); // refused
+    await gcase(['STATUS'], ['PI_LIST:dsemi'], ['sum', 'running_total']);    // refused
+    await gcase(['PI_LIST:dsemi'], ['STATUS'], ['sum', 'index']);            // kept
+    rec('W-gatedir', S(gs) === S([true, false, false, true, true, true, false]), S(gs));
+    // 3. rank: an Overall rank in Rows: no (Other) row, the note says so; in Columns: refused
+    await pvGen({ rows: ['PI_LIST:dsemi'], cols: ['STATUS'], vals: 'AMT', agg: ['count'], rankDir: 'top', rankN: 3, rankAgg: 'count' },
+      function () { var s = pm.settings(); return pm.on() && s && s.rankN === 3; });
+    var rl = bodyRows().map(lblOf), rnote = $('.pivot-active-note').text();
+    rec('W-rankother', rl.length === 3 && rl.indexOf('(Other)') < 0 && /The \(Other\) row is off/.test(rnote), S({ rows: rl, note: rnote }));
+    await pvGen({ rows: ['STATUS'], cols: ['PI_LIST:dsemi'], vals: 'AMT', agg: ['count'], rankDir: 'top', rankN: 2, rankAgg: 'count' });
+    rec('W-rankcols', /Rank is not offered with PI_LIST \(split by ;\) in Columns/.test(refusal()), refusal());
+    // 4. a rank within each value: its (Other) breakdown holds exactly the rows its cell counts
+    await pvGen({ rows: ['PI_LIST:dsemi', 'STATUS'], cols: [], vals: 'AMT', agg: ['count'], rankDir: 'top', rankN: 1, rankAgg: 'count', rankScope: 'PI_LIST:dsemi', rowLayout: 'tabular' },
+      function () { var s = pm.settings(); return pm.on() && s && s.rankScope === 'PI_LIST:dsemi'; });
+    var oRes = [];
+    var oTds = Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable td[data-row-key]'), function (td) {
+      return /\|\|\|\(Other\)$/.test(td.getAttribute('data-row-key')) && !td.hasAttribute('data-pv-drv');
+    });
+    var seenK = {};
+    for (var oi = 0; oi < oTds.length; oi++) {
+      var ok0 = oTds[oi].getAttribute('data-row-key');
+      if (seenK[ok0]) continue; seenK[ok0] = true;
+      var shown = num(oTds[oi].textContent), nOv2 = $('.infobox-overlay').length, got2 = null;
+      try { pm.drill(oTds[oi]); } catch (e) { }
+      await until(function () { return $('.infobox-overlay').length > nOv2; }, 5000);
+      got2 = $('.infobox-overlay').last().find('table.pnb-breakdown tbody tr').length;
+      $('.infobox-overlay').last().remove();
+      oRes.push([ok0, shown, got2]);
+    }
+    R.obs.pvdOther = oRes;
+    rec('W-otherdrill', oRes.length > 0 && oRes.every(function (x) { return x[1] === x[2]; }), S(oRes));
+    // 5. a refused pivot counts no rows (the status bar's count)
+    var SRC_ = fn('penumbraPivotShownRowCount'), cnt = null;
+    try { cnt = SRC_ ? SRC_(master(), { rows: ['STATUS', 'PI_LIST:dsemi'], cols: [], vals: 'AMT', agg: ['count'] }) : null; } catch (e) { R.obs.cntErr = String(e.message); }
+    rec('W-refusedcount', cnt === 0, S(cnt));
+    // 6. the searches View in table writes: a value with an entity (O'Brien), and the [Blank] (cells listing nothing, ";" too)
+    var DS = fn('_pnbPvDrillSearch');
+    var obQ = DS ? DS([{ field: 'XL', delim: 'dsemi', value: 'O&#039;Brien' }], null) : null;
+    var blQ = DS ? DS([{ field: 'XL', delim: 'dsemi', value: '' }], null) : null;
+    var obIds = obQ ? evalQ(obQ) : null, blIds = blQ ? evalQ(blQ) : null;
+    var obW = idsWhere(function (r) { return /(?:^|; )O&#039;Brien(?:;|$)/.test(r.XL); }), blW = idsWhere(function (r) { return /^[ ;]*$/.test(r.XL); });
+    rec('W-search', !!obQ && S(obIds) === S(obW) && obW.length > 0 && !!blQ && S(blIds) === S(blW) && blW.length >= 2,
+      S({ obQ: obQ, ob: obIds && obIds.length, obW: obW.length, blQ: blQ, bl: blIds && blIds.length, blW: blW.length }));
   }
 
   async function scnRender() {
@@ -1050,6 +1262,7 @@
       else if (SCN === 'snippet') await scnSnippet();
       else if (SCN === 'active') await scnActive();   // (dtpick C)
       else if (SCN === 'pvactive') await scnPvActive();   // (dtpick D2)
+      else if (SCN === 'pvdelim') await scnPvDelim();   // (pvdelim)
       else if (SCN === 'bucket') await scnBucket();
       else if (SCN === 'json') await scnJson();
       else if (SCN === 'detect') await scnDetect();

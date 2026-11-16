@@ -95,6 +95,18 @@
   function setSel(el, v) { el.value = v; fire(el, 'change'); }
   function hlRules(col) { var c = colopt(); return (c && c[col] && c[col].hl) ? c[col].hl : null; }
   function isShown(el) { return !!el && el.offsetParent !== null; }
+  // (2026-11-14, hlhd drift) the header rule scenarios test a fill taking the header's GRADIENT off and the text
+  // going to the table's ink. The harness has no theme class, so it gets Low Shade (Default Light, 2026-11-08): a
+  // flat #eef0f4 header whose text already IS the ink - both premises gone, every hd-* mutant on them blind. Put
+  // the classic blue gradient header back (what PDFs, email and the gradient themes still draw), inline on <body>
+  // so it beats Low Shade's body:not([class*="theme-"])[data-theme] variables.
+  function classicHead() {
+    var g = 'linear-gradient(to top, #4276b2, #336699, #2a5588)';
+    document.body.style.setProperty('--table-header-bg', g);
+    document.body.style.setProperty('--table-header-sorted-bg', 'linear-gradient(to top, #4778b3, #4070ab, #3868a2)');
+    document.body.style.setProperty('--table-header-text', '#ffffff');
+    document.body.style.setProperty('--table-header-sorted-text', '#ffffff');
+  }
   // what a CSS text computes to here (the theme's variables live on <body>)
   function probe(css, prop) {
     var d = document.createElement('span');
@@ -206,7 +218,10 @@
         ['V_STATUS', 'is', 'Closed'], ['V_STATUS', 'is', 'closed'], ['V_STATUS', 'isnot', 'Closed'], ['V_STATUS', 'contains', 'en'], ['V_STATUS', 'notcontains', 'os'],
         ['V_STATUS', 'starts', 'Pe'], ['V_NAME', 'contains', 'Alpha'], ['V_NAME', 'contains', 'a B'], ['V_NAME', 'is', 'Alpha Bravo'], ['V_NAME', 'starts', 'Echo'],
         ['V_NAME', 'contains', 'ha.B'], ['H_NULL', 'empty'], ['H_NULL', 'notempty'], ['H_FLAG', 'is', 'Y'], ['H_NUM', 'gt', '500'], ['H_CODE', 'contains', 'AB-1'],
-        ['H_GROUP', 'isnot', 'North'], ['H_ENT', 'contains', 'Brien'], ['V_AMOUNT', 'always']];
+        ['H_GROUP', 'isnot', 'North'], ['H_ENT', 'contains', 'Brien'], ['V_AMOUNT', 'always'],
+        // (2026-11-14, hlregex) the email's engine reads them as the page does
+        ['V_STATUS', 'ends', 'ed'], ['V_NAME', 'ends', 'bravo'], ['V_STATUS', 'matches', '^(open|closed)$'], ['V_STATUS', 'notmatches', '^p'],
+        ['H_CODE', 'matches', '^ab-\\d+'], ['H_CODE', 'matches', '\\d{2}'], ['V_NAME', 'matches', 'alpha\\s+b'], ['V_NAME', 'notmatches', 'a/b|echo']];
       var kind = function (c) { return /^(V_AMOUNT|H_NUM)$/.test(c) ? 'num' : c === 'V_DATE' ? 'date' : 'text'; };
       var ws = picks.map(function (p) { return F.hlWhen({ col: p[0], op: p[1], v: p[2], v2: p[3], kind: kind(p[0]) }); });
       ws = ws.concat(['V_AMOUNT > 50000 and V_STATUS = //Open//', 'V_STATUS = //Open// or V_STATUS = //Pending//', 'V_NAME = /Alpha/', 'Alpha']);
@@ -1512,7 +1527,15 @@
         [{ col: 'V_STATUS', op: 'notempty' }, 'V_STATUS != empty'],
         [{ col: 'V_STATUS', op: 'always' }, ''],
         [{ col: 'MY COL', op: 'gt', v: '5' }, '{MY COL} > 5'],
-        [{ col: 'AND', op: 'gt', v: '5' }, '{AND} > 5']
+        [{ col: 'AND', op: 'gt', v: '5' }, '{AND} > 5'],
+        // (2026-11-14, hlregex) ends with, matches / does not match a pattern
+        [{ col: 'V_STATUS', op: 'ends', v: 'ed' }, 'V_STATUS = /ed$/'],
+        [{ col: 'V_STATUS', op: 'ends', v: 'a.b$' }, 'V_STATUS = /a\\.b\\$$/'],
+        [{ col: 'V_STATUS', op: 'matches', v: '^AB-\\d+' }, 'V_STATUS = /^AB-\\d+/'],
+        [{ col: 'V_STATUS', op: 'matches', v: '\\d{4}$' }, 'V_STATUS = /\\d{4}$/'],
+        [{ col: 'V_STATUS', op: 'matches', v: '^Op.*' }, 'V_STATUS = /^Op.*/'],
+        [{ col: 'V_STATUS', op: 'notmatches', v: 'x/y|(z)' }, 'V_STATUS != /x\\x2Fy|(z)/'],
+        [{ col: 'V_STATUS', op: 'notmatches', v: 'a\\/b' }, 'V_STATUS != /a\\x2Fb/', { op: 'notcontains', v: 'a/b' }]   // the same rows: read back as a literal
       ];
       var badW = [], badR = [];
       cases.forEach(function (c) {
@@ -1530,12 +1553,22 @@
         F.hlWhen({ col: 'V_DATE', op: 'before', v: '2/30/2026', kind: 'date' }),
         F.hlWhen({ col: 'V_DATE', op: 'last', v: '0', kind: 'date' }),
         F.hlWhen({ col: 'V_STATUS', op: 'is', v: '  ', kind: 'text' }),
-        F.hlWhen({ col: 'A=B', op: 'gt', v: '1', kind: 'num' })
+        F.hlWhen({ col: 'A=B', op: 'gt', v: '1', kind: 'num' }),
+        // (hlregex) a pattern that does not compile, a lone backslash, nothing
+        F.hlWhen({ col: 'V_STATUS', op: 'matches', v: 'a(b', kind: 'text' }),
+        F.hlWhen({ col: 'V_STATUS', op: 'notmatches', v: 'ab\\', kind: 'text' }),
+        F.hlWhen({ col: 'V_STATUS', op: 'matches', v: '  ', kind: 'text' })
       ];
-      var customs = ['V_AMOUNT > 5 and V_STATUS = //Open//', '{V_AMOUNT} > 5', 'V_STATUS = /^Op.*/', 'V_AMOUNT > 5 or V_AMOUNT < 1', 'Open',
-        'V_AMOUNT > TODAY', 'V_DATE != 2026-01-01', 'V_STATUS = //a//b//'];
+      // (hlregex) 'V_STATUS = /^Op.*/' now reads back as matches; two patterns, a case-sensitive one, one that
+      // does not compile, a pattern on a number column stay Custom
+      var customs = ['V_AMOUNT > 5 and V_STATUS = //Open//', '{V_AMOUNT} > 5', 'V_AMOUNT > 5 or V_AMOUNT < 1', 'Open',
+        'V_AMOUNT > TODAY', 'V_DATE != 2026-01-01', 'V_STATUS = //a//b//',
+        'V_STATUS = /a/ and V_NAME = /b/', 'V_STATUS = /^Op/I', 'V_STATUS = /a(b/', 'V_AMOUNT = /^1\\d+/'];
       var custBad = customs.filter(function (w) { return F.hlWhenPicks(w, kind) !== null; });
-      R.chk.whenNull = nulls.every(function (x) { return x === null; }) && custBad.length === 0;
+      // (hlregex) /.../ around a typed pattern is dropped
+      var wrapped = F.hlWhen({ col: 'V_STATUS', op: 'matches', v: '/ab+c/', kind: 'text' }) === 'V_STATUS = /ab+c/';
+      R.chk.whenNull = nulls.every(function (x) { return x === null; }) && custBad.length === 0 && wrapped;
+      R.info.when = { badW: badW, badR: badR, nulls: nulls, custBad: custBad, wrapped: wrapped };
       var c1 = F.cleanCss("color: red; padding: 4px; background-color: url(x.png); font-family: 'Segoe UI', Arial; COLOR: blue; border: 1px solid var(--x, #fff); bold");
       R.chk.cssGate = c1.css === "color: blue; font-family: 'Segoe UI', Arial; border: 1px solid var(--x, #fff)" && c1.dropped.join() === 'padding,bold' && c1.bad.join() === 'background-color'
         && F.cleanCss('color: red" onmouseover="x').css === '' && F.cleanCss('color: expression(alert(1))').css === '' && F.cleanCss('transform: rotate(3deg').css === ''
@@ -1755,8 +1788,22 @@
       await sleep(550);
       rs = hlRules('V_STATUS');
       var stc = colCells('V_STATUS', true);
-      R.chk.textIs = ops2 === 'is,isnot,contains,notcontains,starts,empty,notempty,always' && !!rs && rs[0].w === 'V_STATUS = //closed//'
+      var isOk = ops2 === 'is,isnot,contains,notcontains,starts,ends,matches,notmatches,empty,notempty,always' && !!rs && rs[0].w === 'V_STATUS = //closed//'
         && stc.length === 300 && stc.every(function (td) { return (rowOf(td).V_STATUS === 'Closed') === (getComputedStyle(td).backgroundColor === amber); });
+      // (2026-11-14, hlregex) matches pattern: a broken one is named and keeps the last good rule, a good one paints
+      setSel(hlQ('[data-co="hl-op"]'), 'matches');
+      setInput(hlQ('[data-co="hl-v"]'), 'clo(');
+      await sleep(550);
+      var reBad = hlQ('.pnb-hl-msg').classList.contains('is-bad') && /not a regular expression/.test(hlQ('.pnb-hl-msg').textContent)
+        && hlRules('V_STATUS')[0].w === 'V_STATUS = /closed/';   // (the switch to matches kept 'closed': a pattern)
+      setInput(hlQ('[data-co="hl-v"]'), '^(clo|pen)');
+      await sleep(550);
+      rs = hlRules('V_STATUS');
+      stc = colCells('V_STATUS', true);
+      var reOk = !!rs && rs[0].w === 'V_STATUS = /^(clo|pen)/' && stc.length === 300
+        && stc.every(function (td) { return /^(Closed|Pending)$/.test(rowOf(td).V_STATUS) === (getComputedStyle(td).backgroundColor === amber); });
+      R.info.textIs = [ops2, reBad, reOk, rs && rs[0].w, hlQ('.pnb-hl-msg').textContent];
+      R.chk.textIs = isOk && reBad && reOk;
       // a date column: before a date typed the US way
       closeAll();
       await sleep(60);
@@ -2230,6 +2277,7 @@
     // This cell again: the cells, the header as it was, the rule's JSON as an older rule's; deleted: nothing left on it.
     hlhd: async function () {
       function hth() { return document.querySelector('#tableHeader th[data-colname="V_AMOUNT"]'); }
+      classicHead();
       var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
       var ink = probe('color: var(--text-main, #333)', 'color');
       var cs0 = getComputedStyle(hth()), bg0 = cs0.backgroundImage, fs0 = cs0.fontSize, col0 = cs0.color;
@@ -2407,6 +2455,7 @@
     // comes off with it). The filter cleared: both drawn again
     hlhdsnip0: async function () {
       function hth(c) { return document.querySelector('#tableHeader th[data-colname="' + c + '"]'); }
+      classicHead();   // (hlhd drift) the gradient header these checks are about
       function inl(th, p) { return th.style.getPropertyValue(p); }
       await sleep(300);
       var a0 = getComputedStyle(hth('V_AMOUNT')), n0 = getComputedStyle(hth('V_NAME'));
@@ -2597,6 +2646,7 @@
     },
     hlhdbad: async function () {
       function hth(c) { return document.querySelector('#tableHeader th[data-colname="' + c + '"]'); }
+      classicHead();   // (hlhd drift) the gradient header these checks are about
       await sleep(300);
       var s0 = getComputedStyle(hth('V_STATUS')), d0 = getComputedStyle(hth('V_DATE')), n0 = getComputedStyle(hth('V_NAME'));
       R.info.boot = [s0.backgroundColor, s0.backgroundImage.slice(0, 30), d0.backgroundColor, d0.backgroundImage.slice(0, 30), n0.color, n0.backgroundImage.slice(0, 30), hth('V_NAME').getAttribute('style')];

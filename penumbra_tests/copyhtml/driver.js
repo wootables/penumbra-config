@@ -119,6 +119,11 @@
       // --- the email embed's path: getExportData('html'), no opts --------------
       var emailHtml = HC.getExportData('html').content;
       R.emailHash = await sha(emailHtml);
+      // (2026-11-15) mailfoot (2026-11-14): the emailed table ends on its totals row, never the pager's link. The body is
+      // still compared byte for byte with the baseline; the foot is checked for what it must and must not hold.
+      R.emailBodyHash = await sha(emailHtml.replace(/<tfoot[\s\S]*?<\/tfoot>/gi, ''));
+      R.emailFoot = footRows(emailHtml);
+      R.emailPagerLink = /View Last Page|View First Page/.test(emailHtml);
       R.emailRowCount = bodyRows(emailHtml).length;
       R.afterEmail = state();
 

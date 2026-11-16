@@ -218,7 +218,7 @@
     copycsv: async function () { R.fp.out = await big(await copyAs('csv')); },
     copytsv: async function () { R.fp.out = await big(await copyAs('tsv')); },
     copyjson: async function () { R.fp.out = await big(await copyAs('json')); },
-    copysql: async function () { R.fp.out = await big(await copyAs('sql')); },
+    // (2026-11-15) copysql retired: Copy as SQL Inserts was removed on purpose in b5e5b4f (2026-11-13); run.py no longer lists the scenario.
     copycustom: async function () {
       R.fp.out = await big(await copyAs('custom', function () { $('#customTemplateInput').val('{V_ID}|{V_NAME}|{V_AMOUNT}|{H_TEXT}'); }));
     },
@@ -247,7 +247,9 @@
     // Rows = None: a search leaves every match displayed - the email embed carries them.
     nonesearch: async function () {
       await search('H_FLAG = N');
-      R.fp.email = await big(HC.getExportData('html').content);
+      // (2026-11-15) mailfoot (2026-11-14): the emailed table's foot is its totals row, no longer the pager's link, so
+      // the foot is left out of this byte comparison with the baseline (copyhtml's M-* checks what the foot holds).
+      R.fp.email = await big(HC.getExportData('html').content.replace(/<tfoot[\s\S]*?<\/tfoot>/gi, ''));
       R.fp.csv = await big(HC.getExportData('csv').content);
     },
     // The "Preparing N rows..." path (run.py patches its threshold to 0 for these).
@@ -257,7 +259,7 @@
       await sleep(600);
       R.fp.flat = fpFlat([]);
     },
-    email: async function () { R.fp.email = await big(HC.getExportData('html').content); },
+    email: async function () { R.fp.email = await big(HC.getExportData('html').content.replace(/<tfoot[\s\S]*?<\/tfoot>/gi, '')); },   // (2026-11-15) mailfoot: see nonesearch
     pdf: async function () {
       await HC.loadScript('js/jspdf-2.5.1.umd.min.js');
       await HC.loadScript('js/jspdf-autotable-3.5.23.min.js');

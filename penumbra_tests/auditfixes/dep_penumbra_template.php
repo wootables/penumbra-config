@@ -612,6 +612,11 @@ function penumbra_tpl_flat_source($apiResult) {
         }
         $st = $apiResult;
         unset($st['visibleColumns'], $st['columnOrder']);
+        // (2026-10-24, schedsort) ...but the saved sort counts the report's columns by its column order - a
+        // level whose alias was renamed keeps its place only while nothing came or went - so it is handed on
+        // for that alone (penumbra_sched_sort_rows), and the row-number tag is no column of the page's
+        if (isset($apiResult['columnOrder'])) $st['pnbSortColumnOrder'] = $apiResult['columnOrder'];
+        $toggleCols[] = $NUM;
         $re = apply_state_logic($full, $st, $toggleCols);
         if (isset($re['viewMode']) && $re['viewMode'] === 'grouped') {
             // A group-summary search filter drops whole GROUPS from 'data' but

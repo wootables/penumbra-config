@@ -252,7 +252,8 @@ def evaluate(base, cand, cap, cand_text):
             add('T-' + scn, r.get('toast') == 'SUCCESS: Copied table to clipboard.', 'toast %r' % r.get('toast'))
             add('L-' + scn, r.get('recalcs') is not None and r['recalcs'] <= MAX_RECALCS, 'style recalcs during the copy: %s (layouts %s; %s rows read off-page)' % (
                 r.get('recalcs'), r.get('layouts'), r.get('searchVisible', 0) - r.get('displayed', 0)))
-            m_ok = r.get('emailHash') == b.get('emailHash')
+            m_ok = (r.get('emailBodyHash') == b.get('emailBodyHash') and r.get('emailBodyHash') is not None
+                    and not r.get('emailPagerLink') and r.get('emailFoot') == r.get('copyFoot'))   # (2026-11-15) mailfoot: body as the baseline's, the foot = the copy's totals, no pager link
             if scn in PAGED and scn != 'none':
                 m_ok = m_ok and r.get('emailRowCount') == r.get('displayed')
             add('M-' + scn, m_ok, 'email path %s (%s rows) vs baseline %s; displayed %s' % (

@@ -246,8 +246,13 @@ def static_checks(t):
             'tableSearchCols': 'title="(Alt+Down) Show the columns and saved filters"',
             'schedSearchBuilderIcon': 'aria-label="Open the Visual Filter Builder"'}
     wrong = [i for i, w in want.items() if w not in _tag(i)]
-    extra = [w for w in ('<form class="search-wrapper pnb-sbox" role="search" aria-label="Filter the report"',
-                         '>Apply Filter: <span class="tab-help-icon" data-target="#searchFilterHelpLightbox" title="Help: Apply Filter Syntax">') if not has(w)]
+    # (2026-11-15) 918c40e (2026-10-22, every Scheduler tip is a hover card) swapped the icon's title= for
+    # data-hcard-title="Apply Filter" + data-hcard="..."; a build before it still carries the title.
+    _af = '>Apply Filter: <span class="tab-help-icon" data-target="#searchFilterHelpLightbox" '
+    _af_now, _af_old = _af + 'data-hcard-title="Apply Filter" data-hcard="', _af + 'title="Help: Apply Filter Syntax">'
+    extra = [w for w in ('<form class="search-wrapper pnb-sbox" role="search" aria-label="Filter the report"',) if not has(w)]
+    if not (has(_af_now) or has(_af_old)):
+        extra.append(_af_now)
     old = [w for w in ('Search report table', 'Visual Search Builder', 'saved searches', 'Search Filter Syntax') if has(w)]
     rec('S5', "index.php: the report box's own words say filter (label, run, clear, builder, the arrow's saved filters); the scheduler's is labelled Apply Filter; the old words gone",
         not wrong and not extra and not old, 'wrong=%s missing=%s old=%s' % (wrong, extra, old))

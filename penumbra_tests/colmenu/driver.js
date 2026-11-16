@@ -1816,6 +1816,10 @@
       R.chk.ungroupResets = R.chk.chosenSticks && okd && oku && Object.keys(codes).length > 8 && L() === 'list' && glOn();
       $('#groupingLightbox').hide();
       await flat();
+      // (2026-11-15, drift) removeGrouping() drops group-mode-active at once but empties the grouped container 50 ms later; a search
+      // sent in that gap is a GROUPED search, and since ce48caa (2026-11-13, grpsrch) a grouped search under another flat search
+      // draws the groups whole again (121 built, 112 hidden) - so wait for the container to go before the next search
+      async function flatDone() { await flat(); return await until(function () { return !$('#groupedResultsContainer').is(':visible'); }, 15000); }
       // 6. what is DRAWN decides: the filter leaves 8 names - Stacked; 9 - List
       function only(n) { return 'V_NAME = /^(?:' + names.slice(0, n).join('|') + ')$/'; }
       function rowsOf(n) { return names.slice(0, n).reduce(function (s, k) { return s + cnt[k]; }, 0); }
@@ -1824,7 +1828,7 @@
       await until(function () { return flatShown() === rowsOf(8); }, 10000);
       var ok8 = await oneClick('V_NAME', 8);
       R.chk.boundary8 = ok8 && L() === 'stacked';
-      await flat();
+      await flatDone();
       snipAction('search', only(9));
       await until(function () { return flatShown() === rowsOf(9); }, 10000);
       var ok9 = await oneClick('V_NAME', 9);
@@ -1835,7 +1839,7 @@
       await until(function () { return topKeys().length === 8; }, 10000);
       await sleep(400);
       R.chk.filterNoFlip = ok9 && topKeys().length === 8 && L() === 'list';
-      await flat();
+      await flatDone();
       snipAction('search', '');
       await until(function () { return flatShown() === 300; }, 10000);
       // 7. a limit left in the form (a cancelled dialog, a grouping since removed) is not applied

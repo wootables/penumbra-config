@@ -111,13 +111,14 @@ $db->sqliteCreateFunction('PNB_INSTR4', function ($h, $n, $off = 1, $occ = 1) {
 }, 4);
 $db->sqliteCreateFunction('TO_CHAR', function ($x, $fmt = null) { return $x; }, 2);
 $db->sqliteCreateFunction('NVL', function ($a, $b) { return $a === null ? $b : $a; }, 2);
-$db->sqliteCreateFunction('REGEXP_LIKE', function ($s, $p) {
+// (2026-11-15) any number of arguments: listforms (2026-11-14) calls REGEXP_LIKE(value, pattern, 'i') for the access list
+$db->sqliteCreateFunction('REGEXP_LIKE', function ($s, $p, $flags = '') {
     global $REGEX_ERR;
     if ($s === null || $p === null) return null;
-    $r = @preg_match('~' . str_replace('~', '\\~', (string)$p) . '~', (string)$s);
+    $r = @preg_match('~' . str_replace('~', '\\~', (string)$p) . '~' . (strpos((string)$flags, 'i') !== false ? 'i' : ''), (string)$s);
     if ($r === false) { $REGEX_ERR = 'ORA-12725 stand-in: the pattern ' . $p . ' does not compile'; return 0; }
     return $r;
-}, 2);
+}, -1);
 $db->exec('CREATE TABLE PENUMBRA_REPORTS (ID INTEGER, SHORT_ID TEXT, TITLE TEXT, OWNER_ID TEXT, AUTHORIZED TEXT, STATE_DATA TEXT, CREATED_AT TEXT, UPDATED_AT TEXT)');
 $db->exec('CREATE TABLE PENUMBRA_REPORT_TAGS (REPORT_ID INTEGER, TAG TEXT)');
 $db->exec('CREATE TABLE PENUMBRA_AUDIT (ID INTEGER, REPORT_ID INTEGER, USER_ID TEXT, ACTION TEXT, "TIMESTAMP" TEXT)');
@@ -278,7 +279,7 @@ order_is('S-ownername', run_mode('search', 'smith', 50), array('smith-report', '
 order_is('S-escape-dot', run_mode('search', 'a.b', 50), array('a.b', 'q-thing', 'axb-tool'), ' (a regex-escaped "a.b": AXB is no word start)');
 $paren = run_mode('quicksearch', '(epa', 8);
 t('Q-escape-paren', $paren['error'] === null && isset($paren['ids'][0]) && $paren['ids'][0] === 'epa-perm', $paren['what'] . ' -> ' . show($paren) . ' (an unbalanced paren is ORA-12725 unless escaped)');
-order_is('S-literal', run_mode('search', 'fy_budget', 50), array('fy_budget_x', 'fy-budget'), ' (LIKE lets _ reach fy-budget; the rank is literal, so that wildcard hit sorts last)');
+order_is('S-literal', run_mode('search', 'fy_budget', 50), array('fy_budget_x'), ' (likeescape, 2026-11-14: _ and % in the typed text are literal, so fy-budget is no longer a wildcard hit)');
 // ---- a non-admin under the discovery gate: id / title / tag only, and a rank with no owner or access list
 order_is('S-nonadmin', run_mode('search', 'budget', 50, false, 'viewer1'), sid_of(array(100, 101, 112, 103, 102, 111, 105, 104, 108)), ' (viewer1: id/title tiers, then the tag hit)');
 // ---- tag:NAME stays exact and newest-first, no rank

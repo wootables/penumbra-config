@@ -131,6 +131,42 @@
         if (root.matches && root.matches(sel)) { out.unshift(root); }
         return out;
     }
+    // (2026-11-10, perf) inAndUnder() for a selector LIST, asked one part at a time. The
+    // browser answers one simple selector (.x, .x[y], [y]) from a fast path and a list of
+    // them many times slower: the keyboard-stamp list took 270 ms on a 25,000-row report
+    // with its grouped view up, its eleven parts asked one by one 5 ms. The result is the
+    // list's own, the same elements in the same order: one part's finds are returned as
+    // they are; several parts' finds are put back into document order; and past
+    // PARTS_SORT_MAX of those the list itself is asked, as before (putting thousands of
+    // siblings in order is the slow thing to do).
+    var PARTS_SORT_MAX = 100;
+    function inAndUnderParts(root, sel, parts) {
+        var lists = [], total = 0, i, j;
+        for (i = 0; i < parts.length; i++) {
+            var one = inAndUnder(root, parts[i]);
+            if (one.length) { lists.push(one); total += one.length; }
+        }
+        if (!lists.length) { return []; }
+        if (lists.length === 1) { return lists[0]; }
+        if (total > PARTS_SORT_MAX) { return inAndUnder(root, sel); }
+        var out = [];
+        for (i = 0; i < lists.length; i++) {
+            for (j = 0; j < lists[i].length; j++) { if (out.indexOf(lists[i][j]) === -1) { out.push(lists[i][j]); } }
+        }
+        out.sort(function (a, b) { return (a.compareDocumentPosition(b) & 4) ? -1 : 1; });
+        return out;
+    }
+    // A list's parts, for the above. A list with a part that is not a selector on its own
+    // (a comma inside a part) is given back whole, as its only part, and is then asked
+    // exactly as it always was.
+    function selectorParts(sel) {
+        var parts = sel.split(', ');
+        try {
+            var probe = document.createElement('div');
+            for (var i = 0; i < parts.length; i++) { probe.matches(parts[i]); }
+            return parts;
+        } catch (e) { return [sel]; }
+    }
     function sweepAdded() {
         sweepPending = false;
         var roots = sweepRoots, all = sweepAll;
@@ -221,8 +257,14 @@
     // same click. (main.js handles its own [data-pnb-ktoggle], .export-icon and
     // .pivot-collapse-toggle keys - keep those OUT of this list.)
     var SELK = '.action-icon, .item-icon[data-action], .remove-access, .group-hide, .sp-sort-item, .chart-drill-popup-item, .chart-drill-popup-secondary, .favorite-icon, .delete-report-btn, .task-status-toggle, .tab-help-icon';
+    // (2026-11-10, perf) Asked one part of the list at a time (see inAndUnderParts above).
+    // Each element is stamped on its own, so the order they come in changes nothing, and
+    // one that carries two of the classes comes twice and finds every stamp in place.
+    var SELK_PARTS = selectorParts(SELK);
     function enhanceIcons(root) {
-        var els = inAndUnder(root, SELK);
+        for (var p = 0; p < SELK_PARTS.length; p++) { stampIcons(inAndUnder(root, SELK_PARTS[p])); }
+    }
+    function stampIcons(els) {
         for (var i = 0; i < els.length; i++) {
             var el = els[i];
             if (!el.getAttribute('role')) { el.setAttribute('role', 'button'); }
@@ -272,6 +314,7 @@
     (function () {
         if (!hasMO) { return; }
         var SEL = '.help-lightbox, .query-prompt-lightbox, [data-pnb-modal]';
+        var SEL_PARTS = selectorParts(SEL);   // (2026-11-10, perf) for the sweep below: inAndUnderParts
         var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
         var seq = 0, lastExternalFocus = null, lastInputKbd = false;
         // Remember the control the user last interacted with OUTSIDE any dialog -
@@ -431,7 +474,7 @@
             for (var i = 0; i < muts.length; i++) { check(muts[i].target); }
         });
         function watchDialogs(root) {
-            var all = inAndUnder(root, SEL);
+            var all = inAndUnderParts(root, SEL, SEL_PARTS);
             for (var j = 0; j < all.length; j++) {
                 var d = all[j];
                 if (d.__pnbWatched) { continue; }
@@ -533,12 +576,16 @@
         document.addEventListener('keydown', function (e) {
             if (!isTab(e)) { return; }
             var ovs = document.querySelectorAll('.modal-prompt-overlay'), ov = null;
-            for (var i = ovs.length - 1; i >= 0; i--) { if (ovs[i].offsetParent !== null) { ov = ovs[i]; break; } }
+            // (2026-11-13, traplive) shown(), not offsetParent: the overlay is position:fixed, whose offsetParent is always
+            // null, so no open dialog was ever found and Tab walked out into the page behind it
+            for (var i = ovs.length - 1; i >= 0; i--) { if (shown(ovs[i])) { ov = ovs[i]; break; } }
             if (!ov) { return; }
             var f = focusablesIn(ov);
             if (!f.length) { e.preventDefault(); return; }
             var first = f[0], last = f[f.length - 1];
             if (!ov.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+            // ...and Shift+Tab from the dialog's own box (where a click on its text leaves focus): to the last control
+            if (e.shiftKey && f.indexOf(document.activeElement) < 0) { e.preventDefault(); last.focus(); return; }
             if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
             else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
         }, true);
@@ -805,7 +852,7 @@
             var hasData = custom ? true : !!(labels.length && datasets.length);
             var rowCount = custom ? custom.rows.length : labels.length;
             if (hasData) {
-                var h = '<div id="' + wrapId + '" class="sr-only pnb-chart-a11y"><table id="' + tableId + '"><caption>' + (title ? esc(title) + ' - ' : '') + 'chart data</caption><thead><tr>';
+                var h = '<div id="' + wrapId + '" class="sr-only pnb-chart-a11y"><table id="' + tableId + '"><caption>' + (title ? esc(title) + ' - ' : '') + 'chart data' + (data._a11yNote ? '. ' + esc(data._a11yNote) : '') + '</caption><thead><tr>';   // a builder's note, e.g. the gantt bars a Limit cut (wcag mod 2026-11-07)
                 if (custom) {
                     var cols = custom.columns || [];
                     for (var c = 0; c < cols.length; c++) { h += '<th scope="col">' + esc(cols[c]) + '</th>'; }

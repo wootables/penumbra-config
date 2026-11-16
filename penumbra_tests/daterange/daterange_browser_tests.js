@@ -86,6 +86,13 @@
             + 'var _promptRangeCache = new Map();\n'
             + 'var _forceDefaultApplied = new Set();\n'
             + 'var allResolvedPrompts = [];\n'
+            // (2026-11-15) "Copy a link to this view" (07398c1, 2026-10-21): processPrompts notes its answers
+            // for a view link and reads a stored answer through _pnbPromptStored. No view link here, so the
+            // real helper is exactly localStorage.getItem (main.js: `_pnbViewLink && ... : localStorage.getItem(k)`).
+            // _pnbPromptRanByName (23bf72a, 2026-10-12, prompt|NAME|VALUE): the answers of the last pass by name.
+            + 'var _pnbViewLink = null, _pnbVlPromptSaves = {}, _pnbPromptRanByName = Object.create(null);\n'
+            + 'function _pnbViewPromptReset() {}\nfunction _pnbViewPromptNote() {}\n'
+            + 'function _pnbPromptStored(k) { return localStorage.getItem(k); }\n'
             + names.map(grabFn).join('\n')
             + '\nreturn {'
             + names.map(function (n) { return n + ':' + n; }).join(',')

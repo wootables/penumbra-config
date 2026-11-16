@@ -27,6 +27,14 @@
   var R = [];
   function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 600) }); }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // (2026-11-15, drift) ac53d1f (2026-11-13, myview 5): the my-view popover lists label / value rows under group headings
+  // ("Column widths" + "TITLE"), no longer the sentence "Column widths set here: TITLE". Read as 'label: value | ...';
+  // an older build's sentence is put in the same words, so a control build still answers.
+  function ccDiffText() {
+    var r = $('#sbCustomColsDiff .sb-cc-diff-row');
+    if (!r.length) return $('#sbCustomColsDiff').text().replace(/Pivot column widths set here: /g, 'Pivot widths: ').replace(/Column widths set here: /g, 'Column widths: ');
+    return r.map(function () { return $(this).find('.sb-cc-k').text() + ': ' + $(this).find('.sb-cc-v').text(); }).get().join(' | ');
+  }
   function errs() { return window.__errors.concat(window.__rejections); }
   function finish(fatal) {
     var payload = { results: R, pageErrors: errs().slice(0, 8),
@@ -626,11 +634,11 @@
     setReport({}); fire();
     var off = $('#sbCustomCols').css('display');
     host.setUser('TITLE', 222);
-    var on = $('#sbCustomCols').css('display'), txt = $('#sbCustomColsDiff').text();
+    var on = $('#sbCustomCols').css('display'), txt = ccDiffText();
     setReport({ TITLE: 222 }); fire();
     var same = $('#sbCustomCols').css('display');
     rec('C1 the pill lights for a width that departs from the report, names the column, and goes out when they agree',
-      off === 'none' && on !== 'none' && txt.indexOf('Column widths set here: TITLE') !== -1 && same === 'none',
+      off === 'none' && on !== 'none' && txt.indexOf('Column widths: TITLE') !== -1 && same === 'none',
       'off=' + off + ' on=' + on + ' [' + txt + '] same=' + same);
     setReport({}); fire();
     var cw = window.Penumbra.colWidths;
@@ -1525,10 +1533,10 @@
     // 2026-10-01: the custom-layout pill reports pivot widths - but not here,
     // where they apply nowhere (a stored one from a views-on visit, say).
     host.setUser('PIVOT:NAME', 250); fire();
-    var w4 = $('#sbCustomCols').css('display'), w4d = $('#sbCustomColsDiff').text();
+    var w4 = $('#sbCustomCols').css('display'), w4d = ccDiffText();
     host.clearUser(); fire();
     rec('W4 a pivot width of this browser\'s own does not light the custom-layout pill while the views part is off',
-      w4 === 'none' && w4d.indexOf('Pivot column widths') === -1, 'pill=' + w4 + ' [' + w4d + ']');
+      w4 === 'none' && w4d.indexOf('Pivot widths') === -1, 'pill=' + w4 + ' [' + w4d + ']');
 
     // 2026-10-01: a breakdown table is one of the "views" parts too.
     if (H.chartDrill) {
@@ -1556,7 +1564,7 @@
     var host = HOST(), cw = CW();
     if (!host || !cw || !cw.pivotGrid || !cw.pivotValueHeads) { rec('L the pill beyond the flat table', false, 'this build has no round-5 grid'); return; }
     var pill = function () { return $('#sbCustomCols').css('display') !== 'none'; };
-    var diff = function () { return $('#sbCustomColsDiff').text(); };
+    var diff = function () { return ccDiffText(); };
     var head = function (th) { return String(th.textContent || '').replace(/[▲▼▶◀]/g, '').replace(/\s+/g, ' ').trim(); };
     localStorage.removeItem(KEY);
     H.setName('rpill'); H.hydrate();
@@ -1570,7 +1578,7 @@
     var g1 = pill(), gd = diff();
     host.clearUser();
     rec('L1 a width set in the grouped view lights the pill under its column name - the grouped view files it under the flat column\'s - and goes out when cleared',
-      !g0 && g1 && gd.indexOf('Column widths set here: NAME') !== -1 && !pill(), 'before=' + g0 + ' set=' + g1 + ' [' + gd + '] cleared=' + pill());
+      !g0 && g1 && gd.indexOf('Column widths: NAME') !== -1 && !pill(), 'before=' + g0 + ' set=' + g1 + ' [' + gd + '] cleared=' + pill());
     gbox().style.display = 'none';
 
     await mountPivot(['C11', 'NAME'], []);
@@ -1578,7 +1586,7 @@
     host.setUser('PIVOT:C11', 180);
     var p1 = pill(), pd = diff(), st1 = entry('rpill');
     rec('L2 a pivot row label\'s width lights the pill, named by its field (and it is what this browser stores)',
-      !p0 && p1 && pd.indexOf('Pivot column widths set here: C11') !== -1 && !!st1 && !!st1.widths && st1.widths['PIVOT:C11'] === 180,
+      !p0 && p1 && pd.indexOf('Pivot widths: C11') !== -1 && !!st1 && !!st1.widths && st1.widths['PIVOT:C11'] === 180,
       'before=' + p0 + ' set=' + p1 + ' [' + pd + '] stored=' + JSON.stringify(st1));
     host.clearUser();
 
@@ -1587,7 +1595,7 @@
     host.setUser('PIVOT:TOTAL=AMOUNT', 140);
     var vd = diff();
     rec('L3 the value columns (one width together) and the Grand Total light it too, in words: "the value columns, Grand Total"',
-      pill() && vd.indexOf('Pivot column widths set here: ') !== -1 && vd.indexOf('the value columns') !== -1 && vd.indexOf('Grand Total') !== -1 && vd.indexOf('PIVOT:') === -1,
+      pill() && vd.indexOf('Pivot widths: ') !== -1 && vd.indexOf('the value columns') !== -1 && vd.indexOf('Grand Total') !== -1 && vd.indexOf('PIVOT:') === -1,
       'pill=' + pill() + ' [' + vd + ']');
     host.clearUser();
 
@@ -1608,7 +1616,7 @@
     fire();
     var fd = diff();
     rec('L5 with no pivot on screen the pivot widths are still reported (a save would carry them), the heading column by count',
-      pill() && fd.indexOf('Pivot column widths set here: ') !== -1 && fd.indexOf('Grand Total') !== -1 && fd.indexOf('1 value column') !== -1,
+      pill() && fd.indexOf('Pivot widths: ') !== -1 && fd.indexOf('Grand Total') !== -1 && fd.indexOf('1 value column') !== -1,
       'pill=' + pill() + ' [' + fd + ']');
 
     // The grouped-view + pivot part switched off: they apply nowhere.

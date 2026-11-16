@@ -45,6 +45,8 @@
   if (!window.matchMedia) {
     window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
   }
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's state restore calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.__errors = [];
   window.onerror = function (m) { window.__errors.push(String(m)); return true; };
 </script>

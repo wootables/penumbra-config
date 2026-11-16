@@ -21,13 +21,16 @@
 # from the PHP folder (a UNC extension_dir gets mangled).
 # UNC .ps1 files may be GPO-blocked: run the body as a scriptblock, or a local copy.
 # =============================================================================
-param([string]$App = '\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+# (2026-11-15) This file was written through a shell that halved its backslashes (2026-10-11): the UNC
+# paths began with one backslash and the -replace pattern was a lone backslash (an invalid regex), so the
+# default run only ever printed errors. Paths and pattern restored; nothing else changed.
+param([string]$App = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra',
       [switch]$Control, [int]$Mutant = 0)
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\noticescope' }
-$phpDir = '\oitras\d$\Utilities\PHP_8.2-p'
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\noticescope' }
+$phpDir = '\\oitras\d$\Utilities\PHP_8.2-p'
 $php  = Join-Path $phpDir 'php.exe'
 $a = @('-n', '-d', 'extension_dir=ext', '-d', 'extension=php_mbstring.dll', '-d', 'date.timezone=America/New_York',
-       (Join-Path $here 'test_noticescope.php'), "--app=$($App -replace '\','/')")
+       (Join-Path $here 'test_noticescope.php'), "--app=$($App -replace '\\','/')")
 if ($Control) { $a += '--control' }
 if ($Mutant)  { $a += "--mutant=$Mutant" }
 Push-Location $phpDir

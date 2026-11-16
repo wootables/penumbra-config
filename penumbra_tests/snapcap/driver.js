@@ -746,14 +746,22 @@
     await sleep(400);
     document.dispatchEvent(new CustomEvent('penumbra:columns-changed'));
     await sleep(300);
-    var live = String($('#sbCustomColsDiff').text() || '');
+    // (2026-11-15, drift) ac53d1f (2026-11-13, myview 5): the chip's popover lists label / value rows under group headings
+    // ("Hidden here" + "NAME"), no longer the sentence "Hidden only here: NAME". Read as 'label: value; ...'; an older
+    // build's sentence is put in the same words.
+    function chipText() {
+      var r = $('#sbCustomColsDiff .sb-cc-diff-row');
+      if (!r.length) return String($('#sbCustomColsDiff').text() || '').replace(/(Hidden|Shown) only here: /g, '$1 here: ');
+      return r.map(function () { return $(this).find('.sb-cc-k').text() + ': ' + $(this).find('.sb-cc-v').text(); }).get().join('; ');
+    }
+    var live = chipText();
     var on = await loadView(SNAP2, 'Another query\'s snapshot', 5);
     document.dispatchEvent(new CustomEvent('penumbra:columns-changed'));
     await sleep(300);
-    var txt = String($('#sbCustomColsDiff').text() || '');
+    var txt = chipText();
     INFO.rsc = { live: live, view: txt };
     rec('RV0 the custom-layout chip on a view of a report saved before its column names were kept reads the report\'s layout by name: QTY and AMOUNT shown only here',
-      b && applied && on && /Hidden only here: NAME/.test(live) && /Shown only here: QTY, AMOUNT/.test(txt), 'live=' + J(live) + ' view=' + J(txt));
+      b && applied && on && /Hidden here: NAME(;|$)/.test(live) && /Shown here: QTY, AMOUNT(;|$)/.test(txt), 'live=' + J(live) + ' view=' + J(txt));
   }
 
   // ?mode=ovgx: the FLAT report's snapshot grouped during the view, then back to live data - the report flat, out of

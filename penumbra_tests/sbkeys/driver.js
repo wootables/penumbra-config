@@ -60,7 +60,7 @@
   // test, not when they show.
   function forceChips() {
     $('#sbGroup, #sbCustomCols, #sbSnapshot, #sbAsOf, #sbTableHidden, #sbPivot').css('display', 'inline-flex');
-    $('#sbCustomColsSave').show();
+    // (2026-11-15) #sbCustomColsSave was removed from the card in 062f70a (2026-11-06); nothing to show.
   }
   // Counts the keys that get past their target all the way to the document
   // (bubble phase) - what a chip's stopPropagation() is there to prevent.

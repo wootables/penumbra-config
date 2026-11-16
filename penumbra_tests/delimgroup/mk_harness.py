@@ -150,6 +150,16 @@ FIXTURE = r'''  (function () {
       });
       COLS.push('PROJS', 'D_LIST');
     }
+    // (pvdelim fix, 2026-11-15) XL: a semicolon list as query.php sends it (entities escaped), with markup that must
+    // print as text ("x <img onerror>", "a<b"), an apostrophe (O&#039;Brien), and cells listing nothing ('' and ';')
+    if (window.__SCN === 'pvdelim') {
+      rows.forEach(function (r, ri) {
+        var k = ri % 5;
+        r.XL = k === 0 ? 'x &lt;img src=x onerror=window.__pvXss=1//; Smith' : k === 1 ? 'Smith; a&lt;b'
+             : k === 2 ? 'O&#039;Brien; Smith' : k === 3 ? (ri % 10 === 3 ? ';' : '') : 'O&#039;Brien';
+      });
+      COLS.push('XL');
+    }
     window.__rowsFixture = rows;
     var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
     var st = {

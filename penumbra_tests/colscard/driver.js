@@ -138,9 +138,9 @@
 
     // C5 / C6 - the lines.
     var ks = keysOf(), labs = lines().map(function (x) { return x.label; }).join('|');
-    rec('C5 one line per chip of the segment, in the bar\'s order, in use or not: Showing, Frozen, Nested, Calculated, Pivot, Grouping, Earlier version, Snapshot, Table, Custom layout',
+    rec('C5 one line per chip of the segment, in the bar\'s order, in use or not: Showing, Frozen, Nested, Calculated, Pivot, Grouping, Earlier version, Snapshot, Table, My view (218936b, 2026-11-13: the Custom layout line was renamed, and counts its changes)',
       ks === 'shown,frozen,nested,calc,pivot,group,asof,snap,table,custom' &&
-      labs === 'Showing|Frozen|Nested|Calculated|Pivot|Grouping|Earlier version|Snapshot|Table|Custom layout', 'keys=' + ks + ' labels=' + labs);
+      labs === 'Showing|Frozen|Nested|Calculated|Pivot|Grouping|Earlier version|Snapshot|Table|My view', 'keys=' + ks + ' labels=' + labs);
     var L = function (k) { return line(k) || {}; };
     // (Freezing 2 where the report freezes none is a layout of this browser's own:
     // the custom-layout chip shows, and its line says so.)
@@ -150,7 +150,7 @@
       L('nested').value === 'none' && !L('nested').on && L('calc').value === 'none' && !L('calc').on &&
       L('pivot').value === 'none' && !L('pivot').on && L('group').value === 'none' && !L('group').on &&
       L('asof').value === 'none (the live version)' && !L('asof').on && L('snap').value === 'none (live data)' && !L('snap').on &&
-      L('table').value === 'shown' && !L('table').on && cc6 && L('custom').value === 'yours, in this browser only' && L('custom').on,
+      L('table').value === 'shown' && !L('table').on && cc6 && L('custom').value === 'yours, in this browser only (1 change)' && L('custom').on,
       'count=' + countAsLine() + ' customChip=' + cc6 + ' ' + JSON.stringify(lines()));
 
     // C7 - a second click closes it.

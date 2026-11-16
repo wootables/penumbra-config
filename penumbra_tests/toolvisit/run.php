@@ -188,6 +188,11 @@ eval(str_replace('function penumbraToolReportIds(', 'function penumbraToolReport
 eval(lift_or_die($srcChrome, 'penumbra_tool_visit_beacon', 'penumbra_admin_chrome.php'));
 eval(lift_or_die($srcChrome, 'penumbra_admin_tools', 'penumbra_admin_chrome.php'));
 eval(lift_or_die($srcRepo, 'buildAuthFilter', 'get_server_reports.php'));
+// (2026-11-15) buildAuthFilter() calls penumbraReportDiscoveryAllowed() since the discovery gate (2026-10-20):
+// penumbra_discovery.php holds only two function_exists-guarded pure functions, so it is safe to require.
+if (is_file($APP . "/penumbra_discovery.php")) require_once $APP . "/penumbra_discovery.php";
+// ... and, for a non-admin under that gate, penumbraKnownReportsSql() (same file, pure SQL text): lifted too.
+if (lift_function($srcRepo, "penumbraKnownReportsSql") !== null) eval(lift_function($srcRepo, "penumbraKnownReportsSql"));
 
 $config = array('scheduler_secret_key' => 'toolvisit-suite-secret-0123456789');
 $currentUserKey = 'bplimon';

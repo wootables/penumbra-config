@@ -18,6 +18,12 @@ $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 "app: $App"
 $js = [IO.File]::ReadAllText((Src 'js\penumbra_idcard.js'))
 $liveJs = [IO.File]::ReadAllText((Join-Path $live 'js\penumbra_idcard.js'))
+# (2026-11-15) "live js" is this suite's REFERENCE: the card as it was before the wcag mod, its actions <a> links
+# (the kbd control must show the k-* reds; the look check compares each <button> with that <a>). The mod went live on
+# 2026-11-07 (c45e7f1), so live became the target and the reference was lost (sane-orig-links, kbd LIVE, m2underl red).
+# The reference is now frozen beside this file: js/penumbra_idcard.js as of ef52aab (2026-11-03), used whenever live
+# no longer carries the <a> actions.
+if ($liveJs -notmatch '<a href="#" data-idc="copylink">') { $liveJs = [IO.File]::ReadAllText("$here\orig_ef52aab_penumbra_idcard.js"); 'reference js: orig_ef52aab_penumbra_idcard.js (live has the buttons)' }
 $anchor = "if (c && String(c.id || '').toLowerCase() !== id.toLowerCase()) c = null;"
 if (([regex]::Matches($js, [regex]::Escape($anchor))).Count -ne 1) { throw 'mutant anchor not found exactly once' }
 [IO.File]::WriteAllText("$work\target.js", $js)

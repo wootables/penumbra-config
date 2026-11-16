@@ -36,7 +36,7 @@ JS_LIBS = ['jspdf-2.5.1.umd.min.js', 'jspdf-autotable-3.5.23.min.js', 'exceljs-4
 SCN = [('boot', ''), ('page2', ''), ('rpp25', ''), ('rowsall', ''), ('toall', ''), ('rowsnone', ''),
        ('search', ''), ('sort', ''), ('savedsort', ''), ('presearch', '&search=H_FLAG%20%3D%20N'),
        ('show', ''), ('hide', ''), ('group', ''), ('fmt', ''), ('exports', ''), ('nested', ''),
-       ('copyhtml', ''), ('copycsv', ''), ('copytsv', ''), ('copyjson', ''), ('copysql', ''), ('copycustom', ''),
+       ('copyhtml', ''), ('copycsv', ''), ('copytsv', ''), ('copyjson', ''), ('copycustom', ''),   # (2026-11-15) 'copysql' retired: Copy as SQL Inserts was removed on purpose in b5e5b4f (2026-11-13), so D-copysql / L-copysql / E-copysql have nothing to read
        ('copysingle', ''), ('nestedsort', ''), ('cfglobal', ''), ('nonesearch', ''),
        ('prepcsv', ''), ('prepall', ''),
        ('email', ''), ('pdf', ''), ('xlsx', ''), ('killswitch', '&lazycells=off')]
@@ -46,7 +46,7 @@ PREP_SCN = ['prepcsv', 'prepall']
 PREP_OLD = 'var _PNB_PREPARE_NOTICE_CELLS = 60000;'
 PREP_NEW = 'var _PNB_PREPARE_NOTICE_CELLS = 0;'
 # Scenarios whose outputs read EVERY row the search keeps: none may be left EMPTY there after.
-READS_ALL = ['prepcsv', 'prepall', 'rowsnone', 'hide', 'group', 'fmt', 'exports', 'nested', 'copyhtml', 'copycsv', 'copytsv', 'copyjson', 'copysql',
+READS_ALL = ['prepcsv', 'prepall', 'rowsnone', 'hide', 'group', 'fmt', 'exports', 'nested', 'copyhtml', 'copycsv', 'copytsv', 'copyjson',
              'cfglobal', 'nonesearch', 'pdf', 'xlsx', 'toall', 'rowsall', 'killswitch']
 # (copysingle / copycustom read single columns - they fill those columns only, by design)
 
@@ -66,9 +66,9 @@ MUTANTS = {
     # Copy as HTML over every page reads EMPTY rows
     'nocopyfill': ([("                            if (_rowList[_fj].style.display === 'none') _pnbFillRowWith(_rowList[_fj], _fillCtx);\r\n", "")],
                    ['D-copyhtml'], ['copyhtml']),
-    # Copy as SQL reads EMPTY cells
-    'nosqlfill': ([("                    _pnbFillSearchVisibleRows();   // lazy rows (2026-09-30): every row the search keeps is read\r\n", "")],
-                  ['D-copysql'], ['copysql']),
+    # Copy as SQL reads EMPTY cells. RETIRED 2026-11-15 with the copysql scenario: b5e5b4f (2026-11-13) removed Copy as SQL Inserts and this fill site with it.
+    # 'nosqlfill': ([("                    _pnbFillSearchVisibleRows();   // lazy rows (2026-09-30): every row the search keeps is read\r\n", "")],
+    #                 ['D-copysql'], ['copysql']),
     # a nested sub-table header sort skips the EMPTY rows, which fill unsorted later
     'nonestedfill': ([("            penumbraFillLazyColumns([colIndex]);\r\n            const $targetRows", "            const $targetRows")],
                      ['D-nestedsort'], ['nestedsort']),

@@ -153,6 +153,18 @@ function php_parse_search_query($query, $columns) {
     preg_match_all('#\\{[^}]+\\}|//.*?//|!?/.*?/[iI]?|"[^"]+"|\'[^\']+\'|\\S+#', $processedQuery, $matches);
     $tokens = isset($matches[0]) ? $matches[0] : array();
 
+    // The word operator in any case (`TITLE Contains grant`), like the browser.
+    foreach ($tokens as $_wi => $_wt) {
+        if (strcasecmp($_wt, 'contains') === 0) $tokens[$_wi] = 'contains';
+    }
+
+    // Parentheses (2026-10-30): see _search_split_paren_tokens. Groups are parsed on a stack.
+    // Before the date join below (2026-10-31): `Feb 2025)` gives its closer up first, then joins.
+    $pqSplit = _search_split_paren_tokens($tokens, $operatorKeys);
+    $pqGroups = $pqSplit['grouped'];
+    if ($pqGroups) $tokens = $pqSplit['tokens'];
+    $pqOpen = array();   // the lists outside each open group
+
     // Allow an UNQUOTED month-name + year as a single date value after a comparison
     // operator (e.g. `DATE >= Feb 2025` / `DATE >= 2025 February`), mirroring
     // js/main.js parseAdvancedQuery. The tokenizer split the pair on the space;
@@ -164,15 +176,15 @@ function php_parse_search_query($query, $columns) {
     for ($mi = 0; $mi + 2 < count($tokens); $mi++) {
         if (!in_array($tokens[$mi], $operatorKeys, true)) continue;
         $a = $tokens[$mi + 1]; $b = $tokens[$mi + 2];
+        // A day + month name + year (`DATE = 5 Mar 25`, `5 March 2025`) joins first.
+        if ($mi + 3 < count($tokens) && preg_match('/^\d{1,2}$/', $a) && preg_match($_sbMonthTok, $b) && preg_match('/^(?:\d{2}|\d{4})$/', $tokens[$mi + 3])) {
+            array_splice($tokens, $mi + 1, 3, array($a . ' ' . $b . ' ' . $tokens[$mi + 3]));
+            continue;
+        }
         if ((preg_match($_sbMonthTok, $a) && preg_match($_sbYearTok, $b)) ||
             (preg_match($_sbYearTok, $a) && preg_match($_sbMonthTok, $b))) {
             array_splice($tokens, $mi + 1, 2, array($a . ' ' . $b));
         }
-    }
-
-    // The word operator in any case (`TITLE Contains grant`), like the browser.
-    foreach ($tokens as $_wi => $_wt) {
-        if (strcasecmp($_wt, 'contains') === 0) $tokens[$_wi] = 'contains';
     }
 
     $tokenCount = count($tokens);
@@ -185,7 +197,45 @@ function php_parse_search_query($query, $columns) {
 
     while ($pos < $tokenCount) {
         $condition = null;
+        if ($pqGroups && $tokens[$pos] === '(') {
+            $pqOpen[] = $queryTree;
+            $queryTree = array();
+            $pos++;
+            continue;
+        }
+        if ($pqGroups && $tokens[$pos] === ')') {
+            // Close the group: one part stands alone, several become a 'group' node (reduced on
+            // its own, AND first then OR); an empty group leaves nothing behind.
+            $pos++;
+            if (!empty($pqOpen)) {
+                $pqInner = _search_trim_logicals($queryTree);
+                $queryTree = array_pop($pqOpen);
+                if (!empty($pqInner)) {
+                    if (!empty($queryTree) && $queryTree[count($queryTree) - 1]['type'] !== 'logical') $queryTree[] = array('type' => 'logical', 'op' => 'and');
+                    $queryTree[] = (count($pqInner) === 1) ? $pqInner[0] : array('type' => 'group', 'parts' => $pqInner);
+                }
+            }
+            // The connector after the group, as after a condition.
+            if ($pos < $tokenCount) {
+                $nextLower = strtolower($tokens[$pos]);
+                if ($nextLower === 'and' || $nextLower === 'or') {
+                    // an empty group left a joiner behind (2026-10-31): this word takes its place
+                    if (!empty($queryTree) && $queryTree[count($queryTree) - 1]['type'] === 'logical') $queryTree[count($queryTree) - 1]['op'] = $nextLower;
+                    else $queryTree[] = array('type' => 'logical', 'op' => $nextLower);
+                    $pos++;
+                } elseif ($nextLower !== ')' && !empty($queryTree) && $queryTree[count($queryTree) - 1]['type'] !== 'logical') {
+                    $queryTree[] = array('type' => 'logical', 'op' => 'and');
+                }
+            }
+            continue;
+        }
         $currentTokens = array_slice($tokens, $pos);
+        if ($pqGroups) {
+            // A paren token ends the expression: `(STATUS)` is STATUS, not STATUS contains `)`.
+            foreach ($currentTokens as $pqIdx => $pqTok) {
+                if ($pqTok === '(' || $pqTok === ')') { $currentTokens = array_slice($currentTokens, 0, $pqIdx); break; }
+            }
+        }
         $ctLen = count($currentTokens);
 
         $firstToken = $currentTokens[0];
@@ -217,6 +267,24 @@ function php_parse_search_query($query, $columns) {
                     'op'     => 'contains',
                     'value'  => $operatorToken
                 );
+                $pos += 2;
+            }
+        }
+
+        // --- 1a. A bucket of a column (2026-11-06, fbucket): LOG_DATE:fy = FY26, {AWARD DATE:ym} >= 'Jan 2025',
+        // PI_LIST:dsemi 'Jones, Jacob' - main.js parseAdvancedQuery's step 0b; the condition's column is its token.
+        // Step 1 read {AWARD DATE:fy} as a name of its own: that condition takes its bucket here.
+        $sbk = _search_bucket_of($firstToken, $columnMap);
+        if ($sbk !== null && $condition !== null && $condition['type'] === 'condition') {
+            $condition['column'] = $sbk['token'];
+            $condition['bucket'] = $sbk;
+        } elseif ($sbk !== null && $condition === null) {
+            $sbkOp = ($ctLen > 1) ? _search_find_op_key($currentTokens[1], $operatorKeys) : null;
+            if ($sbkOp !== null && $ctLen > 2) {
+                $condition = array('type' => 'condition', 'column' => $sbk['token'], 'op' => $operators[$sbkOp], 'value' => $currentTokens[2], 'bucket' => $sbk);
+                $pos += 3;
+            } elseif ($sbkOp === null && $ctLen > 1) {
+                $condition = array('type' => 'condition', 'column' => $sbk['token'], 'op' => 'contains', 'value' => $currentTokens[1], 'bucket' => $sbk);
                 $pos += 2;
             }
         }
@@ -321,9 +389,9 @@ function php_parse_search_query($query, $columns) {
 
         // --- 3. Fallback logic ---
         if ($condition === null) {
-            $part1 = $tokens[$pos];
-            $part2 = ($pos + 1 < $tokenCount) ? $tokens[$pos + 1] : null;
-            $part3 = ($pos + 2 < $tokenCount) ? $tokens[$pos + 2] : null;
+            $part1 = $currentTokens[0];
+            $part2 = ($ctLen > 1) ? $currentTokens[1] : null;
+            $part3 = ($ctLen > 2) ? $currentTokens[2] : null;
 
             // 3a. Literal comparison fallback (e.g., "1 = 1", "0 < 1")
             // part1 is NOT an operator, part2 IS an operator, part3 exists.
@@ -372,12 +440,16 @@ function php_parse_search_query($query, $columns) {
         if ($pos < $tokenCount) {
             $nextLower = strtolower($tokens[$pos]);
             if ($nextLower === 'and' || $nextLower === 'or') {
-                $queryTree[] = array(
-                    'type' => 'logical',
-                    'op'   => $nextLower
-                );
+                if (!empty($queryTree) && $queryTree[count($queryTree) - 1]['type'] === 'logical') {
+                    $queryTree[count($queryTree) - 1]['op'] = $nextLower;   // an empty group's joiner (2026-10-31)
+                } else {
+                    $queryTree[] = array(
+                        'type' => 'logical',
+                        'op'   => $nextLower
+                    );
+                }
                 $pos++;
-            } elseif (count($queryTree) > 0) {
+            } elseif (count($queryTree) > 0 && !($pqGroups && $tokens[$pos] === ')')) {
                 $lastEntry = $queryTree[count($queryTree) - 1];
                 if ($lastEntry['type'] !== 'logical') {
                     // Implicit AND between adjacent conditions
@@ -386,8 +458,138 @@ function php_parse_search_query($query, $columns) {
             }
         }
     }
+    while (!empty($pqOpen)) {   // an opener never closed (the balance check makes this unreachable)
+        $pqRest = $queryTree;
+        $queryTree = array_pop($pqOpen);
+        if (!empty($queryTree) && !empty($pqRest) && $queryTree[count($queryTree) - 1]['type'] !== 'logical') $queryTree[] = array('type' => 'logical', 'op' => 'and');
+        $queryTree = array_merge($queryTree, $pqRest);
+    }
+    // An empty group at the start or end (`() and A`, `A and ()`) left a dangling and / or (2026-10-31)
+    if ($pqGroups) $queryTree = _search_trim_logicals($queryTree);
 
     return $queryTree;
+}
+}
+
+if (!function_exists('_search_paren_name_mask')) {
+function _search_paren_name_mask($tokens, $operatorKeys) {
+    $ch = array(); $hit = false; $n = count($tokens);
+    for ($t = 0; $t < $n; $t++) $ch[$t] = str_split((string)$tokens[$t]);
+    // A brace name the opener cut open: its `{` to its `}`, over several tokens.
+    for ($t = 0; $t < $n; $t++) {
+        $s = (string)$tokens[$t];
+        $lead = preg_match('/^\(+/', $s, $m) ? strlen($m[0]) : 0;
+        if (substr($s, $lead, 1) !== '{' || strpos($s, '}', $lead) !== false) continue;
+        $e = $t + 1;
+        while ($e < $n && strpos((string)$tokens[$e], '}') === false) $e++;
+        if ($e >= $n) continue;   // never closed: no name
+        for ($b = $t; $b <= $e; $b++) {
+            $to = ($b === $e) ? strpos((string)$tokens[$e], '}') : count($ch[$b]);
+            for ($k = ($b === $t) ? $lead + 1 : 0; $k < $to; $k++) {
+                if ($ch[$b][$k] === '(') { $ch[$b][$k] = "\xEE\x80\x80"; $hit = true; }
+                elseif ($ch[$b][$k] === ')') { $ch[$b][$k] = "\xEE\x80\x81"; $hit = true; }
+            }
+        }
+        $t = $e;
+    }
+    // The parens the split cuts off, paired in order; a pair followed by an operator is a name's.
+    $ev = array(); $stack = array(); $named = array();
+    for ($t = 0; $t < $n; $t++) {
+        $tok = implode('', $ch[$t]);
+        $slot = $t > 0 && in_array($tokens[$t - 1], $operatorKeys, true);   // (not $valueSlot: *-valueslot anchor that line)
+        if (($slot && $tok[0] === '(') || !preg_match('/^\(|\)$/', $tok) || preg_match('#^(?:\{|//|!?/|"|\')#', $tok)) continue;
+        $len = count($ch[$t]);
+        $open = 0; while ($open < $len && $ch[$t][$open] === '(') $open++;
+        $close = 0; while ($close < $len - $open && $ch[$t][$len - 1 - $close] === ')') $close++;
+        for ($k = 0; $k < $len; $k++) {
+            if ($open + $close < $len && $k >= $open && $k < $len - $close) continue;   // the core
+            if ($ch[$t][$k] === '(') { $stack[] = count($ev); $ev[] = array($t, $k); continue; }
+            if (empty($stack)) return null;
+            $o = array_pop($stack);
+            $ev[] = array($t, $k);
+            if ($k === $len - 1 && $t + 1 < $n && in_array($tokens[$t + 1], $operatorKeys, true)) $named[] = array($o, count($ev) - 1);
+        }
+    }
+    if (!empty($stack)) return null;
+    foreach ($named as $p) {
+        for ($x = $p[0]; $x <= $p[1]; $x++) {
+            $tt = $ev[$x][0]; $kk = $ev[$x][1];
+            if ($ch[$tt][$kk] === '(') { $ch[$tt][$kk] = "\xEE\x80\x80"; $hit = true; }
+            elseif ($ch[$tt][$kk] === ')') { $ch[$tt][$kk] = "\xEE\x80\x81"; $hit = true; }
+        }
+    }
+    if (!$hit) return null;
+    $outM = array();
+    for ($t = 0; $t < $n; $t++) $outM[] = implode('', $ch[$t]);
+    return $outM;
+}
+}
+
+if (!function_exists('_search_paren_unmask')) {
+function _search_paren_unmask($s) { return str_replace(array("\xEE\x80\x80", "\xEE\x80\x81"), array('(', ')'), (string)$s); }
+}
+
+if (!function_exists('_search_split_paren_tokens')) {
+function _search_split_paren_tokens($tokens, $operatorKeys) {
+    // (2026-11-03) A NAME's own parentheses group nothing (_search_paren_name_mask): masked, the
+    // split runs on the rest and the names come back as written; all of them a name's = the old reading.
+    $pnMask = _search_paren_name_mask($tokens, $operatorKeys);
+    if ($pnMask !== null) {
+        $pnRes = _search_split_paren_tokens($pnMask, $operatorKeys);
+        return $pnRes['grouped'] ? array('grouped' => true, 'tokens' => array_map('_search_paren_unmask', $pnRes['tokens'])) : array('grouped' => false, 'tokens' => $tokens);
+    }
+    $out = array(); $any = false; $n = count($tokens);
+    for ($t = 0; $t < $n; $t++) {
+        $tok = $tokens[$t];
+        $valueSlot = $t > 0 && in_array($tokens[$t - 1], $operatorKeys, true);
+        if (($valueSlot && $tok[0] === '(') || !preg_match('/^\(|\)$/', $tok) || preg_match('#^(?:\{|//|!?/|"|\')#', $tok)) { $out[] = $tok; continue; }
+        $open = preg_match('/^\(+/', $tok, $m) ? $m[0] : '';
+        $close = preg_match('/\)+$/', $tok, $m) ? $m[0] : '';
+        $core = (string)substr($tok, strlen($open), strlen($tok) - strlen($open) - strlen($close));
+        if ($core === '') { $open = $tok; $close = ''; }   // nothing but parens: one token each
+        for ($o = 0; $o < strlen($open); $o++) $out[] = $open[$o];
+        if ($core !== '') $out[] = $core;
+        for ($c = 0; $c < strlen($close); $c++) $out[] = $close[$c];
+        $any = true;
+    }
+    if ($any) {
+        // `({ A }` (2026-10-31): a brace name the opener had cut open is one token again
+        for ($j = 0; $j < count($out); $j++) {
+            if (substr($out[$j], 0, 1) !== '{' || strpos($out[$j], '}') !== false) continue;
+            $e = $j + 1;
+            while ($e < count($out) && $out[$e] !== '(' && $out[$e] !== ')' && strpos($out[$e], '}') === false) $e++;
+            if ($e < count($out) && $out[$e] !== '(' && $out[$e] !== ')') array_splice($out, $j, $e - $j + 1, array(implode(' ', array_slice($out, $j, $e - $j + 1))));
+        }
+    }
+    $depth = 0;
+    if ($any) {
+        foreach ($out as $tk) {
+            if ($tk === '(') $depth++;
+            elseif ($tk === ')' && --$depth < 0) break;
+        }
+    }
+    return ($any && $depth === 0) ? array('grouped' => true, 'tokens' => $out) : array('grouped' => false, 'tokens' => $tokens);
+}
+}
+
+if (!function_exists('_search_trim_logicals')) {
+function _search_trim_logicals($parts) {
+    $a = 0; $b = count($parts);
+    while ($a < $b && $parts[$a]['type'] === 'logical') $a++;
+    while ($b > $a && $parts[$b - 1]['type'] === 'logical') $b--;
+    return array_slice($parts, $a, $b - $a);
+}
+}
+
+if (!function_exists('_search_query_leaves')) {
+function _search_query_leaves($parts) {
+    $out = array();
+    foreach ((array)$parts as $p) {
+        if (!is_array($p) || !isset($p['type']) || $p['type'] === 'logical') continue;
+        if ($p['type'] === 'group') { foreach (_search_query_leaves($p['parts']) as $q) $out[] = $q; }
+        else $out[] = $p;
+    }
+    return $out;
 }
 }
 
@@ -446,7 +648,7 @@ function php_evaluate_search_row($row, $parsedQuery, $columns, $requireRowMatch 
     // Normal path: compute virtual cols and call inner function
     $needsVirtual = false;
     foreach ($parsedQuery as $_qp) {
-        if ($_qp['type'] === 'global' || $_qp['type'] === 'condition') {
+        if ($_qp['type'] === 'global' || $_qp['type'] === 'condition' || $_qp['type'] === 'group') {
             $needsVirtual = true;
             break;
         }
@@ -470,6 +672,11 @@ function _php_evaluate_search_row_with_virtual($row, $parsedQuery, $columns, $vi
     foreach ($parsedQuery as $part) {
         if ($part['type'] === 'logical') {
             $ops[] = $part['op'];
+            continue;
+        }
+        if ($part['type'] === 'group') {
+            // Parentheses (2026-10-30): the group is reduced as a query of its own, AND first then OR.
+            $results[] = _php_evaluate_search_row_with_virtual($row, $part['parts'], $columns, $virtualCols);
             continue;
         }
 
@@ -546,6 +753,10 @@ function _php_evaluate_search_row_with_virtual($row, $parsedQuery, $columns, $vi
         }
         // --- Column-specific condition ---
         elseif ($part['type'] === 'condition') {
+            if (isset($part['bucket'])) {   // a bucket of a column (2026-11-06, fbucket): the cell's bucket in place of its text
+                $results[] = _search_bucket_part($part, $rowUpper, $row, $columns, $virtualCols);
+                continue;
+            }
             $colName = preg_replace('/^\\{\\s*[\'"]?|[\'"]?\\s*\\}$/', '', $part['column']);
             $upperCol = strtoupper($colName);
 
@@ -613,12 +824,13 @@ function _php_evaluate_with_row_match($row, $parsedQuery, $columns) {
         return _php_evaluate_search_row_with_virtual($row, $parsedQuery, $columns, $virtualCols);
     }
 
-    // Collect column names referenced in conditions
+    // Collect column names referenced in conditions (through every group: parentheses, 2026-10-30)
     $referencedCols = array();
-    foreach ($parsedQuery as $part) {
+    foreach (_search_query_leaves($parsedQuery) as $part) {
         if ($part['type'] === 'condition' && isset($part['column'])) {
             $col = strtoupper(preg_replace('/^\\{\\s*[\'"]?|[\'"]?\\s*\\}$/', '', $part['column']));
             $referencedCols[$col] = true;
+            if (isset($part['bucket'])) $referencedCols[strtoupper((string)$part['bucket']['base'])] = true;   // (fbucket)
         }
     }
 
@@ -688,8 +900,7 @@ function _search_get_virtual_columns($row) {
                 $virtualCols[$upperKey] = array();
             }
             foreach ($jsonData as $jsonRow) {
-                $val = isset($jsonRow[$key]) ? $jsonRow[$key] : '';
-                $virtualCols[$upperKey][] = ($val === null) ? '' : (string)$val;
+                $virtualCols[$upperKey][] = _search_nested_value(isset($jsonRow[$key]) ? $jsonRow[$key] : '');
             }
         }
     }
@@ -741,8 +952,7 @@ function _search_get_structured_virtual_data($row) {
         foreach ($jsonData as $jsonRow) {
             $rowMap = array();
             foreach ($keys as $k) {
-                $val = isset($jsonRow[$k]) ? $jsonRow[$k] : '';
-                $rowMap[strtoupper($k)] = ($val === null) ? '' : (string)$val;
+                $rowMap[strtoupper($k)] = _search_nested_value(isset($jsonRow[$k]) ? $jsonRow[$k] : '');
             }
             $rows[] = $rowMap;
         }
@@ -756,15 +966,108 @@ function _search_get_structured_virtual_data($row) {
 if (!function_exists('_search_get_cell_value')) {
 function _search_get_cell_value($colName, $rowUpper) {
     $key = strtoupper($colName);
-    $raw = isset($rowUpper[$key]) ? (string)$rowUpper[$key] : '';
+    $raw = _search_decode_entities(isset($rowUpper[$key]) ? (string)$rowUpper[$key] : '');
 
     // Strip @@HTML prefix
     if (strpos($raw, '@@HTML') === 0) {
         $raw = substr($raw, 6);
     }
 
-    // Strip HTML tags and trim
-    return trim(strip_tags($raw));
+    // Strip HTML tags (the browser's /<[^>]*>/g: a "<" with no ">" after it stays) and trim
+    if (strpos($raw, '<') !== false) {
+        $raw = preg_replace('/<[^>]*>/', '', $raw);
+    }
+    return _search_js_trim($raw);
+}
+}
+
+if (!function_exists('_search_nested_value')) {
+function _search_nested_value($val) {
+    $s = ($val === null) ? '' : (string)$val;
+    if (strpos($s, '@@HTML') !== 0) {
+        return $s;
+    }
+    return _search_js_trim(preg_replace('/<[^>]*>/', '', substr($s, 6)));
+}
+}
+
+if (!function_exists('_search_decode_entities')) {
+function _search_decode_entities($s) {
+    if (strpos($s, '&') === false) {
+        return $s;
+    }
+    $out = preg_replace_callback('/&(amp|lt|gt|quot|apos|nbsp|#(\d+)|#x([0-9a-fA-F]+));/', '_search_decode_entity', $s);
+    if ($out === null) {
+        return $s;
+    }
+    // A surrogate came out as its 3 bytes (\xED\xA0-\xBF ..), which no real UTF-8
+    // holds: join a high one to the low one right after it, then mark the halves left.
+    if (strpos($out, "\xED") !== false) {
+        $out = preg_replace_callback('/\xED([\xA0-\xAF])([\x80-\xBF])\xED([\xB0-\xBF])([\x80-\xBF])/', '_search_join_surrogates', $out);
+        $out = preg_replace('/\xED[\xA0-\xBF][\x80-\xBF]/', "\xEF\xBF\xBD", $out);
+    }
+    return $out;
+}
+}
+
+if (!function_exists('_search_decode_entity')) {
+function _search_decode_entity($m) {
+    static $named = array('amp' => '&', 'lt' => '<', 'gt' => '>', 'quot' => '"', 'apos' => "'", 'nbsp' => ' ');
+    if (isset($m[3]) && $m[3] !== '') {
+        $c = _search_js_char_code($m[3], 16);
+    } elseif (isset($m[2]) && $m[2] !== '') {
+        $c = _search_js_char_code($m[2], 10);
+    } else {
+        return $named[$m[1]];
+    }
+    if ($c < 0x80) return chr($c);
+    if ($c < 0x800) return chr(0xC0 | ($c >> 6)) . chr(0x80 | ($c & 0x3F));
+    return chr(0xE0 | ($c >> 12)) . chr(0x80 | (($c >> 6) & 0x3F)) . chr(0x80 | ($c & 0x3F));
+}
+}
+
+if (!function_exists('_search_join_surrogates')) {
+function _search_join_surrogates($m) {
+    $cp = 0x10000 + ((((ord($m[1]) & 0x0F) << 6) | (ord($m[2]) & 0x3F)) << 10)
+        + (((ord($m[3]) & 0x0F) << 6) | (ord($m[4]) & 0x3F));
+    return chr(0xF0 | ($cp >> 18)) . chr(0x80 | (($cp >> 12) & 0x3F))
+        . chr(0x80 | (($cp >> 6) & 0x3F)) . chr(0x80 | ($cp & 0x3F));
+}
+}
+
+if (!function_exists('_search_js_char_code')) {
+function _search_js_char_code($digits, $base) {
+    $digits = ltrim($digits, '0');
+    if ($base === 10) {
+        if (strlen($digits) <= 15) return (int)$digits & 0xFFFF;
+        $f = (float)$digits;   // strtod: correctly rounded, as parseInt is
+        return is_finite($f) ? (int)fmod($f, 65536.0) : 0;
+    }
+    if (strlen($digits) <= 13) return (int)hexdec('0' . $digits) & 0xFFFF;
+    $bits = '';
+    foreach (str_split($digits) as $h) {
+        $bits .= sprintf('%04b', hexdec($h));
+    }
+    $bits = ltrim($bits, '0');
+    $k = strlen($bits) - 53;
+    if ($k <= 0) return bindec($bits) & 0xFFFF;
+    if ($k >= 16) return 0;
+    $m = bindec(substr($bits, 0, 53));
+    $rest = substr($bits, 53);
+    if ($rest[0] === '1' && (($m & 1) || strpos($rest, '1', 1) !== false)) $m++;
+    return ($m << $k) & 0xFFFF;
+}
+}
+
+if (!function_exists('_search_js_trim')) {
+function _search_js_trim($s) {
+    $s = trim($s, " \t\n\r\x0B\x0C");
+    if ($s === '' || (ord($s[0]) < 0xC2 && ord(substr($s, -1)) < 0x80)) {
+        return $s;
+    }
+    $ws = '[\x{0009}-\x{000D}\x{0020}\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]';
+    $t = preg_replace('/^' . $ws . '+|' . $ws . '+$/u', '', $s);
+    return ($t === null) ? $s : $t;
 }
 }
 
@@ -980,10 +1283,15 @@ function _search_parse_date($str) {
         array('Y-m-d H:i:s',   'second'),
         array('m/d/Y', 'day'),
         array('n/j/Y', 'day'),
+        array('m/d/y', 'day'),
+        array('n/j/y', 'day'),
         array('Y-m-d', 'day'),
         array('Y-n-j', 'day'),
         array('d-M-y', 'day'),
         array('j-M-y', 'day'),
+        array('d-M-Y', 'day'),
+        array('j M y', 'day'),
+        array('j M Y', 'day'),
         array('m/Y', 'month'),
         array('Y-m', 'month'),
         array('F Y', 'month'),
@@ -996,6 +1304,12 @@ function _search_parse_date($str) {
     $result = false;
     foreach ($formats as $f) {
         if ($f[0] === 'Y' && !preg_match('/^\d{4}$/', $probe)) continue;
+        // Any 'Y' year takes 4 digits and 'y' 2, as moment's strict YYYY / YY:
+        // PHP's 'Y' alone reads 03/05/25 as the year 25. A day + month name takes
+        // a 3-letter month and one separator, as DD-MMM-YY / D MMM YYYY do
+        // (PHP's 'M' also reads "March", its space also matches none).
+        if (strpos($f[0], 'Y') !== false && !preg_match('/(?<!\d)\d{4}(?!\d)/', $probe)) continue;
+        if (preg_match('/^[dj][ -]M/', $f[0]) && !preg_match('/^\d{1,2}[ -][A-Za-z]{3}[ -]\d+$/', $probe)) continue;
         $dt = DateTime::createFromFormat('!' . $f[0], $probe);
         if ($dt === false) continue;
         // Reject loose matches (trailing data / impossible dates); PHP 8.2 returns
@@ -1065,6 +1379,7 @@ function _journal_normalize_toggle_conditions($parsedQuery, $toggleResolver) {
     $names = array();
     foreach ($toggleResolver['colNames'] as $n) $names[strtoupper((string)$n)] = true;
     foreach ($parsedQuery as $i => $part) {
+        if (isset($part['type']) && $part['type'] === 'group') { $parsedQuery[$i]['parts'] = _journal_normalize_toggle_conditions($part['parts'], $toggleResolver); continue; }
         if (!isset($part['type']) || $part['type'] !== 'condition' || !isset($part['column'])) continue;
         $colName = preg_replace('/^\{\s*[\'"]?|[\'"]?\s*\}$/', '', (string)$part['column']);
         if (!isset($names[strtoupper($colName)])) continue;
@@ -1079,6 +1394,32 @@ function _journal_normalize_toggle_conditions($parsedQuery, $toggleResolver) {
         } else {
             $parsedQuery[$i]['journalToggle'] = true;
         }
+    }
+    return $parsedQuery;
+}
+}
+
+if (!function_exists('_journal_field_option_conditions')) {
+function _journal_field_option_conditions($parsedQuery, $toggleResolver) {
+    if (!is_array($toggleResolver) || empty($parsedQuery) || empty($toggleResolver['fieldOpts']) || !is_array($toggleResolver['fieldOpts'])) return $parsedQuery;
+    $up = function ($s) { return function_exists('journalUpperKey') ? journalUpperKey($s) : strtoupper((string)$s); };
+    foreach ($parsedQuery as $i => $part) {
+        if (isset($part['type']) && $part['type'] === 'group' && isset($part['parts']) && is_array($part['parts'])) {
+            $parsedQuery[$i]['parts'] = _journal_field_option_conditions($part['parts'], $toggleResolver);
+            continue;
+        }
+        if (!isset($part['type']) || $part['type'] !== 'condition' || !isset($part['column']) || !isset($part['value']) || !is_scalar($part['value'])) continue;
+        $op = isset($part['op']) ? trim((string)$part['op']) : '';
+        if (!in_array($op, array('=', '==', '!=', '<>', "\xE2\x89\xA0"), true)) continue;
+        $bare = trim((string)preg_replace('/^\{\s*[\'"]?|[\'"]?\s*\}$/', '', (string)$part['column']));
+        $fo = null;
+        foreach (array($up($bare), strtoupper($bare)) as $u) {
+            if (isset($toggleResolver['fieldOpts'][$u])) { $fo = $toggleResolver['fieldOpts'][$u]; break; }
+        }
+        if (!$fo) continue;
+        $want = $up(trim(preg_replace('/^[\'"]|[\'"]$/', '', trim((string)$part['value']))));
+        if ($want === '' || isset($fo['cur'][$want]) || !isset($fo['old'][$want])) continue;
+        $parsedQuery[$i]['value'] = (string)$fo['old'][$want];
     }
     return $parsedQuery;
 }
@@ -1195,7 +1536,7 @@ function penumbra_search_filter_set($s) {
 }
 
 if (!function_exists('php_apply_search_filter')) {
-function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars = null, $toggleResolver = null) {
+function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars = null, $toggleResolver = null, $numsIn = null, &$numsOut = null) {
     if (!penumbra_search_filter_set($searchFilter)) {
         return $data;
     }
@@ -1316,7 +1657,7 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
     // values, so never put through the toggle value rewrite above.
     $aliasCols = array();
     $journalNames = array();   // UPPER => true: a bare term skips them (_search_journal_skip, 2026-10-09)
-    if ($toggleResolver && !empty($toggleResolver['colNames'])) {
+    if ($toggleResolver && (!empty($toggleResolver['colNames']) || !empty($toggleResolver['whoNames']))) {   // (2026-11-11) a pick list alone too
         $whoNames = (isset($toggleResolver['whoNames']) && is_array($toggleResolver['whoNames'])) ? $toggleResolver['whoNames'] : array();
         foreach (array_merge($toggleResolver['colNames'], $whoNames) as $tName) {
             // Skipped by a bare term whether or not the rows already carry it (2026-10-09): the ?json=1 API appends
@@ -1359,7 +1700,11 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
     // "Done = ☑" -> "Done = 1" (the stored form). Must run AFTER parsing so we
     // only rewrite values whose column is actually a toggle.
     $parsedQuery = _journal_normalize_toggle_conditions($parsedQuery, $toggleResolver);
+    // A pick list's option by an old label reads as its label now (2026-11-11).
+    $parsedQuery = _journal_field_option_conditions($parsedQuery, $toggleResolver);
     _search_journal_skip($journalNames);
+    // An auto-width bin (AMOUNT:bin, 2026-11-06 fbucket): the width these rows give, as the grouping's own
+    $parsedQuery = _search_bucket_auto_widths($parsedQuery, $data, $viewMode);
 
     // Filter based on viewMode
     if ($viewMode === 'grouped') {
@@ -1414,13 +1759,16 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
     } else {
         // Standard or pivot: filter flat array of rows
         $filtered = array();
+        $numsOut = array();
         $rowNum = 0;
         foreach ($data as $row) {
             $rowNum++;
             if (is_array($row)) {
                 // Inject # (1-based row number) for evaluation, matching front-end behavior
+                // (hashc) a row's own number where the caller has one (rows an earlier filter kept)
+                $num = (is_array($numsIn) && isset($numsIn[$rowNum - 1])) ? (int)$numsIn[$rowNum - 1] : $rowNum;
                 $evalRow = $row;
-                $evalRow['#'] = (string)$rowNum;
+                $evalRow['#'] = (string)$num;
                 if ($toggleResolver) {
                     foreach (journalExportToggleRowValues($toggleResolver, $row) as $tn => $tv) $evalRow[$tn] = $tv;
                 }
@@ -1429,6 +1777,7 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
                 }
                 if (php_evaluate_search_row($evalRow, $parsedQuery, $columns, $requireRowMatch)) {
                     $filtered[] = $row; // Keep original row without injected # / toggles
+                    $numsOut[] = $num;
                 }
             }
         }
@@ -1577,5 +1926,367 @@ function _penumbra_json_rows($s, $i) {
         elseif ($o === 44 && $depth === 1) $want = true;       // ,
     }
     return $count;
+}
+}
+
+if (!function_exists('_search_bucket_suffix')) {
+function _search_bucket_suffix($sx) {
+    static $dates = array('year', 'fy', 'yq', 'fyq', 'ym', 'quarter', 'fquarter', 'month', 'monthnum', 'dow', 'hour');
+    static $delims = array('dsemi', 'dpipe', 'dcomma', 'dtab', 'dnl', 'dspace');
+    $sx = (string)$sx;
+    $b = array('sx' => $sx, 'split' => null, 'kind' => null, 'width' => null, 'edges' => null, 'delim' => null);
+    if (in_array($sx, $dates, true)) { $b['split'] = $sx; $b['kind'] = 'date'; return $b; }
+    if ($sx === 'binlog' || $sx === 'bin') { $b['split'] = $sx; $b['kind'] = 'bin'; return $b; }
+    if (preg_match('/^bin([1-9]\d{0,14})$/D', $sx, $m)) { $b['split'] = 'bin'; $b['kind'] = 'bin'; $b['width'] = (int)$m[1]; return $b; }
+    if (preg_match('/^bins(\d{1,15}(?:_\d{1,15})*)$/D', $sx, $m)) {
+        $e = _search_bucket_edges(explode('_', $m[1]));
+        if ($e === null) return null;
+        $b['sx'] = 'bins' . implode('_', $e); $b['split'] = 'bins'; $b['kind'] = 'bin'; $b['edges'] = $e;
+        return $b;
+    }
+    if (in_array($sx, $delims, true)) { $b['kind'] = 'list'; $b['delim'] = $sx; return $b; }
+    return null;
+}
+}
+
+if (!function_exists('_search_bucket_edges')) {
+function _search_bucket_edges($list) {
+    if (!is_array($list) || !count($list)) return null;
+    $out = array();
+    foreach ($list as $v) {
+        if (!preg_match('/^\d+$/D', (string)$v)) return null;
+        $n = (int)round((float)$v);
+        if (!in_array($n, $out, true)) $out[] = $n;
+    }
+    if (!count($out) || count($out) > 40) return null;
+    sort($out, SORT_NUMERIC);
+    return $out;
+}
+}
+
+if (!function_exists('_search_bucket_of')) {
+function _search_bucket_of($tok, $columnMap) {
+    $t = (string)$tok;
+    if (strpos($t, ':') === false || !is_array($columnMap)) return null;
+    $c0 = substr($t, 0, 1); $cz = substr($t, -1);
+    if ($c0 === '{' && $cz === '}') $t = preg_replace('/^\\{\\s*[\'"]?|[\'"]?\\s*\\}$/', '', $t);
+    elseif (strlen($t) > 1 && ($c0 === "'" || $c0 === '"') && $cz === $c0) $t = substr($t, 1, -1);
+    elseif ($c0 === '/' || $c0 === '!' || $c0 === '{' || $c0 === "'" || $c0 === '"') return null;
+    if (isset($columnMap[strtoupper($t)])) return null;   // a column whose own name holds a colon
+    $at = strrpos($t, ':');
+    if ($at === false || $at < 1) return null;
+    $base = _search_js_trim(substr($t, 0, $at));
+    $bu = strtoupper($base);
+    if ($base === '' || !isset($columnMap[$bu])) return null;
+    $b = _search_bucket_suffix(strtolower(_search_js_trim((string)substr($t, $at + 1))));
+    if ($b === null) return null;
+    $b['base'] = $columnMap[$bu];
+    $b['token'] = $b['base'] . ':' . $b['sx'];
+    return $b;
+}
+}
+
+if (!function_exists('_search_bucket_clean')) {
+function _search_bucket_clean($s) {
+    $s = (string)$s;
+    if (substr($s, 0, 6) === '@@HTML' || substr($s, 0, 6) === '@@JSON') $s = substr($s, 6);
+    if (strpos($s, '<') !== false) $s = preg_replace('/<[^>]*>/', '', $s);
+    return _search_js_trim($s);
+}
+}
+
+if (!function_exists('_search_bucket_num')) {
+function _search_bucket_num($raw) {
+    $str = trim((string)$raw);
+    if ($str === '') return false;
+    $isNegative = (substr($str, 0, 1) === '(' && substr($str, -1) === ')');
+    $clean = preg_replace('/[$,()%\x02]/u', '', $str);
+    if ($clean === null) return false;
+    $clean = trim($clean);
+    if ($clean === '' || !preg_match('/^[-+]?(\d+(\.\d*)?|\.\d+)$/D', $clean)) return false;
+    $num = (float)$clean;
+    if (!is_finite($num)) return false;
+    return $isNegative ? -$num : $num;
+}
+}
+
+if (!function_exists('_search_bucket_int')) {
+function _search_bucket_int($n) { return number_format(round($n)); }
+}
+
+if (!function_exists('_search_bucket_compact')) {
+function _search_bucket_compact($n) {
+    static $U = array(array(1000000000, 'B'), array(1000000, 'M'), array(1000, 'K'));
+    foreach ($U as $u) {
+        if (abs($n) >= $u[0]) {
+            $v = $n / $u[0];
+            if ($v == floor($v)) return ((string)(int)$v) . $u[1];
+            if (round($v * 10) / 10 == $v) return rtrim(rtrim(number_format($v, 1, '.', ''), '0'), '.') . $u[1];
+            break;
+        }
+    }
+    return number_format(round($n));
+}
+}
+
+if (!function_exists('_search_bucket_compact_parse')) {
+function _search_bucket_compact_parse($s) {
+    if (!preg_match('/^\$?\s*(-?[\d,]*\.?\d+)\s*([KMB])?$/iD', trim((string)$s), $m)) return null;
+    $n = (float)str_replace(',', '', $m[1]);
+    $u = strtoupper(isset($m[2]) ? $m[2] : '');
+    if ($u === 'K') $n *= 1000; elseif ($u === 'M') $n *= 1000000; elseif ($u === 'B') $n *= 1000000000;
+    return $n;
+}
+}
+
+if (!function_exists('_search_bucket_date_label')) {
+function _search_bucket_date_label($split, $s) {
+    static $rank = array('year' => 0, 'month' => 1, 'day' => 2, 'second' => 3);
+    static $minGran = array('year' => 0, 'fy' => 1, 'yq' => 1, 'fyq' => 1, 'ym' => 1, 'quarter' => 1, 'fquarter' => 1,
+        'month' => 1, 'monthnum' => 1, 'dow' => 2, 'hour' => 3);
+    static $MO = array('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+    static $DW = array('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun');
+    $s = _search_bucket_clean($s);
+    if ($s === '' || !isset($minGran[$split])) return $s;
+    $p = _search_parse_date($s);
+    if ($p === false) return $s;
+    if (!isset($rank[$p['gran']]) || $rank[$p['gran']] < $minGran[$split]) return $s;
+    $ts = $p['ts'];
+    $y = (int)date('Y', $ts); $m1 = (int)date('n', $ts); $h = (int)date('G', $ts);
+    $fy = ($m1 >= 7) ? $y + 1 : $y;
+    $fy2 = 'FY' . substr((string)$fy, -2);
+    $fq = intdiv(($m1 + 5) % 12, 3) + 1;   // Jul = FQ1
+    $q = intdiv($m1 - 1, 3) + 1;
+    switch ($split) {
+        case 'year':     return (string)$y;
+        case 'fy':       return $fy2;
+        case 'yq':       return $y . ' Q' . $q;
+        case 'fyq':      return $fy2 . ' Q' . $fq;
+        case 'ym':       return $MO[$m1 - 1] . ' ' . $y;
+        case 'quarter':  return 'Q' . $q;
+        case 'fquarter': return 'FQ' . $fq;
+        case 'month':    return $MO[$m1 - 1];
+        case 'monthnum': return str_pad((string)$m1, 2, '0', STR_PAD_LEFT);
+        case 'dow':      return $DW[((int)date('N', $ts)) - 1];
+        case 'hour':     return str_pad((string)$h, 2, '0', STR_PAD_LEFT) . ':00';
+    }
+    return $s;
+}
+}
+
+if (!function_exists('_search_bucket_bin_label')) {
+function _search_bucket_bin_label($split, $s, $width) {
+    $s = _search_bucket_clean($s);
+    if ($s === '') return '';
+    $n = _search_bucket_num($s);
+    if ($n === false) return $s;
+    if ($split === 'binlog') {
+        if (!($n >= 1)) return '< 1';
+        $lo = 1;
+        while ($n >= $lo * 10 && $lo < 1e15) $lo *= 10;
+        return _search_bucket_int($lo) . ' – ' . _search_bucket_int($lo * 10 - 1);
+    }
+    $w = ($width && $width > 0) ? $width : 1;
+    $lo2 = floor($n / $w) * $w;
+    return _search_bucket_int($lo2) . ' – ' . _search_bucket_int($lo2 + $w - 1);
+}
+}
+
+if (!function_exists('_search_bucket_bins_label')) {
+function _search_bucket_bins_label($s, $edges) {
+    $s = _search_bucket_clean($s);
+    if ($s === '') return '';
+    if (!is_array($edges) || !count($edges)) return $s;
+    $n = _search_bucket_num($s);
+    if ($n === false) return $s;
+    $last = count($edges) - 1;
+    if ($n < $edges[0]) return 'below ' . _search_bucket_compact($edges[0]);
+    for ($i = $last; $i >= 0; $i--) {
+        if ($n >= $edges[$i]) {
+            return ($i === $last)
+                ? 'above ' . _search_bucket_compact($edges[$i])
+                : _search_bucket_compact($edges[$i]) . ' – ' . _search_bucket_compact($edges[$i + 1]);
+        }
+    }
+    return 'below ' . _search_bucket_compact($edges[0]);
+}
+}
+
+if (!function_exists('_search_bucket_labels')) {
+function _search_bucket_labels($b, $text) {
+    static $CH = array('dsemi' => ';', 'dpipe' => '|', 'dcomma' => ',', 'dtab' => "\t");
+    $s = (string)$text;
+    if ($b['delim'] !== null) {
+        if ($b['delim'] === 'dnl') $parts = preg_split('/\r\n|\r|\n/', $s);
+        elseif ($b['delim'] === 'dspace') $parts = preg_split('/ +/', $s);
+        else $parts = explode($CH[$b['delim']], $s);
+        $out = array(); $seen = array();   // '#'-prefixed keys: a value like "2025" must not become an int key
+        foreach ((array)$parts as $p) {
+            $p = trim($p, " \t\n\r\0\x0B");
+            if ($p === '' || isset($seen['#' . $p])) continue;
+            $seen['#' . $p] = true;
+            $out[] = $p;
+        }
+        return $out;
+    }
+    if ($b['split'] === 'bins') $l = _search_bucket_bins_label($s, $b['edges']);
+    elseif ($b['kind'] === 'bin') $l = _search_bucket_bin_label($b['split'], $s, $b['width']);
+    else $l = _search_bucket_date_label($b['split'], $s);
+    $l = (string)$l;
+    return ($l === '') ? array() : array($l);
+}
+}
+
+if (!function_exists('_search_bucket_sort_val1')) {
+function _search_bucket_sort_val1($split, $s) {
+    static $MO = array('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+    static $DW = array('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun');
+    if ($split === 'bins') {
+        if (preg_match('/^below /u', $s)) return -1e12;
+        if (preg_match('/^above (.+)$/uD', $s, $m)) return _search_bucket_compact_parse($m[1]);
+        if (preg_match('/^(.+?) – (.+)$/uD', $s, $m)) return _search_bucket_compact_parse($m[1]);
+        return null;
+    }
+    if ($split === 'bin' || $split === 'binlog') {
+        if (preg_match('/^< /u', $s)) return -1e12;
+        if (preg_match('/^(-?[\d,]+)/', $s, $m)) return (float)str_replace(',', '', $m[1]);
+        return null;
+    }
+    switch ($split) {
+        case 'year':     return preg_match('/^\d{4}$/D', $s) ? (int)$s : null;
+        case 'fy':       if (!preg_match('/^FY(\d{2})$/iD', $s, $m)) return null; $y = (int)$m[1]; return $y + ($y <= 68 ? 2000 : 1900);
+        case 'yq':       return preg_match('/^(\d{4}) Q([1-4])$/D', $s, $m) ? ((int)$m[1]) * 10 + (int)$m[2] : null;
+        case 'fyq':      if (!preg_match('/^FY(\d{2}) Q([1-4])$/iD', $s, $m)) return null; $y = (int)$m[1]; $y += ($y <= 68 ? 2000 : 1900); return $y * 10 + (int)$m[2];
+        case 'ym':
+            if (!preg_match('/^([A-Za-z]{3}) (\d{4})$/D', $s, $m)) return null;
+            $i = array_search($m[1], $MO, true);
+            return ($i === false) ? null : ((int)$m[2]) * 100 + $i + 1;
+        case 'quarter':  return preg_match('/^Q([1-4])$/iD', $s, $m) ? (int)$m[1] : null;
+        case 'fquarter': return preg_match('/^FQ([1-4])$/iD', $s, $m) ? (int)$m[1] : null;
+        case 'month':    $i = array_search($s, $MO, true); return ($i === false) ? null : $i + 1;
+        case 'monthnum': return preg_match('/^(0[1-9]|1[0-2])$/D', $s) ? (int)$s : null;
+        case 'dow':      $i = array_search($s, $DW, true); return ($i === false) ? null : $i;
+        case 'hour':     return preg_match('/^([01]\d|2[0-3]):00$/D', $s, $m) ? (int)$m[1] : null;
+    }
+    return null;
+}
+}
+
+if (!function_exists('_search_bucket_cap')) {
+function _search_bucket_cap($m) { return strtoupper(substr($m[0], 0, 1)) . strtolower(substr($m[0], 1)); }
+}
+
+if (!function_exists('_search_bucket_sort_val')) {
+function _search_bucket_sort_val($split, $s) {
+    $s = (string)$s;
+    if ($split === null || $s === '') return null;
+    $n = _search_bucket_sort_val1($split, $s);
+    if ($n === null) {
+        $t = preg_replace_callback('/[A-Za-z]+/', '_search_bucket_cap', $s);
+        $n = ($t !== null && $t !== $s) ? _search_bucket_sort_val1($split, $t) : null;
+    }
+    return ($n === null || is_nan((float)$n)) ? null : (float)$n;
+}
+}
+
+if (!function_exists('_search_bucket_order')) {
+function _search_bucket_order($b, $op, $value, $label) {
+    if ($b['delim'] !== null || !in_array($op, array('>', '<', '>=', '<='), true)) return null;
+    $v = _search_js_trim((string)$value);
+    $q = substr($v, 0, 1);
+    if (strlen($v) > 1 && ($q === "'" || $q === '"') && substr($v, -1) === $q) $v = _search_js_trim(substr($v, 1, -1));
+    $a = _search_bucket_sort_val($b['split'], $label);
+    $c = _search_bucket_sort_val($b['split'], $v);
+    if ($a === null || $c === null) return null;
+    if ($op === '>') return $a > $c;
+    if ($op === '<') return $a < $c;
+    if ($op === '>=') return $a >= $c;
+    return $a <= $c;
+}
+}
+
+if (!function_exists('_search_bucket_test')) {
+function _search_bucket_test($b, $op, $value, $text, $row, $columns) {
+    $ls = _search_bucket_labels($b, $text);
+    if ($b['delim'] === null) {
+        $l = count($ls) ? $ls[0] : '';
+        $o = _search_bucket_order($b, $op, $value, $l);
+        return ($o !== null) ? $o : (bool)php_test_search_condition($op, $value, $l, $row, $columns);
+    }
+    if (!count($ls)) return (bool)php_test_search_condition($op, $value, '', $row, $columns);
+    $neg = ($op === '!=' || $op === '<>' || $op === '!/');
+    foreach ($ls as $l) {
+        if ((bool)php_test_search_condition($op, $value, $l, $row, $columns) !== $neg) return !$neg;
+    }
+    return $neg;
+}
+}
+
+if (!function_exists('_search_bucket_part')) {
+function _search_bucket_part($part, $rowUpper, $row, $columns, $virtualCols) {
+    $b = $part['bucket'];
+    $up = strtoupper((string)$b['base']);
+    if (!empty($virtualCols) && isset($virtualCols[$up])) {
+        foreach ($virtualCols[$up] as $vVal) {
+            if (_search_bucket_test($b, $part['op'], $part['value'], $vVal, $row, $columns)) return true;
+        }
+        return false;
+    }
+    return _search_bucket_test($b, $part['op'], $part['value'], _search_get_cell_value($b['base'], $rowUpper), $row, $columns);
+}
+}
+
+if (!function_exists('_search_bucket_nice_width')) {
+function _search_bucket_nice_width($min, $max) {
+    $range = $max - $min;
+    if (!($range > 0)) return 1;
+    $raw = $range / 10;
+    $p = pow(10, floor(log10($raw)));
+    $w = 10 * $p;
+    if ($raw <= 1 * $p) $w = 1 * $p; elseif ($raw <= 2 * $p) $w = 2 * $p; elseif ($raw <= 5 * $p) $w = 5 * $p;
+    return max(1, (int)round($w));
+}
+}
+
+if (!function_exists('_search_bucket_auto_width')) {
+function _search_bucket_auto_width($data, $viewMode, $base) {
+    $key = strtoupper((string)$base); $min = INF; $max = -INF; $realKey = null;
+    $rowsets = array();
+    if ($viewMode === 'grouped') {
+        foreach ((array)$data as $group) {
+            if (!is_array($group)) continue;
+            if (isset($group['rows']) && is_array($group['rows'])) $rowsets[] = $group['rows'];
+            elseif (isset($group[0]) && is_array($group[0])) $rowsets[] = $group;
+        }
+    } else {
+        $rowsets[] = (array)$data;
+    }
+    foreach ($rowsets as $rows) {
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            if ($realKey === null || !array_key_exists($realKey, $r)) {
+                $realKey = null;
+                foreach ($r as $k => $unused) { if (strtoupper((string)$k) === $key) { $realKey = $k; break; } }
+                if ($realKey === null) continue;
+            }
+            $n = _search_bucket_num(_search_bucket_clean((string)$r[$realKey]));
+            if ($n === false) continue;
+            if ($n < $min) $min = $n;
+            if ($n > $max) $max = $n;
+        }
+    }
+    return ($min <= $max) ? _search_bucket_nice_width($min, $max) : 1;
+}
+}
+
+if (!function_exists('_search_bucket_auto_widths')) {
+function _search_bucket_auto_widths($parts, $data, $viewMode) {
+    foreach ($parts as $i => $p) {
+        if (!is_array($p) || !isset($p['type'])) continue;
+        if ($p['type'] === 'group' && isset($p['parts'])) { $parts[$i]['parts'] = _search_bucket_auto_widths($p['parts'], $data, $viewMode); continue; }
+        if (!isset($p['bucket']) || $p['bucket']['split'] !== 'bin' || $p['bucket']['width'] !== null) continue;
+        $parts[$i]['bucket']['width'] = _search_bucket_auto_width($data, $viewMode, $p['bucket']['base']);
+    }
+    return $parts;
 }
 }

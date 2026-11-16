@@ -55,6 +55,8 @@ function pnb_fake_answer($sql, $b) {
         return $t ? array($t) : array();
     }
     if (strpos($sql, "WHERE TASK_TYPE = 'DB_DUMP' AND IS_ACTIVE = 1") !== false) { $rec('COLLISION_CHECK'); return array(); }
+    // (2026-11-15) manage_schedule.php's file-name collision check for drop tasks: no other drop tasks here
+    if (strpos($sql, "SELECT ID, OPTIONS FROM NC_REPORTING.PENUMBRA_SCHEDULED_TASKS WHERE REPORT_ID = :rid AND TASK_TYPE = 'DROP_FILE'") === 0) { $rec('DROP_NAME_CHECK'); return array(); }
     if (strpos($sql, 'SELECT ID, TO_CHAR(CREATED_AT') === 0 && strpos($sql, '_test_run_transient') !== false) { $rec('DUP_TEST_CHECK'); return array(); }
     if (strpos($sql, 'SELECT MAX(ID) AS NEW_ID') === 0) { return array(array('NEW_ID' => 777)); }
     if (strpos($sql, 'SELECT ID, ACTION, REPORT_ID FROM NC_REPORTING.PENUMBRA_AUDIT WHERE ID = :aid') === 0) {
@@ -63,6 +65,13 @@ function pnb_fake_answer($sql, $b) {
         $a = $S['audits'][$aid];
         return array(array('ID' => $aid, 'ACTION' => $a['ACTION'], 'REPORT_ID' => $a['REPORT_ID']));
     }
+    // (2026-11-15) Reads the endpoint gained since this fake was written. Each answers as a quiet system would.
+    //   - the report's UPDATED_AT read around the touch (2026-10): no row, the touch goes ahead
+    if (strpos($sql, 'SELECT TRIM(SHORT_ID) AS SID, TO_CHAR(UPDATED_AT') === 0) { return array(); }
+    //   - newtaskid (2026-11-14): the id of the task just inserted, read back by report + owner + type
+    if (strpos($sql, 'SELECT MAX(ID) FROM NC_REPORTING.PENUMBRA_SCHEDULED_TASKS WHERE REPORT_ID = :rid AND OWNER_ID = :own') === 0) { return array(array('NEW_ID' => 777)); }
+    //   - taskchain (2026-11-14): an earlier re-creation of the same deleted task; none here
+    if (strpos($sql, "SELECT JSON_VALUE(r.\"AFTER\", '$.ID') FROM NC_REPORTING.PENUMBRA_AUDIT r") === 0) { return array(); }
     $GLOBALS['__pnb_rec']['unknown'][] = $sql;
     return array();
 }
@@ -120,6 +129,11 @@ if (!function_exists('penumbraSubCondValidate')) {
 }
 if (!function_exists('penumbra_tpl_drop_options_error')) {
     function penumbra_tpl_drop_options_error($options) { return null; }
+}
+// (2026-11-15) db_connection.php helpers the save has called since 2026-10-16 (the SSH key is stored encrypted);
+// the scenarios carry no key, so the pass-through answer is the real one for them.
+if (!function_exists('penumbraSchedulerEncryptPlainSftpKey')) {
+    function penumbraSchedulerEncryptPlainSftpKey($options, $secret) { return array($options, false); }
 }
 function penumbraDenyUnauthenticated() {}
 function penumbraReportGrantAllowsScheduler($g, $s) { return true; }

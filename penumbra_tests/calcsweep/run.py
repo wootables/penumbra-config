@@ -58,6 +58,8 @@ MUTANTS = {
     'whitelistpush': ([("            if (x.def.format !== 'text') summableNames[x.def.name] = true;",
                         "            if (x.def.format !== 'text') { summableNames[x.def.name] = true; window.penumbra_vars.totalExemptions.push(x.def.name); }")],
                       ['no-whitelist-push']),
+    # (2026-11-15) calcraw (7c207fc, 2026-11-14): a chained number column is read by its value, not its shown text
+    'rawread': ([("                    if (rv[n] !== undefined) return rv[n];\n", "")], ['chain-currency']),
 }
 CR = '\n'
 
@@ -110,6 +112,11 @@ if mutants or one:
     print('RESULT: GREEN' if bad == 0 and ok else 'RESULT: RED')
 else:
     res = run_build(src)
+    if control:
+        # (2026-11-15) the build before the sweep is also before calcraw (7c207fc): there a chained Currency column
+        # is read back as shown, so chain-currency's old answer 0.99 is the control's right one (not in CONTROL_RED).
+        for c in res.get('cases', []):
+            if c['id'] == 'chain-currency' and c['got'] == '0.99': c['ok'] = True; c['want'] = '0.99'
     p = f = 0; failed = []
     for c in res.get('cases', []):
         print('  %s  %-22s got=%s want=%s%s' % ('PASS' if c['ok'] else 'FAIL', c['id'], json.dumps(c['got']), json.dumps(c['want']), ('  # ' + c['note']) if c.get('note') else ''))

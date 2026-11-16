@@ -31,7 +31,7 @@ arguments, a colon starts a bucket, and white space is trimmed off every token.
   A split level tags each row with `PENUMBRA_GROUP_ROWID` until the (Other) rollup and the row
   count have seen it once; `penumbra_grouped_row_total` gives the three "N total rows" texts the
   distinct count for that very map.
-- **Not split (yet):** a pivot field reads such a token as the plain column.
+- **Pivots split too (pvdelim, 2026-11-15, LIVE 1ae88da):** a Rows/Columns pill carries data-delim; one such field per pivot, first on its axis; totals across its values off, their shares refused. Scenario `pvdelim` (W-*, 12; control 7 red). Sweep d16d248: 8 more (W-escape, W-escdrill, W-gatedir, W-rankother, W-rankcols, W-otherdrill, W-refusedcount, W-search; fixture column XL on scn=pvdelim only), 7 red on 1ae88da; php test 34 (6 red on 1ae88da); runner test ..\pvdelim\php_pivot_test.php (27).
 - **(splitviz, 2026-10-26) Charts and the value lists split too.** A chart's X axis or series `PI_LIST:dsemi`
   draws one bar per value (`vizBucketRowsForAxis` gives a row one copy per value it lists; the bars count
   listings, and the builder's note under the X axis says so); a click, the breakdown, a drill and the filter

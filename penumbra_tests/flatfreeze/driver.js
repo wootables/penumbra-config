@@ -452,13 +452,16 @@
     FF.set(0, null); fire();
     var off = $('#sbCustomCols').css('display');
     FF.set(0, 2); fire();
-    var on = $('#sbCustomCols').css('display'), txt = $('#sbCustomColsDiff').text();
+    // (2026-11-15) the diff is a row per setting now (myview 7): label, this view's value, "default: <report's>"
+    var frozenRow = function () { var r = $('#sbCustomColsDiff .sb-cc-diff-row').filter(function () { return $(this).find('.sb-cc-k').text() === 'Frozen columns'; }).first();
+      return r.length ? r.find('.sb-cc-v').text() + ' | ' + r.find('.sb-cc-r').text() : ''; };
+    var on = $('#sbCustomCols').css('display'), txt = frozenRow();
     FF.set(3, 0); fire();
-    var txt2 = $('#sbCustomColsDiff').text();
+    var txt2 = frozenRow();
     FF.set(2, 2); fire();
     var same = $('#sbCustomCols').css('display');
     rec('C1 the pill lights for a count that departs from the report, and says both numbers',
-      off === 'none' && on !== 'none' && txt.indexOf('Frozen columns: 2 here, none in the report') !== -1 && txt2.indexOf('Frozen columns: none here, 3 in the report') !== -1 && same === 'none',
+      off === 'none' && on !== 'none' && txt === '2 | default: none' && txt2 === 'none | default: 3' && same === 'none',
       'off=' + off + ' on=' + on + ' [' + txt + '] [' + txt2 + '] same=' + same);
     FF.set(0, null); fire();
   }

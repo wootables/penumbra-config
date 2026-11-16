@@ -103,13 +103,13 @@
                     <div id="pivot-vals" class="pivot-drop-zone pivot-vals-drop" data-placeholder="Drop a column here to add an aggregation"></div>
                     <table id="pivot-agg-table">
                         <thead><tr>
-                            <th class="pat-drag"></th>
-                            <th class="pat-agg" data-tip="The math operation applied to each cell of this pivot row. Sum adds values, Count counts matching rows, Average/Median give the center, Min/Max find extremes, Std Deviation and Range measure spread, Count Non-Blank/Blank split rows by whether the value is filled in, and Mode/Antimode find the most/least common value. Derived types (% of Row/Column/Grand Total, % Change, Running Total, Index) are calculated from a base row above them and must be listed after at least one base aggregation. Click any Aggregate cell below to change its type.">Aggregate</th>
-                            <th class="pat-src" data-tip="Which column from your query result this aggregation reads. Sum/Avg/Min/Max/Median/Std Deviation/Range need a numeric column (dollars, counts, etc). Count, Count (Distinct), Count Non-Blank/Blank, Mode and Antimode accept any column. Derived types like % Change or Running Total inherit their source from the base row above and cannot be changed here. Click a cell to pick a different source column.">Source Column</th>
-                            <th class="pat-lbl" data-tip="The header text shown for this value in the generated pivot table, Excel/CSV exports, and scheduled emails. Defaults to the aggregation name ('Sum', 'Count', etc.). Click a cell to type a custom label - handy when you have multiple aggregations and want clearer names like 'Total Awarded' or 'Active Grants Count'.">Display Label</th>
-                            <th class="pat-flt" data-tip="Optional condition that restricts which rows feed into this aggregation. Uses the same syntax as the main filter box - e.g. STATUS = Active, AMOUNT > 1000, DEPT = /^Med/. Leave blank to include all rows (default). Great for side-by-side comparisons in one pivot: add two Sum rows, filter one to 'STATUS = Active' and leave the other unfiltered to show Active vs All.">Filter</th>
-                            <th class="pat-colt" data-tip="Controls how this row is summarized in the footer (totals) row at the bottom of the pivot. Defaults to 'Same as [Aggregate]' - the footer uses the same operation as the cells. Click a cell below to override with a different base aggregation, e.g. show an Average in the footer even though the cells are Sums. Useful when summing sums doesn't make sense (averaging per-row counts, showing a median across columns, etc.).">Column Total</th>
-                            <th class="pat-opt" data-tip="Options for this value. Format: Number, Currency or Percent, and how many decimals. Shading: a color scale or data bars on its cells, each pivot column on its own scale (bars are capped at the 99th percentile, negatives and % changes shade both ways from zero). Applies when you Generate; saved with the pivot, its presets and the report, and scheduled emails show it too.">&#9881;</th>
+                            <th class="pat-drag"><span class="bld-help-icon" data-tip="pivot-vt-table" aria-label="About the Values table"></span></th>
+                            <th class="pat-agg" data-tip="pivot-vt-agg">Aggregate</th>
+                            <th class="pat-src" data-tip="pivot-vt-src">Source Column</th>
+                            <th class="pat-lbl" data-tip="pivot-vt-lbl">Display Label</th>
+                            <th class="pat-flt" data-tip="pivot-vt-flt">Filter</th>
+                            <th class="pat-colt" data-tip="pivot-vt-colt">Column Total</th>
+                            <th class="pat-opt" data-tip="pivot-value-options">&#9881;</th>
                             <th class="pat-rm"></th>
                         </tr></thead>
                         <tbody id="pivot-agg-table-body">
@@ -554,6 +554,16 @@
         r.D_LIST = d5.join('; ');
       });
       COLS.push('PROJS', 'D_LIST');
+    }
+    // (pvdelim fix, 2026-11-15) XL: a semicolon list as query.php sends it (entities escaped), with markup that must
+    // print as text ("x <img onerror>", "a<b"), an apostrophe (O&#039;Brien), and cells listing nothing ('' and ';')
+    if (window.__SCN === 'pvdelim') {
+      rows.forEach(function (r, ri) {
+        var k = ri % 5;
+        r.XL = k === 0 ? 'x &lt;img src=x onerror=window.__pvXss=1//; Smith' : k === 1 ? 'Smith; a&lt;b'
+             : k === 2 ? 'O&#039;Brien; Smith' : k === 3 ? (ri % 10 === 3 ? ';' : '') : 'O&#039;Brien';
+      });
+      COLS.push('XL');
     }
     window.__rowsFixture = rows;
     var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);

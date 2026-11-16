@@ -153,7 +153,11 @@
                '\nvar vhReportId = H.rid, vhDefaultSub = null;\n' +
                slice(js, '        function vhOpen(selectId, otherShortId, otherTitle) {', '        // Published on the shared bridge', 8000) +
                '\nwindow.Penumbra = window.Penumbra || {}; window.Penumbra.openVersionHistory = vhOpen;\n' +
-               (q.get('tip') === '1' ? slice(js, '    $(document).tooltip({', "    $('#report-options-tab').tooltip({", 8000) : '') +
+               // (2026-11-15) The block used to end at the Custom Code tab's own jQuery UI tooltip; fnpop
+               // (2026-10-22) replaced that widget with a popover and left a comment in its place. New
+               // builds end at that comment; a pre-fnpop build (-Control) still ends at the old widget.
+               (q.get('tip') === '1' ? slice(js, '    $(document).tooltip({',
+                   js.indexOf("    $('#report-options-tab').tooltip({") >= 0 ? "    $('#report-options-tab').tooltip({" : "    // The function names' hover help (2026-10-22, fnpop)", 8000) : '') +
                // The REAL Ctrl+Shift+Y case of the capture-phase hotkey listener.
                '\nwindow.__hotY = function () { var e = { preventDefault: function () { }, stopPropagation: function () { } }; switch (\'Y\') {\n' +
                slice(js, "                case 'Y': // Open Version History", '\n            }\n        }\n', 3000) + '\n} };\n' +

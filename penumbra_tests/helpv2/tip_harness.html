@@ -38,23 +38,26 @@
   function leave(el) { el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })); }
   function pop() { var p = $('.bld-help-pop'); return { n: p.length, open: p.hasClass('open'), text: $.trim(p.text()) }; }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // (2026-11-15) hoverdelay (8f91000, 2026-11-13): a tip opens only after the pointer rests on its icon for 450 ms
+  // (SHOW_DELAY), so each hover waits past that before reading the popover (the waits were 30 ms).
+  var REST = 600;
   (async function () {
     try {
       // T1: nothing has asked for the popover yet. The first hover must wire it and replay itself.
-      over(document.getElementById('icType')); await wait(30);
+      over(document.getElementById('icType')); await wait(REST);
       var p1 = pop();
       record('T1 first hover wires the popover (no dialog asked)', p1.open && p1.text.indexOf('Type tip') === 0, JSON.stringify(p1));
       leave(document.getElementById('icType')); await wait(250);
 
       // T2: the explicit path every builder's open uses still works, and stays idempotent (one popover element).
       initHelpPopover();
-      over(document.getElementById('icName')); await wait(30);
+      over(document.getElementById('icName')); await wait(REST);
       var p2 = pop();
       record('T2 explicit initHelpPopover then a tab-help-icon hover', p2.n === 1 && p2.open && p2.text.indexOf('Name tip') === 0, JSON.stringify(p2));
       leave(document.getElementById('icName')); await wait(250);
 
       // T3: a data-tip that is a sentence, not a key, renders as plain text.
-      over(document.getElementById('icText')); await wait(30);
+      over(document.getElementById('icText')); await wait(REST);
       var p3 = pop();
       record('T3 inline text tip', p3.open && p3.text === 'A plain sentence shown as text', JSON.stringify(p3));
       leave(document.getElementById('icText')); await wait(250);

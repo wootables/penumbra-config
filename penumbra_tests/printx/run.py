@@ -2,12 +2,12 @@
 # PRINTX SUITE (2026-10-10) - the print sweep: data bars print, the tables size
 # their columns on paper, help icons / chart cog stay off, a dark theme's pivot
 # Grand Total and charts print readably, the "Printed ..." stamp, and the
-# Download dialog's Print option. (2026-11-01: + gtBand, a pivot's total cells
+# Download dialog's Print option (removed 2026-11-15: the checks now pin it gone). (2026-11-01: + gtBand, a pivot's total cells
 # print the #eee band - from this sweep on they had printed white.)
 #   page half   harness.html (mk_harness.py, from shade's) + driver.js; run.py puts
 #               the page in PRINT media (Emulation.setEmulatedMedia) when the driver
 #               is ready, so every check reads the styles as they print  L-*, E-*
-#   source      index.php's Print option + its tip, main.js's case 'print'     S-*
+#   source      the Download dialog has no Print row, main.js no case 'print'  S-*
 #
 #   py -3 run.py [--stage DIR] [--control] [--mutants | --mutant NAME]
 # =============================================================================
@@ -42,7 +42,7 @@ MUTANTS = {
     # js (CRLF)
     'j-stamp': ([('main', "                    ? onSheet.toLocaleString() + ' of ' + $all.length.toLocaleString() + ' rows (this page only)'\r\n",
                   "                    ? $all.length.toLocaleString() + ' rows'\r\n")], ['L-xflat-stampText'], ['xflat']),
-    'j-print': ([('main', "                setTimeout(function () { window.print(); }, 150);\r\n", "")], ['S-printCase'], []),
+    'j-print': ([('main', "            case 'csv':\r\n                let csvExportData;\r\n", "            case 'print':\r\n            case 'csv':\r\n                let csvExportData;\r\n")], ['S-noPrintCase'], []),
 }
 
 args = sys.argv[1:]
@@ -144,10 +144,10 @@ def write_stage(texts):
 def run_source(texts):
     idx, m = texts['idx'], texts['main']
     out = []
-    # the box: "search box", or "filter box" since penumbra_tests\filterword (2026-10-19), which pins the word
-    out.append(('S-printOption', '<input type="radio" name="downloadFormat" value="print">' in idx and any(('<code># 1-200</code> in the %s box for the first 200 rows' % w) in idx for w in ('filter', 'search')), ''))
+    # (2026-11-15) the Download dialog's Print row is gone (Ctrl+P and quick actions' Print print the same view)
+    out.append(('S-noPrintOption', 'value="print"' not in idx and '<input type="radio" name="downloadFormat" value="pdf">' in idx, ''))
     out.append(('S-stampEl', '<div id="pnbPrintStamp" aria-hidden="true"></div>' in idx and idx.index('id="pnbPrintStamp"') < idx.index('<div id="reportHeaderContainer"'), ''))
-    out.append(('S-printCase', "case 'print':" in m and "setTimeout(function () { window.print(); }, 150);" in m, ''))
+    out.append(('S-noPrintCase', "case 'print':" not in m and "case 'csv':" in m, ''))
     return out
 
 def run_browser(scns):

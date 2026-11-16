@@ -335,11 +335,20 @@
         R.chk.engNoFlag = nf(2) === ref(0.02) && nf(100) === ref(1) && nf(-10) === ref(-0.1);
         R.info.eng = { rs2: rs(2), want: ref(0.5), nf2: nf(2) };
         // vectors for the email's twin (test_pvfix.php): each value's css under rankSides
-        var vecs = [];
+        // (2026-11-15, drift) Default Light's screen colours are Low Shade since 2026-11-08 (e65935d: main.css, the
+        // class-free body[data-theme], --brand-primary #2747c7) while "the themes_config.php row is deliberately
+        // unchanged: PDFs, print, Excel and email keep the established blue" (#336699) - so on Default the page and the
+        // email differ by design, in the ramp's colours, not in the rank. The vectors are taken on the established
+        // Default (data-theme off for the reading: :root's own variables, the ones themes_config.php carries), which is
+        // what the email twin is asked for ('theme-default').
+        var vecs = [], dt0 = document.body.getAttribute('data-theme');
+        if (dt0 !== null) document.body.removeAttribute('data-theme');
+        R.info.vecPrimary = getComputedStyle(document.body).getPropertyValue('--brand-primary').trim();
         [[-10, 1, 2, 2, 3, 100], [-500, -400, -3, 0, 0, 7, 9, 12, 40000], [5, 6, 7, -1]].forEach(function (vs) {
           var d = H.domainFrom(vs, null, '0'), f = H.colorizer(d, { ramp: 'diverging', curve: 'rank', rankSides: true, mode: 'fill', text: 'auto' });
           vecs.push({ vals: vs, css: vs.map(function (v) { return f(v); }) });
         });
+        if (dt0 !== null) document.body.setAttribute('data-theme', dt0);
         R.info.vec = vecs;
       });
     }

@@ -53,6 +53,24 @@ $g3 = pivot_active_gate(array('rows' => array('DEPT'), 'cols' => array($T . ':pr
 eqv('gate: a Sum split by days keeps every total', array($g3['note'], isset($g3['settings']['totalRowAggs']), $g3['noFooter']), array('', false, false));
 eqv('gate: a plain pivot is untouched', pivot_active_gate(array('rows' => array('DEPT'), 'cols' => array('START_DATE:fy'), 'agg' => array('sum')))['note'], '');
 
+// (pvactfix, 2026-11-15) the cumulative % and running totals by direction, % of parent, the rank
+$ga = function ($rows, $cols, $agg, $extra = array()) { return pivot_active_gate(array_merge(array('rows' => $rows, 'cols' => $cols, 'agg' => $agg), $extra)); };
+$adir = array(
+    $ga(array('DEPT'), array($T), array('sum', 'pct_cum'))['refuse'] !== '',
+    $ga(array('DEPT'), array($T), array('sum', 'pct_cum:down'))['refuse'] !== '',
+    $ga(array($T), array('DEPT'), array('sum', 'pct_cum'))['refuse'] !== '',
+    $ga(array($T), array('DEPT'), array('sum', 'pct_cum:down'))['refuse'] !== '',
+    $ga(array($T), array('DEPT'), array('sum', 'running_total:down'))['refuse'] !== '',
+    $ga(array('DEPT'), array($T), array('sum', 'running_count'))['refuse'] !== '',
+    $ga(array($T), array('DEPT'), array('sum', 'pct_parent_row'))['refuse'] !== '');
+eqv('fix: by direction (pct_cum across, :down down), running totals, % of parent', $adir, array(true, false, false, true, true, true, true));
+$ark = array('rankDir' => 'top', 'rankN' => 2, 'rankAgg' => 'sum');
+ok('fix: rank with it in Columns: refused', strpos($ga(array('DEPT'), array($T), array('sum'), $ark)['refuse'], 'Rank is not offered with START_DATE to END_DATE in Columns') === 0);
+$gAo = $ga(array($T), array('DEPT'), array('sum'), $ark);
+eqv('fix: rank with it in Rows: (Other) off, said', array($gAo['refuse'], $gAo['settings']['rankOther'], strpos($gAo['note'], 'The (Other) row is off too') !== false), array('', false, true));
+eqv('fix: a Sum split by days keeps rank and (Other) (its shares add up)', array($ga(array('DEPT'), array($T . ':prorate'), array('sum'), $ark)['refuse'], isset($ga(array($T . ':prorate'), array('DEPT'), array('sum'), $ark)['settings']['rankOther'])), array('', false));
+eqv('fix: the count of a ranked active field: the top 2, no (Other)', pivot_count_after_rank($rows, array('rows' => array($T), 'cols' => array(), 'vals' => 'AMT', 'agg' => array('sum'), 'rankDir' => 'top', 'rankN' => 2, 'rankAgg' => 'sum')), 2);
+
 // the three builders
 $sC = array('rows' => array('DEPT'), 'cols' => array($T), 'vals' => 'AMT', 'agg' => array('sum'));
 $sR = array('rows' => array($T), 'cols' => array('DEPT'), 'vals' => 'AMT', 'agg' => array('sum'));

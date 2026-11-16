@@ -132,6 +132,13 @@ def hook(src):
         if len(m) != 1: raise SystemExit('count %s: %d definitions' % (name, len(m)))
         ind, asy = m[0].group(1), m[0].group(2) or ''
         pre = 'var __C = window.__CNT; __C.%s = (__C.%s || 0) + 1;' % (name, name)
+        # (2026-11-15, drift) 673a5be (2026-11-06, pvcount): a search's status line counts the pivot's rows through
+        # generatePivotTable's count-only exit (arguments[19] === true: its row pass, no HTML) - once per source and
+        # settings (penumbraPivotShownBaseline's memo). Not a BUILD of the pivot, which is what these checks count:
+        # kept apart as __CNT.generatePivotTableCount.
+        if name == 'generatePivotTable':
+            pre = ('var __C = window.__CNT; if (arguments[19] === true) __C.generatePivotTableCount = (__C.generatePivotTableCount || 0) + 1; '
+                   'else __C.generatePivotTable = (__C.generatePivotTable || 0) + 1;')
         if name == 'resetCellStates':
             body = pre + ' window.__CNTX.rcs++; try { return __o_%s.apply(this, arguments); } finally { window.__CNTX.rcs--; }' % name
         elif name == 'applyConditionalFormatting':

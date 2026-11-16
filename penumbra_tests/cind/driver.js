@@ -26,7 +26,15 @@
   function acts() { var m = menu(); return m ? Array.prototype.map.call(m.querySelectorAll('.pnb-hm-item'), function (e) { return e.getAttribute('data-act'); }) : []; }
   function itemOf(act) { var m = menu(); return m ? m.querySelector('.pnb-hm-item[data-act="' + act + '"]') : null; }
   function tops() { return Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer > .group-wrapper')); }
-  function diffText() { var d = document.getElementById('sbCustomColsDiff'); return d ? d.textContent.replace(/\s+/g, ' ') : ''; }
+  // (2026-11-15, drift) ac53d1f (2026-11-13, myview 5): the chip's popover lists label / value rows under group headings, the report's
+  // own setting in a 'default: X' tail (myview 7) - no longer sentences ('Formats set here: V_AMOUNT', 'Sorted here by V_ID (ascending)
+  // (the report has no sort)'). Read as 'label: value (default: X); ...'. An ascending sort is the bare column name now.
+  function diffText() {
+    var d = document.getElementById('sbCustomColsDiff'); if (!d) return '';
+    var r = d.querySelectorAll('.sb-cc-diff-row'); if (!r.length) return d.textContent.replace(/\s+/g, ' ');
+    return Array.prototype.map.call(r, function (e) { var k = e.querySelector('.sb-cc-k'), v = e.querySelector('.sb-cc-v'), p = e.querySelector('.sb-cc-r');
+      return (k ? k.textContent : '') + ': ' + (v ? v.textContent : '') + (p ? ' (' + p.textContent + ')' : ''); }).join('; ');
+  }
   function chipOn() { var c = document.getElementById('sbCustomCols'); return !!c && getComputedStyle(c).display !== 'none'; }
   var S = {
     mcind: async function () {
@@ -37,7 +45,7 @@
       R.chk.plainNoDot = !!o0 && !o0.querySelector('.pnb-hm-dot') && !/Set on this column/.test(o0.getAttribute('title') || '');
       closeMenu();
       R.info.chip0 = { on: chipOn(), diff: diffText() };
-      var chip0 = !chipOn() || !/Formats set here|Sorted here/.test(diffText());
+      var chip0 = !chipOn() || !/Formats: |Sort: /.test(diffText());
       // a format on V_AMOUNT: the dot, its words in the tip, the count for a screen reader
       window.Penumbra.setColOpt('V_AMOUNT', 'format', 'currency:0');
       await sleep(300);
@@ -60,14 +68,14 @@
       R.info.name = t2;
       closeMenu();
       // the chip: lit, the formats and the Click to filter named
-      await until(function () { return /Click to filter set here/.test(diffText()); }, 3000);
+      await until(function () { return /Click to filter: /.test(diffText()); }, 3000);
       R.info.chip1 = { on: chipOn(), diff: diffText() };
-      R.chk.chipOpts = chip0 && chipOn() && /Formats set here: V_AMOUNT/.test(diffText()) && /Click to filter set here: V_NAME/.test(diffText());
+      R.chk.chipOpts = chip0 && chipOn() && /Formats: V_AMOUNT(;|$)/.test(diffText()) && /Click to filter: V_NAME(;|$)/.test(diffText());
       // a sort the report does not have: named on the chip, the report's none
       $(fth('V_ID')).trigger('click');
-      await until(function () { return /Sorted here/.test(diffText()); }, 3000);
+      await until(function () { return /Sort: /.test(diffText()); }, 3000);
       R.info.chip2 = diffText();
-      R.chk.chipSort = /Sorted here by V_ID \(ascending\) \(the report has no sort\)/.test(diffText());
+      R.chk.chipSort = /Sort: V_ID \(default: none\)(;|$)/.test(diffText());
       // no Save button in the chip's card any more
       R.chk.noSave = !document.getElementById('sbCustomColsSave') || getComputedStyle(document.getElementById('sbCustomColsSave')).display === 'none';
     },

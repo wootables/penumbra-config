@@ -36,7 +36,7 @@
 # -n (skip php.ini) because from a workstation the ini cannot load oci8/sqlsrv -
 # those client libraries exist only on the server. Nothing here needs them.
 #
-# EXPECTED TAIL: "PASS 138   FAIL 0". Any other tail is a failure, a smaller
+# EXPECTED TAIL: "PASS 140   FAIL 0" (2026-11-15: harness repaired, rollbackaccess pair). Any other tail is a failure, a smaller
 # pass count included. (Re-baselined 2026-09-16 from 135 after the 09-06/09-09
 # $relinkTables additions - see the RE-BASELINE note in test_restore.php.)
 # =============================================================================

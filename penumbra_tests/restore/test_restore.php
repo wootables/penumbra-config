@@ -187,8 +187,19 @@ function pnb_build_core($srcFile, $destFile) {
     $lines = file($srcFile);
     $out = array();
     $hit = array('require' => 0, 'csrf' => 0, 'header' => 0, 'input' => 0, 'exit' => 0, 'httpcode' => 0);
+    $inTopFn = false;   // (2026-11-15) the endpoint declares helper functions at its top level; the core is required
+                        // once per scenario, so each is guarded (the second require died on "Cannot redeclare")
+    $appDir = str_replace(chr(92), '/', dirname($srcFile));
     foreach ($lines as $ln) {
         $t = trim($ln);
+        if (preg_match('/^function\s+(\w+)\s*\(/', $ln, $fm)) {
+            $out[] = "if (!function_exists('" . $fm[1] . "')) {" . PHP_EOL; $out[] = $ln; $inTopFn = true; continue;
+        }
+        if ($inTopFn && rtrim($ln) === '}') { $out[] = $ln; $out[] = '}' . PHP_EOL; $inTopFn = false; continue; }
+        if (strpos($t, "require_once 'penumbra_report_tags.php';") === 0) {
+            // resolved from the app, not from the temp folder the patched core sits in
+            $ln = str_replace("require_once 'penumbra_report_tags.php';", "require_once '" . $appDir . "/penumbra_report_tags.php';", $ln);
+        }
         if (strpos($t, "require_once 'db_connection.php';") === 0) {
             $hit['require']++; $out[] = "// [harness] require stripped\n"; continue;
         }
@@ -372,6 +383,8 @@ class FakeStmt {
         }
         if (strpos($this->sql, 'COUNT(*)') !== false) { return $this->target() ? 1 : 0; }
         $r = $this->target();
+        // (2026-11-15) rollbackaccess reads the report's CURRENT access list by itself (SELECT AUTHORIZED ...)
+        if ($r && strpos($this->sql, 'SELECT AUTHORIZED FROM PENUMBRA_REPORTS') !== false) { return $r['AUTHORIZED']; }
         return $r ? $r['ID'] : false;
     }
     public function rowCount() {
@@ -511,11 +524,23 @@ $SCENARIOS['F1 UPDATE row restores'] = array(
         eq(fx_count('INSERT'), 0, 'UPDATE: nothing inserted');
         $u = fx_first('UPDATE');
         eq($u['set']['TITLE'], 'Grant Profiles (old)', 'UPDATE: snapshot title written');
-        eq($u['set']['AUTHORIZED'], 'dept-a', 'UPDATE: snapshot access list written');
+        // (2026-11-15) rollbackaccess (2026-11-14): a rollback leaves the access list as it is NOW, unless the
+        // request asks for the version's (restore_access) - the scenario after this one.
+        eq($u['set']['AUTHORIZED'], 'dept-a,dept-b', 'UPDATE: the access list is left as it is now');
         eq(state_of($u['set']['STATE_DATA']), array('query' => 'SELECT 1', 'theme' => 'light'),
            'UPDATE: snapshot state written wholesale');
         eq(fx_first('AUDIT')['action'], 'ROLLBACK', 'UPDATE: logged as ROLLBACK');
         eq(fx_first('AUDIT')['report_id'], 4242, 'UPDATE: logged against the live id');
+    }
+);
+
+$SCENARIOS['F1 UPDATE row restores, the access list asked for'] = array(
+    'rows' => array(live_report()), 'in' => payload('UPDATE', array('restore_access' => true)),
+    'user' => $OWNER, 'admin' => false, 'grants' => $NOGRANTS,
+    'check' => function ($resp) {
+        eq($resp['status'], 'success', 'UPDATE + restore_access: success');
+        $u = fx_first('UPDATE');
+        eq($u['set']['AUTHORIZED'], 'dept-a', 'UPDATE + restore_access: snapshot access list written');
     }
 );
 

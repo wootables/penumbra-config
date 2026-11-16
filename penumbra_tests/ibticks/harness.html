@@ -7,7 +7,7 @@
 <div id="reportHeaderContainer"></div>
 <input type="hidden" id="reportSubtitle" value="Harness">
 <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
-<div id="resultsTable"></div><div id="errorBox"></div>
+<!-- (2026-11-15) a real table: journalWatch() (main.js, 2026-10-02) reads resultsTable.tBodies at boot --><table id="resultsTable"><thead></thead><tbody></tbody></table><div id="errorBox"></div>
 <div id="action_overlay" class="pnb-toast-dock"></div>
 <pre id="out">running</pre>
 
@@ -42,6 +42,7 @@
     window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
   }
   if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.__errors = [];
   window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
   window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason))); });

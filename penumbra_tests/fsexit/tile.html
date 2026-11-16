@@ -44,6 +44,7 @@
   window.PENUMBRA_THEME_IDS = ['theme-default'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   // Did an Escape reach THIS page at all? (In native fullscreen the browser
   // normally keeps it.) Window capture, registered before main.js's own
   // capture handler, so it is counted even when that handler stops it.

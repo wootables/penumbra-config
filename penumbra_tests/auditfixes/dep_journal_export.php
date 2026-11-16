@@ -31,6 +31,120 @@ function journalNotesFlatten($notes) {
     }
 }
 
+if (!function_exists('journalSharedNoteText')) {
+function journalSharedNoteText($notes) {
+        if (!is_array($notes) || !$notes) return '';
+        $best = null;
+        foreach ($notes as $n) {
+            if (!is_array($n)) continue;
+            $pid = isset($n['PARENT_ID']) ? (string)$n['PARENT_ID'] : '';
+            if ($pid === '' || $pid === '0') $best = $n;
+        }
+        if ($best === null) return '';
+        $t = preg_replace('/\r\n|\r/', "\n", isset($best['NOTE_TEXT']) ? (string)$best['NOTE_TEXT'] : '');
+        return preg_replace('/^[ \t\n]+|[ \t\n]+$/', '', $t);
+    }
+}
+
+if (!function_exists('journalHasPrivateColumn')) {
+function journalHasPrivateColumn() {
+        static $has = null;
+        if ($has !== null) return $has;
+        try {
+            $r = queryViaOci8("SELECT COUNT(*) AS CNT FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = 'PENUMBRA_JOURNAL' AND COLUMN_NAME = 'IS_PRIVATE'");
+            $has = isset($r[0]['CNT']) && (int)$r[0]['CNT'] > 0;
+        } catch (Exception $e) { $has = false; }
+        return $has;
+    }
+}
+
+if (!function_exists('journalNoteThreadId')) {
+function journalNoteThreadId($n) {
+        $p = (is_array($n) && isset($n['PARENT_ID'])) ? trim((string)$n['PARENT_ID']) : '';
+        if ($p !== '' && $p !== '0') return $p;
+        return (is_array($n) && isset($n['ID'])) ? trim((string)$n['ID']) : '';
+    }
+}
+
+if (!function_exists('journalNoteIsPrivate')) {
+function journalNoteIsPrivate($n) {
+        return is_array($n) && isset($n['IS_PRIVATE']) && trim((string)$n['IS_PRIVATE']) !== '' && (int)$n['IS_PRIVATE'] !== 0;
+    }
+}
+
+if (!function_exists('journalMentionUids')) {
+function journalMentionUids($csv) {
+        $out = array();
+        foreach (explode(',', strtolower((string)$csv)) as $u) {
+            $u = trim($u);
+            if ($u !== '' && !in_array($u, $out, true)) $out[] = $u;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('journalThreadAudiences')) {
+function journalThreadAudiences($rows) {
+        $priv = array();
+        foreach ((array)$rows as $n) { if (journalNoteIsPrivate($n)) $priv[journalNoteThreadId($n)] = true; }
+        if (!$priv) return array();
+        $aud = array();
+        foreach ((array)$rows as $n) {
+            $t = journalNoteThreadId($n);
+            if (!isset($priv[$t])) continue;
+            if (!isset($aud[$t])) $aud[$t] = array();
+            $by = strtolower(trim((string)(isset($n['CREATED_BY']) ? $n['CREATED_BY'] : '')));
+            if ($by !== '') $aud[$t][$by] = true;
+            foreach (journalMentionUids(isset($n['MENTIONS']) ? $n['MENTIONS'] : '') as $u) $aud[$t][$u] = true;
+        }
+        return $aud;
+    }
+}
+
+if (!function_exists('journalVisibleNotes')) {
+function journalVisibleNotes($rows, $uid) {
+        if (!is_array($rows) || !$rows) return is_array($rows) ? $rows : array();
+        $aud = journalThreadAudiences($rows);
+        if (!$aud) return $rows;
+        $me = strtolower(trim((string)$uid));
+        $out = array();
+        foreach ($rows as $n) {
+            $t = journalNoteThreadId($n);
+            if (isset($aud[$t]) && ($me === '' || !isset($aud[$t][$me]))) continue;
+            $out[] = $n;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('journalThreadAudienceList')) {
+function journalThreadAudienceList($rows) {
+        $aud = array();
+        foreach ((array)$rows as $n) {
+            $by = strtolower(trim((string)(isset($n['CREATED_BY']) ? $n['CREATED_BY'] : '')));
+            if ($by !== '') $aud[$by] = true;
+            foreach (journalMentionUids(isset($n['MENTIONS']) ? $n['MENTIONS'] : '') as $u) $aud[$u] = true;
+        }
+        $list = array_keys($aud);
+        $list = array_map('strval', $list);
+        sort($list, SORT_STRING);
+        return $list;
+    }
+}
+
+if (!function_exists('journalNoteCounts')) {
+function journalNoteCounts($rows) {
+        $total = 0; $unseen = 0; $latest = null;
+        foreach ((array)$rows as $n) {
+            $total++;
+            if (isset($n['UNSEEN_FLAG']) && (int)$n['UNSEEN_FLAG'] === 1) $unseen++;
+            $at = isset($n['CREATED_AT']) ? (string)$n['CREATED_AT'] : '';
+            if ($at !== '' && ($latest === null || strcmp($at, $latest) > 0)) $latest = $at;
+        }
+        return array('TOTAL' => $total, 'UNSEEN' => $unseen, 'LATEST_AT' => $latest);
+    }
+}
+
 if (!function_exists('journalCleanKeyValueExport')) {
 function journalCleanKeyValueExport($v) {
         if ($v === null) return '';
@@ -345,7 +459,56 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         // can find rows by their notes ("Notes = budget", a bare word, "Notes > 2") as the page's
         // search does - whether or not the output carries the column.
         $notesRead = !empty($vo['journalRowNotes']);
-        if ((empty($toggles) && !$notesRead) || empty($keyCols)) return null;
+        // Pick lists (2026-11-11, PICKLIST_SPEC.md): the saved lists (viewOptions.journalFields), cleaned as main.js's
+        // penumbraCleanJournalFields restores them - type 'pick', at most 4, a key a toggle column has (or '__...')
+        // skipped, at most 30 options with ids o1..o9999, labels trimmed to 60 characters, the last 10 old names. Each is
+        // a column of TEXT (its option's label), read from the STATE = 2 rows below: it rides with the who / when columns
+        // (whoMeta, kind 'field'), which no toggle rule (1 / 0, Checked / Unchecked) reads.
+        $fieldDefs = array();   // key => array('key', 'label', 'oldLabels', 'options' => [{id, label, retired, oldLabels}])
+        if (isset($vo['journalFields']) && is_array($vo['journalFields'])) {
+            $fCut = function ($s) { return function_exists('mb_substr') ? (string)mb_substr($s, 0, 60, 'UTF-8') : substr($s, 0, 60); };
+            $fClip = function ($v, $d) use ($fCut) {
+                $s = (is_scalar($v) && (string)$v !== '') ? (string)$v : $d;
+                $s = $fCut(trim($s));
+                return ($s === '') ? $d : $s;
+            };
+            $fOld = function ($a) use ($fCut) {
+                $o = array();
+                if (is_array($a)) { foreach ($a as $x) { if (is_string($x) && trim($x) !== '') $o[] = $fCut(trim($x)); } }
+                return array_slice($o, -10);
+            };
+            $fTk = array();
+            foreach ($toggles as $t) {
+                $k = strtolower((string)preg_replace('/[^a-zA-Z0-9_\-]/', '', (is_array($t) && isset($t['key']) && is_scalar($t['key'])) ? (string)$t['key'] : ''));
+                $fTk[($k === '') ? 'done' : $k] = true;
+            }
+            $fPer = array('pick' => 0, 'date' => 0);   // (2026-11-12, DATE_SPEC.md) at most four of each type
+            foreach ($vo['journalFields'] as $fd) {
+                if (!is_array($fd) || !isset($fd['type']) || ($fd['type'] !== 'pick' && $fd['type'] !== 'date')) continue;
+                if ($fPer[$fd['type']] >= 4) continue;
+                $fk = strtolower((string)preg_replace('/[^a-zA-Z0-9_\-]/', '', (isset($fd['key']) && is_scalar($fd['key'])) ? (string)$fd['key'] : ''));
+                if (strlen($fk) > 100) $fk = substr($fk, 0, 100);
+                if ($fk === '' || isset($fieldDefs[$fk]) || isset($fTk[$fk]) || strpos($fk, '__') === 0) continue;
+                $fPer[$fd['type']]++;
+                if ($fd['type'] === 'date') {   // a date column: a label, no options; its values pass through as days
+                    $fieldDefs[$fk] = array('key' => $fk, 'type' => 'date', 'label' => $fClip(isset($fd['label']) ? $fd['label'] : null, 'Due'),
+                                            'oldLabels' => $fOld(isset($fd['oldLabels']) ? $fd['oldLabels'] : null), 'options' => array());
+                    continue;
+                }
+                $fopts = array();
+                $fids = array();
+                foreach ((isset($fd['options']) && is_array($fd['options'])) ? $fd['options'] : array() as $fo) {
+                    if (count($fopts) >= 30) break;
+                    if (!is_array($fo) || !isset($fo['id']) || !is_string($fo['id']) || !preg_match('/^o[1-9][0-9]{0,3}$/', $fo['id']) || isset($fids[$fo['id']])) continue;
+                    $fids[$fo['id']] = true;
+                    $fopts[] = array('id' => $fo['id'], 'label' => $fClip(isset($fo['label']) ? $fo['label'] : null, $fo['id']),
+                                     'retired' => !empty($fo['retired']), 'oldLabels' => $fOld(isset($fo['oldLabels']) ? $fo['oldLabels'] : null));
+                }
+                $fieldDefs[$fk] = array('key' => $fk, 'type' => 'pick', 'label' => $fClip(isset($fd['label']) ? $fd['label'] : null, 'Status'),
+                                        'oldLabels' => $fOld(isset($fd['oldLabels']) ? $fd['oldLabels'] : null), 'options' => $fopts);
+            }
+        }
+        if ((empty($toggles) && !$notesRead && !$fieldDefs) || empty($keyCols)) return null;
         // The toggles as the page reads them (2026-10-09; main.js, manage_journal.php's
         // journalSanitizeToggleKey): a key lower-cased with anything but a-z 0-9 _ - taken out, 'done'
         // when that leaves nothing, at most 100 characters; a missing label "Done". The raw key ("Done")
@@ -443,6 +606,42 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
             }
         }
 
+        // Pick lists (2026-11-11): each row's option - STATE = 2, the option's id in FIELD_VALUE (manage_journal.php's
+        // set_field; a cleared row is STATE 0 and is never read) - kept in whoMap as {field: the option's label, by, on}
+        // (a pick list's key is never a toggle's). Read only when the report has a pick list. A table without FIELD_VALUE
+        // (ORA-00904), or a failed read, leaves the pick lists' columns out this run, with a breadcrumb; the toggles and
+        // the notes are read as before.
+        if ($fieldDefs) {
+            try {
+                $fr = queryViaOci8(
+                    "SELECT TOGGLE_KEY, ROW_KEY, FIELD_VALUE, UPDATED_BY, TO_CHAR(UPDATED_AT, 'YYYY-MM-DD') AS UPDATED_ON FROM PENUMBRA_JOURNAL_TOGGLE WHERE REPORT_ID = :rid AND STATE = 2",
+                    array(':rid' => $reportId));
+            } catch (Exception $e) {
+                $fr = null;
+                $m = (stripos($e->getMessage(), 'ORA-00904') !== false)
+                    ? 'journal pick lists not read - the toggle table has no FIELD_VALUE column; their columns are left out this run.'
+                    : 'journal pick lists not read - their columns are left out this run. ' . $e->getMessage();
+                if (function_exists('log_scheduler')) log_scheduler('  WARNING: ' . $m); else error_log('[penumbra] ' . $m);
+            }
+            if (!is_array($fr)) $fieldDefs = array();
+            else foreach ($fr as $frow) {
+                $fk = isset($frow['TOGGLE_KEY']) ? (string)$frow['TOGGLE_KEY'] : '';
+                $rk = isset($frow['ROW_KEY']) ? (string)$frow['ROW_KEY'] : '';
+                $fv = isset($frow['FIELD_VALUE']) ? (string)$frow['FIELD_VALUE'] : '';
+                if ($fk === '' || $fv === '' || !isset($fieldDefs[$fk])) continue;
+                if (defined('JOURNAL_PARK_OPEN') && strpos($rk, JOURNAL_PARK_OPEN) === 0) continue;   // filed under another key
+                if ($fieldDefs[$fk]['type'] === 'date') {   // (2026-11-12) a day, as stored; anything else as the page shows it
+                    $flbl = (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $fv, $fdm) && checkdate((int)$fdm[2], (int)$fdm[3], (int)$fdm[1])) ? $fv : '(not a date)';
+                } else {
+                    $flbl = '(unknown option)';   // an id the list no longer has, as the page shows it
+                    foreach ($fieldDefs[$fk]['options'] as $fo) { if ($fo['id'] === $fv) { $flbl = $fo['label']; break; } }
+                }
+                $whoMap[$fk][$rk] = array('field' => $flbl,
+                                          'by' => isset($frow['UPDATED_BY']) ? (string)$frow['UPDATED_BY'] : '',
+                                          'on' => isset($frow['UPDATED_ON']) ? (string)$frow['UPDATED_ON'] : '');
+            }
+        }
+
         // Key columns are looked up UPPERCASE (matching masterRowData keys).
         $keyUpper = array();
         foreach ($keyCols as $kc) { $u = journalUpperKey(trim((string)$kc)); if ($u !== '') $keyUpper[] = $u; }
@@ -486,6 +685,49 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                 }
             }
         }
+        // Pick lists (2026-11-11): each named by its label upper-cased (NAME_2... beside a column of that name), after
+        // the toggles as the page paints them, with its who / when columns ("<LABEL> BY" / "<LABEL> ON") when the report
+        // shows them. In whoMeta / whoNames: kind 'field', its who / when entries carrying 'field' => true. fieldOpts,
+        // by output name: the options' labels in the list's order, retired ones last (the page's sort and group order),
+        // the labels now ('cur') and the old ones ('old' => the label now), all upper-cased as the page reads them.
+        $fieldNames = array();
+        $fieldOpts = array();
+        foreach ($fieldDefs as $fd) {
+            $fk = $fd['key'];
+            $name = journalUpperKey($fd['label']);
+            if ($name === '') $name = journalUpperKey($fk);
+            $base = $name; $n = 2;
+            while (isset($existing[$name])) { $name = $base . '_' . $n; $n++; }
+            $existing[$name] = true;
+            $whoMeta[] = array('name' => $name, 'key' => $fk, 'kind' => 'field');
+            $whoNames[] = $name;
+            $fieldNames[] = $name;
+            // (2026-11-12, DATE_SPEC.md DD6) a date column's who / when columns are "<LABEL> SET BY" / "SET ON": "DUE ON"
+            // would read as the due day itself
+            $fIsDate = ($fd['type'] === 'date');
+            $fSfx = $fIsDate ? array('by' => ' SET BY', 'on' => ' SET ON') : array('by' => ' BY', 'on' => ' ON');
+            $outByKey[$fk] = array('name' => $name, 'sfx' => $fSfx);
+            if ($who) {
+                foreach ($fSfx as $fkind => $fsfx) {
+                    $fwn = $base . $fsfx; $fwb = $fwn; $fwi = 2;
+                    while (isset($existing[$fwn])) { $fwn = $fwb . '_' . $fwi; $fwi++; }
+                    $existing[$fwn] = true;
+                    $whoMeta[] = array('name' => $fwn, 'key' => $fk, 'kind' => $fkind, 'field' => true);
+                    $whoNames[] = $fwn;
+                    $outByKey[$fk][$fkind] = $fwn;
+                }
+            }
+            if ($fIsDate) continue;   // no options: its order is the days' own (natural text order, chronological for ISO)
+            $fLive = array(); $fRet = array(); $fCur = array(); $fOldMap = array();
+            foreach ($fd['options'] as $fo) {
+                if ($fo['retired']) $fRet[] = $fo['label']; else $fLive[] = $fo['label'];
+                $fCur[journalUpperKey($fo['label'])] = true;
+            }
+            foreach ($fd['options'] as $fo) {
+                foreach ($fo['oldLabels'] as $fol) { $fu = journalUpperKey($fol); if (!isset($fOldMap[$fu])) $fOldMap[$fu] = $fo['label']; }
+            }
+            $fieldOpts[$name] = array('key' => $fk, 'order' => array_merge($fLive, $fRet), 'cur' => $fCur, 'old' => $fOldMap);
+        }
         // The Notes column (2026-10-14): named "NOTES" as the page names it, or NOTES_2... beside a
         // data column of that name; each row's notes flattened as the page's copy does.
         $notesName = null;     // the output column: only with "Include notes in downloads and emails"
@@ -494,13 +736,17 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         $notesCount = array(); // row key => number of notes (replies too), as the page counts them
         if ($notesRead) {
             $nr = null;
+            // Private notes (2026-11-13, privnote) are left out of every server output - exports, the API,
+            // scheduled email, task filters, search - for everyone, their audience included: one email body
+            // goes to every recipient, and this resolver's memo is shared across a task's recipients.
+            $privCol = function_exists('journalHasPrivateColumn') && journalHasPrivateColumn();
             foreach (array(true, false) as $withParent) {   // a table from before threads or attachments has no PARENT_ID / ATTACH_NAME
                 try {
                     $nr = queryViaOci8(
-                        "SELECT ID, ROW_KEY, NOTE_TEXT, CREATED_BY, AUTHOR_NAME" . ($withParent ? ', PARENT_ID, ATTACH_NAME' : '') . ",
+                        "SELECT ID, ROW_KEY, NOTE_TEXT, CREATED_BY, AUTHOR_NAME" . ($withParent ? ', PARENT_ID, ATTACH_NAME' : '') . ($privCol ? ', IS_PRIVATE' : '') . ",
                                 TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS') AS CREATED_AT
                            FROM PENUMBRA_JOURNAL
-                          WHERE REPORT_ID = :rid AND SCOPE = 'row' AND ROW_KEY IS NOT NULL
+                          WHERE REPORT_ID = :rid AND SCOPE = 'row' AND ROW_KEY IS NOT NULL" . ($privCol ? " AND NVL(IS_PRIVATE, 0) = 0" : '') . "
                           ORDER BY CREATED_AT ASC, ID ASC",
                         array(':rid' => $reportId));
                     break;
@@ -515,18 +761,21 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
             if (is_array($nr)) {
                 $byKey = array();
                 foreach ($nr as $n) {
+                    if (function_exists('journalNoteIsPrivate') && journalNoteIsPrivate($n)) continue;   // (privnote) never out of the page
                     $rk = isset($n['ROW_KEY']) ? (string)$n['ROW_KEY'] : '';
                     if ($rk === '' || (defined('JOURNAL_PARK_OPEN') && strpos($rk, JOURNAL_PARK_OPEN) === 0)) continue;   // filed under another key
                     $byKey[$rk][] = $n;
                 }
                 foreach ($byKey as $rk => $list) { $notesMap[(string)$rk] = journalNotesFlatten($list); $notesCount[(string)$rk] = count($list); }
+                // A Shared note (2026-11-01, sharednote): the row's note as its own text, as the page reads it.
+                if (isset($vo['journalNotesMode']) && $vo['journalNotesMode'] === 'shared') { foreach ($byKey as $rk => $list) $notesMap[(string)$rk] = journalSharedNoteText($list); }
                 $notesSearch = 'NOTES'; $nn = 2;
                 while (isset($existing[$notesSearch])) { $notesSearch = 'NOTES_' . $nn; $nn++; }
                 $existing[$notesSearch] = true;
                 if ($notesOut) $notesName = $notesSearch;
             }
         }
-        if (empty($colMeta) && $notesSearch === null) return null;
+        if (empty($colMeta) && empty($whoMeta) && $notesSearch === null) return null;
 
         // A renamed toggle keeps answering to its OLD names (2026-10-08): the browser saves
         // them (viewOptions.journalToggles[].oldLabels) when a renamed toggle is saved, and
@@ -584,6 +833,35 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
             }
         }
 
+        // A pick list's names as a toggle's (2026-11-11): its label's ASCII-only forms, and a renamed list's old names
+        // (viewOptions.journalFields[].oldLabels) with their who / when columns. Twin: main.js journalSearchCols.
+        foreach ($fieldDefs as $fd) {
+            $fk = $fd['key'];
+            if (!isset($outByKey[$fk])) continue;
+            $fpairs = array();
+            $fsx = $outByKey[$fk]['sfx'];   // (2026-11-12) ' BY' / ' ON', or a date column's ' SET BY' / ' SET ON'
+            $fu = journalUpperKey(trim($fd['label']));
+            if ($fu !== '') {
+                foreach ($asciiForms($fd['label']) as $fa) {
+                    if ($fa === $fu) continue;
+                    $fpairs[$fa] = $fu;
+                    if (isset($outByKey[$fk]['by']) && $outByKey[$fk]['by'] === $fu . $fsx['by']) $fpairs[$fa . $fsx['by']] = $fu . $fsx['by'];
+                    if (isset($outByKey[$fk]['on']) && $outByKey[$fk]['on'] === $fu . $fsx['on']) $fpairs[$fa . $fsx['on']] = $fu . $fsx['on'];
+                }
+            }
+            foreach ($fd['oldLabels'] as $fol) {
+                foreach (array_unique(array_merge(array(journalUpperKey(trim((string)$fol))), $asciiForms($fol))) as $fa) {
+                    if ($fa === '' || $fa === 'NOTES' || isset($fpairs[$fa])) continue;
+                    $fpairs[$fa] = $outByKey[$fk]['name'];
+                    if (isset($outByKey[$fk]['by'])) $fpairs[$fa . $fsx['by']] = $outByKey[$fk]['by'];
+                    if (isset($outByKey[$fk]['on'])) $fpairs[$fa . $fsx['on']] = $outByKey[$fk]['on'];
+                }
+            }
+            foreach ($fpairs as $fa => $fto) {
+                $fa = (string)$fa;   // a numeric-looking name is an INT array key
+                if (!isset($existing[$fa]) && !isset($aliasMap[$fa])) $aliasMap[$fa] = (string)$fto;
+            }
+        }
         $built = array('colNames' => $colNames, 'colMeta' => $colMeta, 'keyUpper' => $keyUpper, 'stateMap' => $stateMap,
                        'whoMeta' => $whoMeta, 'whoNames' => $whoNames, 'whoMap' => $whoMap, 'aliasMap' => $aliasMap,
                        // Kept apart from whoNames: a search or a snippet never reads it (the page's
@@ -591,6 +869,10 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                        'notesName' => $notesName, 'notesMap' => $notesMap,
                        // The search's (2026-10-14): read by journalExportNotesSearchValues().
                        'notesSearch' => $notesSearch, 'notesCount' => $notesCount);
+        // The pick lists' output names, and their options by output name (2026-11-11): the task filters' old option
+        // labels (penumbra_search.php) and the list's sort order (journalExportFieldSortOrders) read them.
+        $built['fieldNames'] = $fieldNames;
+        $built['fieldOpts'] = $fieldOpts;
         if ($memoOn) $GLOBALS['penumbra_jt_resolver_memo'][$memoKey] = $built;
         return $built;
     }
@@ -734,11 +1016,12 @@ function journalStripWhoCols($rows, $from) {
 
 if (!function_exists('journalExportMapSortCriteria')) {
 function journalExportMapSortCriteria($criteria, $resolver) {
-        if (!is_array($criteria) || !is_array($resolver) || empty($resolver['colMeta'])) return $criteria;
+        if (!is_array($criteria) || !is_array($resolver) || (empty($resolver['colMeta']) && empty($resolver['whoMeta']))) return $criteria;
         $map = array();
         foreach ($resolver['colMeta'] as $cm) $map[strtoupper('__JOURNAL_TOGGLE__' . $cm['key'])] = (string)$cm['name'];
         if (!empty($resolver['whoMeta'])) {
-            foreach ($resolver['whoMeta'] as $wm) $map[strtoupper(($wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__') . $wm['key'])] = (string)$wm['name'];
+            // ...and a pick list's (2026-11-11): kind 'field', __JOURNAL_FIELD__<key>.
+            foreach ($resolver['whoMeta'] as $wm) $map[strtoupper(($wm['kind'] === 'field' ? '__JOURNAL_FIELD__' : ($wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__')) . $wm['key'])] = (string)$wm['name'];
         }
         if (!empty($resolver['aliasMap']) && is_array($resolver['aliasMap'])) {
             foreach ($resolver['aliasMap'] as $a => $to) { if (!isset($map[strtoupper((string)$a)])) $map[strtoupper((string)$a)] = (string)$to; }
@@ -755,18 +1038,25 @@ function journalExportMapSortCriteria($criteria, $resolver) {
 
 if (!function_exists('journalExportToggleGroupBy')) {
 function journalExportToggleGroupBy($groupBy, $resolver) {
-        if (!is_array($resolver) || empty($resolver['colMeta']) || !is_string($groupBy)) return $groupBy;
+        if (!is_array($resolver) || (empty($resolver['colMeta']) && empty($resolver['whoMeta'])) || !is_string($groupBy)) return $groupBy;
         $byKey = array();
         foreach ($resolver['colMeta'] as $cm) $byKey[strtolower((string)$cm['key'])] = $cm['name'];
         $byWho = array();
         if (!empty($resolver['whoMeta'])) {
-            foreach ($resolver['whoMeta'] as $wm) $byWho[strtoupper(($wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__') . $wm['key'])] = $wm['name'];
+            // ...and a pick list's, __JOURNAL_FIELD__<key> (2026-11-11).
+            foreach ($resolver['whoMeta'] as $wm) $byWho[strtoupper(($wm['kind'] === 'field' ? '__JOURNAL_FIELD__' : ($wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__')) . $wm['key'])] = $wm['name'];
         }
         $levels = explode(',', $groupBy);
         $changed = false;
         foreach ($levels as $i => $lv) {
             $t = trim($lv);
             $to = null;
+            // (2026-11-12, DATE_SPEC.md 3b) a column by a date period (__JOURNAL_FIELD__due:ym): its name, the period kept
+            $sfx = '';
+            if (!isset($byWho[strtoupper($t)]) && preg_match('/^(.+):(year|fy|yq|fyq|ym|quarter|fquarter|month|monthnum|dow|hour)$/i', $t, $pm)) {
+                $t = trim($pm[1]);
+                $sfx = ':' . strtolower($pm[2]);
+            }
             if (isset($byWho[strtoupper($t)])) $to = (string)$byWho[strtoupper($t)];
             elseif (isset($resolver['aliasMap'][strtoupper($t)])) $to = (string)$resolver['aliasMap'][strtoupper($t)];
             elseif (stripos($t, '__JOURNAL_TOGGLE__') === 0) {
@@ -774,10 +1064,29 @@ function journalExportToggleGroupBy($groupBy, $resolver) {
                 if (isset($byKey[$k])) $to = (string)$byKey[$k];
             }
             if ($to === null || strpos($to, ',') !== false) continue;
-            $levels[$i] = $to;
+            $levels[$i] = $to . $sfx;
             $changed = true;
         }
         return $changed ? implode(',', array_map('trim', $levels)) : $groupBy;
+    }
+}
+
+if (!function_exists('journalExportFieldSortOrders')) {
+function journalExportFieldSortOrders($customSortOrders, $resolver) {
+        $out = is_array($customSortOrders) ? $customSortOrders : array();
+        if (!is_array($resolver) || empty($resolver['fieldOpts']) || !is_array($resolver['fieldOpts']) || empty($resolver['whoMeta'])) return $out;
+        $have = array();
+        foreach ($out as $k => $v) $have[strtoupper((string)$k)] = $k;
+        foreach ($resolver['whoMeta'] as $wm) {
+            if (!isset($wm['kind']) || $wm['kind'] !== 'field') continue;
+            $name = (string)$wm['name'];
+            if (isset($have[strtoupper($name)])) continue;
+            $own = strtoupper('__JOURNAL_FIELD__' . $wm['key']);
+            if (isset($have[$own])) { $out[$name] = $out[$have[$own]]; continue; }
+            $fo = isset($resolver['fieldOpts'][$name]) ? $resolver['fieldOpts'][$name] : null;
+            if ($fo && !empty($fo['order'])) $out[$name] = array('values' => array_values($fo['order']));
+        }
+        return $out;
     }
 }
 

@@ -1,6 +1,6 @@
 {
     "pageErrors":  [
-
+                       "Uncaught TypeError: window.penumbraResolveTheme is not a function @jquery-3.7.1.min.js:2"
                    ],
     "results":  [
                     {

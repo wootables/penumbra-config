@@ -1,4 +1,13 @@
 journalNotesFlatten
+journalSharedNoteText
+journalHasPrivateColumn
+journalNoteThreadId
+journalNoteIsPrivate
+journalMentionUids
+journalThreadAudiences
+journalVisibleNotes
+journalThreadAudienceList
+journalNoteCounts
 journalCleanKeyValueExport
 journalUpperKey
 journalToggleWantExport
@@ -25,4 +34,5 @@ journalDecorateRowsWithToggles
 journalStripWhoCols
 journalExportMapSortCriteria
 journalExportToggleGroupBy
+journalExportFieldSortOrders
 journalExportToggleColumns

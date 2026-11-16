@@ -326,7 +326,7 @@ if ($del !== '' && is_file($del)) {
 }
 if ($res !== '' && is_file($res)) {
     $p = php_strip_whitespace($res);
-    ok(strpos($p, "\$rtSnap = pnbRestoreDeleteSnapshot(\$oracleConn, \$short_id);") !== false && strpos($p, 'penumbraReportTagsSqlAdd()') !== false, 'restore: the snapshot\'s tags go back on the re-inserted row');
+    ok(strpos($p, "\$rtSnap = pnbRestoreDeleteSnapshot(\$oracleConn, \$short_id") !== false && strpos($p, 'penumbraReportTagsSqlAdd()') !== false, 'restore: the snapshot\'s tags go back on the re-inserted row');
 }
 if ($idx !== '' && is_file($idx)) {
     $p = file_get_contents($idx);

@@ -46,6 +46,8 @@
   window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's state restore calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
 </script>
 <script src="jquery-3.7.1.min.js"></script>
 <script src="jquery-ui.min.js"></script>

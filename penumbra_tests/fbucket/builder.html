@@ -45,10 +45,15 @@
 <script src="corpus.js"></script>
 <script src="sb_markup.js"></script>
 <script>
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's theme apply calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.penumbra_vars = {
     isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
     tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
-    imports: [], reports: [], themes: {}, prompts: {}, grants: [], canEditReport: true
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    // (2026-11-15, numgate 0c5903e) AMT is this corpus's measure: bins are offered only for a currency column, a
+    // total_exemptions name or a numeric summary, and production's list (AMOUNT, TOTAL...) does not hold AMT
+    totalExemptions: ['AMT'], canEditReport: true
   };
   jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
   jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax;

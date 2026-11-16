@@ -858,9 +858,15 @@
     var opts = qa('#pnbCcfgTitle1 option');
     R.chk.pickersListed = opts.length === 21 && opts[0].value === '' && opts[0].textContent === 'Automatic' && opts.some(function (o) { return o.value === 'V_NAME'; }) && opts.some(function (o) { return o.value === 'H_TEXT' && /hidden/.test(o.textContent); })
       && qa('#pnbCcfgPill option')[0].textContent === 'None' && qa('#pnbCcfgSize option').map(function (o) { return o.value; }).join(',') === 'compact,standard,large,xl' && q('#pnbCcfgSize').value === 'standard';
-    R.chk.chipsListed = qa('#pnbCcfgFields .pnb-cards-chip').length === 20 && text(q('#pnbCcfgFieldsCount')) === 'Automatic';
+    // (2026-11-15) autofields (2026-11-14): with no fields chosen the automatic ones (three at most) are shown ticked,
+    // and the count gives their number; "Automatic" is what None leaves.
+    var auto0 = qa('#pnbCcfgFields input:checked').length;
+    R.chk.chipsListed = qa('#pnbCcfgFields .pnb-cards-chip').length === 20 && auto0 >= 1 && auto0 <= 3 && text(q('#pnbCcfgFieldsCount')) === auto0 + ' of 16';
     R.chk.noDefaultYet = bsoCards() === undefined && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-default') && cbtn('pnb-ccfg-editor').hidden && /then Save the report/.test(text(q('#pnbCcfgSub')));   // (cfix)
     setSel('pnbCcfgTitle1', 'V_NAME'); setSel('pnbCcfgSub1', 'V_ID'); setSel('pnbCcfgBig', 'H_AMT'); setSel('pnbCcfgPill', 'V_STATUS'); setSel('pnbCcfgBar', 'H_NUM');
+    // (2026-11-15) None first: the automatic fields are ticked (autofields), and a click on one would take it off
+    var none0 = q('.pnb-ccfg-picknone[data-chips="pnbCcfgFields"]'); if (none0) none0.click(); await sleep(120);
+    R.chk.chipsListed = R.chk.chipsListed && text(q('#pnbCcfgFieldsCount')) === 'Automatic';
     ['V_DATE', 'V_LINK', 'H_TEXT', 'H_CODE'].forEach(function (n) { cchip(n).click(); });
     await sleep(250);
     R.chk.drawnPicks = same(slots(), PICKS); R.info.slots = slots();
@@ -3443,7 +3449,8 @@
     var n = cards().length, rep = text(q('#mainReportTitle'));
     // the Download dialog's Print row: what a print is while cards show
     var note = q('#downloadActionsLightbox .pnb-cards-printnote');
-    R.chk.noteShown = !!note && !note.hidden && /one page per card/.test(text(note)) && text(note).indexOf('(25 pages)') >= 0;
+    // (2026-11-15) the Download dialog's Print row and its cards note were removed (Ctrl+P prints the same): pin them gone
+    R.chk.noteShown = !note && !q('#downloadActionsLightbox input[name="downloadFormat"][value="print"]');
     R.info.note = note ? text(note) : null;
     // a print (Ctrl+P, the Download dialog's Print): every card drawn, one page each, in their order
     fire('beforeprint');
@@ -4182,7 +4189,7 @@
     // the Download dialog's PDF row while cards show
     var pn = q('#downloadActionsLightbox .pnb-cards-pdfnote');
     R.info.pdfNote = pn ? text(pn) : null;
-    R.chk.pdfNote = !!pn && !pn.hidden && /one page per card \(25 cards\)/.test(text(pn)) && !!q('#downloadActionsLightbox .pnb-cards-printnote');
+    R.chk.pdfNote = !!pn && !pn.hidden && /one page per card \(25 cards\)/.test(text(pn)) && !q('#downloadActionsLightbox .pnb-cards-printnote');   // (2026-11-15) the PDF note stands alone now
     // Download as PDF: the cover, then a page per card, portrait; the email's call (no ask) is the table's
     var ok = true; try { await loadJs('jspdf-2.5.1.umd.min.js'); await loadJs('jspdf-autotable-3.5.23.min.js'); } catch (e) { ok = false; }
     var b64 = ok && window.__HC.gpdf ? await window.__HC.gpdf({ cards: true }) : null, txt = b64 ? atob(b64) : '';

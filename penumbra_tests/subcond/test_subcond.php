@@ -242,7 +242,10 @@ if ($missing) {
     ok($opt !== false && $optEnd !== false && strpos(substr($ix, $opt, $optEnd - $opt), 'tab-help-icon') === false
         && strpos($ix, 'data-jump-to="schedHelp-subsCondition"') === false && strpos($hp, '<h4 id="schedHelp-subsCondition"') !== false,
         'the condition option carries no "?" of its own (its section is still a jump target from the chart)');
-    ok(strpos($ix, 'title="Only people whose employee-directory record matches the condition see the Subscribe option for this schedule.') !== false
+    // (2026-11-15) 918c40e (2026-10-22, every Scheduler tip is a hover card): the same words moved from title= to
+    // the option label's data-hcard= (still inside #schedSubsCondOpt); a build before it carries the title.
+    $tipWords = '="Only people whose employee-directory record matches the condition see the Subscribe option for this schedule.';
+    ok(($opt !== false && $optEnd !== false && strpos(substr($ix, $opt, $optEnd - $opt), 'data-hcard' . $tipWords) !== false || strpos($ix, 'title' . $tipWords) !== false)
         && strpos($ix, 'matches a condition can subscribe') === false, 'the option\'s tooltip says who SEES the Subscribe option (not "can subscribe")');
     ok(strpos($ix, 'placeholder="e.g. {OUC2D} = 14 AND {PI_ELIGIBLE} = 1   or   {TAGS} = CALS_PREAWARD"') !== false, 'the input\'s placeholder uses braces');
     ok(strpos($mj, '<code>{OUC2D} = 14 AND {PI_ELIGIBLE} = 1</code> or <code>{TAGS} = CALS_PREAWARD</code>') !== false, 'main.js: the empty-condition prompt uses braces');

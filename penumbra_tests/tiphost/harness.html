@@ -73,6 +73,7 @@
   window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   // main.js's lazy loader (ensureSnippetHelp) reads this; the files sit next to the page.
   window.PENUMBRA_SNIPPET_HELP_ASSETS = { js: 'penumbra_snippet_help.js', css: 'penumbra_snippet_help.css' };
 </script>

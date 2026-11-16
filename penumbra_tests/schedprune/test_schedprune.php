@@ -305,6 +305,9 @@ function pnb_part_a($RUNNER, $MAINJS, $EMAIL_ONLY) {
     // 3. Reverse check: a key the form writes for EVERY type is read off-EMAIL, or pruned.
     foreach ($formAll as $k) {
         if (in_array($k, $EMAIL_ONLY, true)) continue;
+        // (2026-11-15) A helper key the save itself consumes and unsets (prompt_answers_cleared, me_map_cleared) is
+        // never stored on any type, so no run path reads it and none should.
+        if (strpos((string)@file_get_contents((string)$GLOBALS['MANAGE']), "unset(\$options['" . $k . "']);") !== false) continue;
         $shared = false;
         foreach (isset($byKey[$k]) ? $byKey[$k] : array() as $o) if (strpos($o[2], 'NON_EMAIL') === 0) $shared = true;
         ok($shared, "form key '$k' (written for every type) is read by a non-EMAIL path",

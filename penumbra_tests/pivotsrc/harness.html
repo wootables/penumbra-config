@@ -59,6 +59,8 @@
     window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
   }
   if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's state restore calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.__errors = [];
   window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
   window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason))); });

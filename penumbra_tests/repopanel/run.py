@@ -73,12 +73,12 @@ panel = ix[a:b]
 c = ix.index('<div id="pnbStatusBar"'); d = ix.index('<div class="sb-spring"></div>', c)
 bar = ix[c:d] + '</div>'
 print('files: ' + APP + (' (missing ones from LIVE)' if APP != LIVE else ''))
-mb = re.search(r"\n(    // REPOSITORY PAGE = NO REPORT \(2026-10-09\).*?\n    if \(\$\('body'\)\.hasClass\('pnb-repo-mode'\)\) \{.*?\n    \}\r?\n)", F['main'], re.S)
+mb = re.search(r"\n(    // REPOSITORY PAGE = NO REPORT \(2026-10-09\).*?\n    if \(\$\((?:'body'|document\.body)\)\.hasClass\('pnb-repo-mode'\)\) \{.*?\n    \}\r?\n)", F['main'], re.S)
 REPOJS = mb.group(1) if mb else ''
 ok(bool(REPOJS), 'lifted the repository-page block from main.js')
 ok(F['idx'].count('<div class="sp-section sp-columns-section">') == 1 and '$isRepoMode' not in bar and '<?' not in panel[panel.index('id="settingsPanelHandle"'):panel.index('>', panel.index('id="settingsPanelHandle"'))], 'index.php markup untouched where suites lift it verbatim (flatfreeze, sbkeys, singlekeytips)')
 ok('id="spThemeSelector"' in panel and 'id="spClearStorage"' in panel and 'id="sbColsOpen"' in bar and 'id="sbPivot"' in bar, 'lifted the settings panel and the status bar from index.php')
-ok("$('body').hasClass('pnb-repo-mode') ? ' (the app default)' : \" (this report's default)\"" in F['main'], "J main.js names the default option \"(the app default)\" on the repository page")
+ok(any((h + ".hasClass('pnb-repo-mode') ? ' (the app default)' : \" (this report's default)\"") in F['main'] for h in ("$('body')", "$(document.body)")), "J main.js names the default option \"(the app default)\" on the repository page")
 
 work = tempfile.mkdtemp(prefix='pnb_repopanel_')
 try:

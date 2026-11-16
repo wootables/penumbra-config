@@ -194,6 +194,11 @@ function get_next_run_date_calc($cron_expr) {
     for ($i = 1; $i < 525600; $i++) { 
         $check_ts = $now + ($i * 60);
         $check_ts = $check_ts - ($check_ts % 60); 
+        // (2026-11-14, dstonce) Never a time whose clock reading is not AFTER now's. On the night the clocks go back
+        // the hour from 1:00 comes twice: a task run at 1:30 (daylight time) found 1:30 (standard time) as its next
+        // run - the same reading, already behind the clock NEXT_RUN is compared with - and was due again on every
+        // cycle for an hour. It now runs once in that hour. (The twin in schedule_runner.php does the same.)
+        if (date('Y-m-d H:i:s', $check_ts) <= date('Y-m-d H:i:s', $now)) continue;
         $min = (int)date('i', $check_ts); $hour = (int)date('G', $check_ts);
         $day = (int)date('j', $check_ts); $mon = (int)date('n', $check_ts);
         $dow = (int)date('w', $check_ts);
@@ -224,25 +229,24 @@ function cron_never_comes_round($cron_expr) {
 
 if (!function_exists('check_cron_part_calc')) {
 function check_cron_part_calc($pattern, $value) {
-    if ($pattern === '*') return true;
-    if (strpos($pattern, '/') !== false) {
-        list($base, $step) = explode('/', $pattern);
-        $step = (int)$step;
-        if ($base === '*') {
-            return ($value % $step) === 0;
+    // (2026-11-14, cronlist) A list of items, each a number, a range (9-17), or either with a step (*/5, 5/15, 8-18/2).
+    // The list was read number by number (9-17,20 as 9 and 20) and a stepped range lost its end (8-18/2 ran on past 18).
+    // js/main.js checkCronPart and the twin in schedule_runner.php do the same: keep the three alike.
+    foreach (explode(',', (string)$pattern) as $item) {
+        $item = trim($item);
+        if ($item === '') continue;
+        $step = 1; $hasStep = false;
+        if (strpos($item, '/') !== false) {
+            list($item, $s) = explode('/', $item, 2);
+            $step = (int)$s; $hasStep = true;
+            if ($step < 1) continue;
         }
-        $base = (int)$base;
-        return ($value >= $base) && (($value - $base) % $step) === 0;
+        if ($item === '*') { $lo = 0; $hi = PHP_INT_MAX; }
+        elseif (strpos($item, '-') !== false) { list($a, $b) = explode('-', $item, 2); $lo = (int)$a; $hi = (int)$b; }
+        else { $lo = (int)$item; $hi = $hasStep ? PHP_INT_MAX : $lo; }
+        if ($value >= $lo && $value <= $hi && (($value - $lo) % $step) === 0) return true;
     }
-    if (strpos($pattern, ',') !== false) {
-        $parts = array_map(function($p) { return (int)trim($p); }, explode(',', $pattern));
-        return in_array($value, $parts, true);
-    }
-    if (strpos($pattern, '-') !== false) {
-        list($min, $max) = explode('-', $pattern);
-        return ($value >= (int)$min && $value <= (int)$max);
-    }
-    return (int)$pattern === $value;
+    return false;
 }
 }
 

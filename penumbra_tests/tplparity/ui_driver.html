@@ -22,6 +22,9 @@
 <!--@@SCHED_DROP_MARKUP@@-->
 <pre id="out">RUNNING</pre>
 <script>window.__pageErrors=[];window.onerror=function(m){window.__pageErrors.push(String(m));return true;};</script>
+<!-- (2026-11-15) themes_config.php's inline resolver, defined by the real page before main.js: without it main.js
+     stopped at its first call and the scheduler panel's template code never loaded (17 UI checks red) -->
+<script>if (!window.penumbraResolveTheme) window.penumbraResolveTheme = function (t) { return t === 'random' ? 'theme-default' : t; };</script>
 <script src="jquery-3.7.1.min.js"></script>
 <script src="jquery-ui.min.js"></script>
 <script src="moment.min.js"></script>

@@ -89,6 +89,8 @@
   if (!window.matchMedia) {
     window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
   }
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's state restore calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.__errors = [];
   window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
   window.__clip = null;
@@ -404,7 +406,9 @@
     }).then(function () {
       assert('commit: focus stays on the box through the redraw', document.activeElement === B('AMOUNT', 'min')[0], document.activeElement && (document.activeElement.outerHTML || '').substring(0, 100));
       eq('counts: a range narrows the chips like any condition', counts('STATUS'), ['1', '2', '1']);
-      assert('render: a bound set, a clear button', G('AMOUNT').find('.pnb-fs-clear').length === 1 && $(S + ' .pnb-fs-clearall').length === 1, '');
+      // (2026-11-15) fsclearall (2026-11-10, e65935d): one group set = its x alone; Clear all comes with a second
+      // group ("clear all: ranges and chips together" below presses one).
+      assert('render: a bound set, a clear button', G('AMOUNT').find('.pnb-fs-clear').length === 1 && $(S + ' .pnb-fs-clearall').length === 0, G('AMOUNT').find('.pnb-fs-clear').length + ' x, ' + $(S + ' .pnb-fs-clearall').length + ' Clear all');
       // Typing in one box and moving to the other writes nothing: the pair commits together.
       B('AMOUNT', 'max').trigger('focus').val('1,250.50');
       B('AMOUNT', 'min').trigger('focus');
@@ -622,6 +626,10 @@
       assert('pivot: a hand-typed source condition rebuilds the pivot and presses its chip', has('Ag') && !has('Sci'), ptext().substring(0, 160));
       F.sync();
       assert('pivot: ... the sync reads it', CH('COLLEGE', 'Ag').attr('aria-pressed') === 'true' && CH('COLLEGE', 'Sci').attr('aria-pressed') === 'false', $(S).html().substring(0, 200));
+      // (2026-11-15) fsclearall (2026-11-10, e65935d): Clear all needs two pressed groups; a FY condition is typed
+      // beside it and the sync (no search run) brings the button.
+      $('#tableSearch').val('COLLEGE = /^(?:Ag)$/ and FY = /^(?:2025)$/');
+      F.sync();
       $(S + ' .pnb-fs-clearall').trigger('click');
       return until(function () { return !F.motion() && box() === '' && pvis() && has('Eng'); }, 8000);
     }).then(function () {
@@ -740,7 +748,8 @@
       $('#tableSearch').val('SPONSOR = /^(?:S25)$/');
       F.sync();
       assert('list: a hand-typed value presses its row through the sync, un-hidden though the find text misses it', CH('SPONSOR', 'S25').attr('aria-pressed') === 'true' && !CH('SPONSOR', 'S25').hasClass('pnb-fs-hid') && CH('SPONSOR', 'S10').attr('aria-pressed') === 'false', CH('SPONSOR', 'S25').prop('outerHTML'));
-      $('#tableSearch').val('SPONSOR = /^(?:S10)$/');
+      // (2026-11-15) fsclearall (2026-11-10, e65935d): Clear all needs two pressed groups, so College joins the list row.
+      $('#tableSearch').val('SPONSOR = /^(?:S10)$/ and COLLEGE = /^(?:Eng)$/');
       F.sync();
       $(S + ' .pnb-fs-clearall').trigger('click');
       return until(function () { return !F.motion() && box() === ''; }, 8000);
@@ -755,7 +764,7 @@
       return until(function () { return !F.motion() && box() !== ''; }, 8000);
     }).then(function () {
       eq('list: an exclude list writes != like an exclude group', box(), 'SPONSOR != /^(?:S03)$/');
-      $(S + ' .pnb-fs-clearall').trigger('click');
+      G('SPONSOR').find('.pnb-fs-clear').trigger('click');   // (2026-11-15) one group pressed: its x (no Clear all since fsclearall, e65935d)
       return until(function () { return !F.motion() && box() === ''; }, 8000);
     }).then(function () {
       $('#tableSearch').val('SPONSOR = /^(?:S01)$/ or COLLEGE = /^(?:Eng)$/');
@@ -824,7 +833,7 @@
       var gs = COLS3.map(function (c) { return R(G(c)[0]); });
       assert('vertical: several fields - one group per line, as before', gs[1].t >= gs[0].b - 0.5 && gs[2].t >= gs[1].b - 0.5 && near(gs[1].l, gs[0].l), JSON.stringify(gs.map(function (g) { return [Math.round(g.l), Math.round(g.t), Math.round(g.b)]; })));
       assert('vertical: ... and every group\'s chips stack too', stacked(chips('COLLEGE')) && stacked(chips('STATUS')), geo(chips('COLLEGE')) + ' ' + geo(chips('STATUS')));
-      $('#tableSearch').val('SPONSOR = /^(?:NSF)$/');
+      $('#tableSearch').val('SPONSOR = /^(?:NSF)$/ and COLLEGE = /^(?:Sci)$/');   // (2026-11-15) two groups: Clear all needs them since fsclearall (e65935d)
       return draw("filter_strip('vertical', 'labels=left', " + THREE + ")");
     }).then(function () {
       var nm = R(G('SPONSOR').find('.pnb-fs-name')[0]), c0 = R(G('SPONSOR').find('.pnb-fs-chip')[0]), cl = R(G('SPONSOR').find('.pnb-fs-clear')[0]);
@@ -1482,9 +1491,15 @@
     }).then(function () { return draw("filter_strip('Sponsor|SPONSOR', 'College|COLLEGE')"); }).then(function () {
       $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
       F.sync();
+      // (2026-11-15) fsclearall (2026-11-10, e65935d): the sync brings Clear all once TWO groups are pressed
+      // (_pnbSyncFilterStrips, pageSel >= 2), never beside a lone group's x. One typed condition: the x alone;
+      // a second one typed for the other group: Clear all too (the last element).
+      var lone = [CH('COLLEGE', 'Eng').attr('aria-pressed'), G('COLLEGE').find('.pnb-fs-clear').length, G('SPONSOR').find('.pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length,
+         G('COLLEGE').find('.pnb-fs-clear').attr('aria-label')];
+      $('#tableSearch').val('SPONSOR = /^(?:S08)$/ and COLLEGE = /^(?:Eng)$/');
+      F.sync();
       eq('sweep sync: a condition typed by hand brings its group\'s x and Clear all with the pressed chip, before the search runs',
-        [CH('COLLEGE', 'Eng').attr('aria-pressed'), G('COLLEGE').find('.pnb-fs-clear').length, G('SPONSOR').find('.pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length,
-         G('COLLEGE').find('.pnb-fs-clear').attr('aria-label')], ['true', 1, 0, 1, 'Clear College']);
+        lone.concat([G('SPONSOR').find('.pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length]), ['true', 1, 0, 0, 'Clear College', 1, 1]);
       $('#tableSearch').val('');
       F.sync();
       eq('sweep sync: ... and takes them off when it is typed away', [CH('COLLEGE', 'Eng').attr('aria-pressed'), G('COLLEGE').find('.pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length], ['false', 0, 0]);
@@ -1671,10 +1686,18 @@
     }).then(function () {
       assert('render: the pressed chip is read from the box, unclicked', $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') === 'true'
         && $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed') === 'false', $(S).html().substring(0, 200));
-      assert('render: a selected group gets a clear button and the strip a Clear all', $(S + ' .pnb-fs-group:eq(0) .pnb-fs-clear').length === 1 && $(S + ' .pnb-fs-clearall').length === 1, '');
+      // (2026-11-15) fsclearall (2026-11-10, in the catch-up commit e65935d): Clear all shows only when it does more
+      // than a group's x, i.e. two or more groups pressed. One group: its x alone; then a second group is pressed
+      // and the strip drawn again for the Clear all.
+      var oneSel = [$(S + ' .pnb-fs-group:eq(0) .pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length];
       eq('render: the cross-filtered FY counts are shown', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(), ['1', '2', '3']);
-      $('#tableSearch').val('');
-      return draw("filter_strip('sideways', 'College|COLLEGE')");
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/ and FY = /^(?:2025)$/');
+      return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')").then(function () {
+        var twoSel = [$(S + ' .pnb-fs-group:eq(0) .pnb-fs-clear').length, $(S + ' .pnb-fs-group:eq(1) .pnb-fs-clear').length, $(S + ' .pnb-fs-clearall').length];
+        assert('render: a selected group gets a clear button and the strip a Clear all', JSON.stringify(oneSel) === '[1,0]' && JSON.stringify(twoSel) === '[1,1,1]', JSON.stringify({ one: oneSel, two: twoSel }));
+        $('#tableSearch').val('');
+        return draw("filter_strip('sideways', 'College|COLLEGE')");
+      });
     }).then(function () {
       assert('render: unknown keyword errors and names itself', $(S).length === 0 && outText().indexOf('unknown keyword sideways') !== -1, outText().substring(0, 120));
       return draw("filter_strip('College|NOPE')");
@@ -1761,6 +1784,10 @@
       return wait(300);
     }).then(function () {
       eq('click: a typed condition survives a chip click', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/ and AMOUNT > 100');
+      // (2026-11-15) fsclearall (2026-11-10, e65935d): Clear all needs two pressed groups, so a FY chip joins first.
+      $(S + ' .pnb-fs-chip[data-fs-val="2025"]').trigger('click');
+      return wait(300);
+    }).then(function () {
       $(S + ' .pnb-fs-clearall').trigger('click');
       return wait(300);
     }).then(function () {

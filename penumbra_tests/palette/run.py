@@ -621,7 +621,7 @@ MUTANTS = {
     # --- (round 18a) the time budget gone: PHP's 90-s limit kills a slow provider call mid-flight again
     'a-notime': ([('aia', "set_time_limit(360);\n$response = curl_exec($ch);\n", "$response = curl_exec($ch);\n")], ['S-aiTimeBudget'], []),   # (round 19a: the budget grew with the stream)
     # --- (round 18b) a hand list of themes missing most of them; Report Default counted as a density again
-    'h-themelist': ([('pal', "        themeOptions().forEach(function (t) {\n            out.push({ id: 'combo:theme:'", "        [{ value: 'theme-default', label: 'Default Light' }, { value: 'theme-dark-blue', label: 'Dark Blue' }].forEach(function (t) {\n            out.push({ id: 'combo:theme:'")], ['L-pthm-everyTheme', 'S-themeSource'], ['pthm']),
+    'h-themelist': ([('pal', "        themeOptions().forEach(function (t) {\n            out.push({ id: 'combo:theme:'", "        [{ value: 'theme-default', label: 'Default Light' }, { value: 'theme-dark-blue', label: 'Cyanotype' }].forEach(function (t) {\n            out.push({ id: 'combo:theme:'")], ['L-pthm-everyTheme', 'S-themeSource'], ['pthm']),
     'h-density': ([('pal', "                if (o.value === 'report-default') { return; }   // (round 18b) a choice, not a density: the three densities are rows\n", "")], ['L-pthm-densityThree'], ['pthm']),
     # --- (round 19a) a partial SSE line dropped at a chunk boundary; the stream not requested
     'a-nobuffer': ([('aia', "    $st['buf'] .= $chunk;\n", "    $st['buf'] = $chunk;\n")], ['S-aiStreamParse'], []),

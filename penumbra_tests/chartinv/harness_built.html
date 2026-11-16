@@ -26,6 +26,16 @@
                 <h3 class="pnb-dlg-title">Data Visualization Builder <span class="tab-help-icon" data-target="#visualizationBuilderHelpLightbox" title="Visualization Builder Help">?</span></h3>
                 <p class="pnb-dlg-sub">Chart the current result set</p>
             </div>
+            
+            <!-- Describe a chart (vizdesc, 2026-11-13): words in, a chart out, through viz_describe.php and
+                 Auto-build's own rules; any failure falls back to plain Auto-build. In the title bar, not the
+                 docked button bar, which is already at its one-line limit when the admin group shows.
+                 viz_describe.off beside index.php leaves it out. -->
+            <div class="pnb-dlg-action viz-describe" role="group" aria-label="Describe a chart">
+                <input type="text" id="vizDescribeInput" maxlength="300" autocomplete="off" spellcheck="false" placeholder="Describe a chart, e.g. amount by sponsor per fiscal year" aria-label="Describe the chart you want" title="Say what to chart in your own words - columns, a period, top 10, stacked - and press Enter. Only the column names on this report are sent to the AI, never the data. If it cannot help, Auto-build draws the chart instead.">
+                <button type="button" id="vizDescribeBtn" class="pnb-btn pnb-btn-sm pnb-btn-primary" title="Build the chart you described (Enter)">&#x2728; Build</button>
+            </div>
+            
             <span class="pnb-dlg-action" id="vizPresetMount"></span>
             <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
         </div>
@@ -67,31 +77,50 @@
                         <strong>Doughnut</strong>
                         <div class="viz-option-desc">Proportions</div>
                     </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="scatter">
-                        <svg viewBox="0 0 36 28"><circle class="viz-icon-fill" cx="6" cy="18" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="13" cy="7" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="19" cy="20" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="26" cy="10" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="31" cy="14" r="2.5" fill="#336699" opacity="0.7"/></svg>
-                        <strong>Scatter</strong>
-                        <div class="viz-option-desc">X/Y + Bubble</div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="gantt">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="3" width="16" height="4" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="8" y="9" width="18" height="4" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="14" y="15" width="12" height="4" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="20" y="21" width="14" height="4" rx="1.5" fill="#336699" opacity="0.5"/><line x1="24" y1="1" x2="24" y2="27" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3,2"/></svg>
+                        <strong>Gantt</strong>
+                        <div class="viz-option-desc">Timeline</div>
                     </div>
-
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="radar">
-                        <svg viewBox="0 0 32 32"><polygon points="16,4 27,12 24,26 8,26 5,12" fill="none" class="viz-icon-mute-stroke" stroke="#e5e7eb" stroke-width="1"/><polygon class="viz-icon-fill" points="16,8 23,13 21,23 11,23 9,13" fill="#336699" opacity="0.25" stroke="#336699" stroke-width="1.5"/></svg>
-                        <strong>Radar</strong>
-                        <div class="viz-option-desc">Multi-axis</div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="map">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.25"/><rect class="viz-icon-fill" x="8" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.5"/><rect class="viz-icon-fill" x="15" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.85"/><rect class="viz-icon-fill" x="22" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.4"/><rect class="viz-icon-fill" x="29" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="1" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="8" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="15" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.75"/><rect class="viz-icon-fill" x="22" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.95"/><rect class="viz-icon-fill" x="29" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.35"/><rect class="viz-icon-fill" x="8" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="15" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.7"/><rect class="viz-icon-fill" x="22" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.2"/><rect class="viz-icon-fill" x="15" y="23" width="6" height="4" rx="1" fill="#336699" opacity="0.55"/></svg>
+                        <strong>Map</strong>
+                        <div class="viz-option-desc">By State</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="sankey">
+                        <svg viewBox="0 0 36 28"><path class="viz-icon-fill" d="M5 3 C17 3 17 4 31 4 L31 12 C17 12 17 9 5 9 Z" fill="#336699" opacity="0.45"/><path class="viz-icon-fill" d="M5 11 C17 11 17 21 31 21 L31 25 C17 25 17 15 5 15 Z" fill="#336699" opacity="0.3"/><path class="viz-icon-fill" d="M5 18 C17 18 17 13 31 13 L31 19 C17 19 17 25 5 25 Z" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="2" y="2" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="11" width="3" height="5" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="18" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="3" width="3" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="14" width="3" height="12" rx="1" fill="#336699"/></svg>
+                        <strong>Sankey</strong>
+                        <div class="viz-option-desc">Flows</div>
                     </div>
                     <div class="viz-type-option" role="option" aria-selected="false" data-type="treemap">
                         <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="1" width="20" height="16" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="22" y="1" width="13" height="16" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="1" y="18" width="12" height="9" rx="1.5" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="14" y="18" width="10" height="9" rx="1.5" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="25" y="18" width="10" height="9" rx="1.5" fill="#336699" opacity="0.55"/></svg>
                         <strong>Treemap</strong>
                         <div class="viz-option-desc">Hierarchy</div>
                     </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="histogram">
-                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="16" width="5" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="8" y="8" width="5" height="18" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="14" y="3" width="5" height="23" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="20" y="6" width="5" height="20" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="26" y="13" width="5" height="13" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="32" y="21" width="3" height="5" rx="1" fill="#336699"/></svg>
-                        <strong>Histogram</strong>
-                        <div class="viz-option-desc">Distribution</div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="box">
+                        <svg viewBox="0 0 36 28"><line x1="7" y1="3" x2="7" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="3" x2="10" y2="3" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="25" x2="10" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="3" y="9" width="8" height="10" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="3" y1="14" x2="11" y2="14" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><line x1="19" y1="6" x2="19" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="6" x2="22" y2="6" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="27" x2="22" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="15" y="12" width="8" height="9" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="15" y1="17" x2="23" y2="17" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><circle cx="19" cy="2" r="1.6" fill="none" class="viz-icon-line" stroke="#888"/><line x1="31" y1="8" x2="31" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="8" x2="34" y2="8" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="24" x2="34" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="27" y="12" width="8" height="8" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="27" y1="16" x2="35" y2="16" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/></svg>
+                        <strong>Box Plot</strong>
+                        <div class="viz-option-desc">Spread</div>
                     </div>
                     <div class="viz-type-option" role="option" aria-selected="false" data-type="waterfall">
                         <svg viewBox="0 0 36 28"><rect x="2" y="16" width="5" height="10" rx="1" fill="#4CAF50"/><rect x="9" y="10" width="5" height="6" rx="1" fill="#4CAF50"/><rect x="16" y="6" width="5" height="4" rx="1" fill="#4CAF50"/><rect x="23" y="8" width="5" height="4" rx="1" fill="#c0392b" opacity="0.8"/><rect class="viz-icon-fill" x="30" y="2" width="5" height="24" rx="1" fill="#336699" opacity="0.6"/></svg>
                         <strong>Waterfall</strong>
                         <div class="viz-option-desc">Build-up</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="scatter">
+                        <svg viewBox="0 0 36 28"><circle class="viz-icon-fill" cx="6" cy="18" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="13" cy="7" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="19" cy="20" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="26" cy="10" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="31" cy="14" r="2.5" fill="#336699" opacity="0.7"/></svg>
+                        <strong>Scatter</strong>
+                        <div class="viz-option-desc">X/Y + Bubble</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="radar">
+                        <svg viewBox="0 0 32 32"><polygon points="16,4 27,12 24,26 8,26 5,12" fill="none" class="viz-icon-mute-stroke" stroke="#e5e7eb" stroke-width="1"/><polygon class="viz-icon-fill" points="16,8 23,13 21,23 11,23 9,13" fill="#336699" opacity="0.25" stroke="#336699" stroke-width="1.5"/></svg>
+                        <strong>Radar</strong>
+                        <div class="viz-option-desc">Multi-axis</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="histogram">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="16" width="5" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="8" y="8" width="5" height="18" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="14" y="3" width="5" height="23" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="20" y="6" width="5" height="20" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="26" y="13" width="5" height="13" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="32" y="21" width="3" height="5" rx="1" fill="#336699"/></svg>
+                        <strong>Histogram</strong>
+                        <div class="viz-option-desc">Distribution</div>
                     </div>
                     <div class="viz-type-option" role="option" aria-selected="false" data-type="funnel">
                         <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="2" width="32" height="5" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="6" y="9" width="24" height="5" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="10" y="16" width="16" height="5" rx="1.5" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="14" y="23" width="8" height="4" rx="1.5" fill="#336699" opacity="0.45"/></svg>
@@ -107,26 +136,6 @@
                         <svg viewBox="0 0 36 28"><rect x="2" y="3" width="32" height="6" rx="1" class="viz-icon-mute" fill="#e5e7eb"/><rect x="2" y="3" width="21" height="6" rx="1" class="viz-icon-mute" fill="#d1d5db"/><rect class="viz-icon-fill" x="2" y="4.5" width="17" height="3" rx="1" fill="#336699"/><line x1="25" y1="2" x2="25" y2="10" stroke="#c0392b" stroke-width="2"/><rect x="2" y="14" width="32" height="6" rx="1" class="viz-icon-mute" fill="#e5e7eb"/><rect x="2" y="14" width="21" height="6" rx="1" class="viz-icon-mute" fill="#d1d5db"/><rect class="viz-icon-fill" x="2" y="15.5" width="26" height="3" rx="1" fill="#336699"/><line x1="20" y1="13" x2="20" y2="21" stroke="#c0392b" stroke-width="2"/></svg>
                         <strong>Bullet</strong>
                         <div class="viz-option-desc">vs Target</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="box">
-                        <svg viewBox="0 0 36 28"><line x1="7" y1="3" x2="7" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="3" x2="10" y2="3" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="25" x2="10" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="3" y="9" width="8" height="10" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="3" y1="14" x2="11" y2="14" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><line x1="19" y1="6" x2="19" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="6" x2="22" y2="6" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="27" x2="22" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="15" y="12" width="8" height="9" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="15" y1="17" x2="23" y2="17" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><circle cx="19" cy="2" r="1.6" fill="none" class="viz-icon-line" stroke="#888"/><line x1="31" y1="8" x2="31" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="8" x2="34" y2="8" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="24" x2="34" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="27" y="12" width="8" height="8" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="27" y1="16" x2="35" y2="16" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/></svg>
-                        <strong>Box Plot</strong>
-                        <div class="viz-option-desc">Spread</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="gantt">
-                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="3" width="16" height="4" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="8" y="9" width="18" height="4" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="14" y="15" width="12" height="4" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="20" y="21" width="14" height="4" rx="1.5" fill="#336699" opacity="0.5"/><line x1="24" y1="1" x2="24" y2="27" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3,2"/></svg>
-                        <strong>Gantt</strong>
-                        <div class="viz-option-desc">Timeline</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="map">
-                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.25"/><rect class="viz-icon-fill" x="8" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.5"/><rect class="viz-icon-fill" x="15" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.85"/><rect class="viz-icon-fill" x="22" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.4"/><rect class="viz-icon-fill" x="29" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="1" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="8" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="15" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.75"/><rect class="viz-icon-fill" x="22" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.95"/><rect class="viz-icon-fill" x="29" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.35"/><rect class="viz-icon-fill" x="8" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="15" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.7"/><rect class="viz-icon-fill" x="22" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.2"/><rect class="viz-icon-fill" x="15" y="23" width="6" height="4" rx="1" fill="#336699" opacity="0.55"/></svg>
-                        <strong>Map</strong>
-                        <div class="viz-option-desc">By State</div>
-                    </div>
-                    <div class="viz-type-option" role="option" aria-selected="false" data-type="sankey">
-                        <svg viewBox="0 0 36 28"><path class="viz-icon-fill" d="M5 3 C17 3 17 4 31 4 L31 12 C17 12 17 9 5 9 Z" fill="#336699" opacity="0.45"/><path class="viz-icon-fill" d="M5 11 C17 11 17 21 31 21 L31 25 C17 25 17 15 5 15 Z" fill="#336699" opacity="0.3"/><path class="viz-icon-fill" d="M5 18 C17 18 17 13 31 13 L31 19 C17 19 17 25 5 25 Z" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="2" y="2" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="11" width="3" height="5" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="2" y="18" width="3" height="8" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="3" width="3" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="31" y="14" width="3" height="12" rx="1" fill="#336699"/></svg>
-                        <strong>Sankey</strong>
-                        <div class="viz-option-desc">Flows</div>
                     </div>
                 </div>
                 <!-- Position rail: with only 8 of the 17 tiles in view, this is
@@ -420,6 +429,9 @@
                     <div id="vizShowSettingsWrap">
                         <label class="viz-chip" data-tip="Show the settings cog icon on this chart. When unchecked, the cog is hidden so viewers see a cleaner chart - power users can still right-click the chart to access sort, filter, drill, fullscreen, and download options.">
                             <input type="checkbox" id="vizShowSettings" checked> Show Settings
+                        </label>
+                        <label class="viz-chip" data-tip="Open this chart minimized: it shows as a small chip naming it, and anyone viewing the report can click the chip to show it (their own choice is kept in their browser). Saved with the chart as &quot;min&quot;: true in its options.">
+                            <input type="checkbox" id="vizStartMin"> Start minimized
                         </label>
                     </div>
                 </div>
@@ -726,6 +738,8 @@
 <script src="penumbra_template.js"></script>
 <script src="penumbra_a11y.js"></script>
 <script>
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's theme apply calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.penumbra_vars = {
     isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
     tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
@@ -1540,7 +1554,9 @@
         var cv = hasCV ? HM.chartVariants('START_DATE') : [], ids = cv.map(function (v) { return v.id; });
         assert('Q the Chart by list: every grouping the X list offers the date', ['year', 'fy', 'yq', 'fyq', 'ym', 'quarter', 'fquarter', 'month', 'monthnum', 'dow'].every(function (i) { return ids.indexOf(i) >= 0; }) && ids.indexOf('hour') < 0, ids.join());
         eq('Q no Chart by list on a text column', hasCV ? HM.chartVariants('DEPT') : 'absent', []);
-        eq('Q ...nor a number column', hasCV ? HM.chartVariants('AMOUNT') : 'absent', []);
+        // (numchart, 2026-11-06) a number column's list is its X axes (section N), never the date groupings
+        var qN = hasCV ? HM.chartVariants('AMOUNT') : [];
+        assert('Q ...a number column lists X axes, not date groupings (section N)', qN.length > 0 && qN.every(function (v) { return v.measure; }), JSON.stringify(qN.map(function (v) { return v.id; })));
         HM.chartColumn('START_DATE', 'fy');
         eq('Q Chart by Fiscal Year: the X axis', $('#vizXAxis').val(), 'START_DATE:fy');
         eq('Q ...counted', $('#vizAggregation').val(), 'count');
@@ -1564,6 +1580,162 @@
       }
       } finally {
         if (window.__CI && window.__CI.setMaster) window.__CI.setMaster(keepQM);
+        $rt.data('columnProperties', cp0); $rt.data('columnNameToOriginalIndex', cni0);
+      }
+    });
+  }
+
+  // ---- N (numchart, 2026-11-06): a number / money column charts as the MEASURE, by the X axis its Chart by list picks;
+  // a chart reads its columns' own formats (Column options): the measure's on the value axis, labels and tooltips, the
+  // X column's on its category labels. Chart this column of a date still counts its rows, laid out by Auto-build.
+  async function runN() {
+    var F = window.__CI;
+    await asection('N', async function () {
+      var HM = window.Penumbra && window.Penumbra.headerMenu;
+      assert('N the header API is there', !!HM && typeof HM.chartVariants === 'function' && typeof HM.chartColumn === 'function');
+      if (!HM) return;
+      await F.loadScript('penumbra_colfmt.js');
+      assert('N (the column options module is up)', !!(window.PenumbraColFmt && window.PenumbraColFmt.openPopover));
+      var $rt = $('#resultsTable'), cp0 = $rt.data('columnProperties'), cni0 = $rt.data('columnNameToOriginalIndex');
+      var QC = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'], qcp = {}, qcni = {};
+      QC.forEach(function (c, i) { qcni[c] = i; qcp[i] = { isDate: c === 'START_DATE' || c === 'END_DATE', isCurrency: c === 'AMOUNT', isNumeric: c === 'N', isBoolean: false }; });
+      $rt.data('columnProperties', qcp); $rt.data('columnNameToOriginalIndex', qcni);
+      var keepM = F.setMaster(FIX);
+      var vb = document.getElementById('visualizeBtn'), vbMade = !vb;
+      if (!vb) { vb = document.createElement('span'); vb.id = 'visualizeBtn'; document.body.appendChild(vb); }
+      var vbShown = $(vb).is(':visible'), vbSt = vb.getAttribute('style');
+      if (!vbShown) { vb.style.display = 'inline-block'; $(vb).parents().filter(function () { return $(this).css('display') === 'none'; }).addClass('zzn-shown').css('display', 'block'); }
+      var $lb = $('#visualizationLightbox'), shown0 = $lb.css('display');
+      $lb.css('display', 'flex');
+      openBuilder();   // (the builder as the Chart button leaves it: its lists filled, its live listeners on)
+      function x() { return $('#vizXAxis').val(); }
+      function y() { return $('#vizYAxis').val() || ''; }
+      function agg() { return $('#vizAggregation').val(); }
+      function type() { return $('.viz-type-option.active').data('type'); }
+      function tipOf(ch, v) {
+        var ds = ch.data.datasets[0], cbs = ch.options.plugins.tooltip.callbacks;
+        return cbs.label.call(ch.tooltip || {}, { parsed: { x: 0, y: v, r: 0 }, raw: v, dataset: ds, dataIndex: 0, datasetIndex: 0, label: String(ch.data.labels[0]), chart: ch });
+      }
+      try {
+        // 1. the list
+        var cv = HM.chartVariants('AMOUNT'), byKind = function (k) { return cv.filter(function (v) { return v.kind === k; }); };
+        assert('N AMOUNT (money): a Chart by list of X axes', cv.length > 0 && cv.every(function (v) { return v.measure; }), JSON.stringify(cv.map(function (v) { return v.id; })));
+        var cats = byKind('cat').map(function (v) { return v.token; });
+        assert('N ...the columns that group it best (Auto-build scoring): STATUS, not the id-like AWARD_ID, never a number', cats.indexOf('STATUS') >= 0 && cats.indexOf('AWARD_ID') < 0 && cats.indexOf('N') < 0 && cats.indexOf('AMOUNT') < 0, cats.join());
+        var dts = byKind('date');
+        eq('N ...each date column a list of its groupings', dts.map(function (v) { return v.token; }), ['START_DATE', 'END_DATE']);
+        var p0 = (dts[0] && dts[0].periods) || [];
+        assert('N ...As is first, then every grouping its dates take (Fiscal Year among them, no Hour)', p0.length > 5 && p0[0].label === 'As is' && p0[0].id === 'x:START_DATE' &&
+          p0.some(function (p) { return p.id === 'x:START_DATE:fy'; }) && !p0.some(function (p) { return /:hour$/.test(p.id); }), JSON.stringify(p0.map(function (p) { return p.id; })));
+        eq('N ...then its own ranges', byKind('bins').map(function (v) { return v.id; }), ['bin', 'binlog']);
+        var sug = cv.filter(function (v) { return v.suggested; });
+        // (DEPT, STATUS, FY and STATE all score alike here - a dozen values or fewer - and Auto-build takes the first in table order)
+        eq('N ...Auto-build\'s pick named (suggested): one, the category it would chart AMOUNT by', sug.map(function (v) { return v.token; }), ['DEPT']);
+        assert('N ...acts the palette exempts (chartAs-[a-z0-9]+)', cv.every(function (v) { return /^[a-z0-9]+$/.test(v.act); }) && p0.every(function (p) { return /^[a-z0-9]+$/.test(p.act); }));
+        eq('N a text column has no Chart by list', HM.chartVariants('DEPT'), []);
+        assert('N a plain number column (N) has one', HM.chartVariants('N').length > 0 && HM.chartVariants('N')[0].measure === true);
+        assert('N a date column keeps its date groupings', HM.chartVariants('START_DATE').some(function (v) { return v.id === 'fy'; }) && !HM.chartVariants('START_DATE').some(function (v) { return v.measure; }));
+        // a column the viewer hid is no X axis Auto-build offers (or picks)
+        var thS = document.querySelector('#resultsTable thead th[data-colname="STATUS"]'), stS = thS.getAttribute('style');
+        thS.style.display = 'none';
+        var cvH = HM.chartVariants('AMOUNT');
+        assert('N a hidden column (STATUS) is neither listed nor suggested', !cvH.some(function (v) { return v.token === 'STATUS'; }) && !cvH.some(function (v) { return v.suggested && v.token === 'STATUS'; }), JSON.stringify(cvH.map(function (v) { return v.token + (v.suggested ? '*' : ''); })));
+        if (stS === null) thS.removeAttribute('style'); else thS.setAttribute('style', stS);
+        // 2. Chart this column on the measure: Auto-build with the column held on the Y axis
+        HM.chartColumn('AMOUNT');
+        eq('N Chart AMOUNT: its total on the Y axis, by Auto-build\'s pick (the suggested one)', [y(), agg(), x()], ['AMOUNT', 'sum', sug.length ? sug[0].token : '?']);
+        assert('N ...the chart drew', !!Chart.getChart('vizChart'));
+        assert('N ...titled', /AMOUNT/.test($('#vizTitle').val() || ''), $('#vizTitle').val());
+        HM.chartColumn('AMOUNT', 'x:DEPT');
+        eq('N Chart by DEPT: the X axis picked, the measure kept', [x(), y(), agg()], ['DEPT', 'AMOUNT', 'sum']);
+        HM.chartColumn('AMOUNT', 'x:START_DATE:fy');
+        eq('N Chart by START_DATE > Fiscal Year: in period order, every period', [x(), $('#vizSortBy').val(), $('#vizSortDir').val(), $('#vizLimit').val()], ['START_DATE:fy', 'label', 'asc', '9999']);
+        HM.chartColumn('AMOUNT', 'bin');
+        eq('N Chart by Bins: its own ranges, the rows counted', [x(), y(), agg()], ['AMOUNT:bin', '', 'count']);
+        HM.chartColumn('N');
+        eq('N Chart N (a plain number): its total', [y(), agg()], ['N', 'sum']);
+        // the date path through Auto-build: the rows counted, Auto-build's shape
+        HM.chartColumn('START_DATE', 'fy');
+        eq('N Chart a date by Fiscal Year: counted (the date is what is charted)', [x(), y(), agg()], ['START_DATE:fy', '', 'count']);
+        eq('N ...Auto-build\'s shape: a line through the periods', type(), 'line');
+        // 3. the measure's own format on the chart
+        HM.chartColumn('AMOUNT', 'x:STATUS');
+        var ch = Chart.getChart('vizChart');
+        eq('N no format set: the chart keeps its own ladder (no column format rides along)', ch && ch.data._fmt, null);
+        var legacy = ch ? tipOf(ch, 1234567.8) : '';
+        assert('N ...and its tooltip reads as before ($ and up to 3 decimals)', /\$1,234,567\.8$/.test(legacy), legacy);
+        F.setColFmt('AMOUNT', 'currency:0');
+        HM.chartColumn('AMOUNT', 'x:STATUS');
+        ch = Chart.getChart('vizChart');
+        var fm = ch && ch.data._fmt;
+        eq('N currency:0: the chart carries the column\'s format', fm ? [fm.style, fm.t, fm.decimals] : null, ['column', 'currency', 0]);
+        var yt = ch ? ch.scales.y.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N ...the value axis in dollars, no cents', yt.length > 1 && yt.every(function (l) { return /^-?\$\d/.test(l); }) && !yt.some(function (l) { return /\.\d\d$/.test(l); }), JSON.stringify(yt));
+        eq('N ...a tooltip in full, in the column\'s format', ch ? tipOf(ch, 1234567.8) : '', 'AMOUNT: $1,234,568');
+        var rr = await renderReport(window.vizBuildCodeFromForm());
+        assert('N ...the report\'s chart carries it too', !!rr.chart && rr.chart.data._fmt && rr.chart.data._fmt.style === 'column', rr.text || '');
+        if (rr.chart) eq('N ...and its tooltip', tipOf(rr.chart, 1234567.8), 'AMOUNT: $1,234,568');
+        F.setColFmt('AMOUNT', 'number:2');
+        HM.chartColumn('AMOUNT', 'x:STATUS');
+        ch = Chart.getChart('vizChart');
+        eq('N number:2 on a money column: no $, two decimals', ch ? tipOf(ch, 1234567.8) : '', 'AMOUNT: 1,234,567.80');
+        HM.chartColumn('AMOUNT', 'bin');
+        ch = Chart.getChart('vizChart');
+        eq('N ...a count of it keeps no format of its', ch && ch.data._fmt, null);
+        F.setColFmt('AMOUNT', null);
+        // 4. the X column's own format on its category labels: a date pattern, drawn only
+        F.setColFmt('START_DATE', 'date:MMM D, YYYY');
+        HM.chartColumn('START_DATE', 'raw');
+        ch = Chart.getChart('vizChart');
+        var lab0 = ch ? String(ch.data.labels[0]) : '', tk = ch ? ch.scales.x.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N As is on a date formatted MMM D, YYYY: the labels stay the values', /^\d{4}-\d\d-\d\d$/.test(lab0), lab0);
+        assert('N ...the axis reads in the pattern', tk.length > 0 && tk.every(function (l) { return /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(l); }), JSON.stringify(tk.slice(0, 4)));
+        var ttl = ch ? ch.options.plugins.tooltip.callbacks.title([{ label: lab0 }]) : '';
+        assert('N ...the tooltip title too', /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(ttl), ttl);
+        rr = await renderReport(window.vizBuildCodeFromForm());
+        var rtk = rr.chart ? rr.chart.scales.x.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N ...on the report\'s chart as well', rtk.length > 0 && /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(rtk[0]), JSON.stringify(rtk.slice(0, 3)));
+        F.setColFmt('START_DATE', null);
+        HM.chartColumn('START_DATE', 'raw');
+        ch = Chart.getChart('vizChart');
+        tk = ch ? ch.scales.x.ticks.map(function (t) { return String(t.label); }) : [];
+        assert('N ...no format: the axis reads the values', tk.length > 0 && /^\d{4}-\d\d-\d\d$/.test(tk[0]), JSON.stringify(tk.slice(0, 3)));
+        // 5. (numchart 2) the series names (Group By) in the series column's own format: the legend and each tooltip
+        //    line; the datasets keep their names (the series filter and the clicks read them)
+        var SD = ['2024-01-15', '2024-07-01', '2025-03-31', '2025-12-25'];
+        var rowsG = FIX.map(function (m, i) { var c = new Map(m); c.set('SER_DATE', SD[i % 4]); return c; });
+        F.setColFmt('SER_DATE', 'date:MMM D, YYYY');
+        var cfgG = { type: 'bar', xAxis: 'STATUS', yAxis: 'AMOUNT', groupBy: 'SER_DATE', agg: 'sum', limit: 9999 };
+        var bg = buildAndRender(cfgG, rowsG), chG = bg.chart;
+        var names = chG ? chG.data.datasets.map(function (d) { return d.label; }) : [];
+        assert('N series by a date column formatted MMM D, YYYY: the datasets keep their values', names.length === 4 && names.every(function (n) { return /^\d{4}-\d\d-\d\d$/.test(n); }), JSON.stringify(names));
+        var leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...the legend reads in the pattern', leg.length === 4 && leg.every(function (t) { return /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(t); }), JSON.stringify(leg));
+        var rawG = chG ? chG.config._config.options : null;
+        var tipG = rawG ? rawG.plugins.tooltip.callbacks.label.call(chG.tooltip || {}, { parsed: { x: 0, y: 1500 }, raw: 1500, dataset: chG.data.datasets[0], dataIndex: 0, datasetIndex: 0, label: String(chG.data.labels[0]), chart: chG }) : '';
+        assert('N ...each tooltip line names its series in the pattern', /^[A-Z][a-z]{2} \d{1,2}, \d{4}: /.test(tipG), tipG);
+        assert('N ...and the series name is read from a stand-in: the dataset itself unchanged', chG && /^\d{4}-/.test(chG.data.datasets[0].label), chG ? chG.data.datasets[0].label : '');
+        F.setColFmt('SER_DATE', null);
+        bg = buildAndRender(cfgG, rowsG); chG = bg.chart;
+        leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...no format: the legend reads the values', leg.length === 4 && leg.every(function (t) { return /^\d{4}-\d\d-\d\d$/.test(t); }), JSON.stringify(leg));
+        F.setColFmt('SER_DATE', 'date:MMM D, YYYY');
+        bg = buildAndRender({ type: 'line', xAxis: 'STATUS', yAxis: 'AMOUNT', groupBy: 'SER_DATE', agg: 'sum', limit: 9999, sortBy: 'label', sortDir: 'asc' }, rowsG); chG = bg.chart;
+        leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...a line chart\'s legend too', leg.length === 4 && leg.every(function (t) { return /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(t); }), JSON.stringify(leg));
+        F.setColFmt('SER_DATE', null);
+        // a series of a grouping keeps its buckets' own names
+        F.setColFmt('START_DATE', 'date:MMM D, YYYY');
+        bg = buildAndRender({ type: 'bar', xAxis: 'STATUS', yAxis: 'none', groupBy: 'START_DATE:fy', agg: 'count', limit: 9999 }, FIX); chG = bg.chart;
+        leg = (chG && chG.legend && chG.legend.legendItems) ? chG.legend.legendItems.map(function (it) { return it.text; }) : [];
+        assert('N ...a series of a grouping (START_DATE by Fiscal Year) keeps its bucket names', leg.length > 0 && leg.every(function (t) { return /^FY\d\d$/.test(t); }), JSON.stringify(leg));
+        F.setColFmt('START_DATE', null);
+      } finally {
+        try { F.setColFmt('AMOUNT', null); F.setColFmt('START_DATE', null); F.setColFmt('SER_DATE', null); } catch (e) { }
+        $lb.css('display', shown0);
+        if (!vbShown) { if (vbSt === null) vb.removeAttribute('style'); else vb.setAttribute('style', vbSt); $('.zzn-shown').css('display', '').removeClass('zzn-shown'); }
+        if (vbMade && vb.parentNode) vb.parentNode.removeChild(vb);
+        F.setMaster(keepM);
         $rt.data('columnProperties', cp0); $rt.data('columnNameToOriginalIndex', cni0);
       }
     });
@@ -1844,6 +2016,7 @@
     if (!ONLY || ONLY === 'G') await runG();   // (glong)
     if (!ONLY || ONLY === 'S') await runS();   // (gsortcolor)
     if (!ONLY || ONLY === 'E') await runE();   // (gone)
+    if (!ONLY || ONLY === 'N') await runN();   // (numchart) last: it loads the column options module
     // E (email / PDF) runs in the vischarts suite on these very calls and rows.
     Object.keys(EXPORT_CODES).forEach(function (t) { results.push({ name: 'EXPORT code ' + t, pass: true, detail: EXPORT_CODES[t], export: true }); });
     var cols = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'];

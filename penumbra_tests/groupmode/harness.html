@@ -121,6 +121,11 @@
   window.__clip = null;
   if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
   try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's state restore calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
+  // (2026-11-15) main.js defines stackHeaders only where #resultsHeader exists (always, in index.php; not here), and its
+  // debounced resize handler calls it unguarded: without this the handler throws once the page boots.
+  window.stackHeaders = window.stackHeaders || function () {};
   window.__errors = [];
   window.onerror = function (m, src, line) {
     window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line);

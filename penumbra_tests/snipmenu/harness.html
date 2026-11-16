@@ -75,6 +75,8 @@ heatmap(cell, AMOUNT, curve=log) action(search, 'Find', 'STATUS = Active') abs(-
   window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's state restore calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   // main.js's lazy loader (ensureSnippetHelp) reads this; the files sit next to the page.
   window.PENUMBRA_SNIPPET_HELP_ASSETS = { js: 'penumbra_snippet_help.js', css: 'penumbra_snippet_help.css' };
 </script>

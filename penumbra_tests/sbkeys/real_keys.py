@@ -6,7 +6,14 @@
 # page (harness.html?real=1) in headless Edge over CDP with Input.dispatchKeyEvent
 # - real key presses on a really focused control, real activation:
 #
-#   R1  Enter on "Save my customizations..." (custom-layout card) clicks it, the
+#   R1  Enter on the custom-layout card's button clicks it and the Settings panel
+#       stays shut. Until 2026-11-06 that was "Save my customizations..."
+#       (#sbCustomColsSave, whose click went on to #saveQuery); commit 062f70a
+#       removed that button on purpose, so since 2026-11-15 R1 / R2 press the
+#       card's remaining button, "Reset..." (#sbCustomColsReset, its own handler
+#       taken off here: it would clear the stored layout and reload). The
+#       "click reaches Save" half is retired with the button (062f70a).
+#       (old text:) Enter on "Save my customizations..." clicks it, the
 #       click reaches Save (#saveQuery), and the Settings panel stays shut
 #   R2  Space on it does the same
 #   R3  Enter and Space on "Open the pivot builder..." (pivot card) click it
@@ -73,12 +80,14 @@ class Cdp:
 # the app's own handlers do with it) and a reset between checks.
 SETUP = r'''(function () {
   window.__clicks = {};
-  ['sbCustomColsSave', 'saveQuery', 'sbPivotOpenBuilder', 'sbColsSettings'].forEach(function (id) {
+  ['sbCustomColsReset', 'saveQuery', 'sbPivotOpenBuilder', 'sbColsSettings'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('click', function () { window.__clicks[id] = (window.__clicks[id] || 0) + 1; }, true);
   });
   // Save itself would open the save dialog this page does not have.
   $('#saveQuery').off('click');
+  // (2026-11-15) Reset itself would clear the stored layout and reload the page.
+  $('#sbCustomColsReset').off('click');
   window.__state = function () {
     var a = document.activeElement;
     return { panel: __drv.panelOpen(), clicks: JSON.parse(JSON.stringify(window.__clicks)), focus: a ? (a.id || a.className || a.tagName) : 'none',
@@ -158,19 +167,19 @@ def main():
 
         # ---- R1 / R2: Save my customizations... -------------------------------
         reset()
-        c.ev('$("#sbCustomCols").trigger("click"); document.getElementById("sbCustomColsSave").focus(); true')
+        c.ev('$("#sbCustomCols").trigger("click"); document.getElementById("sbCustomColsReset").focus(); true')
         s0 = st()
         c.press('Enter')
         s1 = st()
-        rec('R1 a REAL Enter on "Save my customizations..." clicks it and reaches Save; the Settings panel stays shut',
-            s0['cc'] and s0['focus'] == 'sbCustomColsSave' and s1['clicks'].get('sbCustomColsSave') == 1 and s1['clicks'].get('saveQuery') == 1 and not s1['panel'],
+        rec('R1 a REAL Enter on the custom-layout card button ("Reset..." since 062f70a removed "Save my customizations...") clicks it; the Settings panel stays shut',
+            s0['cc'] and s0['focus'] == 'sbCustomColsReset' and s1['clicks'].get('sbCustomColsReset') == 1 and not s1['panel'],
             'before=%s after=%s' % (json.dumps(s0), json.dumps(s1)))
         reset()
-        c.ev('$("#sbCustomCols").trigger("click"); document.getElementById("sbCustomColsSave").focus(); true')
+        c.ev('$("#sbCustomCols").trigger("click"); document.getElementById("sbCustomColsReset").focus(); true')
         c.press('Space')
         s2 = st()
         rec('R2 a REAL Space on it does the same',
-            s2['clicks'].get('sbCustomColsSave') == 2 and s2['clicks'].get('saveQuery') == 2 and not s2['panel'], json.dumps(s2))
+            s2['clicks'].get('sbCustomColsReset') == 2 and not s2['panel'], json.dumps(s2))
 
         # ---- R3: Open the pivot builder... ------------------------------------
         reset()

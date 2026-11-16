@@ -396,8 +396,9 @@
     // a theme, the Settings panel's own select
     type('theme'); await sleep(40);
     await pickRow('Theme...', 'Actions'); await enter();
-    R.chk.themePick = !!box() && modeOf() === 'theme' && !!row('Dark Blue') && !!row('Default Light');
-    await pickRow('Dark Blue'); await enter();
+    // (2026-11-15) theme-dark-blue is labelled Cyanotype since 2026-11-07 (catch-up commit e65935d; the id stays): the rows are sought by the new label
+    R.chk.themePick = !!box() && modeOf() === 'theme' && !!row('Cyanotype') && !!row('Default Light');
+    await pickRow('Cyanotype'); await enter();
     R.chk.themeRuns = await until(function () { return document.body.classList.contains('theme-dark-blue'); }, 2000);
   };
   // ---------------------------------------------------------------- pwidth (2026-10-22, colmenu round 33)
@@ -1561,13 +1562,13 @@
     R.chk.everyTheme = ok && regThemes.length >= 10 && got.length === regThemes.length && regThemes.every(function (n) { return got.indexOf(n) >= 0; });
     R.chk.themeActionKept = ok && ai >= 0 && (ti < 0 || ai < ti);
     R.chk.themeCurrentMarked = trows().some(function (r) { return r.sub === 'now'; });
-    type('dark blue'); await sleep(150); var db = row('Theme: Dark Blue'); R.chk.themeByName = !!db && !db.off;
+    type('cyanotype'); await sleep(150); var db = row('Theme: Cyanotype'); R.chk.themeByName = !!db && !db.off;
     type('density'); await sleep(150); var dn = rows().filter(function (r) { return r.text.indexOf('Density: ') === 0; });
     R.info.density = [dn.map(function (r) { return r.text; }), ds ? ds.options.length : -1];
     R.chk.densityThree = ok && dn.length === 3 && !!ds && Array.prototype.filter.call(ds.options, function (o) { return o.value !== 'report-default'; }).length === 3;
     type('compact'); await sleep(150); R.chk.densityByName = ok && !!row('Density: Compact');
     var wasVal = ts ? ts.value : null, changes = 0; if (ts) { $(ts).on('change.zzthm', function () { changes++; }); }   // (jQuery: the module triggers the select's change through jQuery, as the panel's own handler listens)
-    type('dark blue'); await sleep(150); var picked = await pickRow('Theme: Dark Blue'); if (picked) { await enter(); }
+    type('cyanotype'); await sleep(150); var picked = await pickRow('Theme: Cyanotype'); if (picked) { await enter(); }
     var applied = await until(function () { return document.body.classList.contains('theme-dark-blue'); }, 2000);
     R.info.apply = [picked, ts ? ts.value : null, changes, applied];
     R.chk.themeApplies = picked && !box() && !!ts && ts.value === 'theme-dark-blue' && changes === 1 && applied;
@@ -2442,7 +2443,7 @@
     R.chk.topRow = await expectTop('row 250', 'Go to row 250');
     R.chk.topNote = await expectTop('add a note', 'Add a note to the Report journal');
     R.chk.topUnhide = await expectTop('unhide', 'Show all hidden columns');
-    R.chk.topTheme = await expectTop('dark blue', 'Theme: Dark Blue');
+    R.chk.topTheme = await expectTop('cyanotype', 'Theme: Cyanotype');
     R.chk.topDensity = await expectTop('compact', 'Density: Compact');
     R.chk.topReportId = await expectTop('zzpal', 'Palette fixture report');
     R.chk.topQuestion = await expectTop('how do I sum a column', 'Ask Jarvis:');

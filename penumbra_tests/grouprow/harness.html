@@ -122,6 +122,8 @@
   window.__clip = null;
   if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
   try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+  // (2026-11-15) index.php defines this inline (themes_config.php); main.js's state restore calls it.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
   window.__errors = [];
   window.onerror = function (m, src, line) {
     window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line);

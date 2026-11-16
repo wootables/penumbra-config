@@ -757,7 +757,7 @@ MUTANTS = {
     'cd-nohead': ([('cards', "            if (sec.name !== null) {\n", "            if (false) {\n")], ['L-gmail-grpHeads', 'L-gmail-grpNames'], ['gmail']),
     'cd-pivot': ([('cards', "    function emailable() { return !!(allowed() && !H.inPivot()); }", "    function emailable() { return !!allowed(); }")], ['L-pmail-noPivot'], ['pmail']),
     'cd-raw': ([('main', "return td ? cloneCell($(td))[0].innerHTML : '';", "return td ? td.innerHTML : '';")], ['L-cmail-mailCleaned'], ['cmail']),
-    'cd-pdf': ([('main', "const pdfContent = await generatePdfContent({ cards: true });", "const pdfContent = await generatePdfContent();")], ['S-cdash'], []),
+    'cd-pdf': ([('main', "const pdfContent = await _pnbGeneratePdf({ cards: true });", "const pdfContent = await _pnbGeneratePdf();")], ['S-cdash'], []),   # (2026-11-15) PDFs go through _pnbGeneratePdf (the Unicode font)
     # (csched) no opening in cards; no sent record; no lists; the open / sent left in links; the table's Save keeps them;
     # clean() drops open; the theme ignored (two ways)
     'cs-noopen': ([('cards', "        if (report && report.open) return 'cards';   // (csched) the report was saved showing cards\n", "")], ['L-copen-opensCards'], ['copen']),
@@ -793,7 +793,7 @@ MUTANTS = {
     'y-pdfhook': ([('main', "const _pnbCardsPdf = !!(opts && opts.cards &&", "const _pnbCardsPdf = !!(false &&")], ['L-cfixprint-pdfCards'], ['cfixprint']),
     'y-pdfblank': ([('cards', "        try { if (doc.internal.getNumberOfPages() > 1) doc.deletePage(doc.internal.getNumberOfPages()); } catch (e) { }\n", "")], ['L-cfixprint-pdfCards'], ['cfixprint']),
     'y-pdfnote': ([('cards', "        pn.textContent = 'While '", "        pn.textContent = 'x' || 'While '")], ['L-cfixprint-pdfNote'], ['cfixprint']),   # (re-aimed: a new note has no hidden to clear)
-    'y-pdfcall': ([('main', "generatePdfContent({ cards: true });", "generatePdfContent();")], ['S-cfix2'], []),
+    'y-pdfcall': ([('main', "_pnbGeneratePdf({ cards: true });", "_pnbGeneratePdf();")], ['S-cfix2'], []),   # (2026-11-15) via _pnbGeneratePdf
     # (cfix) packing off / its spans / its css; the keys; the card's one column; a label's heading menu (card, details); the
     # details' card field; an editor's Save; the setup's nopack (cards clean, main.js layoutSet, the link, a pivot's read,
     # layoutClean); All; the lists' dress; the main.js Save hook (static)
@@ -829,7 +829,6 @@ MUTANTS = {
     'cp-noghost': ([('cards', 'class="pnb-cdet-ghost pnb-cdet-prev"', 'class="pnb-cdet-prev"')], ['L-cprint-ghostClass'], ['cprint']),
     'cp-ghostfill': ([('cardscss', 'border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none;', 'border: 1px solid transparent; border-radius: 6px; box-shadow: none;')], ['L-cprint-ghostFlat'], ['cprint']),
     'cp-nopath': ([('cards', "            var path = printPath(i);", "            var path = '';")], ['L-gprint-gPath', 'L-gprint-boardPath'], ['gprint']),
-    'cp-nonote': ([('cards', "        paintPrintNote();   // (cprint) the Download dialog's Print: the cards' page count\n", "")], ['L-cprint-noteShown'], ['cprint']),
     'cp-pvbtn': ([('cardscss', '    #pnbCardsPrint .pnb-cdet-actions, #pnbCardsPrint .journal-rownote-act', '    #pnbCardsPrint .pnb-cdet-actions-x, #pnbCardsPrint .journal-rownote-act')], ['L-pprint-pNoButton'], ['pprint']),
     # (cfmt2) the frame's timestamp read as `again` again; that and main.js's hooks; the format pass's hook alone; the menu
     # naming the stored value; the old button words
@@ -1433,11 +1432,13 @@ def static_checks(t):
                 'the card setup in the view link; the rank-scaled bar; help, tip, README'))
     # (linkpos) the cards' top card, the open details card and the pivot's scroll in the link: cleaned, captured, dropped
     # early, listed, described, restored; the module's hook; the Show all focus rule; the help
+    # (2026-11-15, drift) d76e13a (chartmin 2) put ['cm', 'minimized charts'] into the drop order between ds and ck; a277190 (help L16)
+    # shortened the view-link topic's bullet to "With cards showing, the top card and any card whose details window is open"
     out.append(('S-linkpos', 'function _pnbViewLinkCardsNow(' in main and 'function _pnbViewLinkPivotNow(' in main and 'function _pnbViewLinkPivotTo(' in main
-                and ("['cd', 'open card'], ['cl', 'card setup']" in dtx or "['cd', 'open card'], ['ck', 'open card'], ['cl', 'card setup']" in dtx or "['cd', 'open card'], ['ds', 'scroll position'], ['ck', 'open card'], ['cl', 'card setup']" in dtx) and "['pt pl', 'scroll position'], ['gb gt gr gc tr lc', 'scroll position']" in dtx
+                and ("['cd', 'open card'], ['cl', 'card setup']" in dtx or "['cd', 'open card'], ['ck', 'open card'], ['cl', 'card setup']" in dtx or "['cd', 'open card'], ['ds', 'scroll position'], ['ck', 'open card'], ['cl', 'card setup']" in dtx or "['cd', 'open card'], ['ds', 'scroll position'], ['cm', 'minimized charts'], ['ck', 'open card'], ['cl', 'card setup']" in dtx) and "['pt pl', 'scroll position'], ['gb gt gr gc tr lc', 'scroll position']" in dtx
                 and "inc.push('open card')" in main and "out.push('pivot row ' + (v.pt + 1) + ' at the top')" in main and 'CD.linkWant({ top:' in main
                 and 'function linkWant(' in cards and 'linkWant: linkWant' in cards and "e.target.closest('.pnb-card-more')) return;" in cards
-                and 'the card at the top and a card whose details window is open' in t['vltopic'] and 'the card at the top and an open details window' in t['ustopic'] and 'linkpos (2026-10-31' in t['readme'],
+                and ('the card at the top and a card whose details window is open' in t['vltopic'] or 'With cards showing, the top card and any card whose details window is open' in t['vltopic']) and 'the card at the top and an open details window' in t['ustopic'] and 'linkpos (2026-10-31' in t['readme'],
                 'the link carries the card at the top, the open card and the pivot scroll; the Show all focus rule; help + README'))
     # (pvlab) one helper words a measure's total on the tile; the pill's title and the bar's label go through it
     out.append(('S-pvlab', 'function pvTotalWord(' in cards and cards.count('pvTotalWord(measures, pmi)') == 1 and cards.count('pvTotalWord(measures, rmi)') == 1 and "esc('Total ' + (measures[pmi] || ''))" not in cards, 'pvTotalWord: the pill title + the bar label'))
@@ -1465,7 +1466,7 @@ def static_checks(t):
                 and bool(tipm) and '<ul>' in tipm.group(0) and len(tipm.group(0)) < 1100 and 'Pack the cards' in tipm.group(0) and 'Right-click a field\'s name for its column heading\'s menu' in t['ustopic'],
                 'cfix: the module, css, main.js hooks, the help (a short tip), README'))
     out.append(('S-cfix2', 'cfix2 (2026-10-31' in t['readme'] and 'function pdfPages(doc)' in cards and 'function boardFit(el)' in cards and 'var(--pnb-board-h,' in css
-                and 'generatePdfContent({ cards: true })' in main and 'function generatePdfContent(opts) {' in main and 'pnb-ccfg-checks' in cards and '.pnb-cards-pdfnote' in css
+                and '_pnbGeneratePdf({ cards: true })' in main and 'function generatePdfContent(opts) {' in main and 'pnb-ccfg-checks' in cards and '.pnb-cards-pdfnote' in css
                 and '<strong>Download &gt; PDF</strong> makes the same as a file' in t['ustopic'] and 'Download as PDF too' in t['tip'],
                 'cfix2: the module (PDF pages, the board fit, the switches row), css, main.js hooks, the help, README'))
     out.append(('S-bdlay', 'bdlay (2026-10-31' in t['readme'] and 'function showBoard()' in cards and 'BOARD_NO_TABLE' in cards and 'function boardLayout()' in cards
@@ -1483,7 +1484,7 @@ def static_checks(t):
                 and 'the email body stays a table' not in t['index']
                 and 'const cloneCell = ($srcTd) =>' in main and 'cellsOnly: tds || []' in main
                 and '_cdM.emailHtml({ budget: _emailBodyBudgetBytes(attachments) })' in main
-                and 'const pdfContent = await generatePdfContent({ cards: true });' in main and 'Email Report sends the cards while they show' in t['ustopic'],
+                and 'const pdfContent = await _pnbGeneratePdf({ cards: true });' in main and 'Email Report sends the cards while they show' in t['ustopic'],
                 'the email\'s cards: the module, main.js (the cell helper, the dialog, the send, the PDF), index.php, the help, README'))
     out.append(('S-csched', 'csched (2026-11-01' in t['readme'] and 'function savedView()' in cards and 'var MAIL_THEME = {' in cards and "if (report && report.open) return 'cards';" in cards
                 and 'emailBodyCardsRow' not in t['index'] and 'emailBodyAsCards' not in main and 'window.Penumbra.cards.on()' in main and 'emailVars: function ()' in main
