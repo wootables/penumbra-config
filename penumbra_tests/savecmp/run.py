@@ -215,7 +215,10 @@ def hook(src):
     if i < 0 or i > 400: raise SystemExit('closure anchor not found')
     h = ('\r\n;try { window.__CF = {}; } catch (e) { window.__CF_ERR = String(e); }\r\n'
          'try { var _cfF = { runCmp: "runComparisonAndDisplayGrouped", runAb: "runComparisonTwoSnapshots", compress: "compressString", decompress: "decompressString",'
-         ' bso: "buildStateObject", bvu: "buildViewStateURL", ser: "_penumbraSerializeSortForUrl", lsc: "_lscPopulateSortField", lvls: "_groupLevelsFromDialog", exitHome: "_exitSnapshotToHome",'
+         ' bso: "buildStateObject", bvu: "buildViewStateURL", ser: "_penumbraSerializeSortForUrl",'
+         # (2026-11-16, savechg C) the Last Stop sort mirror is gone from main.js: hooked only where it still is
+         + (' lsc: "_lscPopulateSortField",' if 'function _lscPopulateSortField' in src else '') +
+         ' lvls: "_groupLevelsFromDialog", exitHome: "_exitSnapshotToHome",'
          ' loadSnap: "loadSnapshotData", clearAll: "performClearAllAction" };\r\n'
          '  Object.keys(_cfF).forEach(function (k) { try { window.__CF[k] = eval(_cfF[k]); } catch (e) { (window.__CF_MISSING = window.__CF_MISSING || []).push(_cfF[k]); } }); } catch (e) { window.__CF_ERR2 = String(e); }\r\n'
          'window.__CF.sc = function () { return JSON.parse(JSON.stringify(sortCriteria)); };\r\n'

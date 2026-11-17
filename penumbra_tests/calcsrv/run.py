@@ -73,7 +73,7 @@ MUTANTS = {
     'j-nolist': ([('calc', "            last.applied.forEach(function (d) { if (d.src === 'report') keep[d.name] = true; });\n", "")], ['L-rnolist-reportKept'], ['rnolist']),
     'j-iscalc': ([('calc', "            return last.applied.some(function (d) { return d.name === n; }) && !isReport(n);\n",
                    "            return last.applied.some(function (d) { return d.name === n; });\n")], ['L-rload-notCalc'], ['rload']),
-    'j-hint': ([('calc', "        if (e.target && e.target.matches && e.target.matches('#pnbCalcSaveRow input[data-calc-save]')) updateSaveHint();\n", "")], ['L-rsave-hintFollows'], ['rsave']),
+    # 'j-hint' retired 2026-11-16 (savechg C): the collapsed hint it counted went with Last Stop Changes
     'j-keepmine': ([('calc', "            if (!mine.some(function (x) { return x.name === d.name; })) mine.push(plain(d));\n", "")], ['L-rsave-untickedKept'], ['rsave']),
     # main.js (CRLF)
     'm-src': ([('main', "window.PenumbraCalc.fromState(decodedState.calcColumns, penumbra_vars.preloadedState ? 'report' : 'state');", "window.PenumbraCalc.fromState(decodedState.calcColumns);")],
@@ -211,6 +211,8 @@ def run_php_side(texts):
     m = texts['main']
     i = m.find('$("#saveQuery").click(')
     j = m.find('_lscPopulateSortField();', i)
+    if j == -1:   # (2026-11-16, savechg C) Last Stop Changes went; the open handler's own marker before the lists
+        j = m.find('_pnbSaveChgOff = {};', i)
     k = m.find("window.PenumbraCalc.renderSaveList();", j)
     nxt = m.find('$(document).on(', j)
     out.append(('S-openCall', i != -1 and j != -1 and k != -1 and k < nxt, 'saveQuery %d lsc %d call %d next %d' % (i, j, k, nxt)))

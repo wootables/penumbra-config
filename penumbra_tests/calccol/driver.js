@@ -375,6 +375,8 @@
       // calcsrv (2026-10-11): a stored report's column is the REPORT's and a save keeps it -
       // unless it is unticked in the Save dialog's Last Stop list, as here: then it is stripped
       if (!document.getElementById('lastStopCardBody')) { var lsb = document.createElement('div'); lsb.id = 'lastStopCardBody'; document.body.appendChild(lsb); }
+      // (2026-11-16, savechg C) ...and "What this save changes"' place for the lists, where the module puts them since Last Stop went
+      if (!document.getElementById('pnbSaveChgLists')) { var scl = document.createElement('div'); scl.id = 'pnbSaveChgLists'; document.body.appendChild(scl); }
       if (window.PenumbraCalc.renderSaveList) window.PenumbraCalc.renderSaveList();
       var tcb = document.querySelector('#pnbCalcSaveRow input[data-calc-save="TRIPLE"]'); if (tcb) tcb.checked = false;
       window.__SAVE_ANSWER = function (b) { return { ok: true, json: { success: true, new_id: b.short_id, numeric_id: 7, is_new: false, updated_at: '2026-10-10 10:00:00.000000' } }; };

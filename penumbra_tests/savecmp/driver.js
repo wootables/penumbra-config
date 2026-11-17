@@ -295,8 +295,8 @@
       'ser=' + J(ser5) + ' v=' + J(v5 && { m: v5.m, g: v5.g, sc: v5.sc, s: v5.s, o: v5.o }) + ' url=' + String(b5 && b5.url).slice(0, 120) + ' err=' + J(b5 && b5.error));
 
     // G6 the Save dialog's Last Stop Changes card shows the sort the save writes: NOTE descending, not QTY
-    H.lsc();
-    var card6 = String($('#serverSaveSortSummary').text() || '').replace(/\s+/g, ' ').trim();
+    // (2026-11-16, savechg C: that card and its mirror are gone - the sort the save's state carries, in the card's words)
+    var card6 = H.lsc ? (H.lsc(), String($('#serverSaveSortSummary').text() || '').replace(/\s+/g, ' ').trim()) : (function (st) { return ((st && st.sortCriteria) || []).map(function (c) { return String(c.colIdentifier) + (c.direction === 'desc' ? ' ▼' : ' ▲'); }).join(' › '); })(H.bso());
     rec('G6 the Save dialog\'s sort card during the comparison shows the report\'s NOTE descending, not the comparison\'s QTY',
       /NOTE/.test(card6) && /▼/.test(card6) && !/QTY/.test(card6), 'card=' + J(card6));
 
@@ -442,9 +442,8 @@
       !!v5 && v5.m === 'keep' && !v5.g && !v5.sc && !v5.o && /[?&]snapcmp=55(&|$)/.test(String(b5.url)) && J(v5).indexOf('__SNAP_TYPE') < 0,
       'v=' + J(v5 && { m: v5.m, o: v5.o, s: v5.s, g: v5.g, sc: v5.sc }) + ' url=' + String(b5 && b5.url).slice(0, 120) + ' err=' + J(b5 && b5.error));
 
-    // F6 the Save dialog's sort card
-    H.lsc();
-    var card6 = String($('#serverSaveSortSummary').text() || '').replace(/\s+/g, ' ').trim();
+    // F6 the Save dialog's sort card (savechg C: without it, the sort the save's state carries)
+    var card6 = H.lsc ? (H.lsc(), String($('#serverSaveSortSummary').text() || '').replace(/\s+/g, ' ').trim()) : (function (st) { return ((st && st.sortCriteria) || []).map(function (c) { return String(c.colIdentifier) + (c.direction === 'desc' ? ' ▼' : ' ▲'); }).join(' › '); })(H.bso());
     rec('F6 the Save dialog\'s sort card during the comparison shows the report\'s NOTE descending, not the comparison\'s QTY',
       /NOTE/.test(card6) && /▼/.test(card6) && !/QTY/.test(card6), 'card=' + J(card6));
 
@@ -694,7 +693,7 @@
 
   (async function () {
     try {
-      var need = ['runCmp', 'runAb', 'compress', 'decompress', 'bso', 'bvu', 'ser', 'lsc', 'lvls', 'exitHome', 'sc', 'rs', 'grp', 'setPre',
+      var need = ['runCmp', 'runAb', 'compress', 'decompress', 'bso', 'bvu', 'ser', 'lvls', 'exitHome',   // (savechg C) lsc optional 'sc', 'rs', 'grp', 'setPre',
                   'loadSnap', 'clearAll', 'chosen', 'pre', 'viewing', 'pend', 'setPendPivot'];
       var miss = need.filter(function (k) { return !H[k]; });
       if (miss.length) { finish('hook: not exported: ' + miss.join(', ')); return; }

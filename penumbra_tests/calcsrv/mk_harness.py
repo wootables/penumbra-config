@@ -17,7 +17,9 @@ rep('<title>saveconf</title>', '<title>calcsrv</title>')
 rep('<script src="main_hc.js"></script>', '<script src="penumbra_calc.js"></script>\n<script src="main_hc.js"></script>')
 rep('<div id="pnbStatusBar">', '<div id="action_overlay"></div>\n'
     '<div class="save-form-container collapsed" id="lastStopCard"><div class="lsc-collapsed-hint">Optional final overrides. Click to expand.</div>'
-    '<div id="lastStopCardBody"></div></div>\n<div id="pnbStatusBar">')
+    '<div id="lastStopCardBody"></div></div>\n'
+    # (2026-11-16, savechg C) "What this save changes", where the lists sit since Last Stop Changes went (both kept: --control)
+    '<div class="save-form-container" id="pnbSaveChg"><div class="pnb-sc-body"></div><div class="pnb-sc-lists" id="pnbSaveChgLists"></div><div class="pnb-sc-bookwrap"></div><div class="pnb-sc-foot" hidden></div><div class="pnb-sc-diff" id="pnbSaveChgDiff" hidden><div class="audit-diff-body"></div></div></div>\n<div id="pnbStatusBar">')
 rep('    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];',
     '    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];\n'
     '    if (/^r/.test(S)) { st.calcColumns = [{ name: "REP1", formula: "{H_NUM} * 3", format: "number" }, { name: "REP2", formula: "ROUND({REP1} / 2, 1)", format: "number" }];\n'

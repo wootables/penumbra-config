@@ -59,12 +59,15 @@
       // the Save dialog opening (main.js calls this from the #saveQuery handler)
       window.PenumbraCalc.renderSaveList();
       var boxes = Array.prototype.slice.call(document.querySelectorAll('#pnbCalcSaveRow input[data-calc-save]'));
+      // (2026-11-16, savechg C) the list sits in "What this save changes" (#pnbSaveChgLists) with no collapsed hint to count
+      // it; the old main.js still lists it under Last Stop Changes (--control)
+      var inNew = !!document.querySelector('#pnbSaveChgLists #pnbCalcSaveRow');
       R.chk.listed = boxes.map(function (b) { return b.getAttribute('data-calc-save') + (b.checked ? '+' : '-'); }).join(',') === 'REP1+,REP2+,A+,B+,C+'
-        && !!document.getElementById('lastStopCardBody').querySelector('#pnbCalcSaveRow');
-      R.chk.hint = /Saves 5 calculated columns with the report/.test(document.querySelector('#lastStopCard .lsc-collapsed-hint').textContent);
+        && (inNew || !!document.getElementById('lastStopCardBody').querySelector('#pnbCalcSaveRow'));
+      R.chk.hint = inNew || /Saves 5 calculated columns with the report/.test(document.querySelector('#lastStopCard .lsc-collapsed-hint').textContent);
       // keep REP1, C; leave out REP2, A, B (C uses B: B goes along)
       ['REP2', 'A', 'B'].forEach(function (n) { var b = document.querySelector('#pnbCalcSaveRow input[data-calc-save="' + n + '"]'); b.checked = false; b.dispatchEvent(new Event('change', { bubbles: true })); });
-      R.chk.hintFollows = /Saves 2 calculated columns/.test(document.querySelector('#lastStopCard .lsc-collapsed-hint').textContent);
+      R.chk.hintFollows = inNew || /Saves 2 calculated columns/.test(document.querySelector('#lastStopCard .lsc-collapsed-hint').textContent);
       var sd = await save();
       var cc = sd && sd.calcColumns ? sd.calcColumns.map(function (d) { return d.name; }).join(',') : '';
       R.chk.kept = cc === 'REP1,B,C';

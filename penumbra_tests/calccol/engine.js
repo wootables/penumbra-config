@@ -277,6 +277,8 @@
       C.fromState([{ name: 'CAR', formula: '{A} + 0', input: { name: 'R', value: 2 } }, { name: 'USER', formula: '{A} * {@R}' }], 'state');
       C.applyRows([{ A: '3' }]);
       var lsb = document.getElementById('lastStopCardBody'); if (!lsb) { lsb = document.createElement('div'); lsb.id = 'lastStopCardBody'; document.body.appendChild(lsb); }
+      // (2026-11-16, savechg C) ...and "What this save changes"' place for the list, where the module puts it since Last Stop went
+      if (!document.getElementById('pnbSaveChgLists')) { var scl = document.createElement('div'); scl.id = 'pnbSaveChgLists'; document.body.appendChild(scl); }
       C.renderSaveList();
       document.querySelector('#pnbCalcSaveRow input[data-calc-save="CAR"]').checked = false;
       var sst = { visibleColumns: ['#', 0, 1, 2], columnOrder: [0, 1, 2] };

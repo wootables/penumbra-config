@@ -24,6 +24,11 @@
 # link, a save without the dialog's list), hrview (a viewer), hrsave (the Save dialog's Last
 # Stop Changes list, the save, after it), P-hl-* (test_colopt.php hl: the scheduled email's
 # twins and its table against the page's answers), S-helpHl2. NEW = NEW_HL2.
+# (2026-11-16, hlx 4abdabe) a report rule's x in place of Off for me's box (removed for the viewer, its arrow
+# back): hrep / hrview click those now; the Save dialog's off line TICKED takes the rule out of the report (the
+# reverse until then): hrsave's save leaves it ticked, and its new untickKeeps saves with nothing ticked (the rule
+# stays in the report, removed for the saver alone); S-helpHl2 reads the new wording. The suite was brought to
+# hlx after it went live, so live is these checks' only run: m-stripold (the code before it) is their control.
 # --control runs LIVE: every NEW check red there, every other one green.
 #   page half   harness.html (mk_harness.py, from calccol's) + driver.js: the REAL
 #               main.js + module + calc module                 L-<scn>-<check>, E-<scn>
@@ -100,7 +105,7 @@ CHK = {
     'hrep': ['repFmt', 'repDrawn', 'repBadges', 'popRepRow', 'offForMe', 'offBadge', 'offBack', 'viewLink', 'autoOverRep', 'resetBack', 'openNoCopy',
              'editCopy', 'changeBack', 'copyDelete', 'openCanon', 'noListKeeps'],
     'hrview': ['viewDrawn', 'viewNoEdit', 'viewOff', 'viewOwnOnTop', 'viewFmtOwn', 'rerunKeeps', 'adhocDrops'],
-    'hrsave': ['seedDrawn', 'listItems', 'listHint', 'savedState', 'afterOwn', 'afterDrawn', 'afterBadges', 'relist', 'copyKeepsOwn'],
+    'hrsave': ['seedDrawn', 'listItems', 'listHint', 'untickKeeps', 'savedState', 'afterOwn', 'afterDrawn', 'afterBadges', 'relist', 'copyKeepsOwn'],
     'hrnomod': ['saveKeeps', 'linkKeeps'],
     # (2026-10-20 c) a pivot value's Highlight rules, through the real pivot builder
     'pvhl': ['popHasHl', 'editorPivot', 'ruleStored', 'editorCount', 'generated', 'reedit', 'fieldRule', 'stateCarries'],
@@ -133,7 +138,7 @@ SCN.extend(['fsplit', 'gsplit'])
 # the PHP half's hl mode (the email): its checks, by name
 PHP_HLHD = ['stateHd', 'stateAnyFlag', 'emailAlways', 'emailAggOn', 'emailAggOff', 'emailAnyOn', 'emailAnyOff', 'emailHeadCss', 'emailCellsStill', 'groupedHeads', 'emailFillShows', 'emailInk', 'emailBadFill', 'emailImpFill', 'pdfUntouched']   # (2026-10-24, hlhead)
 PHP_HL = ['fmtParity', 'numParity', 'cssParity', 'whenParity', 'stateRules', 'emailPaints', 'emailFmt', 'emailFooter', 'pdfPlain', 'darkFill', 'groupedEmail', 'noLeak']
-N = '\r\n'   # main.js, schedule_runner.php and main.css are CRLF; the module and both calc files LF
+N = '\r\n'   # main.js and schedule_runner.php are CRLF; the module, both calc files and (since e65935d, 2026-11-11) main.css LF
 MUTANTS = {
     # --- (2026-10-24, hlhead) header rules: no Header choice; a header rule also drawn as a cell rule; the last styles never taken
     # off; every row read, not the filter's; an aggregate read as a row condition; drawn without !important; the gradient kept;
@@ -202,7 +207,8 @@ MUTANTS = {
                   ['L-fbuild-amtShown', 'L-fsort-sortedByDate', 'L-ffilter-valueNotDisplay'], ['fbuild', 'fsort', 'ffilter']),
     'm-sortraw': ([('main', "                        text = cell ? _pnbCellValText(cell).trim() : '';", "                        text = cell ? cell.textContent.trim() : '';")],
                   ['L-fsort-sortedByDate'], ['fsort']),
-    'm-filterraw': ([('main', "        const value = _pnbCellValText(td).trim();", "        const value = (td.textContent || '').trim();")], ['L-ffilter-valueNotDisplay'], ['ffilter']),
+    # (re-anchored 2026-11-16: the click reads _pnbCellFltText since 2c82893, 2026-11-14 - the value first, as before)
+    'm-filterraw': ([('main', "        const value = _pnbCellFltText(td).trim();", "        const value = (td.textContent || '').trim();")], ['L-ffilter-valueNotDisplay'], ['ffilter']),
     'm-filterclass': ([('main', "        if (!document.body.classList.contains('pnb-click-filter') && !this.classList.contains('pnb-cflt'))" + N + "            return;",
                         "        if (!document.body.classList.contains('pnb-click-filter'))" + N + "            return;")],
                       ['L-ffilter-clickFilters', 'L-gfmt-groupClick'], ['ffilter', 'gfmt']),
@@ -490,7 +496,17 @@ MUTANTS = {
     # main.js: the Save dialog's list, what a save takes into the report, after it
     'm-savelist': ([('main', "try { penumbraHlRenderSaveList(); } catch (e) { console.warn('highlight save list:', e); }", '')], ['L-hrsave-listItems'], ['hrsave']),
     'm-strip': ([('main', '        _pnbHlStripFromState(stateObject);' + N, '')], ['L-hrsave-savedState', 'L-hrep-noListKeeps'], ['hrep', 'hrsave']),
-    'm-stripoff': ([('main', "if (listed && !copy && off.indexOf(r.id) !== -1 && !ticked['off|' + c + '|' + r.id]) return;", '')], ['L-hrsave-savedState'], ['hrsave']),
+    # (hlx, 2026-11-16) a TICKED off line takes the report's rule out (re-anchored from the !ticked line before it): no line takes it out
+    'm-stripoff': ([('main', "if (listed && !copy && off.indexOf(r.id) !== -1 && ticked['off|' + c + '|' + r.id]) return;", '')], ['L-hrsave-savedState'], ['hrsave']),
+    # (hlx) the tick not read: an unticked off line takes the rule out too
+    'm-stripuntick': ([('main', "if (listed && !copy && off.indexOf(r.id) !== -1 && ticked['off|' + c + '|' + r.id]) return;",
+                        "if (listed && !copy && off.indexOf(r.id) !== -1) return;")], ['L-hrsave-untickKeeps'], ['hrsave']),
+    # (hlx) the code before it: an unticked line took the rule out, a ticked one kept it. Only untickKeeps sees it: its
+    # save (nothing ticked) takes r2 out there and _pnbHlSavedToReport drops the saver's off, so the main save has no off line
+    'm-stripold': ([('main', "if (listed && !copy && off.indexOf(r.id) !== -1 && ticked['off|' + c + '|' + r.id]) return;",
+                     "if (listed && !copy && off.indexOf(r.id) !== -1 && !ticked['off|' + c + '|' + r.id]) return;")], ['L-hrsave-untickKeeps'], ['hrsave']),
+    # (hlx) the off line's label as it read before
+    'm-offlabel': ([('main', "' (the report\\'s rule, removed by you)' });", "' (the report\\'s rule, off for you)' });")], ['L-hrsave-listItems'], ['hrsave']),
     'm-stripnew': ([('main', "if (ticked['hl|' + c + '|' + r.id] && !rep.some(function (x) { return x.id === r.id; })) out.push(r);",
                      'if (!rep.some(function (x) { return x.id === r.id; })) out.push(r);')], ['L-hrsave-savedState'], ['hrsave']),
     'm-saved': ([('main', "try { _pnbHlSavedToReport(stateObject, response.new_id || shortId); } catch (e) { console.warn('highlight save:', e); }", '')],
@@ -500,7 +516,14 @@ MUTANTS = {
     'm-savedsame': ([('main', "if (String(savedId || '') === String(currentLoadedStateName || '')) {", 'if (true) {')], ['L-hrsave-copyKeepsOwn'], ['hrsave']),
     # the module: Off for me, opening a report rule, unchanged = the report's (and changed back),
     # the report's format named, Reset's controls, the report's rows, a copy's tag and place
-    'j-repoff': ([('mod', 'if (t.checked) hs.off.push(r.id);', '')], ['L-hrep-offForMe', 'L-hrview-viewOff'], ['hrep', 'hrview']),
+    # (hlx, 2026-11-16) re-anchored to the x's click: the old box's change listener is still in the module, but nothing fires it
+    'j-repoff': ([('mod', "if (k === 'hl-roff') hs.off.push(rr.id);", '')], ['L-hrep-offForMe', 'L-hrview-viewOff'], ['hrep', 'hrview']),
+    # (hlx) a removed rule drawn with its x still (no way back); tagged "report" still; the focus left behind on the button removed
+    'j-rback': ([('mod', "(off ? '<button type=\"button\" class=\"pnb-hl-del pnb-hl-back\" data-co=\"hl-rback\"",
+                  "(false ? '<button type=\"button\" class=\"pnb-hl-del pnb-hl-back\" data-co=\"hl-rback\"")],
+                ['L-hrep-offForMe', 'L-hrep-offBack', 'L-hrview-viewOff'], ['hrep', 'hrview']),
+    'j-rtag': ([('mod', "'<span class=\"pnb-hl-tag\">' + (off ? 'removed' : 'report') + '</span>' +", "'<span class=\"pnb-hl-tag\">report</span>' +")], ['L-hrep-offForMe'], ['hrep']),
+    'j-rfocus': ([('mod', "if (rb) { try { rb.focus({ preventScroll: true }); } catch (x) { } }", '')], ['L-hrep-offForMe', 'L-hrep-offBack'], ['hrep']),
     'j-redit': ([('mod', "if (k === 'hl-redit') { e.preventDefault(); if (hl.canEdit) hlOpen(-1, +t.getAttribute('data-r')); return; }",
                   "if (k === 'hl-redit') { e.preventDefault(); if (hl.canEdit) hlOpen(-1); return; }")], ['L-hrep-openNoCopy', 'L-hrep-editCopy'], ['hrep']),
     'j-canon': ([('mod', 'base: repR ? hlCanon(repR) : null };', 'base: repR ? JSON.stringify(hlCopy(repR)) : null };')], ['L-hrep-openCanon'], ['hrep']),
@@ -566,6 +589,11 @@ MUTANTS = {
     # the help
     't-lsc': ([('stopic', '<h4 id="lsc-colopts"', '<h4 id="lsc-colopt"')], ['S-helpHl2'], []),
     't-hidden': ([('topic', 'reads only the columns it shows', 'reads the columns it shows')], ['S-helpHl2'], []),
+    # (hlx, 2026-11-16) Your Settings' line and the Save topic's row as they read before it
+    't-xline': ([('topic', 'Its &times; removes one for you (marked <em>removed</em>; &#8634; brings it back); saving the report then takes it out for everyone.',
+                  'Tick <em>Off for me</em> to hide one for yourself;')], ['S-helpHl2'], []),
+    't-xrow': ([('stopic', 'Stays in the report, still removed for you. Ticked, it is taken out of the report.',
+                 'Taken out of the report. Ticked, it stays in the report and off for you.')], ['S-helpHl2'], []),
 }
 # (2026-11-02, cfsplit) a list column's Split by ;: the value read, its cells, the click, the cut, Enter, the mark, the badge,
 # Reset, the report's Click-to-Filter; the popover's box, its greying, its pick; the help, the stylesheet
@@ -621,10 +649,13 @@ def static_checks(texts):
          and 'Format, shading and highlight rules' in ptp and 'its <strong>Highlight</strong> rules' in pti
          and 'data-jump-to="pvh-value-options"' in top and chr(0x2014) not in ptp and '&mdash;' not in ptp and chr(0x2014) not in pti, ''),
         # (2026-10-20 b) the Save dialog's topic has its section (and its link); Your Settings tells
-        # Off for me, NO RULE, the report's rules and the email - and what the email cannot read -
-        # and links there; no em-dash in either
+        # a report rule's x (Off for me until hlx, 2026-11-16), NO RULE, the report's rules and the email - and what the
+        # email cannot read - and links there; the Save topic's row for a rule removed: unticked keeps it, ticked takes it out;
+        # no em-dash in either
         ('S-helpHl2', '<h4 id="lsc-colopts"' in stp and stp.count('data-jump-to="lsc-colopts"') == 1 and 'data-jump-to="lsc-colopts"' in top
-         and '<code>NO RULE</code>' in top and '<code>NO $</code>' in top and '<em>Off for me</em>' in top and 'reads only the columns it shows' in top
+         and '<code>NO RULE</code>' in top and '<code>NO $</code>' in top and 'reads only the columns it shows' in top
+         and 'Its &times; removes one for you (marked <em>removed</em>; &#8634; brings it back)' in top and '<em>Off for me</em>' not in top
+         and 'A report rule you removed (its &times;)' in stp and 'Stays in the report, still removed for you. Ticked, it is taken out of the report.' in stp
          and 'a PDF attachment does not yet' in stp and chr(0x2014) not in stp and '&mdash;' not in stp and chr(0x2014) not in top and '&mdash;' not in top, ''),
         # (2026-10-20, hl) the tip and the topic name the Highlight rules - the topic's own
         # section, its link, the RULE badge, the options' list - and carry no em-dash
@@ -784,9 +815,19 @@ def hook(src):
     hl = '    function hideLoading() {\r\n'
     if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
     return out.replace(hl, hl + '        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;\r\n')
+# (2026-11-16) A mutant's anchor follows its file's line endings: the CSS mutants were written with \r\n while
+# css/main.css was CRLF; it is LF since e65935d (2026-11-11), and 27 of them matched nothing (--mutants died at the
+# first). An anchor with CRLF that the file holds only in LF form is read as LF (its replacement too); CRLF files
+# (main.js, schedule_runner.php) are untouched.
+def eol_pair(text, old, new):
+    if '\r\n' in old and old not in text:
+        lf = old.replace('\r\n', '\n')
+        if lf in text: return lf, new.replace('\r\n', '\n')
+    return old, new
 def mutate(texts, name):
     t = dict(texts)
     for f, old, new in MUTANTS[name][0]:
+        old, new = eol_pair(t[f], old, new)
         if t[f].count(old) != 1: raise SystemExit("mutant '%s': %s anchor found %d times: %r" % (name, f, t[f].count(old), old[:90]))
         t[f] = t[f].replace(old, new)
     return t
@@ -919,7 +960,7 @@ try:
         badA = 0
         for m, (edits, must, scns) in MUTANTS.items():
             for f, old, new in edits:
-                n = texts[f].count(old)
+                n = texts[f].count(eol_pair(texts[f], old, new)[0])
                 if n != 1: badA += 1; print('  ANCHOR x%d  %-14s %s: %r' % (n, m, f, old[:100]))
         print('ANCHORS: %d mutants, %d bad' % (len(MUTANTS), badA))
         print('RESULT: GREEN' if badA == 0 else 'RESULT: RED')

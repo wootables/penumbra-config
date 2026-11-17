@@ -183,6 +183,8 @@
       await step('saveList', async function () {
         var body = document.getElementById('lastStopCardBody');
         if (!body) { body = document.createElement('div'); body.id = 'lastStopCardBody'; document.body.appendChild(body); }
+        // (2026-11-16, savechg C) ...and "What this save changes"' place for the list, where main.js puts it since Last Stop went
+        if (!document.getElementById('pnbSaveChgLists')) { var scl = document.createElement('div'); scl.id = 'pnbSaveChgLists'; document.body.appendChild(scl); }
         P().hlRenderSaveList();
         var items = Array.prototype.map.call(document.querySelectorAll('#pnbHlSaveRow .pnb-hl-save-item'), function (l) { return l.textContent.trim(); });
         R.chk.saveLabel = items.some(function (t) { return /^Done: Is checked, whole row/.test(t); }) && !items.some(function (t) { return /__JOURNAL/.test(t); });

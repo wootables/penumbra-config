@@ -1378,8 +1378,10 @@ def static_checks(t):
         m = re.search(rx, idx, re.S)
         return re.findall(r'<option value="([^"]*)"', m.group(1)) if m else []
     want = ['10', '25', '50', '100', '200', '500', 'all', 'none']
-    out.append(('S-pager', opts(r'<select id="rowsPerPageSelector"[^>]*>(.*?)</select>') == want and opts(r'<select id="serverSaveRowsPerPage"[^>]*>(.*?)</select>') == want
-                and '<code>10</code>, <code>25</code>, <code>50</code>, <code>100</code>' in t['pftopic'] and '10, 25, 50, 100, 200 or 500 rows' in t['sptopic'],
+    # (2026-11-16, savechg C) the Save dialog's own Rows / Page select and its help went with Last Stop Changes: checked where they are
+    _sp_gone = '<select id="serverSaveRowsPerPage"' not in idx
+    out.append(('S-pager', opts(r'<select id="rowsPerPageSelector"[^>]*>(.*?)</select>') == want and (_sp_gone or opts(r'<select id="serverSaveRowsPerPage"[^>]*>(.*?)</select>') == want)
+                and '<code>10</code>, <code>25</code>, <code>50</code>, <code>100</code>' in t['pftopic'] and (_sp_gone or '10, 25, 50, 100, 200 or 500 rows' in t['sptopic']),
                 'Rows per page offers 10, 25, 50, 100, 200, 500, All, None (pager + save dialog); the help lists them'))
     # (round L) help + README name the round; the markup; main.js's layout pref and Clear All's line; the palette row
     out.append(('S-roundL', 'Round L (2026-10-30' in t['readme'] and 'id="us-cards"' in t['ustopic'] and ('us-tip-card-layout' in t['tip'] or 'Round P (2026-10-30' in t['readme']) and ('Sort: none' in t['topic'] or '<strong>None</strong> clears it' in t['topic'])

@@ -306,9 +306,13 @@
     clearErr();
     $('#saveQuery').trigger('click');
     await sleep(150);
+    // (2026-11-16, savechg C) the dialog's theme and density selects went with Last Stop Changes: the same per-report
+    // lookup now gives the theme and density a save takes (PenumbraSaveChanges.look); an older main.js still fills the selects
+    var lk16 = (window.PenumbraSaveChanges && window.PenumbraSaveChanges.look) ? window.PenumbraSaveChanges.look()
+      : { theme: $('#serverSaveTheme').val(), density: $('#serverSaveDensity').val() };
     rec('P16 the save dialog pre-selects plainrep\'s own theme and density',
-      $('#serverSaveTheme').val() === 'theme-wolfpack' && $('#serverSaveDensity').val() === 'easy-read',
-      'theme=' + $('#serverSaveTheme').val() + ' density=' + $('#serverSaveDensity').val() + ' errs=' + errs().slice(0, 2).join(' / '));
+      lk16.theme === 'theme-wolfpack' && lk16.density === 'easy-read',
+      'theme=' + lk16.theme + ' density=' + lk16.density + ' errs=' + errs().slice(0, 2).join(' / '));
     rec('P13 Object.prototype untouched after phase P', scrub().length === 0, '');
     window.__NK.setName(null);
   }

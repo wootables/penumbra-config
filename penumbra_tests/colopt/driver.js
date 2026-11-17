@@ -31,11 +31,13 @@
 //            tints, a value that stops matching
 //   ghl      the grouped view: drawn there, and a change drawn again in both tables
 //   (2026-10-20 b) formats and rules SAVED WITH THE REPORT (mk_harness: hr* reports):
-//   hrep     drawn at once and outlined, Off for me, Automatic over the report's format and
+//   hrep     drawn at once and outlined, a report rule's x (removed for me, and back with its arrow;
+//            Off for me's box until hlx, 2026-11-16), Automatic over the report's format and
 //            Reset, a report rule changed into the viewer's copy and back, a view link, a save
 //            without the dialog's list; the email's fixtures (test_colopt.php hl)
-//   hrview   a viewer: no changing the report's rules, Off for me, their own on top
-//   hrsave   the Save dialog's Last Stop Changes list, the save, the report after it
+//   hrview   a viewer: no changing the report's rules, removing one for themself (and back), their own on top
+//   hrsave   the Save dialog's Last Stop Changes list, a save with nothing ticked (a rule removed for the
+//            saver stays in the report), the save (its ticked off line takes the rule out), the report after it
 //   (2026-11-02, cfsplit) a list column's Split by ; under Filter (V_NAME a semicolon list here, mk_harness):
 //   fsplit   offered and greyed, stored, its cells, a click on one value, a separator, a cell of one value, Enter,
 //            the mark as the pointer moves, off again, the SPLIT badge, Reset, the report's Click-to-Filter
@@ -1415,8 +1417,10 @@
         document.getElementById('saveQuery').click();
         await sleep(400);
         sl.style.cssText = 'display:block; position:fixed; left:40px; top:40px; width:640px; background:var(--bg-surface, #fff); padding:12px;';
-        Array.prototype.forEach.call(sl.children, function (c) { if (c.id !== 'lastStopCard') c.style.display = 'none'; });
-        var card = document.getElementById('lastStopCard');
+        // (2026-11-16, savechg C) the lists sit in "What this save changes" since Last Stop Changes went (old main.js: Last Stop)
+        var shotId = document.querySelector('#pnbSaveChgLists #pnbHlSaveRow') ? 'pnbSaveChg' : 'lastStopCard';
+        Array.prototype.forEach.call(sl.children, function (c) { if (c.id !== shotId) c.style.display = 'none'; });
+        var card = document.getElementById(shotId);
         card.classList.remove('collapsed');
         card.classList.add('sp-sumtype-menu');   // shots.py's close-up finds it by this class
       } else if (/[?&]view=(list|rule)/.test(Q)) {
@@ -1933,8 +1937,8 @@
     // ---- (2026-10-20 b) formats and highlight rules SAVED WITH THE REPORT. hr*: the report holds
     // columnFormats { V_AMOUNT: currency:0 } and columnHighlights { V_AMOUNT: [r1 amber over 50,000],
     // V_STATUS: [r2 Closed, the whole row struck], V_NAME: [r3 V_NAME = /Alpha/ italic] } (mk_harness)
-    // hrep: someone who may save it - drawn at once and outlined, Off for me, Automatic over the
-    // report's format and Reset back, a report rule changed into a copy (and back), a view link,
+    // hrep: someone who may save it - drawn at once and outlined, a report rule's x (removed for them,
+    // and back), Automatic over the report's format and Reset back, a report rule changed into a copy (and back), a view link,
     // a save made without the dialog's list; and the PHP half's fixtures
     hrep: async function () {
       var K = hrKit();
@@ -1959,28 +1963,41 @@
       cogOf('V_AMOUNT').click();
       await sleep(80);
       var pop = popover(), reps = pop.querySelectorAll('.pnb-hl-item.is-report'), rr = reps[0];
-      var offCb = rr && rr.querySelector('[data-co="hl-off"]');
+      // (2026-11-16, hlx 4abdabe) the report's rule has an x like a rule of the viewer's own (hl-roff), where Off for me's
+      // box was; removed, it stays listed - struck through, tagged "removed" - with a way back (hl-rback). A click draws
+      // the list again (hlList), so the row is looked up afresh after one, and the focus goes to the other button.
+      var repRow = function () { var p = popover(); return p ? p.querySelector('.pnb-hl-item.is-report') : null; };
+      var xOf = function (row) { return row ? row.querySelector('[data-co="hl-roff"]') : null; };
+      var backOf = function (row) { return row ? row.querySelector('[data-co="hl-rback"]') : null; };
+      var xb = xOf(rr);
       R.chk.popRepRow = reps.length === 1 && pop.querySelectorAll('.pnb-hl-item:not(.is-report)').length === 0
         && rr.querySelector('.pnb-hl-tag').textContent === 'report' && !!rr.querySelector('[data-co="hl-redit"]') && !rr.querySelector('.pnb-hl-text')
-        && !!offCb && !offCb.checked && /Off for me/.test(rr.querySelector('.pnb-hl-offl').textContent)
+        && !!xb && xb.textContent === '\u00d7' && /^Remove the report's rule: /.test(xb.getAttribute('aria-label') || '') && !backOf(rr) && !rr.classList.contains('is-off')
         && pop.querySelector('[data-co="reset"]').disabled && pop.querySelector('[data-co="type"]').value === 'currency'
         && pop.querySelector('[data-co="dp"]').value === '0' && pop.querySelector('[data-hint="fmt"]').textContent === '';
-      // Off for me: off for this viewer alone, at once; the view link carries what they see
-      offCb.click();
+      // its x: removed for this viewer alone, at once; the view link carries what they see
+      if (xb) xb.click();
       await sleep(150);
       var co = colopt() || {};
+      rr = repRow();
+      var bk = backOf(rr);
       R.chk.offForMe = K.none(K.amber) && !!co.V_AMOUNT && JSON.stringify(co.V_AMOUNT.hlOff) === '["r1"]' && !co.V_AMOUNT.hl
-        && rr.classList.contains('is-off') && !pop.querySelector('[data-co="reset"]').disabled && K.strikes(true)
+        && !!rr && rr.classList.contains('is-off') && rr.querySelector('.pnb-hl-tag').textContent === 'removed' && !!bk && !xOf(rr)
+        && /^Bring back the report's rule: /.test(bk.getAttribute('aria-label') || '') && document.activeElement === bk
+        && !pop.querySelector('[data-co="reset"]').disabled && K.strikes(true)
         && getComputedStyle(rr.querySelector('.pnb-hl-open')).opacity === '0.55' && /line-through/.test(getComputedStyle(rr.querySelector('.pnb-hl-open')).textDecorationLine);
       bv = badgesOf('V_AMOUNT');
       R.chk.offBadge = bv.some(function (b) { return b.t === 'NO RULE' && b.own; }) && !bv.some(function (b) { return b.t === 'RULE'; });
       var sv = window.__HC.bso();
       var svOff = !!sv && !!sv.columnHighlights && !sv.columnHighlights.V_AMOUNT && !!sv.columnHighlights.V_STATUS && sv.columnHighlights.V_STATUS[0].id === 'r2'
         && !!sv.columnFormats && sv.columnFormats.V_AMOUNT === 'currency:0';
-      offCb.click();
+      // its arrow: back for them, the x again
+      if (bk) bk.click();
       await sleep(150);
       co = colopt() || {};
-      R.chk.offBack = K.painted(K.amber) && !rr.classList.contains('is-off') && !(co.V_AMOUNT && co.V_AMOUNT.hlOff);
+      rr = repRow();
+      R.chk.offBack = K.painted(K.amber) && !!rr && !rr.classList.contains('is-off') && rr.querySelector('.pnb-hl-tag').textContent === 'report'
+        && !backOf(rr) && !!xOf(rr) && document.activeElement === xOf(rr) && !(co.V_AMOUNT && co.V_AMOUNT.hlOff);
       sv = window.__HC.bso();
       R.chk.viewLink = svOff && !!sv && !!sv.columnHighlights && !!sv.columnHighlights.V_AMOUNT && sv.columnHighlights.V_AMOUNT.length === 1
         && sv.columnHighlights.V_AMOUNT[0].id === 'r1' && sv.columnHighlights.V_AMOUNT[0].css === 'background-color: var(--pnb-hl-amber, #fbe8a6)'
@@ -1994,18 +2011,20 @@
         && pop.querySelector('[data-hint="fmt"]').textContent === "The report's: Currency, 0 decimals. Reset goes back to it."
         && /without the report's format/.test(pop.querySelector('.pnb-colopt-prev').textContent)
         && bv.some(function (b) { return b.t === 'NO $' && b.own; }) && !pop.querySelector('[data-co="reset"]').disabled;
-      // Reset: the report's format, every report rule on
-      offCb = pop.querySelector('.pnb-hl-item.is-report [data-co="hl-off"]');
-      offCb.click();
+      // Reset: the report's format, every report rule back (r1 removed first, with its x)
+      xb = xOf(repRow());
+      if (xb) xb.click();
       await sleep(150);
+      co = colopt() || {};
+      var offPre = !!co.V_AMOUNT && JSON.stringify(co.V_AMOUNT.hlOff) === '["r1"]' && !!backOf(repRow());
       pop.querySelector('[data-co="reset"]').click();
       await sleep(300);
       co = colopt() || {};
-      var pop2 = popover();
-      R.chk.resetBack = K.amtText('cur0') && K.painted(K.amber) && !(co.V_AMOUNT && (co.V_AMOUNT.fmt || co.V_AMOUNT.hl || co.V_AMOUNT.hlOff))
+      var pop2 = popover(), rr2 = pop2 ? pop2.querySelector('.pnb-hl-item.is-report') : null;
+      R.chk.resetBack = offPre && K.amtText('cur0') && K.painted(K.amber) && !(co.V_AMOUNT && (co.V_AMOUNT.fmt || co.V_AMOUNT.hl || co.V_AMOUNT.hlOff))
         && !!pop2 && pop2.querySelector('[data-co="type"]').value === 'currency' && pop2.querySelector('[data-co="dp"]').value === '0'
         && pop2.querySelector('[data-hint="fmt"]').textContent === '' && pop2.querySelector('[data-co="reset"]').disabled
-        && !pop2.querySelector('.pnb-hl-item.is-report [data-co="hl-off"]').checked;
+        && !!rr2 && !rr2.classList.contains('is-off') && !!xOf(rr2) && !backOf(rr2);
       // opened and left: still the report's, nothing stored
       pop2.querySelector('.pnb-hl-item.is-report [data-co="hl-redit"]').click();
       await sleep(120);
@@ -2086,7 +2105,7 @@
       R.info.chk = { bt: bt, sv: sv, sd0: sd0 && { f: sd0.columnFormats, h: sd0.columnHighlights }, co: co, ttl: ttl, delTxt: delTxt, backTxt: backTxt, r3: [r3op, r3v] };
     },
     // hrview: a viewer (canEditReport off) - the report's drawn; its rules cannot be opened, only
-    // turned off for themself; their own rule on top (its fill over the report's); their own format
+    // removed for themself (hlx: its x, and its arrow back); their own rule on top (its fill over the report's); their own format
     hrview: async function () {
       var K = hrKit();
       R.chk.viewDrawn = K.painted(K.amber) && K.strikes(true) && K.amtText('cur0') && K.italicNames(false);
@@ -2095,15 +2114,22 @@
       cogOf('V_AMOUNT').click();
       await sleep(80);
       var pop = popover(), rr = pop.querySelector('.pnb-hl-item.is-report');
-      R.chk.viewNoEdit = !!rr && !rr.querySelector('[data-co="hl-redit"]') && !!rr.querySelector('.pnb-hl-text') && !!rr.querySelector('[data-co="hl-off"]')
+      // (2026-11-16, hlx 4abdabe) the x (hl-roff) where Off for me's box was; removed, the arrow (hl-rback) brings it back.
+      // A click draws the list again, so the row is looked up afresh.
+      var rx = rr ? rr.querySelector('[data-co="hl-roff"]') : null;
+      R.chk.viewNoEdit = !!rr && !rr.querySelector('[data-co="hl-redit"]') && !!rr.querySelector('.pnb-hl-text') && !!rx
         && pop.querySelectorAll('[data-co="hl-redit"]').length === 0;
-      rr.querySelector('[data-co="hl-off"]').click();
+      if (rx) rx.click();
       await sleep(150);
       var co = colopt() || {};
-      var offOk = K.none(K.amber) && !!co.V_AMOUNT && JSON.stringify(co.V_AMOUNT.hlOff) === '["r1"]';
-      rr.querySelector('[data-co="hl-off"]').click();
+      rr = pop.querySelector('.pnb-hl-item.is-report');
+      var rbk = rr ? rr.querySelector('[data-co="hl-rback"]') : null;
+      var offOk = K.none(K.amber) && !!co.V_AMOUNT && JSON.stringify(co.V_AMOUNT.hlOff) === '["r1"]' && !!rbk && rr.classList.contains('is-off')
+        && !!rr.querySelector('.pnb-hl-text') && !rr.querySelector('[data-co="hl-redit"]');
+      if (rbk) rbk.click();
       await sleep(150);
-      R.chk.viewOff = offOk && K.painted(K.amber);
+      co = colopt() || {};
+      R.chk.viewOff = offOk && K.painted(K.amber) && !(co.V_AMOUNT && co.V_AMOUNT.hlOff);
       // their own rule: drawn over the report's (whose fill stays where theirs sets none)
       pop.querySelector('[data-co="hl-add"]').click();
       await sleep(100);
@@ -2153,8 +2179,9 @@
       R.info = { co: co, bv: bv, rs: rs, q: [q0, q1, window.__queryDone], cm: !!cm };
     },
     // hrsave: the Save dialog - Last Stop Changes lists the saver's own (each ticked); the ticked go
-    // into the report, an unticked off rule comes out of it; after the save the report's own copies
-    // go; a save under another id leaves this report's own settings be
+    // into the report - a ticked off line (a report rule they removed) takes that rule out of it (hlx, 2026-11-16:
+    // the reverse until then), an unticked one keeps it, removed for them alone; after the save the report's own
+    // copies go; a save under another id leaves this report's own settings be
     hrsave: async function () {
       var K = hrKit();
       window.alert = function (m) { R.notes.push('alert: ' + m); };
@@ -2169,16 +2196,42 @@
       var lbl = function (k) { var x = items.filter(function (y) { return y.k === k; })[0]; return x ? x.t : ''; };
       R.chk.listItems = items.map(function (x) { return x.k; }).join() === 'hl|V_NAME|o1,hl|V_AMOUNT|o2,hl|V_AMOUNT|r1,fmt|V_DATE,off|V_STATUS|r2'
         && items.every(function (x) { return x.on; }) && /\(your change to the report's rule\)$/.test(lbl('hl|V_AMOUNT|r1'))
-        && /\(the report's rule, off for you\)$/.test(lbl('off|V_STATUS|r2')) && /^V_DATE: format Date, /.test(lbl('fmt|V_DATE'))
-        && !!document.querySelector('#lastStopCardBody #pnbHlSaveRow') && document.getElementById('pnbHlSaveLbl').textContent === 'Column formats and highlight rules'
+        && /\(the report's rule, removed by you\)$/.test(lbl('off|V_STATUS|r2')) && /^V_DATE: format Date, /.test(lbl('fmt|V_DATE'))
+        && !!document.querySelector('#lastStopCardBody #pnbHlSaveRow, #pnbSaveChgLists #pnbHlSaveRow') && document.getElementById('pnbHlSaveLbl').textContent === 'Column formats and highlight rules'
         && !!document.querySelector('#pnbHlSaveRow .pnb-hl-save-note');
       var hint = document.getElementById('pnbHlSaveHint');
-      R.chk.listHint = !!hint && hint.textContent === ' Saves 5 column formats and highlight rules with the report.';
+      // (2026-11-16, savechg C) no collapsed hint in "What this save changes": counted only where Last Stop still is
+      var inNewHl = !!document.querySelector('#pnbSaveChgLists #pnbHlSaveRow');
+      R.chk.listHint = inNewHl || (!!hint && hint.textContent === ' Saves 5 column formats and highlight rules with the report.');
       var cb = function (k) { return document.querySelector('#pnbHlSaveRow input[data-hl-save="' + k + '"]'); };
-      cb('hl|V_NAME|o1').checked = false;
-      cb('off|V_STATUS|r2').checked = false;
+      var ids = function (l) { return (l || []).map(function (r) { return r.id; }).join(); };
+      // (2026-11-16, hlx 4abdabe) nothing ticked: nothing of the saver's goes in, and r2 - removed by them - stays in the
+      // report, still removed for them alone (unticked keeps it; the ticked off line below takes it out); their own all stay
+      Array.prototype.forEach.call(document.querySelectorAll('#pnbHlSaveRow input[data-hl-save]'), function (x) { x.checked = false; });
       $('#serverSaveIdInput').val('lrfix');
       var n = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n; }, 8000);
+      await sleep(500);
+      var sdU = null;
+      try { sdU = JSON.parse(window.__saves[window.__saves.length - 1].state_data); } catch (e) { }
+      var chU = sdU && sdU.columnHighlights, coU = colopt() || {};
+      var untick = { painted: K.painted(K.green), bold: K.bold(80000), strikes: K.strikes(false), italic: K.italicNames(true) };
+      // the dialog again: the same five lines, every one ticked
+      document.getElementById('saveQuery').click();
+      await sleep(500);
+      var keysU = Array.prototype.map.call(document.querySelectorAll('#pnbHlSaveRow input[data-hl-save]'), function (x) { return x.checked ? x.getAttribute('data-hl-save') : '-'; });
+      R.chk.untickKeeps = !!sdU && JSON.stringify(sdU.columnFormats) === '{"V_AMOUNT":"currency:0"}'
+        && !!chU && Object.keys(chU).sort().join() === 'V_AMOUNT,V_NAME,V_STATUS' && ids(chU.V_STATUS) === 'r2' && ids(chU.V_AMOUNT) === 'r1'
+        && chU.V_AMOUNT[0].css === 'background-color: var(--pnb-hl-amber, #fbe8a6)' && ids(chU.V_NAME) === 'r3'
+        && !!coU.V_STATUS && JSON.stringify(coU.V_STATUS.hlOff) === '["r2"]' && !!coU.V_AMOUNT && ids(coU.V_AMOUNT.hl) === 'o2,r1'
+        && untick.painted && untick.bold && untick.strikes && untick.italic && keysU.join() === items.map(function (x) { return x.k; }).join();
+      // o1 unticked (it stays theirs); the off line left ticked: r2 comes out of the report. (Guarded: a mutant that took
+      // o1 into the report above leaves no o1 line, and a throw here would end the scenario before savedState says so.)
+      var o1cb = cb('hl|V_NAME|o1');
+      if (o1cb) o1cb.checked = false;
+      $('#serverSaveIdInput').val('lrfix');
+      n = window.__saves.length;
       $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
       await until(function () { return window.__saves.length > n; }, 8000);
       await sleep(500);
@@ -2203,7 +2256,7 @@
       document.getElementById('saveQuery').click();
       await sleep(500);
       var keys2 = Array.prototype.map.call(document.querySelectorAll('#pnbHlSaveRow input[data-hl-save]'), function (x) { return x.getAttribute('data-hl-save'); });
-      R.chk.relist = keys2.join() === 'hl|V_NAME|o1' && document.getElementById('pnbHlSaveHint').textContent === ' Saves 1 column format or highlight rule with the report.';
+      R.chk.relist = keys2.join() === 'hl|V_NAME|o1' && (!!document.querySelector('#pnbSaveChgLists #pnbHlSaveRow') || (document.getElementById('pnbHlSaveHint') || {}).textContent === ' Saves 1 column format or highlight rule with the report.');
       // a save under another id (a copy): the copy gets o1, this report's own settings stay
       $('#serverSaveIdInput').val('zzcopy');
       n = window.__saves.length;
@@ -2216,7 +2269,8 @@
       R.chk.copyKeepsOwn = !!sd2 && !!sd2.columnHighlights && !!sd2.columnHighlights.V_NAME
         && sd2.columnHighlights.V_NAME.map(function (r) { return r.id; }).join() === 'o1,r3' && !!co.V_NAME && !!co.V_NAME.hl
         && co.V_NAME.hl.map(function (r) { return r.id; }).join() === 'o1';
-      R.info = { seed: seed, after: after, d0: colCells('V_DATE', true).slice(0, 2).map(function (td) { return td.textContent; }), items: items, keys2: keys2, cf: cf, ch: ch, co: co, sd2: sd2 && sd2.columnHighlights, bD: bD, bA: bA, bN: bN, bS: bS, notes: R.notes };
+      R.info = { seed: seed, after: after, d0: colCells('V_DATE', true).slice(0, 2).map(function (td) { return td.textContent; }), items: items, keys2: keys2, cf: cf, ch: ch, co: co, sd2: sd2 && sd2.columnHighlights, bD: bD, bA: bA, bN: bN, bS: bS,
+        untick: { st: untick, keys: keysU, cf: sdU && sdU.columnFormats, ch: chU, co: coU }, notes: R.notes };
     },
     fspa11y: async function () {
       openPanel();

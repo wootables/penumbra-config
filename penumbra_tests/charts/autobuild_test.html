@@ -104,8 +104,8 @@ try {
   ok('static: reset clears the flag', /_vizLimitTouched = false;\n\s*_vizTypeTouched = false;/.test(code));
   ok('static: opening on a saved chart sets the flag', /restoreVizConfig\(lastVisConfig\);\n[\s\S]{0,200}_vizTypeTouched = true;/.test(code));
   ok('static: the auto-build click consults the flag, never the bare active tile', /var _selType = _vizTypeTouched \? \(\$\('\.viz-type-option\.active'\)\.data\('type'\) \|\| ''\) : '';/.test(code));
-  ok('static: the infeasible notice names the suggested type', /Try it as a <strong>" \+ escapeHtml\(_sugLabel\)/.test(code));
-  ok('static: a kept type is announced in the HEADS UP', /Kept the selected ' \+ _selLabel \+ ' type/.test(code));
+  ok('static: the infeasible notice names the suggested type', /Pick <strong>" \+ escapeHtml\(_sugLabel\)/.test(code));
+  ok('static: a kept type is announced in the HEADS UP', /Kept your ' \+ _selLabel \+ ' pick/.test(code));
   ok('static: the applier writes axis titles for axis types only', /VIZ_NO_AXIS_LABELS\.indexOf\(_autoType\) === -1 && _autoType !== 'gantt'/.test(grab('function _vizApplyAutoConfig(')));
   eq('static: all three Auto-build tips say a picked type is kept', (code.match(/A chart type you have already picked is kept/g) || []).length, 3);
   // autoviz3 (2026-11-03): a fresh query keys cni by the SQL alias AS RETURNED
@@ -317,7 +317,7 @@ try {
   w = [];
   s = SB.shape({ xAxis: 'TRANSACTION_TYPE', groupBy: 'BIGCOL', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
   eq('shape: 80 series would hit "Too many groups" -> the split is dropped', s.groupBy, 'none');
-  has('shape: ... and the warning names the column, count and limit', w, /BIGCOL has 80 values - too many to draw as chart series \(the builder tops out at 50\)/);
+  has('shape: ... and the warning names the column, count and limit', w, /BIGCOL has 80 values, more than the 50 series a chart can draw/);
   eq('shape: ... what remains is still shaped (2 clean shares -> doughnut)', s.type, 'doughnut');
   awdRows(200);
 
@@ -327,7 +327,7 @@ try {
   s = SB.shape({ xAxis: 'PRIME_SPONSOR_CATEGORY', groupBy: 'LOG_DATE:fy', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
   eq('shape: constant X + bucketed series -> the series becomes the X axis', [s.xAxis, s.groupBy], ['LOG_DATE:fy', 'none']);
   eq('shape: ... and a fiscal-year axis is a LINE', s.type, 'line');
-  has('shape: ... with a warning naming the single value', w, /PRIME_SPONSOR_CATEGORY has a single value \(US Federal\)/);
+  has('shape: ... with a warning naming the single value', w, /PRIME_SPONSOR_CATEGORY has one value \(US Federal\)/);
   w = [];
   s = SB.shape({ xAxis: 'PRIME_SPONSOR_CATEGORY', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
   eq('shape: constant X with NO series stays put (nothing to promote)', [s.xAxis, w.length], ['PRIME_SPONSOR_CATEGORY', 0]);
@@ -336,7 +336,7 @@ try {
   awdRows(200); w = [];
   s = SB.shape({ xAxis: 'LOG_DATE', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
   eq('shape: raw date with many dates -> bucketed by quarter, as a line', [s.xAxis, s.type], ['LOG_DATE:yq', 'line']);
-  has('shape: ... says so', w, /LOG_DATE holds \d+ distinct dates, so it is charted by quarter/);
+  has('shape: ... says so', w, /LOG_DATE has \d+ dates, so they are grouped by quarter/);
   s = SB.shape({ xAxis: 'LOG_DATE:month', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
   eq('shape: cyclical month bucket -> upright bar (12 short labels, not a time line)', [s.type, s.horizontal], ['bar', false]);
   s = SB.shape({ xAxis: 'LOG_DATE:ym', groupBy: 'TRANSACTION_TYPE', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
@@ -377,13 +377,13 @@ try {
   awdRows(200);
   SB.set('currentGroupingColumn', 'ORIGINATING SPONSOR'); SB.set('currentGroupingColumns', ['ORIGINATING SPONSOR', 'FY', 'TRANSACTION_TYPE']);
   g = SB.groups();
-  has('groups: three levels -> warns that the third is not plotted', g.warnings, /3 levels.*not plotted/);
+  has('groups: three levels -> warns that the third is not plotted', g.warnings, /level 3 is not charted/);
 
   SB.set('currentGroupingColumns', ['ORIGINATING SPONSOR']);
   SB.set('currentGroupAgg', { column: 'DIRECT_SPONSOR_NAME', type: 'mode' });
   g = SB.groups();
   eq('groups: Mode cannot be a Y axis -> count', [g.config.agg, g.config.yAxis], ['count', '']);
-  has('groups: ... and says the builder cannot do Mode', g.warnings, /cannot do Mode/);
+  has('groups: ... and says the builder cannot do Mode', g.warnings, /cannot show Mode/);
   eq('groups: 5 sponsors counted -> doughnut', g.config.type, 'doughnut');
   SB.set('currentGroupAgg', { column: 'RED_PT_ID', type: 'count_distinct' });
   g = SB.groups();
@@ -393,7 +393,7 @@ try {
   eq('groups: a percentile carries over', g.config.agg, 'p90');
   SB.set('currentGroupAgg', null);
   g = SB.groups();
-  has('groups: no summary -> counts rows and says so', g.warnings, /no per-group summary/);
+  has('groups: no summary -> counts rows and says so', g.warnings, /grouping has no summary/);
   SB.set('currentGroupingColumn', '__SNAP_TYPE');
   eq('groups: a snapshot comparison is not chartable', SB.groups(), null);
   SB.set('currentGroupingColumn', ''); SB.set('currentGroupingColumns', []);
@@ -413,21 +413,21 @@ try {
   SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE'], colFields: [], valField: 'AMOUNT' });
   p = SB.pivot();
   eq('pivot: nested rows, no column field -> row 2 becomes the series', [p.config.xAxis, p.config.groupBy], ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE']);
-  has('pivot: ... explained', p.warnings, /second row field, TRANSACTION_TYPE, became the series\./);
+  has('pivot: ... explained', p.warnings, /Row fields: \S.* is the X axis, TRANSACTION_TYPE the series\./);
 
   SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE', 'FY'], colFields: [], valField: 'AMOUNT' });
   p = SB.pivot();
-  has('pivot: three row fields -> deeper one reported', p.warnings, /deeper row field is not plotted/);
+  has('pivot: three row fields -> deeper one reported', p.warnings, /deeper ones are not charted/);
 
   SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE'], colFields: ['FY'], valField: 'AMOUNT' });
   p = SB.pivot();
   eq('pivot: nested rows WITH a column field -> column field is the series', p.config.groupBy, 'FY');
-  has('pivot: ... nested rows reported', p.warnings, /only ORIGINATING SPONSOR came across/);
+  has('pivot: ... nested rows reported', p.warnings, /Only ORIGINATING SPONSOR became the X axis/);
 
   SB.set('_lastPivotChart', { aggTypes: ['mode'], aggLabels: ['Mode'], rowFields: ['FY'], colFields: [], valField: 'AMOUNT' });
   p = SB.pivot();
   eq('pivot: unsupported agg -> sum', p.config.agg, 'sum');
-  has('pivot: ... says so', p.warnings, /cannot do Mode/);
+  has('pivot: ... says so', p.warnings, /cannot show Mode/);
   eq('pivot: FY rows -> sequence sort', [p.sortBy, p.sortDir], ['label', 'asc']);
 
   SB.set('_lastPivotChart', { aggTypes: ['sum', 'avg'], aggLabels: ['Sum', 'Avg'], rowFields: ['LOG_DATE:ym'], colFields: [], valField: 'AMOUNT' });
@@ -437,7 +437,7 @@ try {
 
   SB.set('_lastPivotChart', { aggTypes: ['count'], aggLabels: ['Count'], rowFields: ['FY'], colFields: ['TRANSACTION_TYPE', 'PRIME_SPONSOR_CATEGORY'], valField: 'RED_PT_ID' });
   p = SB.pivot();
-  has('pivot: two column fields -> only the first is the series', p.warnings, /Only the first column field \(TRANSACTION_TYPE\)/);
+  has('pivot: two column fields -> only the first is the series', p.warnings, /Only TRANSACTION_TYPE became the series/);
   eq('pivot: FY x 2 series count -> side-by-side bar', [p.config.type, p.config.stacked], ['bar', false]);
 
   awdRows(120, 'US Federal');
@@ -451,7 +451,7 @@ try {
   eq('report: awdspon-shaped table -> X is the best CATEGORY, Y is the money column', [r.config.xAxis, r.config.yAxis, r.config.agg], ['PRIME_SPONSOR_CATEGORY', 'AMOUNT', 'sum']);
   eq('report: 3 shares of a sum -> doughnut', r.config.type, 'doughnut');
   eq('report: doughnut of categories -> value desc', [r.sortBy, r.sortDir], ['value', 'desc']);
-  has('report: first warning names the pair', [r.warnings[0]], /^Charting the total of AMOUNT by PRIME_SPONSOR_CATEGORY/);
+  has('report: first warning names the pair', [r.warnings[0]], /^Total AMOUNT by PRIME_SPONSOR_CATEGORY/);
 
   setTable([['RECORD_ID', 'text'], ['STATUS', 'text'], ['AMOUNT', 'money'], ['EMPLID', 'num'], ['SUBAWARD_COUNT', 'num']]);
   setRows(80, function (i) { return { RECORD_ID: 'R' + i, STATUS: STATUS[i % 3], AMOUNT: '$' + (i * 10), EMPLID: String(100000 + i), SUBAWARD_COUNT: String(i % 4) }; });
@@ -468,21 +468,21 @@ try {
   setRows(80, function (i) { return { RECORD_ID: 'R' + i, STATUS: STATUS[i % 3], EMPLID: String(100000 + i), ZIP: String(27600 + (i % 20)) }; });
   r = SB.report();
   eq('report: only code-like numerics -> count rows', [r.config.yAxis, r.config.agg], ['', 'count']);
-  has('report: ... and says why', r.warnings, /look like identifiers or codes/);
-  has('report: ... lead message is the count form', [r.warnings[0]], /counts rows by STATUS/);
+  has('report: ... and says why', r.warnings, /looks? like (a )?codes?, so rows are counted/);
+  has('report: ... lead message is the count form', [r.warnings[0]], /^Count of rows by STATUS/);
 
   setTable([['RECORD_ID', 'text'], ['AMOUNT', 'money']]);
   setRows(80, function (i) { return { RECORD_ID: 'R' + i, AMOUNT: '$' + (i * 10) }; });
   r = SB.report();
   eq('report: identifiers + a measure -> histogram of the measure', [r.config.type, r.config.xAxis, r.config.yAxis, r.config.agg], ['histogram', 'AMOUNT', '', 'count']);
-  has('report: ... explained', r.warnings, /distributed \(a histogram\)/);
+  has('report: ... explained', r.warnings, /spread out \(a histogram\)/);
 
   setTable([['RECORD_ID', 'text'], ['LOG_DATE', 'date'], ['AMOUNT', 'money']]);
   setRows(80, function (i) { return { RECORD_ID: 'R' + i, LOG_DATE: iso(2022 + (i % 4), 1 + (i % 12), 5), AMOUNT: '$' + (i * 10) }; });
   r = SB.report();
   eq('report: identifiers + a date + a measure -> the date wins: line per quarter', [r.config.type, r.config.xAxis], ['line', 'LOG_DATE:yq']);
   eq('report: ... in calendar order', [r.sortBy, r.sortDir], ['label', 'asc']);
-  has('report: ... lead message spells the bucket out', [r.warnings[0]], /by LOG_DATE by quarter/);
+  has('report: ... lead message spells the bucket out', [r.warnings[0]], / by LOG_DATE \((yq|Year › Quarter)\)/);
 
   setTable([['RECORD_ID', 'text'], ['FY', 'year'], ['AMOUNT', 'money']]);
   setRows(80, function (i) { return { RECORD_ID: 'R' + i, FY: String(2022 + (i % 4)), AMOUNT: '$' + (i * 10) }; });
@@ -495,13 +495,13 @@ try {
   r = SB.report();
   eq('report: a single row is a KPI -> gauge of the money column', [r.config.type, r.config.yAxis, r.config.agg], ['gauge', 'TOTAL', 'sum']);
   ok('report: ... with an X axis set so the applier accepts it', !!r.config.xAxis);
-  has('report: ... explained', r.warnings, /single row, so TOTAL is shown as a gauge/);
+  has('report: ... explained', r.warnings, /One row, so TOTAL is shown as a gauge/);
 
   setTable([['RECORD_ID', 'text'], ['NOTE', 'text']]);
   setRows(40, function (i) { return { RECORD_ID: 'R' + i, NOTE: 'note ' + i }; });
   r = SB.report();
   eq('report: nothing but identifiers -> still charts, counting rows by the closest column', [r.config.agg, r.config.type], ['count', 'bar']);
-  has('report: ... and admits it may read like a list', r.warnings, /may read more like a list/);
+  has('report: ... and admits it may read like a list', r.warnings, /may read like a list/);
 
   setTable([]);
   eq('report: no columns -> null', SB.report(), null);
@@ -534,7 +534,7 @@ try {
   m10 = SB.report();                                      // auto = doughnut of AMOUNT by PRIME
   rt = SB.retype('bar', 'Bar', m10);
   eq('retype bar: ok, same axes, upright and unstacked', [rt.ok, m10.config.type, m10.config.xAxis, m10.config.yAxis, m10.config.horizontal, m10.config.stacked], [true, 'bar', 'PRIME_SPONSOR_CATEGORY', 'AMOUNT', false, false]);
-  has('retype bar: the reader lead line survives (axes unchanged)', m10.warnings, /^Charting the total of AMOUNT/);
+  has('retype bar: the reader lead line survives (axes unchanged)', m10.warnings, /^Total AMOUNT/);
 
   m10 = SB.report();
   rt = SB.retype('line', 'Line', m10);
@@ -557,8 +557,8 @@ try {
   m10 = SB.report();
   rt = SB.retype('histogram', 'Histogram', m10);
   eq('retype histogram: charts the measure itself', [rt.ok, m10.config.xAxis, m10.config.yAxis, m10.config.agg, m10.config.groupBy], [true, 'AMOUNT', '', 'count', 'none']);
-  has('retype histogram: explained', m10.warnings, /how AMOUNT is distributed/);
-  hasNot('retype histogram: the stale "total of X by Y" lead is gone', m10.warnings, /^Charting the total of /);
+  has('retype histogram: explained', m10.warnings, /how AMOUNT is spread out/);
+  hasNot('retype histogram: the stale "total of X by Y" lead is gone', m10.warnings, /^Total /);
 
   m10 = SB.report();
   rt = SB.retype('gauge', 'Gauge', m10);
@@ -741,7 +741,7 @@ try {
   eq('report phase: by the START per period, stacked by the award type, bars', [r.config.type, r.config.xAxis, r.config.groupBy, r.config.stacked], ['bar', 'AWARD_BEGIN:yq', 'AWARD_TYPE', true]);
   eq('report phase: ...on the Paired palette', r.config.vizOptions, { palette: 'paired' });
   eq('report phase: ...in period order', [r.sortBy, r.sortDir], ['label', 'asc']);
-  has('report phase: ...and says so', r.warnings, /AWARD_TYPE sorts the rows into new and continuing ones, so each bar is stacked by it, in two tones of one colour \(the Paired palette\)/);
+  has('report phase: ...and says so', r.warnings, /Bars stacked by AWARD_TYPE, which sorts new from continuing/);
   phRows(['Non-Competing', 'New']);
   eq('phase: New / Non-Competing counts too', SB.phaseCol(['RECORD_ID', 'AWARD_TYPE'], window.vizCachedData), 'AWARD_TYPE');
   phRows(['Open', 'Closed', 'Pending']);
@@ -791,14 +791,14 @@ try {
   ok('report active: three-year awards -> each counted in every period, by the START', /^AWARD_BEGIN:[a-z]+@AWARD_END$/.test(_at), _at);
   eq('report active: ...stacked into Started / Continuing (the computed phase, ahead of the award type), bars', [r.config.groupBy, r.config.stacked, r.config.type], [_at + ':phase', true, 'bar']);
   eq('report active: ...on the Paired palette', r.config.vizOptions, { palette: 'paired' });
-  has('report active: ...and says so', r.warnings, /Each row counts in every period from AWARD_BEGIN to AWARD_END \(a blank end runs to today\), stacked into started and continuing/);
+  has('report active: ...and says so', r.warnings, /Each row counts in every period from AWARD_BEGIN to AWARD_END \(a blank end runs to today\), split into started and continuing/);
   rt = SB.retype('pie', 'Pie', r);
   ok('retype: a pie of it is refused, saying why', !rt.ok && /would count a row in several parts/.test(rt.reason || ''), rt.reason);
   setTable([['STATUS', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date'], ['AMOUNT', 'money']]);
   setRows(80, function (i) { return { STATUS: STATUS[i % 3], AWARD_END: iso(2025 + (i % 3), 6, 30), AWARD_BEGIN: iso(2020 + (i % 4), 1 + (i % 12), 5), AMOUNT: '$' + (i * 10) }; });
   r = SB.report();
   ok('report active: a category X keeps its chart', r.config.xAxis === 'STATUS' && !r.config.vizOptions, JSON.stringify(r.config));
-  has('report active: ...and the HEADS UP names Chart active by', r.warnings, /AWARD_BEGIN to AWARD_END runs past a year for most rows: right-click either column for Chart active by/);
+  hasNot('report active: ...and the HEADS UP says nothing about it (the chart is not by date; headsup 2)', r.warnings, /Chart active by|run over a year|AWARD_END/);
   setTable([['STATUS', 'text'], ['AWARD_END', 'date'], ['AWARD_BEGIN', 'date']]);
   setRows(80, function (i) { var mo = 1 + (i % 12); return { STATUS: STATUS[i % 3], AWARD_END: iso(2024, mo, 28), AWARD_BEGIN: iso(2024, mo, 1) }; });
   r = SB.report();
@@ -831,10 +831,10 @@ try {
   setRows(60, function (i) { return { DEPT: 'D' + (i % 4), PCT_EFFORT: String(10 + (i % 50)) }; });
   r = SB.report();
   eq('report: a rate measure is averaged', [r.config.yAxis, r.config.agg], ['PCT_EFFORT', 'avg']);
-  has('report: ...the lead says average', [r.warnings[0]], /^Charting the average of PCT_EFFORT by DEPT\./);
+  has('report: ...the lead says average', [r.warnings[0]], /^Average PCT_EFFORT by DEPT\./);
   ok('report: ...never a doughnut of averages', r.config.type !== 'doughnut', r.config.type);
   rt = SB.retype('histogram', 'Histogram', r);
-  hasNot('retype: the stale "average of" lead is stripped too', r.warnings, /^Charting the average of /);
+  hasNot('retype: the stale "average of" lead is stripped too', r.warnings, /^Average /);
   // the columns Chart by charts as the measure
   setTable([['DEPT', 'text'], ['AMOUNT', 'money'], ['EMPLID', 'num'], ['FY', 'year'], ['YRC', 'num'], ['CNT', 'num'], ['LOG_DATE', 'date'], ['FLAG', 'bool']]);
   setRows(40, function (i) { return { DEPT: 'D' + (i % 3), AMOUNT: '$' + i, EMPLID: String(100000 + i), FY: '2025', YRC: String(2019 + (i % 5)), CNT: String(i % 9), LOG_DATE: iso(2025, 1 + (i % 12), 2), FLAG: i % 2 ? 'Y' : 'N' }; });
@@ -844,7 +844,7 @@ try {
   setTable(AWD); awdRows(200);
   r = SB.report({ y: 'AMOUNT' });
   eq('pin y: the measure, by the category Auto-build picks', [r.config.yAxis, r.config.agg, r.config.xAxis], ['AMOUNT', 'sum', 'PRIME_SPONSOR_CATEGORY']);
-  has('pin y: the lead names it', [r.warnings[0]], /^Charting the total of AMOUNT by PRIME_SPONSOR_CATEGORY/);
+  has('pin y: the lead names it', [r.warnings[0]], /^Total AMOUNT by PRIME_SPONSOR_CATEGORY/);
   r = SB.report({ y: 'AMOUNT', x: 'ORIGINATING SPONSOR' });
   eq('pin y+x: both kept; 5 shares of a sum -> doughnut, biggest first', [r.config.xAxis, r.config.yAxis, r.config.type, r.sortBy], ['ORIGINATING SPONSOR', 'AMOUNT', 'doughnut', 'value']);
   r = SB.report({ y: 'AMOUNT', x: 'LOG_DATE:fy' });
@@ -854,13 +854,13 @@ try {
   eq('pin x: the rows counted by the period handed over', [r.config.xAxis, r.config.yAxis, r.config.agg], ['LOG_DATE:fy', '', 'count']);
   eq('dtpick: ...a grouped axis sorts by label, earliest first', [r.sortBy, r.sortDir], ['label', 'asc']);
   eq('pin x: ...stacked by the award type, as Auto-build stacks a date axis', [r.config.groupBy, r.config.stacked], ['TRANSACTION_TYPE', true]);
-  has('pin x: the lead says the rows are counted', [r.warnings[0]], /^Counting the rows by LOG_DATE by fiscal year\./);
+  has('pin x: the lead says the rows are counted', [r.warnings[0]], /^Count of rows by LOG_DATE \((fy|Fiscal Year)\)\./);
   r = SB.report({ x: 'TRANSACTION_TYPE' });
   eq('pin x: the award type itself stays the X axis (not moved to a date, not split by itself)', [r.config.xAxis, r.config.groupBy], ['TRANSACTION_TYPE', 'none']);
   eq('pin x: ...2 shares of a count -> doughnut', r.config.type, 'doughnut');
   r = SB.report({ x: 'AMOUNT:bin' });
   eq('pin x bins: its own ranges, the rows counted, upright, low to high', [r.config.xAxis, r.config.agg, r.config.type, r.config.horizontal, r.sortBy, r.sortDir], ['AMOUNT:bin', 'count', 'bar', false, 'label', 'asc']);
-  has('pin x bins: the lead', [r.warnings[0]], /^Counting the rows by AMOUNT by range\./);
+  has('pin x bins: the lead', [r.warnings[0]], /^Count of rows by AMOUNT \((bin|Bins)\)\./);
   setTable([['STATUS', 'text'], ['LOG_DATE', 'date'], ['AMOUNT', 'money']]);
   setRows(200, function (i) { return { STATUS: STATUS[i % 3], LOG_DATE: iso(2022 + (i % 4), 1 + (i % 12), 1 + (i % 27)), AMOUNT: '$' + (10 + i) }; });
   r = SB.report({ x: 'LOG_DATE' });

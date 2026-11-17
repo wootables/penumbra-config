@@ -159,6 +159,8 @@ def build(index_src=None):
     rep('  <button id="confirmServerSaveBtn" class="pnb-btn pnb-btn-primary">Save to Server</button>\n',
         '  <div class="save-form-container collapsed" id="lastStopCard"><div class="lsc-collapsed-hint">Optional final overrides.</div>\n'
         '    <div id="lastStopCardBody"></div></div>\n'
+        # (2026-11-16, savechg C) "What this save changes", where the lists sit since Last Stop Changes went (both: --control)
+        '  <div class="save-form-container" id="pnbSaveChg"><div class="pnb-sc-body"></div><div class="pnb-sc-lists" id="pnbSaveChgLists"></div><div class="pnb-sc-bookwrap"></div><div class="pnb-sc-foot" hidden></div><div class="pnb-sc-diff" id="pnbSaveChgDiff" hidden><div class="audit-diff-body"></div></div></div>\n'
         '  <button id="confirmServerSaveBtn" class="pnb-btn pnb-btn-primary">Save to Server</button>\n'
         '  <button id="saveQuery" class="toolbar-icon" title="Save Options">Save</button>\n')
     rep('    var S = window.__SCN;\n',
