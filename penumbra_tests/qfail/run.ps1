@@ -67,8 +67,9 @@ $mCardN   = " + (int)`$sys['QFAIL_COUNT'] + (int)`$sys['CLIENT_ERR_COUNT'];"
 $mCardN0  = " + (int)`$sys['CLIENT_ERR_COUNT'];"
 $mCnt     = "        case 'query_fails':          return `"COUNT(CASE WHEN ACTION='QUERY_FAIL' `$t THEN 1 END)`";" + $L
 $mAll     = "if (`$queryFail > 0) `$errBits[] = number_format(`$queryFail) . ' query-fail';" + $L
-$mAllN    = '$timeout + $queryFail + $clientErr;'
-$mAllN0   = '$timeout + $clientErr;'
+# (2026-11-17) the too-big bucket joined the named sum (metricsweep2, 5014062)
+$mAllN    = '$timeout + $tooBig + $queryFail + $clientErr;'
+$mAllN0   = '$timeout + $tooBig + $clientErr;'
 $mCss     = "    .act.QUERY_FAIL, .act.QUERY_TIMEOUT, .act.QUERY_TOOBIG {"
 $mCss0    = "    .act.QUERY_FAILX, .act.QUERY_TIMEOUTX, .act.QUERY_TOOBIGX {"
 $mutantDefs = [ordered]@{

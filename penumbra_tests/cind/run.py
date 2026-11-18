@@ -25,7 +25,8 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 SCN = ['mcind', 'ggcind', 'gglcind']
 CHK = {'mcind': ['plainNoDot', 'dotOn', 'dotPlace', 'dotFilter', 'chipOpts', 'chipSort', 'noSave'],
        'ggcind': ['bandItems', 'bandRule', 'bandLabels', 'bandRuns', 'bandFolded'],
-       'gglcind': ['stackedNone', 'paneMenu', 'paneMarks', 'contentMenu', 'cellStays']}
+       'gglcind': ['stackedNone', 'paneMenu', 'paneMarks', 'contentMenu', 'cellStays',
+                   'headMenu', 'fillMenu']}   # glmenu (2026-11-17): the list's header and the frame's space under the list
 # red on the live build (--control); plainNoDot, noSave and bandFolded hold there too
 NEW = {'L-mcind-dotOn', 'L-mcind-dotPlace', 'L-mcind-dotFilter', 'L-mcind-chipOpts', 'L-mcind-chipSort',
        'L-ggcind-bandItems', 'L-ggcind-bandRule', 'L-ggcind-bandLabels', 'L-ggcind-bandRuns'}
@@ -50,6 +51,10 @@ MUTANTS = {
     # (cind 3) the List pane's empty space keeps the browser's menu
     'm-listpane': ([('menu', "if (listOn() && !target.closest('table, .group-header, #pnbGroupList, .group-grand-total')) {", "if (false) {")],
                    ['L-gglcind-paneMenu', 'L-gglcind-paneMarks', 'L-gglcind-contentMenu']),
+    # (glmenu) the list's header keeps the browser's menu
+    'm-listhead': ([('menu', "|| ((target === list || target.closest('.pnb-gl-head')) ? list", "|| ((target === list) ? list")], ['L-gglcind-headMenu']),
+    # (glmenu) the frame's space under the list keeps the browser's menu
+    'm-listfill': ([('menu', "var gcf = listOn() && target.id === 'groupedResultsContainer' ?", "var gcf = false ?")], ['L-gglcind-fillMenu']),
     'm-foldfit': ([('menu', "if (ths[i].getClientRects().length && tb && tb.querySelector('tbody tr')) { return ths[i]; }", "if (tb) { return ths[i]; }")], ['L-ggcind-bandFolded']),
 }
 

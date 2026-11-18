@@ -42,7 +42,7 @@ py -3 run.py --stage DIR --mutants  # 4 mutants, each turning EXACTLY its checks
 | mutant | the fix undone as | red |
 |---|---|---|
 | numdrop | numbers refused again (the build before) | the 8 NEW |
-| strfix | the level kept as TEXT (String() before validating; String() also turns a missing identifier into "undefined") | A-carries, B-sort, B-nextClick, B-rtView, C-numbersKept, C-pivotKept, C-refusedText, C-refusedShape |
+| strfix | the level kept as TEXT (String() before validating; String() also turns a missing identifier into "undefined"). Since 52d015b the load turns a text level back into the heading value, so B-sort and B-nextClick stay green (2026-11-17) | A-carries, B-rtView, C-numbersKept, C-pivotKept, C-refusedText, C-refusedShape |
 | anyshape | "not text = a number" (the global isFinite() coerces an array, true, null) | C-refusedShape |
 | nolen | text unchecked (oversized and empty names pass) | C-refusedText |
 

@@ -106,6 +106,15 @@ function php_parse_search_query($query, $columns) {
     if ($query === null || $query === false || trim((string)$query) === '') {
         return array();
     }
+    // (2026-11-17, trailjoin parity) A joiner left at the end ("AMT > 5 AND") joins nothing: dropped, as the browser's
+    // parseAdvancedQuery has done since 2026-11-13 (trailjoin). Here it still read as a condition with no right side,
+    // which no row passes - so a filter that showed rows on the page sent an EMPTY scheduled email. Not when the word
+    // is a VALUE (STATE = OR): after an operator it is what the column is compared with (orvalue, 2026-11-14).
+    $query = (string)$query;
+    if (!preg_match('/(?:[=<>]|\b(?:eq|ne|gt|lt|contains))\s+(?:and|or)\s*$/i', $query)) {
+        $query = preg_replace('/\s+(?:and|or)\s*$/i', '', $query);
+    }
+    if (trim($query) === '') { return array(); }
 
     // --- Operator map (sorted longest-first for matching priority) ---
     // `contains` is a WORD operator (2026-09-23, as in main.js parseAdvancedQuery): it counts
@@ -641,6 +650,12 @@ function php_evaluate_search_row($row, $parsedQuery, $columns, $requireRowMatch 
     if (!$parsedQuery || count($parsedQuery) === 0) {
         return true;
     }
+    // (2026-11-15) a dangling and / or ("AMT > 5 AND") is ignored, as the page (main.js) ignores it: the row
+    // evaluated FALSE here, so a scheduled email with that filter came out empty while the page showed rows
+    // (pivotparity filterRow2 / filterRow2B). Trimmed here, not in the parser: the subscription condition's
+    // check reads the dangling AND to refuse it as incomplete.
+    $parsedQuery = _search_trim_logicals($parsedQuery);
+    if (count($parsedQuery) === 0) return true;
     if ($requireRowMatch) {
         return _php_evaluate_with_row_match($row, $parsedQuery, $columns);
     }
@@ -913,9 +928,15 @@ function _search_virtual_column_names($rows) {
     $names = array();
     $n = 0;
     foreach ((array)$rows as $row) {
-        if ($n++ >= 10) {
+        // (2026-11-17, nestsample parity) The first ten rows, and on past them (to 5,000) until one holds a nested
+        // table - the rule main.js buildVirtualColumnNames() has had since 2026-11-14 (nestsample). This reader still
+        // stopped at ten, so where the first nested table came later the report page knew SPECIES as a column and
+        // this engine (the scheduled filter, index.php's ?json=1 dashboard routing) did not: the same filter kept
+        // rows on the page and was skipped, or matched nothing, here.
+        if ($n >= 5000 || ($n >= 10 && $names)) {
             break;
         }
+        $n++;
         if (!is_array($row)) {
             continue;
         }
@@ -1809,6 +1830,22 @@ function penumbra_route_dash_search($dsearch, $columns) {
         $txt = trim(isset($fr[1]) && is_scalar($fr[1]) ? (string)$fr[1] : '');
         if ($txt === '') {
             continue;
+        }
+        // (2026-11-17, metricsweep5) A parenthesised group has no column of its own, so
+        // it used to be kept for every report: on a report without one of its
+        // columns it compared literal text, matched nothing, and the tile read 0
+        // with no "not filtered" mark. The names compared inside it are checked;
+        // if this report lacks one, the group is skipped and reported as skipped.
+        // (metricsweep6) names are read from the group with its quoted values and /patterns/ taken out first:
+        // (URL = "x?id=5" ...) and (NOTE = /a=b/ ...) used to yield ID and A as columns the report lacks.
+        $grpBare = preg_replace('/"[^"]*"|\'[^\']*\'|\/(?:\\\\.|[^\/\\\\])*\/[A-Za-z]*/', ' ', $txt);
+        if ($col === '' && isset($txt[0]) && $txt[0] === '(' && is_string($grpBare) && preg_match_all('/([A-Za-z_][A-Za-z0-9_]*)\s*(?:!=|<>|>=|<=|=|>|<)/', $grpBare, $grpNames)) {
+            $grpMissing = array();
+            foreach ($grpNames[1] as $gn) { $gu = strtoupper($gn); if (!isset($have[$gu])) $grpMissing[$gu] = true; }
+            if ($grpMissing) {
+                foreach (array_keys($grpMissing) as $gm) { if (!in_array($gm, $out['skipped'], true)) $out['skipped'][] = $gm; }
+                continue;
+            }
         }
         if ($col === '' || isset($have[$col])) {
             $keep[] = $txt;

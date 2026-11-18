@@ -179,7 +179,10 @@ $mutants = @{
   'tsfilteractive' = @('if (kind === ''filter'') return fs.has(box, rest);', 'if (kind === ''filter'') return false;', 'main')
   'tsfilterwipe'   = @('var next = fs ? (kind === ''unfilter'' ? fs.remove(cur, cond) : fs.add(cur, cond)) : null;', 'var next = kind === ''unfilter'' ? '''' : cond;', 'main')
   'tsimpliedoff'   = @('if (!tsOff.length && tsOn.every(function (c) { return tsFilterRe.test(c); })) {', 'if (false) {', 'main')
-  'tsorrefuse'     = @('if (next === null) {', 'if (next === null && false) {', 'main')
+  # (2026-11-17) tsorrefuse RETIRED: since the parentheses work (2026-10-30) a box holding an or is wrapped, not refused,
+  # and condAdd / condRemove return null only for a condition that is a bare `or` (or with no strip library loaded).
+  # No snippet can reach the refusal, so no check can turn red for it. Was:
+  # 'tsorrefuse'     = @('if (next === null) {', 'if (next === null && false) {', 'main')
   'tsnumfmt'       = @('unformattedLiterals.push(tsHtml);', 'unformattedLiterals.push(tsHtml.replace(/2025/g, ''2,025''));', 'main')
   'rangeclaim'     = @('if (rf && rf.range && rf.kind !== ''text'') {', 'if (false) {', 'tiles')
   'rangecompose'   = @('if (rg && rg.max) parts.push(fsColRef(col) + '' <= '' + rg.max);', '/* mutant: max dropped */', 'tiles')
@@ -331,7 +334,7 @@ $udd = Join-Path $here 'edgeprofile'
 $dom = Join-Path $here 'dom.txt'
 if (Test-Path $dom) { [IO.File]::Delete($dom) }
 $url = 'file:///' + $here.Replace([char]92, [char]47) + '/harness.html'
-$edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',"--user-data-dir=$udd",'--virtual-time-budget=60000','--dump-dom',$url)
+$edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',"--user-data-dir=$udd",'--virtual-time-budget=240000','--dump-dom',$url)
 Start-Process -FilePath $edge -Wait -NoNewWindow -RedirectStandardOutput $dom -ArgumentList $edgeArgs
 $d = [IO.File]::ReadAllText($dom)
 $i = $d.IndexOf('<pre id="out">'); $j = $d.IndexOf('</pre>', $i)

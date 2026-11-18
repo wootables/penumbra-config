@@ -52,7 +52,8 @@ READS_ALL = ['prepcsv', 'prepall', 'rowsnone', 'hide', 'group', 'fmt', 'exports'
 
 MUTANTS = {
     # the rows on screen are never filled: page 2, a search, a sort, Rows = All show EMPTY cells
-    'nopagefill': ([("        _pnbFillDisplayedRows();\r\n\r\n        // AFTER the page loop, not before it (2026-09-30).", "\r\n        // AFTER the page loop, not before it (2026-09-30).")],
+    # (2026-11-17) re-anchored: the call now hands over the page's rows (_pnbPageRows)
+    'nopagefill': ([("        _pnbFillDisplayedRows(_pnbPageRows);\r\n\r\n        // AFTER the page loop, not before it (2026-09-30).", "\r\n        // AFTER the page loop, not before it (2026-09-30).")],
                    ['D-page2', 'D-rpp25', 'D-toall', 'D-search', 'D-sort', 'D-savedsort', 'D-presearch'], ['page2', 'rpp25', 'toall', 'search', 'sort', 'savedsort', 'presearch']),
     # the flat exports read EMPTY cells
     'noexportfill': ([("        if (format !== 'html' && !isPivotMode && !isGrouped) _pnbFillSearchVisibleRows();\r\n", "")],

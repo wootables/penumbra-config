@@ -57,6 +57,8 @@ $MUTANTS = array(
                           array('E-clear-files')),
     'addguard'   => array('manage_journal.php', "            if (\$sf['shared']) {\n                \$now = journalSharedNoteOf(", "            if (false) {\n                \$now = journalSharedNoteOf(",
                           array('A-exists', 'A-none')),
+    'sharedcur'  => array('manage_journal.php', "            if (!\$curShared || (int)\$curShared['ID'] !== (int)\$note['ID']) \$shared = false;", "",
+                          array('E-old-other', 'E-old-blank', 'E-old-own')),
     'flagrows'   => array('manage_journal.php', "\$f['shared'] = !empty(\$vo['journalRowNotes']) && isset(", "\$f['shared'] = isset(",
                           array('F-needs-rownotes')),
     'exportmode' => array('journal_export.php', "if (isset(\$vo['journalNotesMode']) && \$vo['journalNotesMode'] === 'shared') { foreach", "if (false) { foreach",
@@ -300,7 +302,10 @@ $run = function ($body, $data, $setup) use ($SHARED) {
     $GLOBALS['NOTE'] = array_key_exists('note', $setup) ? $setup['note'] : root_note();
     unset($GLOBALS['REREAD']);
     if (array_key_exists('reread', $setup)) $GLOBALS['REREAD'] = $setup['reread'];
-    $GLOBALS['ROWNOTE'] = isset($setup['rownote']) ? $setup['rownote'] : null;
+    // (2026-11-17, sharedcur) an edit's Shared root is the row's current note (its newest public root) unless the scenario
+    // names another; the add path's row note stays none unless named
+    $GLOBALS['ROWNOTE'] = array_key_exists('rownote', $setup) ? $setup['rownote']
+        : ((isset($GLOBALS['EDIT_RUN']) && $body === $GLOBALS['EDIT_RUN']) ? $GLOBALS['NOTE'] : null);
     $GLOBALS['OCI'] = array(); $GLOBALS['OCI_ROWS'] = isset($setup['rows']) ? $setup['rows'] : array();
     $GLOBALS['AUDIT'] = array(); $GLOBALS['MAILS'] = array(); $GLOBALS['Q'] = array();
     $GLOBALS['REPLIES'] = isset($setup['replies']) ? $setup['replies'] : 0; $GLOBALS['COUNT_OK'] = !empty($setup['countOk']);
@@ -334,6 +339,7 @@ if ($editBody !== '') {
     // the real journalReportStateFlags caches report 7 forever in this process: the edit action is
     // rewritten to read the flags through a fresh call per run (one textual swap, both builds)
     $editRun = str_replace('journalReportStateFlags($report)', '$GLOBALS[\'FLAGS_NOW\']', $editBody);
+    $GLOBALS['EDIT_RUN'] = $editRun;   // (sharedcur) $run's default row note
     $addRun = str_replace('journalReportStateFlags($report)', '$GLOBALS[\'FLAGS_NOW\']', $addBody);
     $BASE = "address: 12 Elm St\nphone: 555-0100";
 
@@ -374,6 +380,19 @@ if ($editBody !== '') {
     A('E-reply-author', ($r['j']['status'] ?? '') === 'error' && stripos($r['j']['message'] ?? '', 'author') !== false && !$updates($r), 'a reply is still its author\'s: ' . json_encode($r['j']));
     $r = $run($editRun, array('note_id' => 902, 'note_text' => 'x', 'base_text' => $BASE), array('note' => root_note(array('SCOPE' => 'pivot'))));
     A('E-pivot-author', ($r['j']['status'] ?? '') === 'error' && stripos($r['j']['message'] ?? '', 'author') !== false && !$updates($r), 'a pivot row\'s note is still its author\'s: ' . json_encode($r['j']));
+
+    // (2026-11-17, sharedcur) an OLDER root note on a Shared row (a Discussion note from before the switch; 905 is the
+    // row's note now): not anyone's to edit - its author's, as an ordinary note that keeps its place
+    $newer = root_note(array('ID' => '905', 'NOTE_TEXT' => 'the row\'s note now', 'CREATED_BY' => 'pat', 'CREATED_AT' => '2026-11-15 09:00:00'));
+    $r = $run($editRun, array('note_id' => 902, 'note_text' => 'rewritten by kim', 'base_text' => $BASE), array('rownote' => $newer));
+    A('E-old-other', ($r['j']['status'] ?? '') === 'error' && stripos($r['j']['message'] ?? '', 'author') !== false && !$updates($r) && !$deletes($r),
+        'an older note is not the Shared note: kim cannot rewrite it: ' . json_encode($r['j']));
+    $r = $run($editRun, array('note_id' => 902, 'note_text' => '', 'base_text' => $BASE), array('rownote' => $newer));
+    A('E-old-blank', ($r['j']['status'] ?? '') === 'error' && !$updates($r) && !$deletes($r), '...nor blank (delete) it: ' . json_encode($r['j']));
+    $r = $run($editRun, array('note_id' => 902, 'note_text' => 'typo fixed', 'base_text' => $BASE), array('rownote' => $newer, 'me' => 'lee'));
+    $u = $updates($r);
+    A('E-old-own', ($r['j']['status'] ?? '') === 'success' && count($u) === 1 && strpos($u[0]['sql'], 'CREATED_AT') === false && strpos($u[0]['sql'], 'CREATED_BY') === false,
+        'its author fixes it as an ordinary note: no new date, no new owner, so it does not become the row\'s note: ' . json_encode($r['j']) . ' ' . ($u ? $u[0]['sql'] : ''));
 
     // (sharedfiles) a note with files (its replies) keeps its place when its text is cleared: the text empties
     $r = $run($editRun, array('note_id' => 902, 'note_text' => '', 'base_text' => $BASE), array('replies' => 2));

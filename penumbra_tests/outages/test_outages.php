@@ -226,7 +226,10 @@ penumbra_outage_record(array(), $T + 300);
 $h = penumbra_outage_history(array('hours' => 24 * 30), array());
 ok(count($h['by_component']) === 0, 'a drill contributes no downtime to any component', $h['by_component']);
 ok(count($h['patterns']) === 0, 'and forms no pattern');
-ok($h['total'] === 1, 'but is still visible in the list, tagged', $h['total']);
+// (2026-11-17, follows 5014062 metricsweep2) a drill is LISTED, tagged, but is not an outage: it used to
+// sit in 'total', where with no known window it read as one more unexplained outage.
+ok(count($h['episodes']) === 1 && isset($h['episodes'][0]['kind']) && $h['episodes'][0]['kind'] === 'drill', 'but is still visible in the list, tagged', $h['episodes']);
+ok($h['total'] === 0 && $h['unexplained'] === 0 && $h['known'] === 0, 'and is not counted as an outage, explained or not', array($h['total'], $h['unexplained'], $h['known']));
 
 echo "\n== corrupt / partial ledger degrades, never fatals ==\n";
 file_put_contents(penumbra_outage_ledger_file(array()), '{not json');

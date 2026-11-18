@@ -189,6 +189,8 @@ JS0, CSS0 = read_b(js_path), read_b(css_path)
 def mutate(js, css, name):
     for which, old, new in MUTANTS[name][0]:
         src = js if which == 'js' else css
+        # (2026-11-17) main.css is LF since e65935d (main.js still CRLF): a CRLF anchor is read as LF where the file has no CRLF
+        if '\r\n' not in src and '\r\n' in old: old, new = old.replace('\r\n', '\n'), new.replace('\r\n', '\n')
         if src.count(old) != 1: raise SystemExit("mutant '%s': anchor found %d times (needs the FIXED build)" % (name, src.count(old)))
         if which == 'js': js = js.replace(old, new)
         else: css = css.replace(old, new)

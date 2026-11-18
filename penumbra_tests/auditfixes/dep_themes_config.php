@@ -85,7 +85,7 @@ function penumbra_get_themes() {
         'id' => 'theme-wolfpack', 'label' => 'Wolfpack Red', 'isDark' => false,
         'aliases' => array('red', 'wolfpack-red'),
         'vars' => array(
-            'bg-body' => '#f5f5f5', 'bg-surface' => '#ffffff', 'bg-surface-alt' => '#fcf0f0',
+            'bg-body' => '#f5f5f5', 'bg-surface' => '#ffffff', 'bg-surface-alt' => '#f7f1e8',
             'text-main' => '#222222', 'text-muted' => '#666666', 'border-color' => '#cccccc',
             'brand-primary' => '#990000', 'brand-secondary' => '#cc0000',
         ),
@@ -173,10 +173,10 @@ function penumbra_get_themes() {
         'cssVars' => array('accent-danger' => '#b3261e', 'on-brand' => '#ffffff', 'brand-text' => '#1c5f5a', 'table-header-bg' => 'linear-gradient(to top, #185a56, #1f6b66)','table-header-text' => '#ffffff', 'table-header-sorted-bg' => 'linear-gradient(to bottom, #ecbf63, #e6b450)', 'table-header-sorted-text' => '#2a1e05', 'table-footer-bg' => '#efe4ca', 'table-footer-border' => '#1f6b66', 'table-footer-text' => '#23393a', 'zebra-light' => '#fffaf0', 'zebra-dark' => '#f7efdc', 'table-link-color' => '#17706a', 'header-card-bg' => 'linear-gradient(100deg, #f1e5c9, #e9d7ae)', 'header-card-border' => '#dccdaa', 'header-card-accent' => '#1f6b66', 'title-color' => '#1c4f4a', 'fab-bg' => 'var(--brand-primary)', 'fab-hover' => 'var(--brand-secondary)', 'bg-main' => 'var(--bg-surface)', 'panel-bg' => 'var(--bg-surface)', 'panel-border' => 'var(--border-color)', 'panel-header-bg' => 'var(--bg-surface-alt)', 'selector-group-bg' => 'var(--bg-surface-alt)', 'selector-highlight-bg' => 'var(--bg-surface-alt)', 'selector-hover-bg' => 'var(--bg-surface-alt)', 'toolbar-bg' => 'var(--bg-surface-alt)', 'row-hover' => '#f0e4c8'),
     );
 
-    // ---- Eclipse (id stays theme-solarized-dark) ------------------------------
+    // ---- Penumbra Eclipse (id stays theme-solarized-dark) ---------------------
     $themes['theme-solarized-dark'] = array(
-        'id' => 'theme-solarized-dark', 'label' => 'Eclipse', 'isDark' => true,
-        'aliases' => array('solarized', 'solarized-dark', 'eclipse'),
+        'id' => 'theme-solarized-dark', 'label' => 'Penumbra Eclipse', 'isDark' => true,
+        'aliases' => array('solarized', 'solarized-dark', 'eclipse', 'penumbra-eclipse'),
         'vars' => array(
             'bg-body' => '#061219', 'bg-surface' => '#0f242d', 'bg-surface-alt' => '#0a1b23',
             'text-main' => '#ece6d6', 'text-muted' => '#a9b3b0', 'border-color' => '#2a414a',
@@ -210,7 +210,7 @@ function penumbra_get_themes() {
         'print' => array('headerBg' => '#2f5a26', 'footerBg' => '#d6e6cf'),
         'emailGroup' => array('border' => '#b7cdaf', 'headerBg' => '#e6f0df', 'nameColor' => '#17271c', 'countBg' => '#2f5a26', 'countColor' => '#ffffff', 'aggLabel' => '#5b6d61', 'aggValue' => '#2f5a26'),
         'nestedHeader' => array('bg' => '#d6e6cf', 'text' => '#17271c', 'border' => '#b7cdaf', 'border_top' => '#2f5a26', 'header_bg' => '#cfe1c8', 'header_text' => '#17271c'),
-        'cssVars' => array('accent-danger' => '#a3473a', 'accent-success' => '#276f2b', 'table-header-bg' => '#2f5a26', 'table-header-text' => '#ffffff', 'table-header-sorted-bg' => '#cfe39a', 'table-header-sorted-text' => '#1d3016', 'table-footer-bg' => '#d6e6cf', 'table-footer-border' => '#2f5a26', 'table-footer-text' => '#17271c', 'zebra-light' => '#f3f8ef', 'zebra-dark' => '#e1ecd9', 'table-link-color' => '#2f5a26', 'header-card-bg' => 'linear-gradient(145deg, #eef5e8, #d6e4cb)', 'header-card-border' => '#9dba92', 'header-card-accent' => '#4a7a3a', 'title-color' => '#1f4119', 'fab-bg' => 'var(--brand-primary)', 'fab-hover' => 'var(--brand-secondary)', 'bg-main' => 'var(--bg-surface)', 'panel-bg' => 'var(--bg-surface)', 'panel-border' => 'var(--border-color)', 'panel-header-bg' => 'var(--bg-surface-alt)', 'selector-group-bg' => 'var(--bg-surface-alt)', 'selector-highlight-bg' => 'var(--bg-surface-alt)', 'selector-hover-bg' => 'var(--bg-surface-alt)', 'toolbar-bg' => 'var(--bg-surface-alt)', 'row-hover' => '#cfe4c7'),
+        'cssVars' => array('accent-danger' => '#a3473a', 'accent-success' => '#276f2b', 'table-header-bg' => 'linear-gradient(to top, #4a7a3a, #2f5a26)', 'table-header-text' => '#ffffff', 'table-header-sorted-bg' => '#cfe39a', 'table-header-sorted-text' => '#1d3016', 'table-footer-bg' => '#d6e6cf', 'table-footer-border' => '#2f5a26', 'table-footer-text' => '#17271c', 'zebra-light' => '#edf2e7', 'zebra-dark' => '#e1ecd9', 'table-link-color' => '#2f5a26', 'header-card-bg' => 'linear-gradient(145deg, #eef5e8, #d6e4cb)', 'header-card-border' => '#9dba92', 'header-card-accent' => '#4a7a3a', 'title-color' => '#1f4119', 'fab-bg' => 'var(--brand-primary)', 'fab-hover' => 'var(--brand-secondary)', 'bg-main' => 'var(--bg-surface)', 'panel-bg' => 'var(--bg-surface)', 'panel-border' => 'var(--border-color)', 'panel-header-bg' => 'var(--bg-surface-alt)', 'selector-group-bg' => 'var(--bg-surface-alt)', 'selector-highlight-bg' => 'var(--bg-surface-alt)', 'selector-hover-bg' => 'var(--bg-surface-alt)', 'toolbar-bg' => 'var(--bg-surface-alt)', 'row-hover' => '#cfe4c7'),
     );
 
     // (The High Contrast theme was REMOVED 2026-08-24 — it existed for

@@ -28,15 +28,19 @@
                 <p class="pnb-dlg-sub">Chart the current result set</p>
             </div>
             
-            <!-- Describe a chart (vizdesc, 2026-11-13): words in, a chart out, through viz_describe.php and
-                 Auto-build's own rules; any failure falls back to plain Auto-build. In the title bar, not the
-                 docked button bar, which is already at its one-line limit when the admin group shows.
-                 viz_describe.off beside index.php leaves it out. -->
-            <div class="pnb-dlg-action viz-describe" role="group" aria-label="Describe a chart">
-                <input type="text" id="vizDescribeInput" maxlength="300" autocomplete="off" spellcheck="false" placeholder="Describe a chart, e.g. amount by sponsor per fiscal year" aria-label="Describe the chart you want" title="Say what to chart in your own words - columns, a period, top 10, stacked - and press Enter. Only the column names on this report are sent to the AI, never the data. If it cannot help, Auto-build draws the chart instead.">
-                <button type="button" id="vizDescribeBtn" class="pnb-btn pnb-btn-sm pnb-btn-primary" title="Build the chart you described (Enter)">&#x2728; Build</button>
+            <!-- Build (Describe a chart, vizdesc 2026-11-13; one button with Auto-build since 2026-11-16,
+                 vizbuild): words in the box go to viz_describe.php and Auto-build's own rules (any failure
+                 falls back to plain Auto-build); an empty box auto-builds from the layout behind the dialog.
+                 The button is Auto-build's: vizSyncAutoBuildBtn() sets its tooltip on every open and
+                 _vizSyncBuildBtn() its label (empty box: Auto-build; words: Build). In the title bar, not
+                 the docked button bar, which is at its one-line limit when the admin group shows.
+                 viz_describe.off beside index.php leaves the box out: the button is then plain Auto-build. -->
+            <div class="pnb-dlg-action viz-describe" role="group" aria-label="Build a chart">
+                
+                <input type="search" id="vizDescribeInput" maxlength="300" autocomplete="off" spellcheck="false" placeholder="Describe a chart, or leave blank to auto-build" aria-label="Describe the chart you want, or leave blank to auto-build" title="Say what to chart in your own words - columns, a period, top 10, stacked - and press Enter. Only the column names on this report go to the AI, never the data. Leave it blank to auto-build from the table instead.">
+                
+                <button type="button" id="vizAutoBuildBtn" class="pnb-btn pnb-btn-sm pnb-btn-primary" aria-label="Auto-build" title="Fill the builder in from the table behind this dialog, then adjust whatever you like."><span class="viz-build-ico" aria-hidden="true">&#x1F4CA;</span><span class="viz-build-txt">Auto-build</span></button>
             </div>
-            
             <span class="pnb-dlg-action" id="vizPresetMount"></span>
             <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
         </div>
@@ -678,11 +682,8 @@
              Same buttons, same ids, same handlers. ============ -->
         <div class="viz-btn-bar">
             <div class="viz-btn-group">
-                <!-- Getting-started action, deliberately first in the bar. Its label and
-                     tooltip are rewritten by vizSyncAutoBuildBtn() each time the builder
-                     opens, so it always names the layout it would actually read
-                     (pivot / groups / report). Successor to "Chart This Pivot". -->
-                <button id="vizAutoBuildBtn" class="pnb-btn pnb-btn-secondary" title="Fill the builder in from the table behind this dialog, then adjust whatever you like.">&#x1F4CA; Auto-build from report</button>
+                <!-- Auto-build sat first in this bar until 2026-11-16 (vizbuild): it is the
+                     title bar's Build button now, shared with Describe a chart. -->
                 <button id="copyChartImage" class="pnb-btn pnb-btn-secondary" disabled title="Copy chart image to clipboard">&#x1F4CB; Copy Image</button>
                 <button id="downloadChart" class="pnb-btn pnb-btn-secondary" disabled>Download PNG</button>
                 <button id="vizResetBtn" class="pnb-btn pnb-btn-secondary" title="Reset the builder back to default settings (clears chart type, axes, all options, and any loaded preset)">&#x21BA; Reset</button>

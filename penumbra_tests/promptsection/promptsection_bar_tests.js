@@ -115,6 +115,15 @@
             + grabLine(src, /\n    const _isRangeKeyword = [^\n]+\n/, '_isRangeKeyword')
             + 'var _promptRangeCache = new Map();\n'
             + 'var _forceDefaultApplied = new Set();\n'
+            // (2026-11-17) Since 780f66e (2026-11-12, "View links: show the prompt bar with the
+            // link's answers") the bar, the chip's dialog and the review read a saved answer
+            // through _pnbPromptStored (a view link's own answers first, else localStorage).
+            // It is a one-line function, so it is lifted as a line - the REAL one - with its
+            // two closure variables set to "not a link visit". Without it updatePromptDisplay's
+            // own try/catch swallowed the ReferenceError and the bar drew no chips. A build
+            // older than 780f66e has no such line and does not call it.
+            + 'var _pnbViewLink = false;\nvar _pnbVlPromptSaves = {};\n'
+            + ((/\n    function _pnbPromptStored\(k\) \{[^\n]+\}\n/.exec(src) || [''])[0])
             + names.map(function (n) { return grabFn(src, n); }).join('\n');
         var found = { bar: false, section: false };
         if (withHandlers) {
@@ -489,12 +498,47 @@
 
             clearAll(); answerAll();
             MIX.forEach(function (t) { before[t] = storedRaw(t); });
+            // (2026-11-17) Follows f02d2be (2026-11-13, reviewkeep: "Cancel on a prompt that has an
+            // answer keeps the answer; it was replaced by the author's default= and the report
+            // re-run"). Since then Cancel on an ANSWERED prompt no longer ends the review: that
+            // answer is kept as it is and the next prompt is asked. The old check here pressed
+            // Cancel once and awaited the review, which now waits on the next dialog for ever
+            // (the page stalled in F). So: Cancel in every dialog - each is asked, every saved
+            // answer stays byte for byte. Whether the report re-runs after that is NOT pinned
+            // (the commit does not say; it is printed as a note).
             var pc = env.reconfigureAllPrompts('dates');
-            await tick(40);
-            var dlg = lastDialog();
-            if (dlg) $('#' + dlg.id + '_cancel').trigger('click');
-            await pc;
-            check('Cancel: nothing saved, nothing re-run', [MIX.every(function (t) { return storedRaw(t) === before[t]; }), window.__execClicks], [true, 0]);
+            var cancelSeen = [], pcDone = false;
+            pc.then(function () { pcDone = true; }, function () { pcDone = true; });
+            for (var cg = 0; cg < 300 && !pcDone; cg++) {
+                await tick(20);
+                var dlg = lastDialog();
+                if (!dlg || dlg.$d.data('seenByTest')) continue;
+                dlg.$d.data('seenByTest', 1);
+                cancelSeen.push(dlg.$d.find('.modal-prompt-content span').first().text());
+                $('#' + dlg.id + '_cancel').trigger('click');
+            }
+            check('Cancel on answered prompts: the review ends, each prompt of the section was asked, every saved answer is kept byte for byte',
+                [pcDone, cancelSeen, MIX.every(function (t) { return storedRaw(t) === before[t]; })], [true, ['From date', 'To date'], true]);
+            note('after Cancel in every dialog the report re-ran ' + window.__execClicks + ' time(s) (not pinned)');
+            // Cancel on a prompt with NO answer and no default= still discards the whole
+            // review: an answer changed earlier in it is not saved and nothing re-runs.
+            clearAll(); answerAll(); localStorage.removeItem(K(T.to));
+            MIX.forEach(function (t) { before[t] = storedRaw(t); });
+            var pc2 = env.reconfigureAllPrompts('dates'), pc2Done = false, pc2Seen = [];
+            pc2.then(function () { pc2Done = true; }, function () { pc2Done = true; });
+            for (var cg2 = 0; cg2 < 300 && !pc2Done; cg2++) {
+                await tick(20);
+                var dlg2 = lastDialog();
+                if (!dlg2 || dlg2.$d.data('seenByTest')) continue;
+                dlg2.$d.data('seenByTest', 1);
+                var msg2 = dlg2.$d.find('.modal-prompt-content span').first().text();
+                pc2Seen.push(msg2);
+                if (msg2 === 'From date') { $(dlg2.input).val('02-JUL-25').trigger('input'); $('#' + dlg2.id + '_ok').trigger('click'); }
+                else $('#' + dlg2.id + '_cancel').trigger('click');
+            }
+            check('Cancel on an UNANSWERED prompt (no default): nothing saved - not even the answer changed before it - and nothing re-run',
+                [pc2Done, pc2Seen, MIX.every(function (t) { return storedRaw(t) === before[t]; }), window.__execClicks, /Nothing was saved/.test(calls.toasts.join(' '))],
+                [true, ['From date', 'To date'], true, 0, true]);
 
             // A child in a section of its OWN is reviewed apart from its parent. The
             // failure to prevent: judged against NO answer, a failed resultif DELETES

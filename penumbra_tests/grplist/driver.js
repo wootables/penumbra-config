@@ -557,9 +557,49 @@
       var srr = srow ? srow.getBoundingClientRect() : null, br = band ? band.getBoundingClientRect() : null;
       var scs = srow ? getComputedStyle(srow) : null, bcs = band ? getComputedStyle(band) : null;
       var nm = srow && srow.querySelector('.pnb-gl-name'), gh = gt && gt.querySelector('.group-header');
-      R.chk.rowFlush = !!(srr && lr && Math.abs(srr.top - lr.top) <= 1 && Math.abs(srr.right - lr.right) <= 1 && parseFloat(lcs.paddingTop) === 0);
+      // glhead (2026-11-17): the list's HEADER is its first row now - flush with the frame's top,
+      // the selected (first) row flush under it
+      var lhd = l && l.querySelector(':scope > .pnb-gl-head'), hdr = lhd ? lhd.getBoundingClientRect() : null;
+      R.chk.rowFlush = !!(srr && lr && hdr && Math.abs(hdr.top - lr.top) <= 1 && Math.abs(srr.top - hdr.bottom) <= 1
+        && Math.abs(srr.right - lr.right) <= 1 && parseFloat(lcs.paddingTop) === 0);
+      // ... level with the selected band: one line across the frame under both
+      R.chk.headBand = !!(hdr && br && Math.abs(hdr.top - br.top) <= 1 && Math.abs(hdr.bottom - br.bottom) <= 0.5);
+      // ... names the grouping as its column heading reads (the raw name when the column has no
+      // heading), counts the groups, keys the pill; the tree's label says the same to a reader
+      var hth = r.querySelector('table > thead > tr:first-child > th[data-colname="H_GROUP"]');
+      var htx = (hth ? String(hth.textContent || '').replace(/[\u25B2\u25BC\u2B06\u2B07\u2191\u2193]/g, '').replace(/\s+/g, ' ').trim() : '') || 'H_GROUP';
+      var hp = lhd && lhd.querySelector('.pnb-gl-hpath'), hn = lhd && lhd.querySelector('.pnb-gl-hn'), hpill = lhd && lhd.querySelector('.pnb-gl-hpill');
+      var tlab = l ? (l.getAttribute('aria-label') || '') : '';
+      R.chk.headText = !!(hp && hp.textContent === htx && hn && hn.textContent === '6 groups' && hpill && hpill.textContent === 'Rows'
+        && lhd.getAttribute('aria-hidden') === 'true' && tlab.indexOf('Groups by ' + htx + ', 6 groups') === 0);
+      // ... one line per cell however narrow the list (an ellipsis, never a wrap), no taller than the band,
+      // nothing spilling past the list's edge - as drawn, and with the list squeezed to 110px (under its 200px floor: the fixture's names are short)
+      var oneLine = function () {
+        var h2 = lhd.getBoundingClientRect();
+        return lhd.children.length >= 3 && Array.prototype.every.call(lhd.children, function (x) {
+          return x.getClientRects().length === 1 && getComputedStyle(x).whiteSpace === 'nowrap'; })
+          && h2.height <= br.height + 0.5 && lhd.scrollWidth <= lhd.clientWidth + 1;
+      };
+      var ol1 = !!(lhd && br) && oneLine(), ol2 = false, w0 = l ? l.style.width : '', mw0 = l ? l.style.minWidth : '';
+      if (lhd && br) { l.style.minWidth = '0'; l.style.width = '110px'; await frames(2); ol2 = oneLine(); R.info.headNarrow = { w: l.getBoundingClientRect().width, sw: lhd.scrollWidth, cw: lhd.clientWidth, h: lhd.getBoundingClientRect().height }; l.style.width = w0; l.style.minWidth = mw0; await frames(2); }
+      R.chk.headOneLine = ol1 && ol2;
+      R.info.head = { text: lhd && lhd.innerText, label: tlab, want: htx, top: hdr && hdr.top, bottom: hdr && hdr.bottom, h: hdr && hdr.height,
+                      bandTop: br && br.top, bandBottom: br && br.bottom, rowTop: srr && srr.top };
+      // glhead (2026-11-17): the band is 3.5em now (a row is 3em) - a little taller than the table's
+      // header row under it; it was the row's height
+      var bfs = bcs ? parseFloat(bcs.fontSize) : 0;
       R.chk.bandTint = !!(scs && bcs && scs.backgroundColor === bcs.backgroundColor && scs.borderRightColor === scs.backgroundColor
-        && Math.abs(srr.height - br.height) <= 1.5);
+        && Math.abs(parseFloat(bcs.height) - 3.5 * bfs) <= 1 && br.height > srr.height + 0.4 * bfs);
+      // glfoot (2026-11-17): the All groups footer is 3.5em too - the list's top and foot match
+      var ghs = gh ? getComputedStyle(gh) : null;
+      R.chk.footTall = !!(ghs && Math.abs(parseFloat(ghs.height) - 3.5 * parseFloat(ghs.fontSize)) <= 1);
+      // gltint (2026-11-17): the list's column is one pane on a shade of its own - the list, its
+      // header and the All groups footer share it, it is not the frame's surface, and the selected
+      // row still takes the band's colour
+      var lbg = l ? getComputedStyle(l).backgroundColor : '', fbg = getComputedStyle(r).backgroundColor;
+      R.chk.paneTint = !!(lbg && lhd && ghs && lbg !== fbg && !/rgba\(0, 0, 0, 0\)|transparent/.test(lbg)
+        && getComputedStyle(lhd).backgroundColor === lbg && ghs.backgroundColor === lbg && scs && bcs && scs.backgroundColor === bcs.backgroundColor);
+      R.info.pane = { list: lbg, frame: fbg, head: lhd && getComputedStyle(lhd).backgroundColor, foot: ghs && ghs.backgroundColor };
       var inset = nm && lr ? nm.getBoundingClientRect().left - lr.left : -1;
       R.chk.oneInset = !!(bcs && gh && inset > 0 && Math.abs(inset - parseFloat(bcs.paddingLeft)) <= 1
         && Math.abs(inset - parseFloat(getComputedStyle(gh).paddingLeft)) <= 1);
@@ -648,7 +688,18 @@
       tgt.click(); await frames(4);
       var tgt2 = itemOf(tp);
       R.chk.rowStays = !!tgt2 && tgt2.classList.contains('is-active') && Math.abs(tgt2.getBoundingClientRect().top - y0) <= 1;
-      R.info = { boxMax: c && c.style.maxHeight, boxSH: c && c.scrollHeight, boxCH: c && c.clientHeight, items: items().length, gap: gap, gtBottom: gt && gt.getBoundingClientRect().bottom, want: want, listH: l && l.clientHeight, listSH: l && l.scrollHeight };
+      // glhead (2026-11-17): the arrow keys walk a scrolled list up without a row going under the
+      // pinned header (the list's scroll-padding-top is the header's height)
+      var L0 = list(); L0.focus(); key(L0, 'End'); await frames(3);
+      var under = [], walked = 0;
+      for (var u = 0; u < 25; u++) {
+        key(list(), 'ArrowUp'); await frames(1); walked++;
+        var aa = list().querySelector('.pnb-gl-item.is-active'), hh = list().querySelector(':scope > .pnb-gl-head');
+        if (!aa || !hh || aa.getBoundingClientRect().top < hh.getBoundingClientRect().bottom - 0.5) { under.push(u); }
+      }
+      R.chk.underHead = under.length === 0 && walked === 25 && list().scrollTop > 0;
+      var underInfo = { under: under, st: list().scrollTop, sp: list().style.scrollPaddingTop };
+      R.info = { boxMax: c && c.style.maxHeight, boxSH: c && c.scrollHeight, boxCH: c && c.clientHeight, items: items().length, gap: gap, gtBottom: gt && gt.getBoundingClientRect().bottom, want: want, listH: l && l.clientHeight, listSH: l && l.scrollHeight, underHead: underInfo };
     },
     // A click on the third name shows that group; the first one stays open, hidden.
     click: async function () {
@@ -797,6 +848,18 @@
       function rule() { var el = document.getElementById('pnbGroupStackFit'); return el ? el.textContent : ''; }
       function ruleW() { var m = /min-width: (\d+)px/.exec(rule()); return m ? +m[1] : 0; }
       var ws = top();
+      // grpjoin (2026-11-17): Stacked reads as one connected table - no gap between groups, each after the first
+      // overlapping the one above by its 1px rule, square corners but the first group's top two and the last's bottom two
+      var vis = ws.filter(function (w) { return !w.classList.contains('search-hidden'); });
+      var jcs = vis.map(function (w) { return getComputedStyle(w); }), jr = vis.map(function (w) { return w.getBoundingClientRect(); });
+      var joined = vis.length >= 3 && jcs.every(function (s) { return parseFloat(s.marginBottom) === 0; });
+      for (var ji = 1; ji < jr.length; ji++) { if (Math.abs(jr[ji].top - (jr[ji - 1].bottom - 1)) > 0.5) { joined = false; } }
+      var jl = jcs.length - 1, rad = function (s, k) { return parseFloat(s[k]); };
+      R.chk.stackJoin = joined && rad(jcs[0], 'borderTopLeftRadius') > 0 && rad(jcs[0], 'borderTopRightRadius') > 0 && rad(jcs[0], 'borderBottomLeftRadius') === 0
+        && rad(jcs[jl], 'borderBottomLeftRadius') > 0 && rad(jcs[jl], 'borderBottomRightRadius') > 0 && rad(jcs[jl], 'borderTopLeftRadius') === 0
+        && jcs.slice(1, jl).every(function (s) { return rad(s, 'borderTopLeftRadius') === 0 && rad(s, 'borderBottomRightRadius') === 0; });
+      R.info.join = { n: vis.length, mb: jcs.map(function (s) { return s.marginBottom; }).slice(0, 4), tops: jr.map(function (r) { return Math.round(r.top); }).slice(0, 4),
+                      bots: jr.map(function (r) { return Math.round(r.bottom); }).slice(0, 4), r0: jcs[0] && jcs[0].borderRadius, rl: jcs[jl] && jcs[jl].borderRadius };
       $(ws[0].querySelector(':scope > .group-header')).trigger('click'); await sleep(200); await frames(3);
       var c = content(ws[0]), t = c.querySelector(':scope > table');
       var w0 = ruleW(), el = document.getElementById('pnbGroupStackFit');

@@ -1401,7 +1401,10 @@
       var ra = subActs(), rl = subLabels(), clearIt = item('clearPrefs');
       R.chk.resetList = ra.indexOf('back') < 0 && ['fit', 'fitAll', 'fitPage', 'resetWidth', 'resetWidths'].every(function (x) { return ra.indexOf(x) >= 0; })
         && rl.indexOf('Fit this column width to contents') >= 0 && rl.indexOf('Fit all column widths to contents') >= 0 && rl.indexOf('Fit all column widths to page') >= 0 && rl.indexOf("Reset this column's width") >= 0 && rl.indexOf('Reset all column widths') >= 0
-        && !!clearIt && clearIt.querySelector('.pnb-hm-label').textContent === 'Clear all customizations...' && !clearIt.querySelector('.pnb-hm-arrow');
+        && !!clearIt && clearIt.querySelector('.pnb-hm-label').textContent === 'Clear all customizations...' && !clearIt.querySelector('.pnb-hm-arrow')
+        // (2026-11-17) ...and no Reset list beside it: since ab526da (2026-11-02, clearLast) the menu adds the clear item at its foot
+        // whenever buildItems left none there, so the item alone no longer shows the list is gone (mutant c-flyout stayed green here)
+        && !item('resets');
       R.info.lists = { move: ma, show: sa, calc: ca, copy: pa, reset: ra };
       // Clear all custom preferences: the Settings panel's button, clicked - its confirm
       // lists what is saved (the format set above), and a No leaves it all in place
@@ -3794,6 +3797,9 @@
       R.chk.roRuns = !!fb && v4.length > 0 && v4.every(function (tr) { var n = low(fx(tr).V_NAME); return n === low(va) || n === low(vb); }) && /V_NAME = \/\^\(\?:/.test(searchVal());
       // a Mac's Ctrl+click is its right-click: the selection stays for the menu (Cmd adds a cell there); elsewhere Ctrl adds
       function ctrlPress(td) { td.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, ctrlKey: true })); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 })); }
+      // (2026-11-17) the box cleared first: the readout's filter above is still on, and a build that filters to ONE of the two
+      // names (mutant sl-onevalue) hid row nj, so dd was null and the scenario died here (F-msel) with its checks unread
+      await boxTo('');
       a = cellIn(trOf(ni), 'V_NAME'); c = cellIn(trOf(ni), 'V_STATUS'); var dd = cellIn(trOf(nj), 'V_NAME');
       pick([a, c]);
       Object.defineProperty(navigator, 'platform', { configurable: true, get: function () { return 'MacIntel'; } });

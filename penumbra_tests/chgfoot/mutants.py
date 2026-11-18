@@ -88,8 +88,9 @@ M = {
         ['C1', 'C2', 'C3']),
     # no ceiling row
     'nomore': ('js',
-        """var more = _auditChangesFetched >= _auditChangesLimit""",
-        """var more = false""",
+        # 2026-11-17: re-anchored, vhdeep (2026-11-14) capped the comparison at the server ceiling
+        """var more = _auditChangesFetched >= Math.min(_auditChangesLimit, 3000) """,
+        """var more = false """,
         ['L1', 'L2']),
     # the arrow handler takes every key in the list again
     'arrowsall': ('js',

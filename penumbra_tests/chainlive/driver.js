@@ -5,6 +5,8 @@
 // editor still must.
 //   B0 boot, the chart live   K1 chain() closing render   T1 action(trigger) catch-all render
 //   G1 group_by trigger + data(group) (the grouping's own re-render)   E1 an editor keystroke still pauses
+// (2026-11-17, follows adb6299 snipgate) the pause goes by estimated cost, not rows: the fixture is 1,500 rows x
+// 120 columns with a format() rule (over the 1,000 ms budget); E0 = the vis() alone on those rows stays live.
 (function () {
   var R = [];
   function rec(name, pass, detail) {
@@ -25,7 +27,9 @@
   function link(label) { return $(OUT + ' a.snippet-action').filter(function () { return $.trim($(this).text()) === label; }).get(0) || null; }
   function pausedImg() { return document.querySelectorAll(OUT + ' img[title^="Live updates paused"]').length; }
   function pausedBox() { return $(OUT).text().indexOf('(Chart Paused)') >= 0 ? 1 : 0; }
-  function notice() { return $(OUT).parent().text().indexOf('Large Dataset Detected') >= 0 ? 1 : 0; }
+  // (2026-11-17, follows adb6299) the notice reads "Large report (N rows x M columns): ..." since the cost gate and
+  // sits on the snippet editor's wrapper (offstage here), with the Apply button
+  function notice() { return document.querySelectorAll('.snippet-manual-apply-container').length ? 1 : 0; }
   function live() { return document.querySelectorAll(OUT + ' canvas').length; }
   function paused() { return pausedImg() + pausedBox() + notice() > 0; }
   function state() {
@@ -76,19 +80,34 @@
     await liveAgain();
     rec('G1 group_by trigger + data(group): grouped, data(group) re-rendered, the chart live', had && $('#groupedResultsContainer').is(':visible') && $.trim($('#grp').text()) === 'true' && live() > 0 && !paused(), state());
 
-    // E1 an editor keystroke on a big report STILL pauses (the intended live-edit guard)
+    // (2026-11-17 repair, follows adb6299 of 2026-11-16, snipgate) the live-edit guard goes by estimated cost
+    // (cells of rules + charts against a 1,000 ms budget), not by "> 1000 rows":
+    // E0 the same 1,500 rows with ONLY the vis() (the format() line typed away): ~65 ms, the chart stays live
+    // E1 with the format() rule over 1,500 x 121 cells (~1,270 ms): the keystroke STILL pauses
     var ed = H.snipEd ? H.snipEd() : null;
     var how;
+    var full = (ed && typeof ed.getValue === 'function') ? ed.getValue() : '';
+    if (ed && typeof ed.setValue === 'function') {
+      var noRule = full.replace(/^format\(.*\n/m, '');
+      ed.setValue(noRule + '\n<span id="typed0">x</span>');
+      for (var j0 = 0; j0 < 160 && !document.getElementById('typed0'); j0++) await sleep(50);   // the editor's 1s debounce, then the render
+      await liveAgain();
+      await sleep(300);
+      rec('E0 an editor keystroke with only a vis() on the big report keeps the chart live (cost under the budget)',
+        noRule !== full && noRule.indexOf('format(') < 0 && !!document.getElementById('typed0') && live() > 0 && !paused(), state());
+    } else {
+      rec('E0 an editor keystroke with only a vis() on the big report keeps the chart live (cost under the budget)', false, 'no snippet editor');
+    }
     if (ed && typeof ed.setValue === 'function') {
       how = 'editor';
-      ed.setValue(ed.getValue() + '\n<span id="typed">x</span>');
-      for (var j = 0; j < 80 && !paused(); j++) await sleep(50);   // the editor's 1s debounce
+      ed.setValue(full + '\n<span id="typed">x</span>');
+      for (var j = 0; j < 160 && !paused(); j++) await sleep(50);   // the editor's 1s debounce + the rule pass
     } else {
       how = 'direct';
       await H.render(null, true);
     }
     await sleep(300);
-    rec('E1 an editor keystroke on a big report still pauses the chart (' + how + ')', paused(), state());
+    rec('E1 an editor keystroke on a big report over the live budget still pauses the chart (' + how + ')', paused(), state());
     rec('V0 no page errors', errs().length === 0, errs().slice(0, 4).join(' | '));
     finish();
   }

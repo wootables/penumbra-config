@@ -72,9 +72,14 @@ function Invoke-BraceSuite([string]$appDir, [switch]$Quiet) {
     # the old one open, so it is never reused or deleted mid-run.
     $dom = Join-Path $work ('dom_' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.txt')
     $url = 'file:///' + $work.Replace([char]92, [char]47) + '/harness.html'
+    # A profile dir of its OWN per launch (2026-11-17): with one shared 'edgeprofile' a lingering child of the
+    # previous launch still held the profile lock on a loaded box ("Lock file can not be created ... Aborting now"),
+    # Edge quit without a dump and a mutant read as FAIL: 999. Older ones are removed best-effort to save disk.
+    Get-ChildItem $work -Directory -Filter 'edgeprofile_*' -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item $_.FullName -Recurse -Force -ErrorAction Stop } catch { } }
+    $ud = Join-Path $work ('edgeprofile_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
     $proc = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -ArgumentList `
         '--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files',
-        "--user-data-dir=$(Join-Path $work 'edgeprofile')", '--virtual-time-budget=20000', '--dump-dom', $url
+        "--user-data-dir=$ud", '--virtual-time-budget=20000', '--dump-dom', $url
     # Wait for the marker IN THE DUMP, not for process exit (a lingering Edge child can hold stdout open).
     $sw = [Diagnostics.Stopwatch]::StartNew(); $txt = $null
     while ($sw.Elapsed.TotalSeconds -lt 150) {
@@ -150,7 +155,8 @@ return preg_replace_callback('#("[^"]*"|\'[^\']*\')|\{\s*([A-Za-z_][A-Za-z0-9_]*
         @{ Name = 'browser parser keeps the spaces (old brace strip)'; File = 'js\main.js'; Expect = 12;
            From = "const colNameRaw = firstToken.replace($NEWJS, '').toUpperCase();"; To = "const colNameRaw = firstToken.replace($OLDJS, '').toUpperCase();" },
         @{ Name = 'browser getCellValue keeps the spaces (hand-built condition + value-side reference)'; File = 'js\main.js'; Expect = 4;
-           From = "const cleanColName = String(colName).replace($NEWJS, '').toUpperCase();"; To = "const cleanColName = String(colName).replace($OLDJS, '').toUpperCase();" },
+           # re-anchored 2026-11-17: 3a9ac0b (bigperf, 2026-10-19) moved getCellValue's brace strip into _epqColKey (cached per column name)
+           From = "k = String(colName).replace($NEWJS, '').toUpperCase();"; To = "k = String(colName).replace($OLDJS, '').toUpperCase();" },
         @{ Name = 'browser canonicalizer is a no-op'; File = 'js\main.js'; Expect = 6;
            From = $CANON_JS; To = "return String(text == null ? '' : text);" },
         @{ Name = 'B parser keeps the spaces'; File = 'penumbra_search.php'; Expect = 12;

@@ -494,11 +494,22 @@ t_ok($p2c !== false && $p2d !== false && $pRecent !== false && $p2c < $pRecent &
 $kStart = strpos($srcIndex, '$kpi_sql = "');
 $kEnd = ($kStart === false) ? false : strpos($srcIndex, '";', $kStart);
 $kpi = ($kEnd === false) ? '' : substr($srcIndex, $kStart, $kEnd - $kStart);
-t_eq(substr_count($kpi, 'FROM PENUMBRA_AUDIT'), 5, 'index.php: pulse KPI block has 5 audit subqueries');
-t_eq(substr_count($kpi, '$pnlToolExcl'), 5, 'index.php: every audit subquery in the pulse excludes the tool placeholders');
+// (2026-11-17, metricsweep2/3: 48506de, 5014062, b2de079) The pulse counts report VIEWS now: four audit subqueries,
+// each carrying $pnlViewExcl, which leaves out every system placeholder ($pnlSysIdSql = __HOME__ + the tool
+// placeholders) where $pnlToolExcl left out the tool placeholders only. ACTIVE_REPORTS reads PENUMBRA_REPORTS.
+t_eq(substr_count($kpi, 'FROM PENUMBRA_AUDIT'), 4, 'index.php: pulse KPI block has 4 audit subqueries');
+t_eq(substr_count($kpi, '$pnlViewExcl'), 4, 'index.php: every audit subquery in the pulse excludes the tool placeholders');
+t_ok(preg_match('/\$pnlViewExcl = "AND \(REPORT_ID IS NULL OR REPORT_ID NOT IN \(SELECT ID FROM PENUMBRA_REPORTS WHERE TRIM\(SHORT_ID\) IN \(\$pnlSysIdSql,/', $srcIndex) === 1,
+     'index.php: the pulse view exclusion is built from the system placeholder list');
+t_ok(strpos($kpi, 'NOT IN ($pnlSysIdSql)) AS ACTIVE_REPORTS') !== false, 'index.php: ACTIVE_REPORTS skips placeholders');
 t_ok(strpos($kpi, 'NOT IN ($pnlSysIdSql)) AS NEW_REPORTS_7D') !== false, 'index.php: NEW_REPORTS_7D skips placeholders');
-t_ok(preg_match('/\$hr_sql = "[^"]*ACTION = \'OPEN\' AND TIMESTAMP > SYSDATE - 30 \$pnlToolExcl/', $srcIndex) === 1, 'index.php: busiest-hours pulse excludes tool views');
-t_ok(preg_match('/\$day_sql = "[^"]*ACTION = \'OPEN\' AND TIMESTAMP > SYSDATE - 30 \$pnlToolExcl/', $srcIndex) === 1, 'index.php: views-per-day pulse excludes tool views');
+// (2026-11-17, metricsweep7: 6d552f5) The two shapes are of the VIEWS the band counts: they carry $pnlBandExcl, which
+// is the KPI block's own $pnlViewExcl (every system placeholder, so every tool placeholder; pinned above) plus
+// $pnlNoDash, and falls back to $pnlToolExcl. They carried $pnlToolExcl itself before.
+t_ok(strpos($srcIndex, '$pnlBandExcl = (isset($pnlViewExcl) && isset($pnlNoDash)) ? ($pnlViewExcl . \' \' . $pnlNoDash) : $pnlToolExcl;') !== false,
+     'index.php: the pulse shapes\' exclusion is the view exclusion (tool placeholders included), else the tool exclusion');
+t_ok(preg_match('/\$hr_sql = "[^"]*ACTION = \'OPEN\' AND TIMESTAMP > SYSDATE - 30 \$pnlBandExcl/', $srcIndex) === 1, 'index.php: busiest-hours pulse excludes tool views');
+t_ok(preg_match('/\$day_sql = "[^"]*ACTION = \'OPEN\' AND TIMESTAMP > SYSDATE - 30 \$pnlBandExcl/', $srcIndex) === 1, 'index.php: views-per-day pulse excludes tool views');
 t_ok(preg_match('/WHERE CREATED_AT > SYSDATE - 7\s+AND TRIM\(SHORT_ID\) NOT IN \(\$pnlSysIdSql\)\s+ORDER BY CREATED_AT DESC/', $srcIndex) === 1, 'index.php: "new in the repository" rail skips placeholders');
 t_ok(strpos($srcAll, "'__HOME__','penumbra_log'") === false, 'analytics_all.php: no hard-coded two-id list left');
 t_ok(strpos($srcAll, "\$sysShortIds   = array_merge(penumbraSystemShortIds(), array('penumbra_log'));") !== false, 'analytics_all.php: system ids from the registry');

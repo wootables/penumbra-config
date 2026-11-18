@@ -35,7 +35,7 @@ PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js']
 EXPECT_S = ['S-lift', 'S-sqlA-15', 'S-sqlB-15', 'S-mine15', 'S-oth15', 'S-order', 'S-excl', 'S-nulls', 'S-fewmine', 'S-nomine']
-EXPECT_J = ['P-loaded', 'P-fixture', 'J-initial', 'P-title-asc', 'J-reset', 'P-rebuild', 'J-rebuild', 'J-loadmore',
+EXPECT_J = ['P-loaded', 'P-fixture', 'J-initial', 'P-title-asc', 'J-sortloads', 'J-reset', 'P-rebuild', 'J-rebuild', 'J-loadmore',
             'J-loadmore-reset', 'J-search', 'J-pill', 'J-cap', 'J-restore', 'W-key', 'W-zero', 'W-reset', 'K-cancel', 'K-escape', 'K-save', 'E-errors']   # K-*: 2026-10-15 (tag editor focus); W-*: 2026-10-15 (keyboard column widths); J-pill / J-cap: 2026-10-21 (the capped-search pill)
 # What the pre-change pair gets wrong (frozen from the first control run against the
 # live files of 2026-10-02 16:30, php c8dcceba / js 4dd461d7). Green there on purpose:
@@ -47,7 +47,8 @@ CONTROL_RED = ['S-sqlA-15', 'S-sqlB-15', 'S-mine15', 'S-oth15', 'S-order', 'S-fe
                # (W-reset was GREEN there until 2026-10-21 - the pair saves no widths, so its reset had nothing to clear and
                #  passed vacuously; driver.js now seeds a width first and W-reset fails when it does not show, as on that pair)
                'J-search',   # 2026-10-21 (searchrank): search results keep the server's relevance order; the 10-02 pair re-sorts them by date
-               'J-cap']      # 2026-10-21: the 10-02 pair says "3 results found" for a capped search
+               'J-cap',      # 2026-10-21: the 10-02 pair says "3 results found" for a capped search
+               'J-sortloads']   # 2026-11-17 (metricsweep3, b2de079): a sort loads the reports still unloaded; the 10-02 pair sorts the loaded page only
 
 MUTANTS = json.load(open(os.path.join(HERE, 'mutants.json'), encoding='utf-8'))
 

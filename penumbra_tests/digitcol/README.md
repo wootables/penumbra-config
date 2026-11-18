@@ -31,7 +31,7 @@ internal one, through the eval export hook (jsongroup's).
 |---|---|---|
 | dlg | the Group icon -> the dialog (no search builder: main.js's own list) | P, G-dlg-open / -list / -by2021, E |
 | dlgsb | the same with search_builder.js, as index.php loads it | P, G-dlgsb-*, E |
-| plainsb | no nested-table column (the dialog opened before the fix): the same columns in the same order, and the one listing change - a numeric column named in digits (2022) gets the bin entries a numeric column gets (V_AMT) | P, G-plainsb-open / -list / -buckets, E |
+| plainsb | no nested-table column (the dialog opened before the fix): the same columns in the same order, and the one listing change - a numeric column named in digits (2022) gets the bin entries a numeric column gets (V_AMT) | P, G-plainsb-open / -list / -plain / -buckets, E |
 | sweep | format() + rewrite() rules on plain columns, the readers one by one (the Copy dialog's distinct values of one column through its real Copy button), the commands (pivot\| up to the builder: no Generate button here) | P, F-cf, F-rw, U-*, K-*, E |
 
 `P-*` proves the premise on every run (data() really hands back the number 2021).
@@ -43,7 +43,7 @@ py -3 run.py --control              # the pre-fix build: EXACTLY the 29 CONTROL_
                                     # LIVE since 306438e (2026-10-25): the control is 306438e^, read from git
 py -3 run.py --stage DIR --mutants  # 21 mutants, each one fix site put back -> exactly its asserts red
 ```
-A clean run is 36 asserts (dlg 5, dlgsb 5, plainsb 5, sweep 21). The sweep's fixture adds 2023, a
+A clean run is 37 asserts (dlg 5, dlgsb 5, plainsb 6, sweep 21). Since the numeric bucket gate (0c5903e, 2026-11-15) bins are offered only for a measure column: G-plainsb-plain pins that the plain 2022 and V_AMT get none, and G-plainsb-buckets that both get the same list once each has a Total summary on (repaired 2026-11-17; mutants `numgate` and `numgatesum` turn one each red; `sbapi` no longer reaches -buckets, the bucket dropdown of 10-26 reads the picker's token as text). The sweep's fixture adds 2023, a
 nested-table column named in digits (U-nestplan: the plan Copy / Download read keeps its name as text).
 
 Run from a LOCAL cwd copy or `cd` into this folder first (Git Bash mangles a `\\server\d$`

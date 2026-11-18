@@ -45,6 +45,11 @@ function cond(row, part) {
 }
 function filt(rows, text) {
   if (!text) { return rows; }
+  // (2026-11-17) "(a or b) and (c or d)": each group in parentheses filters in turn (metricsweep5 sends a tile's own
+  // filter and the dashboard's "or" filter this way)
+  if (/^\(.*\)$/.test(text) && /\)\s+and\s+\(/i.test(text)) {
+    return text.slice(1, -1).split(/\)\s+and\s+\(/i).reduce(function (rs, g) { return filt(rs, g); }, rows);
+  }
   var ors = text.split(/\s+or\s+/i).map(function (s) { return s.split(/\s+and\s+/i); });
   return rows.filter(function (r) { return ors.some(function (ands) { return ands.every(function (p) { return cond(r, p); }); }); });
 }
@@ -298,8 +303,11 @@ until(function () { return ['e1', 'e2', 'e3', 'e4', 'e5'].every(booted) && stat(
     return wait(300);
   }).then(function () {
     var pa = lastCall('repA');
-    ok('an "or" filter goes as ONE fragment with no column', pa && pa.dsearch === DSOR, JSON.stringify(pa));
-    eq('an "or" filter replaces a tile\'s own filter', [stat('d1'), stat('d4')], ['33', '3']);
+    // (2026-11-17, metricsweep5 296b5cc / metricsweep6) a tile's own filter stays, in parentheses beside the typed one;
+    // a tile without one still gets the typed filter as ONE fragment with no column
+    ok('an "or" filter goes as ONE fragment with no column', CALLS.some(function (c) { return c.p.id === 'repA' && c.p.dsearch === DSOR; }), JSON.stringify(pa));
+    ok('an "or" filter goes beside a tile\'s own filter, each in parentheses', pa && pa.dsearch === '{"p":"","f":[["","(STATUS = Open or STATUS = Closed)"],["","(COLLEGE = Eng or COLLEGE = Sci)"]]}' && !pa.search, JSON.stringify(pa));
+    eq('an "or" filter keeps a tile\'s own filter (3 of the 4 Open / Closed rows are Eng or Sci)', [stat('d1'), stat('d4')], ['33', '3']);
     ok('the note warns about "or"', note().indexOf('A filter with "or" goes to every tile as typed') > -1, note());
     ok('a report without the column shows no rows under an "or" filter (as documented)', tile('d2').find('tbody tr').length === 0, tile('d2').find('tbody').text());
 

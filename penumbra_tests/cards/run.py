@@ -593,7 +593,7 @@ MUTANTS = {
     'ck-cap': ([('main', "if (ckNow && (v.m === 'pivot') === !!ckNow.p) {", "if (false) {")], ['L-cklA-carriesRecord', 'L-cvlE-carriesDetails'], ['cklA', 'cvlE']),
     'ck-idlike': ([('main', "            var cand = names.filter(function (n) { return _PNB_VL_IDLIKE.test(n); }).concat(", "            var cand = [].concat(")], ['L-cklA-carriesRecord'], ['cklA']),
     'ck-turn': ([('main', "turned = FH.showRow(rec.tr);   // another page", "turned = false;   // another page")], ['L-cklB-sameRecord', 'L-cklB-pageTurned'], ['cklA', 'cklB']),
-    'ck-wait': ([('cards', "&& cards().length && !raf) linkApply(); }", "&& cards().length) linkApply(); }")], ['L-cklB-sameRecord'], ['cklA', 'cklB']),
+    'ck-wait': ([('cards', "        if (cards().length && !raf) linkApply();", "        if (cards().length) linkApply();")], ['L-cklB-sameRecord'], ['cklA', 'cklB']),
     'ck-miss': ([('main', "        if (!rec.tr) { _pnbViewLinkRecordMiss(rec.why, vlk); return false; }", "        if (!rec.tr) { return false; }")], ['L-cklC-saysGone', 'L-cklD-saysFiltered'], ['cklA', 'cklC', 'cklD']),
     'ck-retry': ([('main', "            if (rec.tr) { _pnbViewLinkOpenRecord({ ck: vlk.ck, cv: vlk.cv, m: vlk.m }); return; }", "            if (rec.tr) { return; }")], ['L-cklD-clearOpens'], ['cklA', 'cklD']),
     'ck-menu': ([('cards', "        if (lnk) prt.push(lnk);\n", "")], ['L-cklA-menuInWindow', 'L-cklA-menuCopies'], ['cklA']),
@@ -679,7 +679,7 @@ MUTANTS = {
     'cr-rows': ([('cards', "    function detRows() { return det.tbl ? (det.rows || []) : rowsDrawn.map(", "    function detRows() { return false ? (det.rows || []) : rowsDrawn.map(")], ['L-ctrow-opens', 'L-ctrow-nextRow'], ['ctrow']),
     'cr-sync': ([('cards', "            if (det.tbl) { if (det.open) detRender(); } else closeDetails(false);", "            closeDetails(false);")], ['L-ctrow-pageTurns', 'L-ctrow-sortFollows'], ['ctrow']),
     'cr-word': ([('cards', "var word = det.list ? ' ' + det.list.word : (det.tbl ? ' rows' : ' cards');", "var word = det.list ? ' ' + det.list.word : ' cards';")], ['L-ctrow-countRows', 'L-gtrow-opensInGroup'], ['ctrow', 'gtrow']),
-    'cr-extras': ([('cards', "        if (t.tbl) return [];   // (crow)", "        if (false) return [];   // (crow)")], ['L-ctrow-menuInside'], ['ctrow']),
+    'cr-extras': ([('cards', "        if (t.tbl) return prt.length ? (after ? ['-'] : []).concat(prt) : [];   // (crow)", "        if (false) return [];   // (crow)")], ['L-ctrow-menuInside'], ['ctrow']),   # (2026-11-17) re-anchored: c53d600 (menufix3) kept the window's Print item there
     'cr-menu': ([('cards', "if (!CM || !hostApi() || !(on() || (det.open && det.tbl))) return false;", "if (!CM || !hostApi() || !on()) return false;")], ['L-ctrow-menuInside'], ['ctrow']),
     'cr-active': ([('cards', "if (CS && typeof CS.activate === 'function') CS.activate(back); }", "}")], ['L-ctrow-escBack'], ['ctrow']),
     'cr-col': ([('cards', "        if (tr && tr.isConnected && col) for (i = 0; i < tr.cells.length; i++) if (tr.cells[i].getAttribute('data-column') === col) return tr.cells[i];\n", "")], ['L-ctrow-paletteBack'], ['ctrow']),
@@ -690,7 +690,7 @@ MUTANTS = {
     # --- (cnest) a nested table's gaps; Clear all customizations last
     'cn-hit': ([('cards', "|| n.classList.contains('nested-json-container')) && inRect(", ") && inRect(")], ['L-cnest-nestHot', 'L-cnest-nestGapField', 'L-cnest-nestGapDetails'], ['cnest']),
     'cn-last': ([('menu', "        items = clearLast(items);   // (cnest)", "")], ['L-cnest-clearLastCard', 'L-cnest-clearLastLabel', 'L-cnest-clearLastDetails', 'L-ctclear-tableClearLast', 'L-ctclear-headClearLast'], ['cnest', 'ctclear']),
-    'cn-sep': ([('menu', "return tidy.concat(tidy.length ? ['-'] : [], [c]);", "return tidy.concat([c]);")], ['L-cnest-clearLastCard', 'L-ctclear-tableClearLast'], ['cnest', 'ctclear']),
+    'cn-sep': ([('menu', "return c ? tidy.concat(tidy.length ? ['-'] : [], [c]) : tidy;", "return c ? tidy.concat([c]) : tidy;")], ['L-cnest-clearLastCard', 'L-ctclear-tableClearLast'], ['cnest', 'ctclear']),   # (2026-11-17) re-anchored: 5b124ce (menufix) made the Clear item optional
     # --- (cnest sweep) one mutant per fix
     'cs-esc': ([('cards', "    function escMine(t, sel) {", "    function escMine(t, sel) { return true;")], ['L-csweep-escOverPopover'], ['csweep']),
     'cs-dbl': ([('cards', "if (e.target === dlg && !(e.detail > 1) && !(detDown", "if (e.target === dlg && !(detDown")], ['L-csweep-dblKeeps'], ['csweep']),
@@ -793,7 +793,7 @@ MUTANTS = {
     'y-pdfhook': ([('main', "const _pnbCardsPdf = !!(opts && opts.cards &&", "const _pnbCardsPdf = !!(false &&")], ['L-cfixprint-pdfCards'], ['cfixprint']),
     'y-pdfblank': ([('cards', "        try { if (doc.internal.getNumberOfPages() > 1) doc.deletePage(doc.internal.getNumberOfPages()); } catch (e) { }\n", "")], ['L-cfixprint-pdfCards'], ['cfixprint']),
     'y-pdfnote': ([('cards', "        pn.textContent = 'While '", "        pn.textContent = 'x' || 'While '")], ['L-cfixprint-pdfNote'], ['cfixprint']),   # (re-aimed: a new note has no hidden to clear)
-    'y-pdfcall': ([('main', "_pnbGeneratePdf({ cards: true });", "_pnbGeneratePdf();")], ['S-cfix2'], []),   # (2026-11-15) via _pnbGeneratePdf
+    'y-pdfcall': ([('main', "const pdfBase64 = await _pnbGeneratePdf({ cards: true });", "const pdfBase64 = await _pnbGeneratePdf();")], ['S-cfix2'], []),   # (2026-11-15) via _pnbGeneratePdf   # (2026-11-17) re-anchored to Download's own call: b5bde15 (cdash) added the Email dialog's (cd-pdf's), so the bare text was there twice
     # (cfix) packing off / its spans / its css; the keys; the card's one column; a label's heading menu (card, details); the
     # details' card field; an editor's Save; the setup's nopack (cards clean, main.js layoutSet, the link, a pivot's read,
     # layoutClean); All; the lists' dress; the main.js Save hook (static)
@@ -802,10 +802,10 @@ MUTANTS = {
     'x-packcss': ([('cardscss', "#pnbCardsHost.is-packed.is-packed .pnb-cards-grid { grid-auto-rows: 2px; row-gap: 0; align-items: start; }", "#pnbCardsHost.is-packed.is-packed .pnb-cards-grid { }")], ['L-cfix-packFills'], ['cfix']),
     'x-keys': ([('cards', "        else if ((k === 'ArrowDown' || k === 'ArrowUp') && hostEl().classList.contains('is-packed'))", "        else if (false)")], ['L-cfix-keysColumn'], ['cfix']),
     'x-col': ([('cardscss', "    grid-template-columns: minmax(0, 1fr);   /* (cfix) one column", "    /* (cfix) one column")], ['L-cfix-wideStays'], ['cfix']),
-    'x-head': ([('cards', "        var lab = headTarget(t, pt, card, card, false);   // (cfix)\n        if (lab) return lab;\n", "")], ['L-cfix-labelMenu'], ['cfix']),
-    'x-dhead': ([('cards', "            var dlab = headTarget(t, pt, dfocus, dcard, true);   // (cfix)\n            if (dlab) return dlab;\n", "")], ['L-cfix-detLabelMenu'], ['cfix']),
+    'x-head': ([('cards', "        var lab = inNotes ? null : headTarget(t, pt, card, card, false);   // (cfix)\n        if (lab) return lab;\n", "")], ['L-cfix-labelMenu'], ['cfix']),   # (2026-11-17) re-anchored: e1c835f (cfb8) added inNotes
+    'x-dhead': ([('cards', "            var dlab = inNotes ? null : headTarget(t, pt, dfocus, dcard, true);   // (cfix)\n            if (dlab) return dlab;\n", "")], ['L-cfix-detLabelMenu'], ['cfix']),   # (2026-11-17) re-anchored: e1c835f (cfb8) added inNotes
     'x-detfield': ([('cards', "        for (k = 0; k < r.fields.length; k++) onCard[r.fields[k].name] = 1;\n", "")], ['L-cfix-detCardField', 'L-cdet-noHidden'], ['cfix', 'cdet']),
-    'x-authored': ([('cards', "    function authored() { return canEdit() ? editorSetup() : report; }", "    function authored() { return report; }")], ['L-cfix-editorSaves', 'L-cauth-notReports', 'L-cauth-makeDefault'], ['cfix', 'cauth']),
+    'x-authored': ([('cards', "        var o = canEdit() ? editorSetup() : report;\n", "        var o = report;\n")], ['L-cfix-editorSaves', 'L-cauth-notReports', 'L-cauth-makeDefault'], ['cfix', 'cauth']),   # (2026-11-17) re-anchored: 4bb5714 (csched) made authored() a block
     'x-clean': ([('cards', "        if (cfg.nopack === 1 || cfg.nopack === true) o.nopack = 1;", "")], ['L-cfixB-reportNoPack', 'L-cfix-packOff'], ['cfixB', 'cfix']),
     'x-mainset': ([('main', "                if (v && v.nopack) o.nopack = 1;   // (cfix) Pack the cards off\n", "")], ['L-cfix-packOff'], ['cfix']),
     'x-mainlink': ([('main', "        if (c.nopack === 1 || c.nopack === true) o.nopack = 1;   // (cfix)\n", "")], ['L-cfix-packOff'], ['cfix']),
@@ -813,7 +813,7 @@ MUTANTS = {
     'x-lclean': ([('cards', "        if (o.nopack) L.nopack = 1;   // (cfix) so does Pack the cards off (set over a pivot)\n", "")], ['L-pfix-pivotPackOff'], ['pfix']),
     'x-all': ([('cards', "if (!bx[i].checked && !bx[i].parentNode.classList.contains('is-missing')) { bx[i].checked = true; n++; }", "if (false) { n++; }")], ['L-cfix-allNone'], ['cfix']),
     'x-select': ([('cardscss', "    appearance: none; -webkit-appearance: none; -moz-appearance: none;\n    height: 28px;", "    height: 28px;")], ['L-cfix-listsStyled'], ['cfix']),
-    'x-mainhook': ([('main', "            if (overwrite) { try { if (window.Penumbra && window.Penumbra.cards && window.Penumbra.cards.savedToReport)", "            if (overwrite) { try { if (window.Penumbra && window.Penumbra.cards && window.Penumbra.cards.savedToReportX)")], ['S-cfix'], []),
+    'x-mainhook': ([('main', " { try { if (window.Penumbra && window.Penumbra.cards && window.Penumbra.cards.savedToReport) window.Penumbra.cards.savedToReport(stateObject", " { try { if (window.Penumbra && window.Penumbra.cards && window.Penumbra.cards.savedToReportX) window.Penumbra.cards.savedToReport(stateObject")], ['S-cfix'], []),   # (2026-11-17) re-anchored: 8fea5db (savesweep) lengthened the if before it
     # (cprint) no sheet on beforeprint; never removed; no page breaks; the rest of the page printed too; the theme's text on
     # paper; Ctrl+P in the window prints every card; the window's icon prints every card; no name for the PDF; Previous not a
     # ghost; the ghost filled by the themes; no group line; no Download line; the pivot's breakdown on paper
@@ -840,7 +840,7 @@ MUTANTS = {
     'g-words': ([('cards', "pnb-ccfg-reset\">Reset</button>", "pnb-ccfg-reset\">Reset my cards</button>")], ['L-cfmt-buttonWords'], ['cfmt']),   # (re-anchored, cfix: Reset)
     # (cfmt) the values wearing nothing again; the column options' hooks gone; the module's hook renamed
     'f-val': ([('cards', "    function valStyle(td) { return styleOf(td, VAL_PROPS); }", "    function valStyle(td) { return ''; }")], ['L-cfmt-titleRuled', 'L-cfmt-subRuled', 'L-cfmt-bigRuled', 'L-cfmt-fieldRuled', 'L-cfmt-detRuled'], ['cfmt']),
-    'f-hlhook': ([('main', "        try { applyConditionalFormatting(true); } catch (e) { console.warn('highlight:', e); }\r\n        _pnbCardsFormatted();   // (cfmt)\r\n", "        try { applyConditionalFormatting(true); } catch (e) { console.warn('highlight:', e); }\r\n")], ['L-cfmt-liveRule'], ['cfmt']),
+    'f-hlhook': ([('main', "        _pnbBdFormat(null, true);   // (bdhl 2) an open breakdown too\r\n        _pnbCardsFormatted();   // (cfmt)\r\n", "        _pnbBdFormat(null, true);   // (bdhl 2) an open breakdown too\r\n")], ['L-cfmt-liveRule'], ['cfmt']),   # (2026-11-17) re-anchored: 9c0fc35 (bdhl 2) put the breakdown's line between
     'f-opthook': ([('main', "        _pnbCardsFormatted();   // (cfmt) a format / click filter / deep link: the cells written again\r\n", "")], ['L-cfmt-liveFormat'], ['cfmt']),
     'f-api': ([('cards', "        formatted: formatted,   // (cfmt)", "        formattedX: formatted,   // (cfmt)")], ['L-cfmt-liveRule', 'L-cfmt-liveFormat'], ['cfmt']),
     # (round T) Configure cards over a pivot: the button enabled / hidden again, its line gone; the tile menu's / the pivot
@@ -997,7 +997,7 @@ MUTANTS = {
     'm-escfind': ([('cards', "e.target.closest('.pnb-hm, .pnb-hp, #pnbFindBar')) return;", "e.target.closest('.pnb-hm, .pnb-hp')) return;")], ['L-cfind-findEscKeepsDetails'], ['cfind']),
     'm-gsortmo': ([('cards', "                    if (t.tagName === 'TBODY' && !t.closest('#pnbCardsHost')) { clearTimeout(sortTimer); sortTimer = setTimeout(function () { if (on()) draw(); }, 40); return; }\n", "")], ['L-gsort-bandsSorted', 'L-gsort-menuSortFollows'], ['gsort']),
     'm-detgone': ([('cards', "        if (det.tr && !(hostApi() && H.inPivot())) {\n            var di = detRows().indexOf(det.tr);", "        if (false) {\n            var di = detRows().indexOf(det.tr);")], ['L-cdetrow-pageCloses', 'L-cdetrow-sortFollows'], ['cdetrow']),   # (no row kept: by position, as live was)
-    'm-detfollow': ([('cards', "            det.at = di;\n        }\n", "        }\n")], ['L-cdetrow-sortFollows'], ['cdetrow']),
+    'm-detfollow': ([('cards', "            det.at = di; det.ri = rowIdx(det.tr);\n        }\n", "            det.ri = rowIdx(det.tr);\n        }\n")], ['L-cdetrow-sortFollows'], ['cdetrow']),   # (2026-11-17) re-anchored: f02d2be added det.ri on the line
     'm-menuimm': ([('cards', "        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();\n        openMenu(e.target, e);", "        e.preventDefault(); e.stopPropagation();\n        openMenu(e.target, e);")], ['L-ckword-copyCardToast', 'L-cmword-moveToast'], ['ckword', 'cmword']),
     # (round M) the Sort list back to the browser's size; the card's copy failure in the row's words; a pivot cell named
     # without its measure
@@ -1124,7 +1124,7 @@ MUTANTS = {
     # (round I) the note line / its shape after a post / the double-click; the icons' frame; the cap / Show all / the focus
     # opening a cut card / Consistent Row Height read; the table's flyout / its row item / offered; the pager; "this card";
     # the menu-target mark
-    'm-noteline': ([('main', "            if (inline) return inlineItemHtml(n, isReply, author, body, canEdit, canDel);   // (cardnotes 2) a card's\n", "")], ['L-cnote-oneLine'], ['cnote']),
+    'm-noteline': ([('main', "            if (inline) return inlineItemHtml(n, isReply, author, body, canEdit, canDel, priv ? lock : '', flip, aud);   // (cardnotes 2) a card's\n", "")], ['L-cnote-oneLine'], ['cnote']),   # (2026-11-17) re-anchored: 6a52fad (privnote) added lock, flip, aud
     'm-noteshape': ([('main', "$panel.find('.journal-rownote-list').html(renderRowNoteList(rowKey, kind, $panel.hasClass('journal-rownote-inline')));\n                        $panel.find('.journal-rownote-railmeta').html(rowNoteRailMetaHtml(rowKey, kind));\n                        if (window.Penumbra.hydrateMentionPills) window.Penumbra.hydrateMentionPills($panel, jReportId());\n                        scheduleApply();\n                        if (isPivot)", "$panel.find('.journal-rownote-list').html(renderRowNoteList(rowKey, kind));\n                        $panel.find('.journal-rownote-railmeta').html(rowNoteRailMetaHtml(rowKey, kind));\n                        if (window.Penumbra.hydrateMentionPills) window.Penumbra.hydrateMentionPills($panel, jReportId());\n                        scheduleApply();\n                        if (isPivot)")], ['L-cnote-postKeepsShape'], ['cnote']),
     'm-notedbl': ([('main', "            $(eb).trigger('click');\n", "")], ['L-cnote-dblEdit'], ['cnote']),
     'm-noteicons': ([('cardscss', "#pnbCardsHost .journal-rownote-inline .journal-rownote-act button,\n#pnbCardDetails .journal-rownote-inline .journal-rownote-act button {\n    display: inline-flex;", "#pnbCardsHost .journal-rownote-inline .journal-rownote-act button-x,\n#pnbCardDetails .journal-rownote-inline .journal-rownote-act button-x {\n    display: inline-flex;")], ['L-cnote-quietIcons'], ['cnote']),
@@ -1165,9 +1165,9 @@ MUTANTS = {
     'm-jpost': ([('main', "            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');   // (cardnotes) or a card's own notes\n            if (!$card.length) return;\n            postRowNote(", "            var $card = $(this).closest('.journal-pvnote-card');\n            if (!$card.length) return;\n            postRowNote(")], ['L-cnote-post', 'L-cnotedet-postInDetails'], ['cnote', 'cnotedet']),
     'm-jreply': ([('main', "            if ($panel.hasClass('journal-rownote-inline') && !inlineCompose($panel[0])) return;   // (cardnotes) its composer opens first\n", "")], ['L-cnote-reply'], ['cnote']),
     'm-jedit': ([('main', "            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');   // (cardnotes) or a card's own notes\n            var $panel = $card.find(", "            var $card = $(this).closest('.journal-pvnote-card');\n            var $panel = $card.find(")], ['L-cnote-edit'], ['cnote']),
-    'm-jdel': ([('main', "            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');\n            if (!$card.length) return;\n            var kind", "            var $card = $(this).closest('.journal-pvnote-card');\n            if (!$card.length) return;\n            var kind")], ['L-cnote-del'], ['cnote']),
+    'm-jdel': ([('main', "            // view (cardnotes).\n            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');\n            if (!$card.length) return;\n            var kind", "            // view (cardnotes).\n            var $card = $(this).closest('.journal-pvnote-card');\n            if (!$card.length) return;\n            var kind")], ['L-cnote-del'], ['cnote']),   # (2026-11-17) re-anchored with the delete handler's comment line: 6a52fad (privnote) added a Make private handler with the same three lines
     'm-notetop': ([('cardscss', "    align-content: start;   /* (cardnotes) a card stretched", "    align-content: normal;   /* (cardnotes) a card stretched")], ['L-cnote-topAligned'], ['cnote']),
-    'm-jfold': ([('main', "                if ($panel.hasClass('journal-rownote-inline')) inlineClose($panel[0], 'add', true);   // (cardnotes) posted: the card's composer folds away\n", "")], ['L-cnote-post'], ['cnote']),
+    'm-jfold': ([('main', "                if (_pgSame && $panel.hasClass('journal-rownote-inline')) inlineClose($panel[0], 'add', true);   // (cardnotes) posted: the card's composer folds away; (typedwhile) not over newer text\n", "")], ['L-cnote-post'], ['cnote']),   # (2026-11-18) re-anchored: the fold waits for an untouched box
     # a card drawn from every row of the table (the rows the search hid, the other pages)
     'm-unfiltered': ([('cards', "            var rows = flatRows(false);\n            try { H.fillRows(rows); } catch (e) { }", "            var rows = Array.prototype.slice.call(document.querySelectorAll('#resultsTable > tbody > tr'));\n            try { H.fillRows(rows); } catch (e) { }")],
                      ['L-cauto-filtered', 'L-cauto-count'], ['cauto']),
@@ -1463,12 +1463,14 @@ def static_checks(t):
                 'pivot tiles sort: the module, the Quick actions row, the help, README; showAs on its own line'))
     tipm = re.search(r'<div data-tip="us-tip-cards">.*?</div>', t['tip'], re.S)
     out.append(('S-cfix', 'cfix (2026-10-31' in t['readme'] and 'function packCards(' in cards and '#pnbCardsHost.is-packed' in css and 'savedToReport: savedToReport' in cards
-                and 'window.Penumbra.cards.savedToReport(' in main and 'if (v && v.nopack) o.nopack = 1;' in main and 'if (c.nopack === 1 || c.nopack === true) o.nopack = 1;' in main
+                and 'window.Penumbra.cards.savedToReport) window.Penumbra.cards.savedToReport(' in main   # (2026-11-17) the guard AND the call: the call's text alone let x-mainhook (a dead guard) through
+                and 'if (v && v.nopack) o.nopack = 1;' in main and 'if (c.nopack === 1 || c.nopack === true) o.nopack = 1;' in main
                 and 'o.fields = v.fields.slice(0, 16);' in main and 'Pack the cards' in t['ustopic'] and '<strong>All</strong> / <strong>None</strong>' in t['ustopic']
                 and bool(tipm) and '<ul>' in tipm.group(0) and len(tipm.group(0)) < 1100 and 'Pack the cards' in tipm.group(0) and 'Right-click a field\'s name for its column heading\'s menu' in t['ustopic'],
                 'cfix: the module, css, main.js hooks, the help (a short tip), README'))
     out.append(('S-cfix2', 'cfix2 (2026-10-31' in t['readme'] and 'function pdfPages(doc)' in cards and 'function boardFit(el)' in cards and 'var(--pnb-board-h,' in css
-                and '_pnbGeneratePdf({ cards: true })' in main and 'function generatePdfContent(opts) {' in main and 'pnb-ccfg-checks' in cards and '.pnb-cards-pdfnote' in css
+                and 'const pdfBase64 = await _pnbGeneratePdf({ cards: true });' in main   # (2026-11-17) Download's own call: the bare text is also the Email dialog's (S-cdash), which let y-pdfcall through
+                and 'function generatePdfContent(opts) {' in main and 'pnb-ccfg-checks' in cards and '.pnb-cards-pdfnote' in css
                 and '<strong>Download &gt; PDF</strong> makes the same as a file' in t['ustopic'] and 'Download as PDF too' in t['tip'],
                 'cfix2: the module (PDF pages, the board fit, the switches row), css, main.js hooks, the help, README'))
     out.append(('S-bdlay', 'bdlay (2026-10-31' in t['readme'] and 'function showBoard()' in cards and 'BOARD_NO_TABLE' in cards and 'function boardLayout()' in cards
@@ -1607,7 +1609,7 @@ MUTANTS.update({
     'mf-gap': ([('cards', "        if (!t) { gapMenu(e); return; }", "        if (!t) return;")], ['L-cgapm-gapMenu', 'L-cgapm-gapSizes', 'L-cgapm-gapTable'], ['cgapm']),
     'mf-gapitems': ([('cards', "        CM.openItems('Cards', menuExtras({ kind: 'gap', card: null, pivot: false }, false), e.clientX, e.clientY, { kbd: kbd });", "        CM.openItems('Cards', [], e.clientX, e.clientY, { kbd: kbd });")], ['L-cgapm-gapMenu', 'L-cgapm-gapSizes'], ['cgapm']),
     'mf-boardword': ([('cards', "        if (bd) out.push({ act: 'cardsStacked', label: 'Show as table',", "        if (bd) out.push({ act: 'cardsStacked', label: 'Switch to Stacked view',")], ['L-gboard-cardTableWord'], ['gboard']),
-    'mf-laneclear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-gboard-laneClear', 'L-cgapm-gapMenu'], ['gboard', 'cgapm']),
+    'mf-laneclear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp && !cur.noClear) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-gboard-laneClear', 'L-cgapm-gapMenu'], ['gboard', 'cgapm']),   # (2026-11-17) re-anchored: 10970ef (menufix4) added noClear
 })
 
 # (2026-11-03, pvgt; found on ?id=cprojects, a pivot of eight labelled measures and no column field) the Grand Total tile

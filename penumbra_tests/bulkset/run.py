@@ -78,7 +78,8 @@ MUTANTS = {
                     ['B3']),
     'rpptype':    ([("spec.rowsPerPage.mode === 'set' && String(s.rowsPerPage) !== String(spec.rowsPerPage.value)) {", "spec.rowsPerPage.mode === 'set') {")],
                    ['B5']),
-    'emptyvo':    ([("            if (s.viewOptions || Object.keys(vo).length) { s.viewOptions = vo; }", "            s.viewOptions = vo;")],
+    # (2026-11-17) re-anchored: voarray (31d69c4, 2026-11-14) added the not-an-array test to this line
+    'emptyvo':    ([("            if ((s.viewOptions && !Array.isArray(s.viewOptions)) || Object.keys(vo).length) { s.viewOptions = vo; }", "            s.viewOptions = vo;")],
                    ['B6']),
     'dropscope':  ([("            if (plan.scopeTables) { w.scope_tables = plan.scopeTables; }\n", "")],
                    ['B7']),

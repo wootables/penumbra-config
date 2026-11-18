@@ -1091,7 +1091,7 @@
                     {
                         "name":  "viz 3 levels: the unplottable level is called out, not dropped silently",
                         "pass":  true,
-                        "detail":  "This grouping has 3 levels, but a chart has room for an X axis and one series. Level 1 became the X axis and level 2 the series; the deeper level is not plotted."
+                        "detail":  "Level 1 is the X axis and level 2 the series; level 3 is not charted."
                     },
                     {
                         "name":  "viz: a bucket token passes through to the series",
@@ -1126,7 +1126,7 @@
                     {
                         "name":  "viz: and says so",
                         "pass":  true,
-                        "detail":  "The chart builder cannot do Mode, so the chart counts rows instead."
+                        "detail":  "A chart cannot show Mode, so it counts rows."
                     },
                     {
                         "name":  "depth: start-depth API is present (__GM5)",
@@ -1585,18 +1585,18 @@
                     },
                     {
                         "name":  "preview/nested: a summary filter on a nested aggregate does not throw",
-                        "pass":  true,
-                        "detail":  ""
+                        "pass":  false,
+                        "detail":  "sharedVals[nGk].push is not a function"
                     },
                     {
                         "name":  "preview/nested: the two nested groups at or over 300 match",
-                        "pass":  true,
-                        "detail":  "got 2 want 2"
+                        "pass":  false,
+                        "detail":  "got undefined want 2"
                     },
                     {
                         "name":  "preview/nested: one parent row in each",
-                        "pass":  true,
-                        "detail":  "got 2 want 2"
+                        "pass":  false,
+                        "detail":  "got undefined want 2"
                     },
                     {
                         "name":  "preview: nothing was written onto Object.prototype",

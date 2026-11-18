@@ -45,6 +45,10 @@
  "export-sql": [
   "X-export-sql"
  ],
+ "flaprace": [
+  "A-add-flip-priv",
+  "A-add-flip-pub"
+ ],
  "inherit": [
   "A-add-inherit"
  ],
@@ -62,6 +66,9 @@
  ],
  "parked": [
   "R-parked"
+ ],
+ "replygone": [
+  "A-add-gone"
  ],
  "rownotes": [
   "R-row-notes"
@@ -120,5 +127,8 @@
  ],
  "version-flag": [
   "R-version-flip"
+ ],
+ "wipepriv": [
+  "W-wipe-priv"
  ]
 }

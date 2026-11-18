@@ -17,7 +17,7 @@
 #
 # -n (skip php.ini) because from a workstation the ini cannot load oci8/sqlsrv.
 #
-# EXPECTED TAIL: "PASS 44   FAIL 0". Any other tail is a failure, a smaller
+# EXPECTED TAIL: "PASS 47   FAIL 0" (44 until 2026-11-17, see test_sqlfn.php). Any other tail is a failure, a smaller
 # pass count included.
 # =============================================================================
 param([switch]$Control)

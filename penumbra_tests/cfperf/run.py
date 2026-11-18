@@ -52,7 +52,8 @@ MUTANTS = {
     'fp-nogate': ([('main', "            if (!applyOnly && !activeRules.some(function (r) { return r.type === 'row' || r.type === 'cell'; })) {\n", "            if (false) {\n")],
                   ['L-cfhl-hlOneRead'], ['cfhl']),
     # ...or the old styles stay on
-    'fp-noreset': ([('main', "                for (let _rsi = 0; _rsi < $rows.length; _rsi++) _pnbCfResetRow($rows[_rsi]);\n", "")], ['L-cfhl-hlStaleOff'], ['cfhl']),
+    # (2026-11-17) re-anchored: bdhl put "if (!bdTable)" in front of the loop
+    'fp-noreset': ([('main', "                if (!bdTable) for (let _rsi = 0; _rsi < $rows.length; _rsi++) _pnbCfResetRow($rows[_rsi]);\n", "")], ['L-cfhl-hlStaleOff'], ['cfhl']),
     # --- the pivot's second build
     'pv-searchregen': ([('main', "                await renderReportSnippet(dataToProcess, false, { noPivotRegen: true });\n", "                await renderReportSnippet(dataToProcess);\n")],
                        ['L-pcf-pvSearchOneBuild', 'L-pcf-pvClearOneBuild'], ['pcf']),
@@ -69,9 +70,10 @@ MUTANTS = {
     'pv-sigalways': ([('main', SIG_LINE, "                || opts.pivotRulesSig));\n")], ['L-pcf-pvSigMismatch'], ['pcf']),
     'pv-signever': ([('main', SIG_LINE, "                || false));\n")], ['L-pcf-pvSigMatch', 'L-pcf-pvOneBuild', 'L-pcf-pvGenOneBuild'], ['pcf']),
     # the rules read first not as the render reads them: comments kept, the pivot's labels missing
-    'pp-noblock': ([('main', "            snippetText = snippetText.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');\n            snippetText = snippetText.replace(/((?:'",
-                     "            snippetText = snippetText.replace(/((?:'")], ['L-pcf-pvOneBuild'], ['pcf']),
-    'pp-noline': ([('main', "            snippetText = snippetText.replace(/((?:'[^']*'|\"[^\"]*\"|\\/\\/[^\\/\\n]*\\/\\/))|\\/\\/.*$/gm, (match, quoted) => quoted ? quoted : '');\n            if (/\\[\\s*PROMPT/i",
+    # (2026-11-17) pp-noblock / pp-noline re-anchored: the line-comment regex now also keeps `backtick` strings
+    'pp-noblock': ([('main', "            snippetText = snippetText.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');\n            snippetText = snippetText.replace(/((?:`[^`]+`|'[^']*'|\"[^\"]*\"|\\/\\/[^\\/\\n]*\\/\\/))|\\/\\/.*$/gm, (match, quoted) => quoted ? quoted : '');\n            if (/\\[\\s*PROMPT/i",
+                     "            snippetText = snippetText.replace(/((?:`[^`]+`|'[^']*'|\"[^\"]*\"|\\/\\/[^\\/\\n]*\\/\\/))|\\/\\/.*$/gm, (match, quoted) => quoted ? quoted : '');\n            if (/\\[\\s*PROMPT/i")], ['L-pcf-pvOneBuild'], ['pcf']),
+    'pp-noline': ([('main', "            snippetText = snippetText.replace(/((?:`[^`]+`|'[^']*'|\"[^\"]*\"|\\/\\/[^\\/\\n]*\\/\\/))|\\/\\/.*$/gm, (match, quoted) => quoted ? quoted : '');\n            if (/\\[\\s*PROMPT/i",
                     "            if (/\\[\\s*PROMPT/i")], ['L-pcf-pvOneBuild'], ['pcf']),
     'pp-cols': ([('main', "            if (pvSettings) {\n                const _aggToks", "            if (false) {\n                const _aggToks")], ['L-pcf-pvOneBuild'], ['pcf']),
 }

@@ -223,6 +223,18 @@ $streamBr = between($qp, "                if (\$penumbraStreamStarted) {\n", "  
 $jsonBr   = between($qp, "        echo json_encode([\"error\" => \"Failed to encode query results as JSON.\"]);", "    } else {");
 $toBr     = between($qp, "} catch (PenumbraQueryTimeoutException \$e) {", "} catch (PenumbraResultTooLargeException \$e) {");
 $bigBr    = between($qp, "} catch (PenumbraResultTooLargeException \$e) {", "} catch (PDOException \$e) {");
+// (2026-11-17) The two "must NOT" checks read the CODE of each catch, not its comments: metricsweep2 (5014062)
+// gated the timeout catch's own QUERY_TIMEOUT row on the scheduler and its comment names penumbraAuditQueryFail()
+// ("Same rule as penumbraAuditQueryFail()"), which the plain text search took for a call.
+$codeOnly = function ($php) {
+    if ($php === null) return null;
+    $o = '';
+    foreach (token_get_all('<?php ' . $php) as $tk) {
+        if (is_array($tk)) { if ($tk[0] === T_COMMENT || $tk[0] === T_DOC_COMMENT) continue; $o .= $tk[1]; } else { $o .= $tk; }
+    }
+    return $o;
+};
+$toBr = $codeOnly($toBr); $bigBr = $codeOnly($bigBr);
 $q5 = array();
 if ($streamBr === null || strpos($streamBr, 'penumbraAuditQueryFail(') === false || strpos($streamBr, 'penumbraQueryFailMessage($streamEx') === false) $q5[] = 'the mid-stream failure writes no row';
 if ($jsonBr === null || strpos($jsonBr, 'penumbraAuditQueryFail(') === false) $q5[] = 'the JSON encode failure writes no row';
@@ -234,14 +246,16 @@ T('Q5', 'the mid-stream failure and the JSON encode failure write it too; the ti
 if ($have) {
     try { $c1 = penumbra_an_counter_sql('query_fails', array('timeFilter' => 'AND T', 'priorFilter' => 'AND P')); }
     catch (Throwable $t) { $c1 = 'threw: ' . $t->getMessage(); }
-    $maps = (substr_count($sh, "'QFAIL_COUNT'      => 'query_fails',") === 1) && (substr_count($all, "'QFAIL_COUNT'      => 'query_fails',") === 1);
-    T('C1', 'the counter "query_fails" = COUNT of QUERY_FAIL in the window; both pages ask for it', $c1 === "COUNT(CASE WHEN ACTION='QUERY_FAIL' AND T THEN 1 END)" && $maps, "sql=$c1 maps=" . var_export($maps, true));
+    // (2026-11-17) The report page asks for it TWICE since metricsweep (48506de): once whole-report and once more
+    // in the re-count of the Errors card under the day / hour / user / department / IP filters. Platform Metrics: once.
+    $maps = (substr_count($sh, "'QFAIL_COUNT'      => 'query_fails',") === 2) && (substr_count($all, "'QFAIL_COUNT'      => 'query_fails',") === 1);
+    T('C1', 'the counter "query_fails" = COUNT of QUERY_FAIL in the window; both pages ask for it (the report page again for its filtered Errors card)', $c1 === "COUNT(CASE WHEN ACTION='QUERY_FAIL' AND T THEN 1 END)" && $maps, "sql=$c1 maps=" . var_export($maps, true));
 } else { T('C1', 'the counter', false, $whyMissing); }
 
 $card = between($sh, "    \$errTotal = (int)\$sys['ERR_TOTAL_COUNT'];", "    \$errorsSub = empty(\$errBits) ? ('none in ' . \$rangeLabelShort) : implode(' · ', \$errBits);", true);
 if ($card !== null) {
     $runCard = function ($sys) use ($card) { try { $rangeLabelShort = '30D'; eval($card . "\n"); return $errorsSub; } catch (Throwable $t) { return 'threw: ' . $t->getMessage(); } };
-    $z = array('BADPASS_COUNT' => 0, 'BADPASS_IP_COUNT' => 0, 'DENIED_COUNT' => 0, 'EMAILFAIL_COUNT' => 0, 'SCHED_FAIL_COUNT' => 0, 'TIMEOUT_COUNT' => 0, 'CLIENT_ERR_COUNT' => 0, 'QFAIL_COUNT' => 0);
+    $z = array('BADPASS_COUNT' => 0, 'BADPASS_IP_COUNT' => 0, 'DENIED_COUNT' => 0, 'EMAILFAIL_COUNT' => 0, 'SCHED_FAIL_COUNT' => 0, 'TIMEOUT_COUNT' => 0, 'CLIENT_ERR_COUNT' => 0, 'QFAIL_COUNT' => 0, 'TOOBIG_COUNT' => 0);   // TOOBIG_COUNT: a named bucket since 2026-11-17 (5014062)
     $a = $runCard(array('ERR_TOTAL_COUNT' => 4, 'QFAIL_COUNT' => 4) + $z);
     $b = $runCard(array('ERR_TOTAL_COUNT' => 7, 'QFAIL_COUNT' => 4, 'TIMEOUT_COUNT' => 2, 'DENIED_COUNT' => 1) + $z);
     T('C2', 'the report page\'s Errors card, RUN: "4 query-fail"; with a timeout + a denial "1 denied · 2 timeout · 4 query-fail" (reconciles, no "other")', $a === '4 query-fail' && $b === '1 denied · 2 timeout · 4 query-fail', "[$a] [$b]");
@@ -250,7 +264,7 @@ if ($card !== null) {
 $brk = between($all, "\$badpass   = (int)\$k['BADPASS_COUNT'];", "\$errSub = empty(\$errBits) ? 'no failures in ' . \$rangeLabelShort : implode(' · ', \$errBits);", true);
 if ($brk !== null) {
     $runBrk = function ($k) use ($brk) { try { $rangeLabelShort = '30D'; eval($brk . "\n"); return $errSub; } catch (Throwable $t) { return 'threw: ' . $t->getMessage(); } };
-    $z = array('BADPASS_COUNT' => 0, 'EMAIL_FAIL_COUNT' => 0, 'DENIED_COUNT' => 0, 'SCHED_FAIL_COUNT' => 0, 'TIMEOUT_COUNT' => 0, 'CLIENT_ERR_COUNT' => 0, 'QFAIL_COUNT' => 0);
+    $z = array('BADPASS_COUNT' => 0, 'EMAIL_FAIL_COUNT' => 0, 'DENIED_COUNT' => 0, 'SCHED_FAIL_COUNT' => 0, 'TIMEOUT_COUNT' => 0, 'CLIENT_ERR_COUNT' => 0, 'QFAIL_COUNT' => 0, 'TOOBIG_COUNT' => 0);   // TOOBIG_COUNT: a named bucket since 2026-11-17 (5014062); the page defaults it to 0
     $a = $runBrk(array('ERR_TOTAL_COUNT' => 1204, 'QFAIL_COUNT' => 1204) + $z);
     $b = $runBrk(array('ERR_TOTAL_COUNT' => 9, 'QFAIL_COUNT' => 4, 'SCHED_FAIL_COUNT' => 5) + $z);
     T('C3', 'Platform Metrics\' Errors breakdown, RUN: "1,204 query-fail"; "5 schedule · 4 query-fail" (reconciles, no "other")', $a === '1,204 query-fail' && $b === '5 schedule · 4 query-fail', "[$a] [$b]");

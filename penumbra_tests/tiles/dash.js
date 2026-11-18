@@ -271,7 +271,19 @@
         var own = String(tile.search || '').trim();
         if (!dash) { return { search: own, dsearch: '', note: '' }; }
         if (dash.or) {
-            return { search: '', dsearch: JSON.stringify({ p: '', f: [['', text]] }), note: '' };
+            // (2026-11-17, metricsweep5) the tile's own filter stays, in parentheses beside the typed one: an "or"
+            // in the dashboard filter used to drop it, so "Active awards" counted every status
+            // (metricsweep6) a row-scope modifier (__ROW / __ALL / __SRC) only counts at the very start of the
+            // search, so it cannot ride inside parentheses: a tile whose own filter has one keeps its own filter and
+            // says so, as the "and" branch below always did; the dashboard's own modifier goes in as the prefix.
+            var mineOr = own ? T.splitSearch(own) : null;
+            if (mineOr && mineOr.prefix) {
+                return { search: own, dsearch: '', note: 'its own filter uses a modifier, so the two cannot be combined' };
+            }
+            if (!own) { return { search: '', dsearch: JSON.stringify({ p: '', f: [['', text]] }), note: '' }; }
+            var pfxOr = dash.prefix || '';
+            var bodyOr = (pfxOr && text.indexOf(pfxOr) === 0) ? text.slice(pfxOr.length).replace(/^\s+/, '') : text;
+            return { search: '', dsearch: JSON.stringify({ p: (bodyOr !== text ? pfxOr : ''), f: [['', '(' + own + ')'], ['', '(' + bodyOr + ')']] }), note: '' };
         }
         var f = [];
         if (own) {
@@ -805,6 +817,11 @@
     // -------------------------------------------------------------------------
     var _xfHinted = false;
     function crossFilterCond(col, value) {
+        // (2026-11-17, metricsweep6) The trailing I added earlier today is taken back out. The Controls chips,
+        // the filter strip and every bookmarked filter read this condition by its exact shape, ending at "/": with
+        // the I they no longer saw a clicked value as one of theirs, so the chip stayed unpressed and a second chip
+        // wrote a filter no row could match. The case mismatch it was meant to fix ("Eng" and "ENG" as two bars,
+        // one click filtering to both) is back, and is the smaller problem.
         return T.strip.colRef(String(col).toUpperCase()) + ' = /^(?:' + T.strip.encode(String(value)) + ')$/';
     }
     function crossFilter(col, value) {
@@ -877,7 +894,9 @@
             onClick: function (evt, els, chart) {
                 if (!chart || !els || !els.length || !tile.groupBy || editMode) { return; }
                 var e0 = els[0], label = chart.data.labels[e0.index];
-                if (label == null || label === '(blank)' || label === '(other)') { return; }
+                // "Other (n)" is the folded remainder past Top N (2026-11-17), not a value to filter on: a click on it
+                // used to write a filter that matched no row, on every tile
+                if (label == null || label === '(blank)' || label === '(other)' || /^Other \(\d+\)$/.test(String(label))) { return; }
                 var ds = chart.data.datasets[e0.datasetIndex];
                 var split = (tile.splitBy && ds && ds.label != null && ds.label !== '(blank)' && ds.label !== '(other)') ? String(ds.label) : null;
                 if (split === null) { crossFilter(tile.groupBy, label); return; }
@@ -1402,7 +1421,10 @@
     }
     function rowsNestedNames(rows) {
         var out = [];
-        for (var i = 0; i < rows.length && i < 10; i++) {
+        // (2026-11-17, nestsample parity) the first ten rows, and on past them (to 5,000) until one holds a nested table,
+        // as the report page reads them since 2026-11-14 (main.js buildVirtualColumnNames, nestsample)
+        for (var i = 0; i < rows.length && i < 5000; i++) {
+            if (i >= 10 && out.length) { break; }
             rowCells(rows[i]).forEach(function (cell) {
                 var t = nestedTable(cell);
                 if (!t) { return; }
@@ -1960,6 +1982,7 @@
                 // The true size when a &limit= trimmed (or the rowset's own length):
                 // lets the tile footer report the real size while holding a slice.
                 entry.totalRows = (typeof res.totalRows === 'number') ? res.totalRows : null;
+                entry.rowLimit = res.rowLimit || null;   // the source report's own row limit capped the read (2026-11-17, rowcap)
                 entry.searchSkipped = res.searchSkipped || null;   // dashboard-filter columns this report lacks
                 entry.columns = res.columns || null;
                 noteColsSeen(tile, res.columns);                    // the report's columns, rows or none (2026-09-30)
@@ -2001,12 +2024,34 @@
 
         entry.promise = $.getJSON('manage_snapshots.php', { action: 'list', report_id: tile.report })
             .then(function (resp) {
+                // (2026-11-17, snapsweep2) a refusal is a 200 with status 'error': it read as "needs 2 snapshots"
+                if (resp && resp.status === 'error' && resp.message) { throw new Error(String(resp.message)); }
                 var list = (resp && resp.status === 'success' && resp.data) ? resp.data.slice() : [];
                 if (list.length < 2) { throw new Error('Trends need at least 2 snapshots of the source report (the Scheduler can create them on a schedule).'); }
                 list.sort(function (a, b) { return String(a.CREATED_AT || '') < String(b.CREATED_AT || '') ? -1 : 1; });
+                // (2026-11-17, snapsweep7) One series, not every snapshot of the report: a trend mixed several
+                // scheduled tasks' snapshots, hand snapshots and filtered ones on one line. Unfiltered ones only
+                // (when there are two), and then the series the NEWEST belongs to: one scheduled task's (its
+                // note names it), the scheduler's unmarked ones, or the hand-saved ones.
+                var _trUnf = list.filter(function (s) { return !String(s.SEARCH_TERM || '').trim(); });
+                if (_trUnf.length >= 2) { list = _trUnf; }
+                var _trKey = function (s) {
+                    var cb = String(s.CREATED_BY || '').toUpperCase(), nt = String(s.NOTES || '');
+                    if (cb.indexOf('SCHEDULER') === 0) { return cb + '|' + (/^Scheduled task #\d+$/.test(nt) ? nt : ''); }
+                    return 'HAND';
+                };
+                var _trSeries = list.length ? _trKey(list[list.length - 1]) : '';
+                var _trSame = list.filter(function (s) { return _trKey(s) === _trSeries; });
+                if (_trSame.length >= 2) { list = _trSame; }
                 list = list.slice(-wanted);   // newest N, oldest-first
 
                 if ((tile.agg || 'count') === 'count') {
+                    // (2026-11-17, snapsweep2) A password-protected report's list carries no row counts (they are
+                    // scrubbed), and each read as 0: a flat line of zeros that looked like data. Say so, as the
+                    // other aggregates do.
+                    if (list.some(function (s) { return String(s.IS_ENCRYPTED) === '1' || s.ROW_COUNT === null || s.ROW_COUNT === undefined; })) {
+                        throw new Error('This report is password-protected, so its snapshots cannot be read here (encrypted reports are not supported).');
+                    }
                     entry.points = list.map(function (s) {
                         return { at: String(s.CREATED_AT || ''), value: parseInt(s.ROW_COUNT, 10) || 0 };
                     });
@@ -2022,6 +2067,11 @@
                             if (!r || r.status !== 'success' || !r.data) { throw new Error((r && r.message) || 'Snapshot load failed.'); }
                             var rows;
                             try { rows = JSON.parse(r.data.SNAP_DATA); } catch (e) { rows = null; }
+                            // (2026-11-17, snapsweep) the stored rows are {signature, rowData} wrappers: every
+                            // point of a sum / average / distinct trend read 0
+                            if (rows && window.PenumbraTiles && typeof window.PenumbraTiles.snapshotRows === 'function') {
+                                rows = window.PenumbraTiles.snapshotRows(rows);
+                            }
                             if (!rows || Object.prototype.toString.call(rows) !== '[object Array]') {
                                 throw new Error('A snapshot payload could not be read (encrypted reports are not supported).');
                             }
@@ -2508,20 +2558,33 @@
     // and wears a "stale HH:MM" badge (the error in its tooltip) instead of
     // swapping a wall-display card for an error box (2026-09-05). A first load,
     // or a render error on rows that did arrive, still shows the error.
+    // (2026-11-17, tile badges) One badge shape on a tile's head for anything that makes its number less
+    // than it looks: capped today, the same element the stale badge uses. An empty text removes it.
+    function tileFlag($tile, key, text, why) {
+        var $b = $tile.find('.dash-flag-' + key);
+        if (!text) { $b.remove(); return; }
+        if (!$b.length) { $b = $('<span class="dash-stale-badge dash-flag-' + key + '"></span>').appendTo($tile.find('.dash-tile-head')); }
+        $b.attr('title', why).html(escapeHtml(text) + '<span class="sr-only">. ' + escapeHtml(why) + '</span>');
+    }
     function tileFailed($tile, msg) {
         if (!$tile.data('hasData')) { renderTileError($tile, msg); return; }
         var d = new Date();
         var hhmm = (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
         $tile.addClass('dash-tile-stale');
-        var $b = $tile.find('.dash-stale-badge');
+        var $b = $tile.find('.dash-stale-badge').not('[class*="dash-flag-"]');   // the stale badge itself, never a flag
         if (!$b.length) { $b = $('<span class="dash-stale-badge"></span>').appendTo($tile.find('.dash-tile-head')); }
-        var why = 'Refresh failed at ' + hhmm + ': ' + msg + '. Showing the last data that loaded.';
+        // (2026-11-17, metricsweep5) the badge gives the age of the DATA: it showed the time of the latest failed
+        // attempt, so 09:00 data read "stale 16:40" on a wall display
+        var ok = $tile.data('okAt'), okhm = hhmm;
+        if (ok && ok.getHours) { okhm = (ok.getHours() < 10 ? '0' : '') + ok.getHours() + ':' + (ok.getMinutes() < 10 ? '0' : '') + ok.getMinutes(); }
+        var why = 'Refresh failed at ' + hhmm + ': ' + msg + '. Showing the data that loaded at ' + okhm + '.';
         // The reason is text for screen readers too, not a tooltip only (WCAG 1.3.1 / 4.1.3).
-        $b.attr('title', why).html('stale ' + hhmm + '<span class="sr-only">. ' + escapeHtml(why) + '</span>');
+        $b.attr('title', why).html('data from ' + okhm + '<span class="sr-only">. ' + escapeHtml(why) + '</span>');
         dashAnnounce(($tile.find('.dash-tile-label').text() || 'A tile') + ': ' + why);
     }
     function tileFresh($tile) {
-        $tile.data('hasData', true).removeClass('dash-tile-stale').find('.dash-stale-badge').remove();
+        // not the flags (capped ...): they share the badge's look, and were removed here the moment they were drawn
+        $tile.data('hasData', true).data('okAt', new Date()).removeClass('dash-tile-stale').find('.dash-stale-badge').not('[class*="dash-flag-"]').remove();
     }
 
     // -------------------------------------------------------------------------
@@ -2810,6 +2873,12 @@
             var $body = $tile.find('.dash-tile-body');
             var $foot = $tile.find('.dash-tile-foot');
             var footBits = [fmtNumber(totalRows, 0) + (totalRows === 1 ? ' row' : ' rows')];
+            // (2026-11-17, rowcap) The server now SAYS when the report's own row limit capped the read (row_limit),
+            // so this is a fact, not the guess from exactly 200 rows it replaced: a badge on the tile head, the same
+            // shape as the stale one, and the footer in words.
+            tileFlag($tile, 'capped', entry.rowLimit ? 'first ' + entry.rowLimit + ' rows' : '',
+                'The source report has its row limit switched on, so this tile reads only its first ' + (entry.rowLimit || 200) + ' rows, not the whole report. Switch the limit off in the report and save it to read everything.');
+            if (entry.rowLimit) { footBits[0] = 'first ' + fmtNumber(entry.rowLimit, 0) + ' rows only'; }
             if (entry.asOf) { footBits.push('as of ' + escapeHtml(String(entry.asOf).substring(0, 16))); }
             $foot.html(footBits.join(' &middot; '));
 
@@ -3842,6 +3911,11 @@
                     var o = list.map(function (c) {
                         return '<option value="' + escapeHtml(c.name) + '"' + (sel === c.name ? ' selected' : '') + '>' + escapeHtml(c.name) + (c.numeric ? ' (#)' : '') + '</option>';
                     }).join('');
+                    // (2026-11-17, metricsweep5) the saved column stays the selection even when this list does not hold
+                    // it (not sniffed numeric, renamed): the select used to show the first option, and Apply saved THAT
+                    if (sel && !list.some(function (c) { return c.name === sel; })) {
+                        o = '<option value="' + escapeHtml(sel) + '" selected>' + escapeHtml(sel) + ' (saved; not in this list)</option>' + o;
+                    }
                     return o || '<option value="">(pick a report first)</option>';
                 }
                 var h = '';
@@ -3873,7 +3947,13 @@
                             'Any summary aggregate, computed per group.') +
                         fieldRow('Split by', '<select id="teSplitBy">' + splitOpts + '</select>',
                             'Optional second grouping: bars stack by it, lines get one series per value (top 8, rest fold into &ldquo;(other)&rdquo;). Not applicable to pie/doughnut/radar/polar.') +
-                        fieldRow('Top N groups', '<input type="number" id="teTopN" min="2" max="50" value="' + (t.topN || 10) + '">');
+                        fieldRow('Top N groups', '<input type="number" id="teTopN" min="2" max="50" value="' + (t.topN || 10) + '">') +
+                        // (2026-11-17, chartsort) the order of the groups: it was always biggest first, whatever the chart
+                        fieldRow('Order', '<select id="teChartSort">'
+                            + '<option value=""' + (!t.sort ? ' selected' : '') + '>Automatic (lines and areas by label, others by value)</option>'
+                            + '<option value="value"' + (t.sort === 'value' ? ' selected' : '') + '>By value, biggest first</option>'
+                            + '<option value="label"' + (t.sort === 'label' ? ' selected' : '') + '>By label (numbers, months, then A to Z)</option>'
+                            + '</select>', 'By label keeps years and months in order. Past Top N, by value folds the rest into &ldquo;Other&rdquo;; by label keeps the last N.');
                 } else if (ty === 'table') {
                     var chosen = t.columns || [];
                     h = fieldRow('Columns', '<div class="dash-col-checks" id="teCols">' + (columns.length ? columns.map(function (c) {
@@ -4288,6 +4368,8 @@
                         next.valueColumn = $('#teValueColumn').val() || '';
                         next.splitBy = $('#teSplitBy').val() || '';
                         next.topN = Math.max(2, Math.min(50, parseInt($('#teTopN').val(), 10) || 10));
+                        var _cs = String($('#teChartSort').val() || '');
+                        if (_cs === 'value' || _cs === 'label') { next.sort = _cs; } else { delete next.sort; }
                         if (!next.groupBy) { alert('Pick a group-by column.'); return; }
                         if (next.valueAgg !== 'count' && !next.valueColumn) { alert('Pick a value column for ' + next.valueAgg + '.'); return; }
                     } else if (ty === 'table') {
@@ -4945,7 +5027,7 @@
         // takes `id` and returns top-level short_id/title/authorized plus the
         // PARSED layout in `state`.
         var ep = _cycleEpoch;
-        $.getJSON('manage_dashboard.php', { action: 'get', id: sid })
+        $.getJSON('manage_dashboard.php', { action: 'get', id: sid, cycle: 1 })   // cycle: a kiosk hop is logged as an open (2026-11-17)
             .done(function (r) {
                 // A response landing after the user left kiosk (or after a
                 // newer hop) must not swap the page under them.

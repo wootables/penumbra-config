@@ -38,7 +38,7 @@
 # =============================================================================
 param([string]$MainJs = '', [string]$MainCss = '', [string]$IndexPhp = '', [string]$CalcJs = '',
       [string]$AdminChrome = '', [string]$HelpTopic = '', [string]$Here = '',
-      [string]$Mutant = '', [switch]$Mutants, [switch]$Keep)
+      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckMutants, [string]$Only = '', [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colscard' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
@@ -110,9 +110,12 @@ function Apply-Mutant([hashtable]$texts, [string]$name) {
   $t = $out[$def.file]
   foreach ($e in $def.edits) {
     if (@($e).Count -ne 2 -or -not ($e[0] -is [string]) -or -not ($e[1] -is [string])) { throw "mutant '$name': an edit is not an (old, new) pair of strings - parenthesize each side built with +" }
-    $n = ([regex]::Matches($t, [regex]::Escape($e[0]))).Count
-    if ($n -ne 1) { throw "mutant '$name' anchor found $n times in $($def.file), expected 1 (needs the NEW build): $($e[0])" }
-    $t = $t.Replace($e[0], $e[1])
+    # (2026-11-17) main.css went LF (e65935d): a CRLF anchor reads as LF where the file under test has no CRLF
+    $old = $e[0]; $new = $e[1]
+    if ($t.IndexOf("`r`n") -lt 0) { $old = $old.Replace("`r`n", "`n"); $new = $new.Replace("`r`n", "`n") }
+    $n = ([regex]::Matches($t, [regex]::Escape($old))).Count
+    if ($n -ne 1) { throw "mutant '$name' anchor found $n times in $($def.file), expected 1 (needs the NEW build): $old" }
+    $t = $t.Replace($old, $new)
   }
   $out[$def.file] = $t
   return $out
@@ -269,10 +272,22 @@ function Show-Results($res, [string]$label) {
   return @($p, $f)
 }
 
+# (2026-11-17) -CheckMutants: every mutant's anchor still applies exactly once (no browser). -Only a,b: just those mutants.
+if ($CheckMutants) {
+  $bad = 0
+  foreach ($name in $mutantDefs.Keys) {
+    try { [void](Apply-Mutant $SRC $name) } catch { $bad++; Write-Host ("  BAD   {0}: {1}" -f $name, $_.Exception.Message) -ForegroundColor Red }
+  }
+  Write-Host ("SUMMARY anchors ok={0} bad={1}" -f ($mutantDefs.Count - $bad), $bad)
+  Write-Host $(if ($bad -eq 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+  return
+}
 if ($Mutants) {
   Write-Host "[mutants] main.js: $MainJs"
   $mOk = 0; $mBad = 0
-  foreach ($name in $mutantDefs.Keys) {
+  $names = @($mutantDefs.Keys)
+  if ($Only) { $names = @($Only.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
+  foreach ($name in $names) {
     $mt = Apply-Mutant $SRC $name
     $run = New-Run $mt
     # Assign first: @(Invoke-Static ...) would nest its result array as ONE element, whose

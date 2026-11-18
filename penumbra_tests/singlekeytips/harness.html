@@ -97,6 +97,10 @@
   window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
   window.PENUMBRA_THEME_ALIASES = {};
   window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  // (2026-11-17 repair) index.php defines the theme resolver inline before main.js, and main.js now
+  // calls it in its ready closure: without it the closure aborted part-way ("penumbraResolveTheme is
+  // not a function", then the driver's "_helpPopoverInited before initialization"). Same stub as cmpfoot.
+  window.penumbraResolveTheme = window.penumbraResolveTheme || function (t) { return t; };
 </script>
 <script src="jquery-3.7.1.min.js"></script>
 <script src="jquery-ui.min.js"></script>

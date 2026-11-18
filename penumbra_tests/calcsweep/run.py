@@ -41,7 +41,8 @@ MUTANTS = {
     'listorder': ([("        entries.forEach(function (e) { if (!e.why) resolve(e); });",
                     "        entries.forEach(function (e) { if (!e.why) { e.cc.refs.forEach(function (r) { if (byName[r] && byName[r].ix > e.ix) e.why = 'later'; }); if (!e.why) resolve(e); } });")],
                   ['forward-ref-order']),
-    'keyorder': ([("            for (var u = 0; u < use.length; u++) row[use[u].def.name] = '';\n", "")], ['forward-ref-order']),
+    # (2026-11-17) re-anchored: c641567 (2026-10-22, a name keeps its typed case) keys the row by keyOf[name]
+    'keyorder': ([("            for (var u = 0; u < use.length; u++) row[keyOf[use[u].def.name]] = '';\n", "")], ['forward-ref-order']),
     'editmoves': ([("            if (editing && x.name === editing) { list.push(r.def); placed = true; return; }",
                     "            if (editing && x.name === editing) return;")], ['edit-keeps-order', 'edit-col-order']),
     'norename': ([("        var fix = function (x) { return renamed ? renameRefs(x, editing, r.def.name) : x; };",
@@ -54,9 +55,10 @@ MUTANTS = {
     'pivotfilter': ([("                names.forEach(function (n) { if (f && new RegExp(", "                names.forEach(function (n) { if (false && new RegExp(")],
                     ['strip-pivot-filter']),
     'pivotsubstr': ([("new RegExp('(^|[^A-Z0-9_])' + n + '([^A-Z0-9_]|$)', 'i')", "new RegExp(n, 'i')")], ['strip-pivot-filter']),
-    'linkdeps': ([("                u.searchParams.append('calc', urlValue(x)); inLink[r] = true;", "                inLink[r] = true;")], ['link-deps']),
-    'whitelistpush': ([("            if (x.def.format !== 'text') summableNames[x.def.name] = true;",
-                        "            if (x.def.format !== 'text') { summableNames[x.def.name] = true; window.penumbra_vars.totalExemptions.push(x.def.name); }")],
+    # (2026-11-17) both re-anchored: calcadj (cea9270, 2026-10-18) links plain(x, true); afa9289 (2026-10-12) added the date-format test
+    'linkdeps': ([("                u.searchParams.append('calc', urlValue(plain(x, true))); inLink[r] = true;", "                inLink[r] = true;")], ['link-deps']),
+    'whitelistpush': ([("            if (x.def.format !== 'text' && !isDateFormat(x.def.format)) summableNames[x.def.name] = true;",
+                        "            if (x.def.format !== 'text' && !isDateFormat(x.def.format)) { summableNames[x.def.name] = true; window.penumbra_vars.totalExemptions.push(x.def.name); }")],
                       ['no-whitelist-push']),
     # (2026-11-15) calcraw (7c207fc, 2026-11-14): a chained number column is read by its value, not its shown text
     'rawread': ([("                    if (rv[n] !== undefined) return rv[n];\n", "")], ['chain-currency']),

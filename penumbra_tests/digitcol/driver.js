@@ -115,6 +115,7 @@
   // The one thing its pickers list differently now: a numeric column named in digits (2022, 60 values)
   // offers the bin entries every numeric column offers (V_AMT here) - data()'s number found no values
   // for the bin test before. The columns themselves are the same, in the same order.
+  // (Since 2026-11-15, numgate, "every numeric column" means every MEASURE: see G-plainsb-plain below.)
   async function scnPlain() {
     var lb = document.getElementById('groupingLightbox');
     var o = await step(function () { clickEl(document.getElementById('groupTableBtn')); return sleep(150); });
@@ -130,8 +131,20 @@
       if (!s || s.style.display === 'none') return [];
       return Array.prototype.map.call(s.options, function (o) { return o.value; }).filter(function (v) { return v; }).map(function (v) { return v.slice(1); }).sort();
     };
+    // (2026-11-17, follows 0c5903e "Numeric buckets only for measure columns (numgate)", 2026-11-15) bins and
+    // ranges are offered for a number column only as a MEASURE: a currency column, a name on the total_exemptions
+    // list, or one whose summary is a number type (penumbraNumBucketEligible). The fixture's 2022 and V_AMT are
+    // plain numbers, so the dialog offers NEITHER any bucket now...
+    var plain = { '2022': of('2022'), V_AMT: of('V_AMT') };
+    R.obs.bucketsPlain = plain;
+    rec('G-plainsb-plain', S(plain['2022']) === '[]' && S(plain.V_AMT) === '[]', 'no summary on: 2022: ' + S(plain['2022']) + ', V_AMT: ' + S(plain.V_AMT));
+    // ...and once each carries a numeric summary (Total - what a footer badge pick stores, by upper-cased name)
+    // both qualify, and the digit-named column must list exactly what the ordinary one lists (the 10-25 fix:
+    // data()'s number found no values for the bin test).
+    var set = { '2022': JG.setSummary ? JG.setSummary('2022', 'sum') : 'no hook', V_AMT: JG.setSummary ? JG.setSummary('V_AMT', 'sum') : 'no hook' };
     R.obs.buckets = { '2022': of('2022'), V_AMT: of('V_AMT') };
-    rec('G-plainsb-buckets', of('V_AMT').length >= 1 && S(of('2022')) === S(of('V_AMT')), '2022: ' + S(of('2022')) + ', V_AMT: ' + S(of('V_AMT')));
+    rec('G-plainsb-buckets', set['2022'] === true && set.V_AMT === true && of('V_AMT').length >= 1 && S(of('2022')) === S(of('V_AMT')),
+      'Total on (set ' + S(set) + '): 2022: ' + S(of('2022')) + ', V_AMT: ' + S(of('V_AMT')));
   }
 
   // ---- the sweep: every other reader -----------------------------------------------------

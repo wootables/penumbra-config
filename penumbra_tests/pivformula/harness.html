@@ -113,7 +113,11 @@
     });
     return { pivotRows: m ? parseInt(m[1].replace(/,/g, ''), 10) : -1, pis: pis, text: html.replace(/<[^>]+>/g, '').trim(),
              tables: $c.find('table').length, grand: $c.find('tr').filter(function () { return /grand total/i.test(jQuery(this).text()); }).length,
-             msg: $c.text().indexOf('No results found in pivot data.') !== -1 };
+             // (2026-11-17, follows errcards 59c6d5f of 2026-11-15) the pivot's empty message is a card drawn by pnbEmptyState
+             // in the pivot container (.pnb-empty, title "The pivot has no cells"); it was the bare line
+             // "No results found in pivot data.". Exactly one such card, visible, with that title.
+             cards: $c.find('.pnb-empty').length, title: $c.find('.pnb-empty h3').text().trim(),
+             msg: $c.find('.pnb-empty').length === 1 && $c.find('.pnb-empty').is(':visible') && $c.find('.pnb-empty h3').text().trim() === 'The pivot has no cells' };
   }
   async function kase(id, q, want) {
     window.__PF.setPivot(S(), rows());
@@ -142,8 +146,8 @@
     await kase('F5', 'Awarded > 0 and Hit Ratio < 60', ['Ann', 'Cy']);
     await kase('F6', '{Hit Ratio} >= 100', ['Ed']);
     var r7 = await kase('F7', 'Hit Ratio > 200', []);
-    t('F7b no match = the No results message, no hollow table / Grand Total', r7.msg && r7.tables === 0 && r7.grand === 0,
-      'msg ' + r7.msg + ', tables ' + r7.tables + ', grand rows ' + r7.grand);
+    t('F7b no match = the pivot\'s empty card ("The pivot has no cells", one, visible), no hollow table / Grand Total', r7.msg && r7.tables === 0 && r7.grand === 0,
+      'msg ' + r7.msg + ' (cards ' + r7.cards + ', title "' + r7.title + '"), tables ' + r7.tables + ', grand rows ' + r7.grand);
     t('F7c ...and the count says 0 filtered results', r7.pivotRows === 0, r7.text);
     await kase('F8', 'Proposals > 3', ['Ann', 'Cy']);   // control: a base aggregate, unchanged
     // parennames (2026-11-03): the label's own parentheses inside a group, typed and as the builder braces it

@@ -344,14 +344,28 @@
     // ahead of a waiting timer (and a background tab holds timers back - seen
     // live on dr-huron2). __SM_SKEW moves the motion clock (_pnbMotionNow is
     // rebound by the hook) without letting any timer run.
-    opts()[3].click();                       // Missing: no load, its settle is 700ms out
+    // (2026-11-17, follows swhold be594f0 of 2026-11-16) a switch's command now runs under its own cover
+    // (_pnbHeld: showLoading + .pnb-lo-hold), a refused step included, so "Missing" is no longer a motion
+    // with no load: 250 ms in, the cover is up, and a load on screen drops a click whatever the motion
+    // clock says (_pnbMotionBusy's first line). The DUE rule now applies in the quiet spell AFTER the cover
+    // lifts (hideLoading arms the settle _PNB_MOTION_QUIET_MS = 120 ms out): Q0 states the first, Q1 the second.
+    opts()[3].click();                       // Missing: refused, but under the switch's cover
     var q0 = motion();
-    await sleep(250);                        // its command has been SENT (after the slide)
+    await sleep(250);                        // its command has been SENT (after the slide): the cover is up
+    window.__SM_SKEW = 2000;                 // 2s pass on the motion clock...
+    opts()[0].click();                       // ...and a click under the cover is still dropped
+    var qa = motion(), qaOv = ovShown();
+    window.__SM_SKEW = 0;
+    rec('Q0 a click while the switch\'s cover is up is dropped, even with the motion clock past due (the cover is a load)',
+      !!q0 && qaOv && qa === q0 && sel() === '3', 'ov=' + qaOv + ' same=' + (qa === q0) + ' ' + state());
+    for (var qw = 0; qw < 600 && ovShown(); qw++) await sleep(5);   // the cover lifts: the settle is armed, 120 ms out
+    var qPending = !ovShown() && motion() === q0 && sel() === '3';
+    var qState = state();
     window.__SM_SKEW = 2000;                 // ...and 2s pass with the timer still waiting
     opts()[0].click();                       // back to flat
     var q1 = motion();
-    rec('Q1 a click once the settle is DUE goes through, even before the settle timer has run',
-      !!q0 && !!q1 && q1 !== q0 && q1.to === 0 && sel() === '0', 'prev=' + J(q0 && { to: q0.to }) + ' now=' + J(q1 && { to: q1.to }) + ' ' + state());
+    rec('Q1 a click once the settle is DUE goes through, even before the settle timer has run (the cover lifted, the motion still pending)',
+      !!q0 && qPending && !!q1 && q1 !== q0 && q1.to === 0 && sel() === '0', 'pending=' + qPending + ' [' + qState + '] prev=' + J(q0 && { to: q0.to }) + ' now=' + J(q1 && { to: q1.to }) + ' ' + state());
     await idle();
     window.__SM_SKEW = 0;
     rec('Q2 ...and lands', view() === 'flat' && sel() === '0' && motion() === null, state());

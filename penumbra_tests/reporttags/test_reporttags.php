@@ -374,7 +374,9 @@ if ($aa !== '' && is_file($aa)) {
     $p = file_get_contents($aa);
     ok(strpos($p, '$reportFilter  .= " AND REPORT_ID IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :rtag)";') !== false && strpos($p, '$reportFilterA .= " AND r.ID IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :rtag)";') !== false && strpos($p, "\$reportBinds[':rtag'] = \$tagSearch;") !== false, 'metrics: ?tag= is folded into both report-filter fragments with its bind');
     ok(strpos($p, "if (isset(\$_GET['tag'])) \$tagSearch = penumbraTagNormalize(\$_GET['tag']);") !== false, 'metrics: the tag comes through the name rule, at Platform scope only');
-    ok(substr_count($p, "'tag'             => \$tagSearch,") === 2, 'metrics: the tag is carried into the report drill and back up');
+    // 2026-11-17: 48506de (metricsweep) carries $anTagCarry, which is $tagSearch at Platform scope and the ?tag= that
+    // came with the drill at report scope (so "All Reports" comes back tagged). Same guarantee, new variable.
+    ok(substr_count($p, "'tag'             => \$anTagCarry,") === 2 && strpos($p, '$anTagCarry = $tagSearch;') !== false && strpos($p, "\$anTagCarry = penumbraTagNormalize(\$_GET['tag']);") !== false, 'metrics: the tag is carried into the report drill and back up');
     ok(strpos($p, "\$chips[] = array('k' => 'tag', 'label' => 'Tag', 'value' => \$tagSearch, 'on' => true);") !== false, 'metrics: a Tag chip');
     ok(substr_count($p, '$ftReport, $ftTag') >= 6, 'metrics: the table tags name the tag wherever they name the report');
     ok(strpos($p, '<select id="fTag" name="tag"') !== false && strpos($p, 'penumbraReportTagsSqlCounts()') !== false, 'metrics: the sidebar offers every tag in use with its report count');

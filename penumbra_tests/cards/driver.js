@@ -3896,7 +3896,9 @@
     var J = window.Penumbra.journalInlineNotes, h0 = J.html;
     J.html = function () { return '<div class="journal-rownote-inline"><div class="pnb-sharednote-text">Shared w2 note</div><div class="pnb-sharednote-meta">Last edited by Tester</div></div>'; };
     var ok = true; try { await loadJs('jspdf-2.5.1.umd.min.js'); await loadJs('jspdf-autotable-3.5.23.min.js'); } catch (e) { ok = false; }
-    var b64 = null; try { b64 = ok && window.__HC.gpdf ? await window.__HC.gpdf({ cards: true }) : null; } finally { J.html = h0; }
+    // (2026-11-18, cardpdf) a PDF carries notes only with the report's "Notes in copies and downloads" on: on for this one
+    var b64 = null, nx0 = window._penumbraJournalNotesExport; window._penumbraJournalNotesExport = true;
+    try { b64 = ok && window.__HC.gpdf ? await window.__HC.gpdf({ cards: true }) : null; } finally { J.html = h0; window._penumbraJournalNotesExport = nx0; }
     var txt = b64 ? atob(b64) : '';
     R.info.pdf = { ok: ok, len: txt.length, st: C().pdf && C().pdf(), note: txt.indexOf('(Note)'), shared: txt.indexOf('(Shared w2 note') };
     R.chk.pdfShared = txt.indexOf('(Note)') >= 0 && txt.indexOf('(Shared w2 note') >= 0;

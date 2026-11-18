@@ -134,9 +134,11 @@ $main = $u8.GetString([IO.File]::ReadAllBytes($MainJs))
 if ($Mutant) {
   $muts = @{
     'xdecl'  = @('var visibleX = Object.create(null);', 'var visibleX = {};')
-    'xread'  = @('return !Object.prototype.hasOwnProperty.call(visibleX, rv);', 'return !visibleX.hasOwnProperty(rv);')
+    # (2026-11-17) re-anchored: the read became an early return (the Other slice also checks its group now)
+    'xread'  = @('if (Object.prototype.hasOwnProperty.call(visibleX, rv)) return false;', 'if (visibleX.hasOwnProperty(rv)) return false;')
     'tmdecl' = @('var visibleTmX = Object.create(null);', 'var visibleTmX = {};')
-    'tmread' = @('return !Object.prototype.hasOwnProperty.call(visibleTmX, rv);', 'return !visibleTmX.hasOwnProperty(rv);')
+    # (2026-11-17) re-anchored: the key is a group + label pair (rk) now
+    'tmread' = @('return !Object.prototype.hasOwnProperty.call(visibleTmX, rk);', 'return !visibleTmX.hasOwnProperty(rk);')
   }
   $m = $muts[$Mutant]
   $n = ([regex]::Matches($main, [regex]::Escape($m[0]))).Count

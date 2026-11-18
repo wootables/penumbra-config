@@ -1385,6 +1385,9 @@
     host.setUser('PIVOT:=AMOUNT@2.0', 210); host.setUser('PIVOT:=AMOUNT@1.0', 190); host.setUser('TITLE', 300); CW().apply();
     g = mgrid();
     var e6 = edge(g.groups[2].th);
+    // (2026-11-17) the harness has no toast dock: phase D's stand-in show_text, for the reset's Undo (M6b)
+    var realShowM6 = window.show_text;
+    window.show_text = function (html) { var d = document.createElement('div'); d.className = 'cw-stub-toast'; d.innerHTML = html; document.body.appendChild(d); };
     ptr('pointerdown', g.groups[2].th, e6.x, e6.y); if (shield()) ptr('pointerup', shield(), e6.x, e6.y);
     ptr('pointerdown', g.groups[2].th, e6.x, e6.y); if (shield()) ptr('pointerup', shield(), e6.x, e6.y);
     g = mgrid();
@@ -1392,6 +1395,17 @@
     rec('M6 a double press on a year\'s edge resets every pivot width the viewer set (back to the report\'s 150s); the flat table\'s TITLE keeps its own',
       host.widthFor('PIVOT:=AMOUNT@2.0') === 150 && host.widthFor('PIVOT:=AMOUNT@1.0') === null && !('PIVOT:=AMOUNT@2.0' in u6) && u6.TITLE === 300,
       '2.0=' + host.widthFor('PIVOT:=AMOUNT@2.0') + ' 1.0=' + host.widthFor('PIVOT:=AMOUNT@1.0') + ' user=' + JSON.stringify(u6));
+    // (2026-11-17) the reset's notice offers Undo, and it puts the viewer's pivot widths back. Until 2026-10-18 the
+    // flat table's double press checked this (the old D6b); that press became a fit and the reset's Undo went unchecked.
+    var ubM6 = document.querySelectorAll('.cw-stub-toast .pnb-colw-undo'), ubM6b = ubM6[ubM6.length - 1];
+    if (ubM6b) ubM6b.click();
+    await sleep(30);
+    var u6b = host.state().user;
+    rec('M6b Undo in the reset\'s notice puts the viewer\'s pivot widths back (2.0 to 210, 1.0 to 190); TITLE still 300',
+      !!ubM6b && u6b['PIVOT:=AMOUNT@2.0'] === 210 && u6b['PIVOT:=AMOUNT@1.0'] === 190 && u6b.TITLE === 300 && host.widthFor('PIVOT:=AMOUNT@2.0') === 210,
+      'button=' + !!ubM6b + ' user=' + JSON.stringify(u6b) + ' widthFor 2.0=' + host.widthFor('PIVOT:=AMOUNT@2.0'));
+    window.show_text = realShowM6;
+    Array.prototype.forEach.call(document.querySelectorAll('.cw-stub-toast'), function (n) { n.remove(); });
     host.clearUser();
     await sleep(700);
 

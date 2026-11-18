@@ -134,7 +134,10 @@ function to_sqlite($sql) {
 }
 /** The bind placeholders of an Oracle statement (string literals stripped first: '(^|[^[:alnum:]])', 'HH24:MI:SS'). */
 function placeholders($sql) {
-    $s = preg_replace("/'(?:''|[^'])*'/", "''", $sql);
+    // (2026-11-17) comments go first, as Oracle reads them: b2de079 put an apostrophe in one ("a person's open"), and
+    // read as the start of a literal it swallowed every bind up to the next quote (ORA-01036 on all MODE search cases).
+    $s = preg_replace('~/[*].*?[*]/~s', ' ', $sql);
+    $s = preg_replace("/'(?:''|[^'])*'/", "''", $s);
     preg_match_all('/(?<![A-Za-z0-9_:]):([A-Za-z_][A-Za-z0-9_]*)/', $s, $m);
     return array_values(array_unique(array_map(function ($x) { return ':' . strtolower($x); }, $m[1])));
 }

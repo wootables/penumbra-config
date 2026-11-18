@@ -1411,12 +1411,12 @@
                     {
                         "name":  "chart map: nested rows keep the first and warn",
                         "pass":  true,
-                        "detail":  "[\"A chart has one X axis, so COLLEGE became the X axis and the second row field, DEPT, became the series.\"]"
+                        "detail":  "[\"COLLEGE\",\"DEPT\",[\"Row fields: COLLEGE is the X axis, DEPT the series.\"]]"
                     },
                     {
                         "name":  "chart map: an unsupported agg falls back to Sum and says so",
                         "pass":  true,
-                        "detail":  "[\"The chart builder cannot do Blank, so the chart is set to Sum - change it in the builder if that is not what you want.\"]"
+                        "detail":  "[\"A chart cannot show Blank, so it shows Sum.\"]"
                     },
                     {
                         "name":  "chart map: picks the first agg the builder supports",
@@ -1556,7 +1556,7 @@
                     {
                         "name":  "chart map: a text-only aggregation still falls back to Sum and says so",
                         "pass":  true,
-                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[\"The chart builder cannot do Antimode, so the chart is set to Sum - change it in the builder if that is not what you want.\"]}"
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[\"A chart cannot show Antimode, so it shows Sum.\"]}"
                     },
                     {
                         "name":  "axis bucket: a text column offers no buckets",
@@ -1564,9 +1564,9 @@
                         "detail":  "[]"
                     },
                     {
-                        "name":  "axis bucket: a numeric column offers bin + binlog",
+                        "name":  "axis bucket: a plain numeric column offers no buckets (bins are for measures)",
                         "pass":  true,
-                        "detail":  "[{\"token\":\"AMOUNT:bin\",\"label\":\"Bins\"},{\"token\":\"AMOUNT:binlog\",\"label\":\"Order of Magnitude\"}]"
+                        "detail":  "[]"
                     },
                     {
                         "name":  "engine B: pivot| trigger keeps case (COLLEGE / Status = Active / Sponsor\u0027s Total) and un-escapes the apostrophe",

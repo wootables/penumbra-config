@@ -243,12 +243,18 @@ MUTANTS = {
     'cm-indent': ([('menu', "        out.push(label + ': ' + String(v).replace(/\\r?\\n/g, '\\n  '));", "        out.push(label + ': ' + String(v));")], ['L-mcopym-cmRowLines'], ['mcopym']),
     'cm-nesttext': ([('menu', "        return box ? nestedRows(box) : cellText(c);", "        return cellText(c);")], ['L-mcopym-cmNestRow'], ['mcopym']),
     'cm-toggle': ([('menu', "            if (jv === '1' || jv === '0') { return jv === '1' ? 'Yes' : 'No'; }", "            if (jv === '1' || jv === '0') { return jv; }")], ['L-mcopym-cmJournal'], ['mcopym']),
-    'cm-headpos': ([('menu', "        else if (cpList.length) { use.unshift(copyEntry('copyMenu', cpList)); }", "        else if (cpList.length) { use.push(copyEntry('copyMenu', cpList)); }")], ['L-mcopym-cmHead'], ['mcopym']),
+    # (2026-11-17) cm-headpos RETIRED: since 766f5e9 (2026-10-27, copymenu 3) every menu carries the copy slot (a heading's goes
+    # into `look`: "if (items.indexOf(copySlot) < 0) { look.push(copySlot); }"), so the use.unshift() fallback it edited is never
+    # reached and the mutant changes nothing (it stayed green on L-mcopym-cmHead). The heading's place is cm-headlow's now.
+    # 'cm-headpos': ([('menu', "        else if (cpList.length) { use.unshift(copyEntry('copyMenu', cpList)); }", "        else if (cpList.length) { use.push(copyEntry('copyMenu', cpList)); }")], ['L-mcopym-cmHead'], ['mcopym']),
     # --- (copymenu 2) Link to this view: none; offered where the page cannot make one; no title; running nothing; no separator
     'cm-novl': ([('menu', "        if (vlOk && cpList.length) {", "        if (false) {")], ['L-mcopym-cmViewLink'], ['mcopym']),
     'cm-vlalways': ([('menu', "VL.available() === true; } catch (eVL) { vlOk = false; }", "true; } catch (eVL) { vlOk = false; }")], ['L-mcopym-cmViewLinkNone'], ['mcopym']),
-    'cm-vltitle': ([('menu', "long: 'Copy a link to this view', title: VIEWLINK_TITLE, run:", "long: 'Copy a link to this view', run:")], ['L-mcopym-cmViewLink'], ['mcopym']),
-    'cm-vlrun': ([('menu', "run: function () { VL.copy(); } });", "run: function () { } });")], ['L-mcopym-cmViewLink'], ['mcopym']),
+    # (2026-11-17) cm-vltitle, cm-vlrun re-anchored to the Copy list's own push (the one after a separator): menufix (2026-11-03)
+    # added a second, bare push for the '#' heading with the same words
+    'cm-vltitle': ([('menu', "cpList.push('-', { act: 'copyViewLink', label: 'Link to this view', long: 'Copy a link to this view', title: VIEWLINK_TITLE, run:", "cpList.push('-', { act: 'copyViewLink', label: 'Link to this view', long: 'Copy a link to this view', run:")], ['L-mcopym-cmViewLink'], ['mcopym']),
+    'cm-vlrun': ([('menu', "cpList.push('-', { act: 'copyViewLink', label: 'Link to this view', long: 'Copy a link to this view', title: VIEWLINK_TITLE, run: function () { VL.copy(); } });",
+                   "cpList.push('-', { act: 'copyViewLink', label: 'Link to this view', long: 'Copy a link to this view', title: VIEWLINK_TITLE, run: function () { } });")], ['L-mcopym-cmViewLink'], ['mcopym']),
     'cm-vlsep': ([('menu', "            cpList.push('-', { act: 'copyViewLink'", "            cpList.push({ act: 'copyViewLink'")], ['L-mcopym-cmViewLink'], ['mcopym']),
     # --- (copymenu 3) the Copy list without its heading; a heading's Copy back below, with Group by
     'cm-nohead': ([('menu', "items: function () { return [{ heading: 'Copy' }].concat(list); } };", "items: function () { return list; } };")], ['L-mcopym-cmHeadRow'], ['mcopym']),
@@ -318,7 +324,7 @@ MUTANTS = {
     'ns-flatonly': ([('menu', "if (!mine) { window.Penumbra.groupByColumn(e.g); }", "if (!gcol) { window.Penumbra.groupByColumn(e.g); }")],
                     ['L-mnestgb-nsRegroup', 'L-ggnest-gnKbdPick'], ['mnestgb', 'ggnest']),
     'ns-again': ([('menu', "                run: function () { if (!mine) { window.Penumbra.groupByColumn(e.g); } } });", "                run: function () { window.Penumbra.groupByColumn(e.g); } });"),
-                  ('main', "            if ($('body').hasClass('group-mode-active') && actualCol === String(currentGroupingColumn)) return;", "")],
+                  ('main', "            if ($(document.body).hasClass('group-mode-active') && actualCol === String(currentGroupingColumn)) return;", "")],   # (2026-11-17) $(document.body): 68221c5
                  ['L-ggnest-gnTickNoop'], ['ggnest']),
     'ns-copyplain': ([('main', "        var $opt = $('<option></option>').attr({ value: name, 'data-nested-parent': String(col), 'data-nested-sub': String(sub), 'data-nested-colid': th.getAttribute('data-column'), 'data-nested-mapkey': String(col).toUpperCase() }).text(name);",
                        "        var $opt = $('<option></option>').attr({ value: name }).text(name);")],
@@ -405,11 +411,13 @@ MUTANTS = {
     'm-autosearch': ([('main', "                _groupLayoutNotify('groupedSearched');   // the List layout follows the search (2026-10-03, grplist)\n",
                        "                _groupLayoutNotify('groupedSearched');   // the List layout follows the search (2026-10-03, grplist)\n                _groupApplyAutoLayout();\n")],
                      ['L-mauto-filterNoFlip'], ['mauto']),
-    'm-chosenon': ([('main', "                !(_groupLayoutChosen && $('body').hasClass('group-mode-active')), true);", "                true, true);")], ['L-mauto-chosenSticks'], ['mauto']),
-    'm-chosenoff': ([('main', "                !(_groupLayoutChosen && $('body').hasClass('group-mode-active')), true);", "                false, true);")], ['L-mauto-autoMany', 'L-mauto-redecides'], ['mauto']),
-    'm-ungroupkeep': ([('main', "        _groupLayoutChosen = false;   // (grpauto) the next grouping starts unchosen\n        currentGroupLimit = null;\n        $('body').removeClass('group-mode-active');\n        // applyPagination()",
-                        "        currentGroupLimit = null;\n        $('body').removeClass('group-mode-active');\n        // applyPagination()")], ['L-mauto-ungroupResets'], ['mauto']),
-    'm-samecol': ([('main', "            if ($('body').hasClass('group-mode-active') && actualCol === String(currentGroupingColumn)) return;", "            if (actualCol === String(currentGroupingColumn)) return;")], ['L-mauto-sameAgain'], ['mauto']),
+    # (2026-11-17) m-chosenon, m-chosenoff, m-ungroupkeep, m-samecol, m-gmrestrict (and ns-again) re-anchored: 68221c5 (2026-11-11, the
+    # selector sweep) wrote $('body') as $(document.body) in main.js
+    'm-chosenon': ([('main', "                !(_groupLayoutChosen && $(document.body).hasClass('group-mode-active')), true);", "                true, true);")], ['L-mauto-chosenSticks'], ['mauto']),
+    'm-chosenoff': ([('main', "                !(_groupLayoutChosen && $(document.body).hasClass('group-mode-active')), true);", "                false, true);")], ['L-mauto-autoMany', 'L-mauto-redecides'], ['mauto']),
+    'm-ungroupkeep': ([('main', "        _groupLayoutChosen = false;   // (grpauto) the next grouping starts unchosen\n        currentGroupLimit = null;\n        $(document.body).removeClass('group-mode-active');\n        // applyPagination()",
+                        "        currentGroupLimit = null;\n        $(document.body).removeClass('group-mode-active');\n        // applyPagination()")], ['L-mauto-ungroupResets'], ['mauto']),
+    'm-samecol': ([('main', "            if ($(document.body).hasClass('group-mode-active') && actualCol === String(currentGroupingColumn)) return;", "            if (actualCol === String(currentGroupingColumn)) return;")], ['L-mauto-sameAgain'], ['mauto']),
     'm-staleform': ([('main', "                limit: currentGroupLimit || null,\n",
                       "                limit: _groupNormalizeLimit({ n: $('#groupLimitN').val(), dir: $('#groupLimitDir').val(), other: $('#groupLimitOther').is(':checked'), minRows: $('#groupLimitMinRows').val() }),\n")],
                     ['L-mauto-staleForm'], ['mauto']),
@@ -439,8 +447,9 @@ MUTANTS = {
     'm-onlyadds': ([('main', "            p.cols.forEach(function (c, k) { st.sel[c] = p.vals[k]; });", "            p.cols.forEach(function (c, k) { st.sel[c] = (st.sel[c] || []).concat(p.vals[k]); });")], ['L-ggmenu-gmOnlyReplaces'], ['ggmenu']),   # (re-anchored, sweep 2)
     'm-gmask': ([('main', "            if (outer !== String(before.levels[0]) && outer.indexOf(':') === -1 && _pnbGroupAllUnique(outer)", "            if (false && outer !== String(before.levels[0]) && outer.indexOf(':') === -1 && _pnbGroupAllUnique(outer)"),
                  ('main', "            _gmApply($.extend({}, before, { levels: levels }), !_groupLayoutChosen, false);", "            _gmApply($.extend({}, before, { levels: levels }), !_groupLayoutChosen, true);")], ['L-ggmenu-gmUniqueNo'], ['ggmenu']),
-    'm-gmrestrict': ([('main', "                restricted: $('body').hasClass('restrict-grouping')\n", "                restricted: false\n")], ['L-ggmenu-gmRestricted'], ['ggmenu']),
-    'm-gmreveal': ([('main', "                else _gmReveal(w);", "                else { }")], ['L-gglist-glToStacked'], ['gglist']),
+    'm-gmrestrict': ([('main', "                restricted: $(document.body).hasClass('restrict-grouping')\n", "                restricted: false\n")], ['L-ggmenu-gmRestricted'], ['ggmenu']),
+    # (2026-11-17) re-anchored: the board layout (bdlay) made the reveal the stacked layout's own branch
+    'm-gmreveal': ([('main', "                else if (layout === 'stacked') _gmReveal(w);", "                else if (layout === 'stacked') { }")], ['L-gglist-glToStacked'], ['gglist']),
     'm-gmselect': ([('main', "                if (layout === 'list') { if (GL && typeof GL.selectGroup === 'function') GL.selectGroup(w); }", "                if (layout === 'list') { }")], ['L-gglist-glSwitch'], ['gglist']),
     'm-gmtoggle': ([('main', "                $(w).children('.group-header').trigger('click');\n                return true;", "                return true;")], ['L-ggmenu-gmToggle'], ['ggmenu']),
     # the band's LABEL in place of the row's value: [Blank] would filter to a literal "[Blank]" no row holds
@@ -548,7 +557,13 @@ MUTANTS = {
     'm-statsdate': ([('main', "                    if (!dMin || k < dMin.k) dMin = { k: k, t: t };", "                    if (!dMin) dMin = { k: k, t: t };")], ['L-mflat-statsDate'], ['mflat']),
     'j-only': ([('menu', "                l.cols.forEach(function (c) { c.visible = c.colName === col; });", "                l.cols.forEach(function (c) { c.visible = true; });")],
                ['L-mmore-only'], ['mmore']),
-    'm-resetpos': ([('main', "        if (to !== i) penumbraApplyHeaderLayout(lay);\n", "")], ['L-mmore-resetCol'], ['mmore']),
+    # (2026-11-17) m-resetpos RETIRED: f41ef22 (2026-10-22, round 33) took the Reset list out of the menu, so nothing calls
+    # penumbraHeaderResetColumn any more (the module's resetColumn() has no caller) and L-mmore-resetCol was turned to Column
+    # widths' "Reset this column's width". The mutant edited unreachable code and stayed green. In its place, the item
+    # the check now reads: j-resetwidthrun (the item resets nothing), j-resetwidthoff (never greyed out).
+    # 'm-resetpos': ([('main', "        if (to !== i) penumbraApplyHeaderLayout(lay);\n", "")], ['L-mmore-resetCol'], ['mmore']),
+    'j-resetwidthrun': ([('menu', "                run: function () { W.resetOne(th); } });", "                run: function () { } });")], ['L-mmore-resetCol'], ['mmore']),
+    'j-resetwidthoff': ([('menu', "disabled: typeof W.resizedOne === 'function' && !W.resizedOne(th),", "disabled: false,")], ['L-mmore-resetCol'], ['mmore']),
     'j-copyname': ([('menu', "            navigator.clipboard.writeText(name).then(", "            navigator.clipboard.writeText(String(name).toLowerCase()).then(")],
                    ['L-mmore-copyName'], ['mmore']),
     # (j-toolon dropped 2026-10-20, mutfix: toolOn() has had no caller since round 13 took Pivot by / Chart out of the menu)
@@ -564,11 +579,15 @@ MUTANTS = {
     'j-cellof': ([('menu', "        if (!th) { cell = cellOf(e.target); th = cell ? cell.th : null; }\n", "")], ['L-mcell-cellOpens', 'L-gmenu-cellGroup'], ['mcell', 'gmenu']),
     'j-celllink': ([('menu', "        if (!onNotes && !onNestLink && target.closest('a, button, input, select, textarea, label, [contenteditable=\"true\"]')) { return null; }\n", "")],
                    ['L-mcell-cellNatives'], ['mcell']),   # (re-anchored 2026-10-20: cellOf's line; the bare one is the pivot's and the breakdown's)
-    'j-cellsel': ([('menu', "        if (sel && !sel.isCollapsed && sel.containsNode && sel.containsNode(td, true)) { return null; }\n", "")], ['L-mcell-cellNatives'], ['mcell']),
+    # (2026-11-17) re-anchored: the summary row's finder (mfix) has the same line after its own selOf(td); cellOf's is the one
+    'j-cellsel': ([('menu', "        var sel = window.getSelection ? window.getSelection() : null;\n        if (sel && !sel.isCollapsed && sel.containsNode && sel.containsNode(td, true)) { return null; }\n",
+                    "        var sel = window.getSelection ? window.getSelection() : null;\n")], ['L-mcell-cellNatives'], ['mcell']),
     'm-cellraw': ([('main', "        return _pnbFsCellText(m.get(String(col || '').toUpperCase()));\n    }\n    // One value into", "        return String(td.textContent || '').trim();\n    }\n    // One value into")],
                   ['L-mcell-cellRaw'], ['mcell']),
-    'm-celladd': ([('main', "        var v = String(value == null ? '' : value), cur = (st.sel[C] || []).slice();\n        if (!cur.some(function (x) { return String(x).toLowerCase() === v.toLowerCase(); })) cur.push(v);",
-                    "        var v = String(value == null ? '' : value), cur = (st.sel[C] || []).slice();\n        cur = [v];")],
+    # (2026-11-17) re-anchored: penumbraHeaderFilterAddItem (splitviz, 2026-10-26) repeats the two lines; the end of
+    # penumbraHeaderFilterAdd (the comment after it is selflt's) is its own. Same break: the value replaces the ones there
+    'm-celladd': ([('main', "        st.sel[C] = cur;\n        _pnbFsApplySearch(_pnbFsCompose(st, fields));\n        return true;\n    }\n    // (2026-10-30, selflt) A selection's values at once",
+                    "        st.sel[C] = [v];\n        _pnbFsApplySearch(_pnbFsCompose(st, fields));\n        return true;\n    }\n    // (2026-10-30, selflt) A selection's values at once")],
                   ['L-mcell-cellAdd'], ['mcell']),   # (re-anchored 2026-10-20: penumbraPivotMenuFilter has the same line; penumbraHeaderFilterAdd's is the one)
     'm-cellex': ([('main', "fields = [exclude ? { col: C, blank: true, mode: 'ex' } : { col: C, blank: true }];", "fields = [{ col: C, blank: true }];")],
                  ['L-mcell-cellExclude'], ['mcell']),
@@ -585,7 +604,9 @@ MUTANTS = {
     # --- (round 12) the lists under one item
     'u-noshowall': ([('menu', "        body.push({ act: 'showAll', label: 'Show all columns', disabled: !hidden.length, why: 'Every column is shown', run: function () {\n            var l = copyLayout(api().layout());\n            l.cols.forEach(function (c) { c.visible = true; });\n            applyWithUndo(l, 'Showing all ' + l.cols.length + ' columns.', false);\n        } });\n", "")],
                     ['L-msubs-showList'], ['msubs']),
-    'u-clear': ([('menu', "run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } };", "run: function () { } };")], ['L-msubs-clearPanel'], ['msubs']),
+    # (2026-11-17) re-anchored: viewstrict (2026-11-05) gave Leave the shared view the same run; the item's own (after its title) is the one
+    'u-clear': ([('menu', "then clears it once you confirm',\n                run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } };",
+                  "then clears it once you confirm',\n                run: function () { } };")], ['L-msubs-clearPanel'], ['msubs']),
     'u-arrow': ([('menu', "((it.sub && it.act !== 'back') ? '<span class=\"pnb-hm-arrow\" aria-hidden=\"true\">&#8250;</span>' : '')", "''")], ['L-msubs-arrows'], ['msubs']),
     'u-copyname': ([('menu', "        if (!isNum) { use.push({ act: 'copyName', label: 'Copy column name', run: function () { copyName(col); } }); }\n", "")], ['L-msubs-topOrder'], ['msubs']),   # (re-anchored 2026-10-20: not on round 20's '#' menu)
     # --- (round 31) the item trusts the panel's checkbox
@@ -916,7 +937,9 @@ MUTANTS.update({
                  ['L-mfix-sumMenu', 'L-mfix-sumTail', 'L-mfix-sumPick', 'L-mfix-sumLabel', 'L-mfix-sumKbd', 'L-ggfix-gSumMenu'], ['mfix', 'ggfix']),
     'mf-noneTick': ([('menu', "checked: !now, title: 'No summary for this column'", "checked: false, title: 'No summary for this column'")], ['L-mfix-sumNoneTick'], ['mfix']),
     'mf-tick': ([('menu', "note: ty.badge, checked: now === ty.key,", "note: ty.badge, checked: false,")], ['L-mfix-sumMenu'], ['mfix']),
-    'mf-label': ([('menu', "if (td.classList.contains('pnb-sum-label')) { return { td: td, label: true }; }", "if (td.classList.contains('pnb-sum-label')) { return null; }")], ['L-mfix-sumLabel'], ['mfix']),
+    # (2026-11-17) mf-label, mf-clear re-anchored: a breakdown's first cell is a label too (bd), and a menu can say noClear
+    'mf-label': ([('menu', "if (td.classList.contains('pnb-sum-label') || (isBd && td.cellIndex === 0 && !td.hasAttribute('data-sum-col'))) { return { td: td, label: true, bd: isBd }; }",
+                   "if (td.classList.contains('pnb-sum-label') || (isBd && td.cellIndex === 0 && !td.hasAttribute('data-sum-col'))) { return null; }")], ['L-mfix-sumLabel'], ['mfix']),
     'mf-restr': ([('menu', "        if (info && !restricted) {\n            var keep", "        if (info) {\n            var keep")], ['L-mfix-sumRestr'], ['mfix']),
     'mf-nocopy': ([('menu', "        if (v) { items.push('-'); items.push({ act: 'sumCopy',", "        if (false) { items.push('-'); items.push({ act: 'sumCopy',")], ['L-mfix-sumTail'], ['mfix']),
     # main.js: a pick never made; the badges never switched; None not the badge's (no Undo)
@@ -924,7 +947,7 @@ MUTANTS.update({
     'mf-badges': ([('main', "        setSumBadges: function (on) { _spSetSummaryBadges(!!on); },", "        setSumBadges: function (on) { },")], ['L-mfix-sumBadges'], ['mfix']),
     'mf-none': ([('main', "            if (type === 'none') { _spBadgePickNone(col); }", "            if (type === 'none') { _spCommitBadgePick(col, false); }")], ['L-mfix-sumNone'], ['mfix']),
     # Clear all: only where buildItems put it (as before)
-    'mf-clear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-ggfix-bandClear', 'L-ggfix-listClear'], ['ggfix']),
+    'mf-clear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp && !cur.noClear) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-ggfix-bandClear', 'L-ggfix-listClear'], ['ggfix']),
 })
 
 # (2026-11-05, dtpick) a date column's Chart by list: red on live (no item); chText and chHidden hold on live (guards)
@@ -940,7 +963,11 @@ MUTANTS.update({
     'ch-vis': ([('main', "        if (!$('#visualizeBtn').is(':visible')) return out;", "        if (false) return out;")], ['L-mchart-chHidden'], ['mchart']),
     'ch-kind': ([('main', "                if (!def || (def.kind !== 'period' && def.kind !== 'cycle')) return;", "                if (!def) return;")], ['L-mchart-chText'], ['mchart']),
     'ch-sug': ([('main', "suggested: !light && sf.split === sug });", "suggested: false });")], ['L-mchart-chSuggest'], ['mchart']),
-    'ch-hour': ([('main', "                if (id === 'hour' && gran < 3) return;", "                if (false) return;")], ['L-mchart-chList', 'L-mchart-chNoHour'], ['mchart']),
+    # (2026-11-17) second edit added: c53b3e2 (2026-11-05, "Hour needs a time") gave the Hour split minGran 3, so the list is
+    # guarded twice and lifting dtpick's line alone changed nothing (the mutant stayed green). Both lifted = Hour offered again
+    'ch-hour': ([('main', "                if (id === 'hour' && gran < 3) return;", "                if (false) return;"),
+                 ('main', "hour: { kind: 'cycle', label: 'Hour', chip: 'Hr', ex: '00–23', minGran: 3,", "hour: { kind: 'cycle', label: 'Hour', chip: 'Hr', ex: '00–23', minGran: 1,")],
+                ['L-mchart-chList', 'L-mchart-chNoHour'], ['mchart']),
     'ch-arg': ([('menu', "                            run: function () { A.chartColumn(col, v.id); } });", "                            run: function () { A.chartColumn(col); } });")], ['L-mchart-chRuns'], ['mchart']),
 })
 

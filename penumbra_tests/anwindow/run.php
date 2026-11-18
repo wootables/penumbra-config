@@ -10,25 +10,33 @@
  *
  *   php.exe -n -d date.timezone=America/New_York run.php [--app=<dir>]
  *           [--orig=<file>] [--control]
- *           [--mutant=dedupe|gate|priornull|cmppause|tagsescape|tagsoff]
+ *           [--mutant=dedupe|gate|priornull|cmppause|tagsescape|tagsoff|priorwhole]
  *
  * --app     defaults to the LIVE webroot; point it at a staging copy before a deploy.
  * --orig    the parser to hold the target against. Defaults to the frozen
- *           fixture_analytics_shared_pre24h.php beside this file: the live
- *           analytics_shared.php as it was BEFORE range=24h existed.
+ *           fixture_analytics_shared_20261117.php beside this file: the live
+ *           analytics_shared.php as of 2026-11-17 (main d35c98b), RE-FROZEN that
+ *           day after the metrics sweeps changed how existing ranges parse on
+ *           purpose (48506de: ?range=N is N days ending today; 5014062: a bare
+ *           ?cmp=1 applies; b2de079: a preset's prior window stops at this time
+ *           of day). Section 1b states those three outright. The older
+ *           fixture_analytics_shared_pre24h.php (before range=24h existed) is
+ *           kept beside it; --orig=<that file> shows the 2026-11-17 differences.
  * --control adds one deliberately false assertion and MUST report FAIL 1.
  * --mutant  breaks one guarantee in the target's source and MUST turn red:
  *           dedupe (DST hour folding), gate (the 24h opt-in), priornull (the
  *           nonexistent spring hour), cmppause (compare applied under 24h),
  *           tagsescape (tag text unescaped), tagsoff (the "not applied" half
- *           of a tag dropped).
+ *           of a tag dropped), priorwhole (2026-11-17: a preset's prior window
+ *           back to N whole days - sections 1 and 1b).
  * The timezone flag is REQUIRED (-n drops php.ini's, and every label is local
  * time); the suite refuses to run without it.
  *
  * Lifts the penumbra_an_* functions from both copies by the tokenizer (never
  * require'd), renames them orig_* / stg_*, and checks:
  *   1. regression: every non-24h input gives byte-identical parser output to
- *      the fixture, with and without the opt-in (17,280 combinations)
+ *      the fixture, with and without the opt-in (17,280 combinations);
+ *      1b. the deliberate 2026-11-17 parser changes, stated outright
  *   2. the 24h window itself (SQL fragments, labels, flags, compare pause, gate)
  *   3. the hourly axis on fixed clocks, incl. both DST nights, and a synthetic
  *      "bars sum to the window" simulation
@@ -43,7 +51,8 @@
  * parses, re-freeze the fixture from the new live file - it exists to catch
  * the accidental kind.
  *
- * EXPECTED TAIL: "PASS 169   FAIL 0". A smaller pass count is a failure too.
+ * EXPECTED TAIL: "PASS 195   FAIL 0" (2026-11-17; it was 164 before section 1b
+ * and the four companion checks in 4 / 4b). A smaller pass count is a failure too.
  */
 $CONTROL = in_array('--control', $argv, true);
 $MUTANT = ''; $ORIG = null; $STAGE = null;
@@ -52,7 +61,8 @@ foreach ($argv as $a) {
     if (strpos($a, '--orig=')   === 0) $ORIG   = substr($a, 7);
     if (strpos($a, '--app=')    === 0) $STAGE  = rtrim(substr($a, 6), '\\/');
 }
-if ($ORIG === null)  $ORIG  = __DIR__ . DIRECTORY_SEPARATOR . 'fixture_analytics_shared_pre24h.php';
+// (2026-11-17) re-frozen after the metrics sweeps - see --orig in the header.
+if ($ORIG === null)  $ORIG  = __DIR__ . DIRECTORY_SEPARATOR . 'fixture_analytics_shared_20261117.php';
 if ($STAGE === null) $STAGE = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
 echo "app:  $STAGE\norig: $ORIG\n";
 
@@ -103,6 +113,8 @@ $mutants = array(
     'tagsescape' => array("'<span class=\"sr-only\">Filtered by </span><span class=\"an-ftag-t\">' . htmlspecialchars(\$txt) . '</span></span>';",
                           "'<span class=\"sr-only\">Filtered by </span><span class=\"an-ftag-t\">' . \$txt . '</span></span>';"),
     'tagsoff'    => array("    if (!empty(\$off)) {", "    if (false && !empty(\$off)) {"),
+    // (2026-11-17) the prior window of a preset back to N WHOLE days (pre-b2de079).
+    'priorwhole' => array("\$priorFilter = 'AND ' . \$col . ' <  SYSDATE-' . \$windowDays\n", "\$priorFilter = 'AND ' . \$col . ' <  TRUNC(SYSDATE)-' . (\$windowDays - 1)\n"),
 );
 if ($MUTANT !== '') {
     if (!isset($mutants[$MUTANT])) { fwrite(STDERR, "unknown mutant\n"); exit(2); }
@@ -112,17 +124,23 @@ if ($MUTANT !== '') {
     $stageSrc = str_replace($from, $to, $stageSrc);
     echo "MUTANT: $MUTANT applied\n";
 }
-$origCode  = lift($origSrc,  $NAMES, 'orig_');
+// (2026-11-17) Only the parser is lifted from the fixture: the re-frozen fixture
+// is a whole analytics_shared.php and has an hour axis of its own, which
+// section 1 does not compare.
+$origCode  = lift($origSrc,  array('penumbra_an_ymd_ok', 'penumbra_an_parse_window'), 'orig_');
 $stageCode = lift($stageSrc, $NAMES, 'stg_');
 eval($origCode);
 eval($stageCode);
 t_ok(function_exists('orig_penumbra_an_parse_window'), 'lifted orig parser');
 t_ok(function_exists('stg_penumbra_an_parse_window'),  'lifted staged parser');
 t_ok(function_exists('stg_penumbra_an_hour_axis'),     'lifted staged hour axis');
-t_ok(!function_exists('orig_penumbra_an_hour_axis'),   'orig has no hour axis (sanity: lifted the right files)');
+t_ok(!function_exists('orig_penumbra_an_hour_axis'),   'only the parser was lifted from the fixture (sanity: lifted the right files)');
 
 // ---- 1. regression ---------------------------------------------------------
-section('1. every non-24h input: target parser output === the pre-24h fixture');
+// The fixture's parser is called WITHOUT the opt-in, so it never resolves 24h:
+// what it gives for a 24h input is the "fell back to 30" answer the target must
+// also give without the opt-in.
+section('1. every non-24h input: target parser output === the frozen fixture');
 $ranges = array(null, '7', '30', '90', 'all', 'All', 'custom', 'CUSTOM', '', 'bogus', ' 30 ', '24h', '24H', '1', '-7', '7d');
 $dates  = array(
     array(),
@@ -178,10 +196,66 @@ foreach ($prefSets as $ps) foreach ($whens as $wh) {
     }
 }
 echo "    $combos combinations, $saw24 resolved to 24h with the opt-in\n";
-t_eq($regDiff, 0, 'without the opt-in: every key identical to the live parser' . ($firstDiff ? " [first: $firstDiff]" : ''));
-t_eq($regDiffOpt, 0, 'with the opt-in: every non-24h input identical to the live parser');
+t_eq($regDiff, 0, 'without the opt-in: every key identical to the frozen parser' . ($firstDiff ? " [first: $firstDiff]" : ''));
+t_eq($regDiffOpt, 0, 'with the opt-in: every non-24h input identical to the frozen parser');
 t_eq($newKeyBad, 0, 'new keys without the opt-in: trendHourly=false, cmpPaused=false, windowEndLit=custom end or empty');
 t_ok($saw24 > 0, 'the matrix did reach 24h with the opt-in');
+
+// ---- 1b. the deliberate parser changes of 2026-11-17 --------------------------
+// Section 1 only says "same as the frozen copy". These say what the metrics
+// sweeps changed on purpose, so a re-freeze can never hide one being undone
+// (against the pre-24h fixture these were section 1's 10,200 / 8,544 / 1,080
+// differences, and nothing else differed).
+section('1b. 2026-11-17 parser changes (metrics sweeps), stated outright');
+$none1b = function ($k, $d) { return $d; };
+$today1b = date('Y-m-d'); $noon1b = strtotime($today1b . ' 12:00:00');
+$ymd1b = function ($off) use ($noon1b) { return date('Y-m-d', strtotime(($off >= 0 ? '+' : '') . $off . ' days', $noon1b)); };
+// b2de079 (metricsweep3): a preset's prior window stops at THIS time of day N days ago.
+foreach (array('7' => 13, '30' => 59, '90' => 179) as $r => $back) {
+    $x = stg_penumbra_an_parse_window(array('range' => (string)$r), $none1b);   // (string): PHP made the array keys ints, and a non-string is "not sent"
+    t_eq($x['priorFilter'], 'AND TIMESTAMP <  SYSDATE-' . $r . ' AND TIMESTAMP >= TRUNC(SYSDATE)-' . $back, "preset $r: prior window = N-1 days and today-so-far, like the window itself");
+    t_eq($x['timeFilter'], 'AND TIMESTAMP >= TRUNC(SYSDATE)-' . ((int)$r - 1), "preset $r: the window itself is unchanged");
+}
+// b2de079: the same for a custom range that ends today; one that ended earlier keeps whole days.
+$x = stg_penumbra_an_parse_window(array('range' => 'custom', 'from' => $ymd1b(-4), 'to' => $today1b), $none1b);
+$fl = "TO_DATE('" . $ymd1b(-4) . "','YYYY-MM-DD')";
+t_eq($x['priorFilter'], "AND TIMESTAMP < $fl-1+(SYSDATE-TRUNC(SYSDATE)) AND TIMESTAMP >= $fl-5", 'custom ending today: prior window stops at this time of day on its own last day');
+$x = stg_penumbra_an_parse_window(array('range' => 'custom', 'from' => '2026-08-01', 'to' => '2026-08-15'), $none1b);
+t_eq($x['priorFilter'], "AND TIMESTAMP < TO_DATE('2026-08-01','YYYY-MM-DD') AND TIMESTAMP >= TO_DATE('2026-08-01','YYYY-MM-DD')-15", 'custom ending in the past: prior window is still the N whole days before');
+// 48506de (metricsweep): ?range=N (a day count the menu does not offer) = N days ending today, as a custom range.
+$x = stg_penumbra_an_parse_window(array('range' => '14'), $none1b);
+t_eq($x['rangeParam'] . '|' . $x['customFrom'] . '|' . $x['customTo'] . '|' . $x['windowDays'], 'custom|' . $ymd1b(-13) . '|' . $today1b . '|14', '?range=14 is 14 days ending today, shown as a custom range (was: 30 days, silently)');
+$x = stg_penumbra_an_parse_window(array('range' => '1'), $none1b);
+t_eq($x['rangeParam'] . '|' . $x['customFrom'] . '|' . $x['customTo'] . '|' . $x['windowDays'], 'custom|' . $today1b . '|' . $today1b . '|1', '?range=1 is today');
+t_eq($x['windowEndLit'], "TO_DATE('" . $today1b . "','YYYY-MM-DD')+1", '?range=1 carries a custom end literal');
+foreach (array('0', '3661', '-7', '7d', 'bogus', '') as $bad) {
+    $x = stg_penumbra_an_parse_window(array('range' => $bad), $none1b);
+    t_eq($x['rangeParam'], '30', '?range=' . var_export($bad, true) . ' still falls back to 30');
+}
+$x = stg_penumbra_an_parse_window(array(), function ($k, $d) { return $k === 'range' ? '14' : $d; });
+t_eq($x['rangeParam'], '30', 'a day count from the saved pref (not the URL) is not expanded');
+// 48506de: a "to" past today is today; a range wholly in the future is left alone; a non-string is "not sent".
+$x = stg_penumbra_an_parse_window(array('range' => 'custom', 'from' => $ymd1b(-5), 'to' => $ymd1b(10)), $none1b);
+t_eq($x['customTo'] . '|' . $x['windowDays'], $today1b . '|6', 'custom "to" in the future is clamped to today');
+$x = stg_penumbra_an_parse_window(array('range' => 'custom', 'from' => $ymd1b(3), 'to' => $ymd1b(10)), $none1b);
+t_eq($x['customFrom'] . '|' . $x['customTo'], $ymd1b(3) . '|' . $ymd1b(10), 'a range wholly in the future is left alone');
+try { $x = stg_penumbra_an_parse_window(array('range' => array('x'), 'from' => array('y'), 'dow' => array('MON')), $none1b); }
+catch (\Throwable $e) { $x = array('rangeParam' => 'THREW ' . get_class($e), 'dowParam' => ''); }   // (a pre-48506de parser dies in trim())
+t_eq($x['rangeParam'] . '|' . $x['dowParam'], '30|', '?range[]=x is "not sent" (it was a blank 500)');
+// 5014062 (metricsweep2): an explicit ?cmp= means what it says without the form's marker.
+$cm = array('cfrom' => '2026-06-01', 'cto' => '2026-06-30');
+$x = stg_penumbra_an_parse_window(array('cmp' => '1') + $cm, $none1b);
+t_eq($x['cmpOn'], true, 'hand-built link ?cmp=1 + dates, no filter_submitted: compare applies (it used to be dropped)');
+t_eq($x['priorFilter'], "AND TIMESTAMP >= TO_DATE('2026-06-01','YYYY-MM-DD') AND TIMESTAMP < TO_DATE('2026-06-30','YYYY-MM-DD')+1", 'and the prior window is the comparison dates');
+$prefCmp = function ($k, $d) { $p = array('cmp' => 1, 'cfrom' => '2026-05-01', 'cto' => '2026-05-31'); return array_key_exists($k, $p) ? $p[$k] : $d; };
+$x = stg_penumbra_an_parse_window(array('cmp' => '0'), $prefCmp);
+t_eq($x['cmpOn'], false, '?cmp=0 without the marker turns a saved compare off');
+$x = stg_penumbra_an_parse_window(array('filter_submitted' => '1'), $prefCmp);
+t_eq($x['cmpOn'], false, 'the form submitted with the box unticked still beats the saved pref');
+$x = stg_penumbra_an_parse_window($cm, $none1b);
+t_eq($x['cmpOn'], false, 'comparison dates alone (no cmp, no pref) do not switch compare on');
+$x = stg_penumbra_an_parse_window(array(), $prefCmp);
+t_eq($x['cmpOn'], true, 'first load with a saved compare pref: still on');
 
 // ---- 2. the 24h window -----------------------------------------------------
 section('2. range=24h');
@@ -336,13 +410,24 @@ t_ok(strpos($allSrc, '<option value="24h"') !== false, 'range select offers Last
 t_ok(strpos($allSrc, '>Last 24 hours</option>') !== false, 'option text');
 // (the pause-scheduler dialog has its own unrelated <option value="24h">, hence the tail)
 t_eq(substr_count($allSrc, '<option value="24h"    <?php echo $rangeParam === \'24h\''), 1, 'exactly one 24h RANGE option');
-t_ok(strpos($allSrc, "WHERE a.ACTION='OPEN' AND a.ROW_COUNT IS NOT NULL \$sysSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA") !== false, 'Heaviest query is windowed + scoped, incl. user/department (round 2)');
+// (2026-11-17, 9829979 metricsweep4) $sysSqlA -> $anPlaceSqlA: $sysSqlA now also
+// drops machine opens and re-runs (they are not VIEWS), and a run's SIZE does
+// not depend on who ran it, so Heaviest takes the placeholder guard alone - the
+// copy made of $sysSqlA before those two were appended. Window, weekday/hour,
+// user/department and report scope are all still in the WHERE.
+t_ok(strpos($allSrc, "WHERE a.ACTION='OPEN' AND a.ROW_COUNT IS NOT NULL \$anPlaceSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA") !== false, 'Heaviest query is windowed + scoped, incl. user/department (round 2)');
+$plDef  = strpos($allSrc, "    \$sysSqlA = 'AND (a.REPORT_ID IS NULL OR a.REPORT_ID NOT IN (' . \$sysList . '))';\n");
+$plCopy = strpos($allSrc, "\n\$anPlaceSqlA   = \$sysSqlA;");
+$plMach = strpos($allSrc, "\n\$sysSqlA = trim(\$sysSqlA . \" AND (a.ACTION <> 'OPEN' OR a.USER_ID IS NULL OR a.USER_ID NOT IN (\$anMachList))\");");
+t_ok($plDef !== false && $plCopy !== false && $plMach !== false && $plDef < $plCopy && $plCopy < $plMach, '$anPlaceSqlA is the placeholder guard: copied after it is built, before the machine-open rule is appended');
+t_eq(substr_count($allSrc, '$anPlaceSqlA'), 2, '$anPlaceSqlA: one definition, one use (Heaviest), never reassigned');
 t_ok(strpos($allSrc, 'window not applied') === false, 'no "window not applied" text left');
 $hvA = strpos($allSrc, '<h3>Heaviest Reports');
 $hvB = ($hvA === false) ? false : strpos($allSrc, '</h3>', $hvA);
 t_ok($hvA !== false && $hvB !== false, 'found the Heaviest header');
 t_ok($hvA !== false && strpos(substr($allSrc, $hvA, $hvB - $hvA), 'not applied') === false, 'Heaviest header no longer says anything is "not applied"');
-t_ok($hvA !== false && strpos(substr($allSrc, $hvA, $hvB - $hvA), "echo 'by median cells · ' . htmlspecialchars(\$rangeLabelShort);") !== false, 'Heaviest header names the window');
+// (2026-11-17, b2de079 metricsweep3) the header says "top 20" when the query's cap of 20 was reached.
+t_ok($hvA !== false && strpos(substr($allSrc, $hvA, $hvB - $hvA), "echo (count(\$heavy) >= 20 ? 'top 20 ' : '') . 'by median cells · ' . htmlspecialchars(\$rangeLabelShort);") !== false, 'Heaviest header names the window');
 t_eq(substr_count($allSrc, '$deadOwnerFilter $deadOucSql $deadExistedSql $reportFilterA'), 2, 'Dead list AND its total carry the owner-department + existed-by guards');
 t_eq(substr_count($allSrc, 'NOT IN ($sysShortIdSql)'), 3, 'toolvisit anchor: exactly three NOT IN ($sysShortIdSql) (Dead list, its total, the Tables catalogue)');
 t_ok(strpos($allSrc, "\$deadExistedSql = (\$windowEndLit !== '') ? 'AND (r.CREATED_AT IS NULL OR r.CREATED_AT < ' . \$windowEndLit . ')' : '';") !== false, 'existed-by guard keeps NULL CREATED_AT');
@@ -364,10 +449,17 @@ t_eq(substr_count($allSrc, '= penumbra_an_trend_series('), 1, 'Platform takes it
 
 // ---- 4b. the two filter fixes (round 2, 2026-09-23) ---------------------------
 section('4b. Heaviest honours user/department; Dead honours department');
-$hq    = strpos($allSrc, "\$sysSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA");
+// (2026-11-17, 9829979) anchor follows $sysSqlA -> $anPlaceSqlA, see section 4.
+$hq    = strpos($allSrc, "\$anPlaceSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA");
 $hqEnd = ($hq === false) ? false : strpos($allSrc, 'analytics_all heaviest query failed', $hq);
 t_ok($hq !== false && $hqEnd !== false && strpos(substr($allSrc, $hq, $hqEnd - $hq), "\n            \$commonBindsA\n") !== false, 'Heaviest binds $commonBindsA (user + ouc + report) - exactly the names it now holds');
-t_eq(substr_count($allSrc, 'array_merge($exclBinds, $userBinds, $reportBinds, $deadOucBinds)'), 2, 'both dead queries bind the owner-department list');
+// (2026-11-17, 48506de metricsweep) $exclBinds -> $deadExclBinds: "no HUMAN views"
+// always leaves the machine accounts' opens out, whatever the Hide toggles say,
+// so the dead queries have their own exclusion ($deadExclSql, binds :dxN). The
+// owner-department list is still bound in both, with the user and report binds.
+t_eq(substr_count($allSrc, 'array_merge($deadExclBinds, $userBinds, $reportBinds, $deadOucBinds)'), 2, 'both dead queries bind the owner-department list');
+t_eq(substr_count($allSrc, "WHERE ACTION='OPEN' AND REPORT_ID IS NOT NULL \$timeFilter \$deadExclSql\n"), 2, 'both dead queries: windowed, with the dead exclusion whose binds they merge');
+t_ok(strpos($allSrc, "\$deadExclNames = array_values(array_unique(array_merge(\$exclNames, \$machineAccounts)));") !== false, 'the dead exclusion = the Hide toggles\' names + the machine accounts');
 t_ok(strpos($allSrc, "SELECT DISTINCT LOWER(TRIM(OWNER_ID)) AS OWNER_ID FROM PENUMBRA_REPORTS WHERE OWNER_ID IS NOT NULL") !== false, 'owners resolved directly, not from the window-active user list');
 t_ok(strpos($allSrc, "\$deadOucSql = 'AND 1=0';") !== false, 'nobody in the unit = an honest empty list');
 t_ok(strpos($allSrc, "'LOWER(TRIM(r.OWNER_ID)) IN ('") !== false, 'owner match is case- and padding-insensitive');
@@ -420,7 +512,10 @@ t_ok(strlen($anSrc) < 4000 && strpos($anSrc, 'penumbra_an_parse_window(') === fa
 t_ok(strpos($stageSrc, "\$sparkHourly = \$w['trendHourly'];") !== false, 'sparks go hourly with the trend');
 t_ok(strpos($stageSrc, "foreach (\$hourAxis as \$hb) \$sparkKeys[] = \$hb['key'];") !== false, 'spark keys = the axis keys');
 t_ok(strpos($stageSrc, "\$sparkTimeCut    = (\$sparkHourly || \$sparkDaily) ? substr(\$timeFilter, 4)") !== false, 'hourly sparks cut on the same predicate as the cards');
-t_ok(strpos($stageSrc, "if (\$sparkDaily || \$sparkHourly) {") !== false, 'Total Views keeps its own monthly spark under 24h');
+// (2026-11-17, 48506de metricsweep) + $sparkPast: a custom range that ended in an
+// earlier month anchors the window sparks on ITS months, so Total Views needs
+// its own last-24-months series there too.
+t_ok(strpos($stageSrc, "if (\$sparkDaily || \$sparkHourly || \$sparkPast) {") !== false, 'Total Views keeps its own monthly spark under 24h');
 t_ok(strpos($stageSrc, "(\$w['trendHourly'] ? 'SYSDATE-1'") !== false, 'new-viewers MINUS starts at SYSDATE-1 under 24h');
 t_ok(strpos($allSrc, "\$anRepSp    = penumbra_an_report_sparks(\$run, \$anRid, \$anWin, \$hourAxis,") !== false, 'the report scope hands the card sparks the hour axis its trend uses');
 t_ok(strpos($allSrc, "<h3>Recent Activity<?php echo \$ftTagsFeed; ?></h3>") !== false, 'the feed carries its own tags');

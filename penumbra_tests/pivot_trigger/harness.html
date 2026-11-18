@@ -677,7 +677,10 @@
         // Nested rows: one axis only.
         MC.setStash({ aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['COLLEGE', 'DEPT'], colFields: [], valField: 'AMOUNT' });
         var mn = MC.toViz();
-        assert('chart map: nested rows keep the first and warn', mn.config.xAxis === 'COLLEGE' && mn.warnings.length === 1 && mn.warnings[0].indexOf('one X axis') !== -1, JSON.stringify(mn.warnings));
+        // (2026-11-17) The note was reworded by 12ec61c (2026-11-16, shorter Auto-build notes): it used to say the
+        // chart has "one X axis"; it now names both roles. The mapping itself is unchanged and is pinned too:
+        // the first row field is the X axis, the second the series, one note.
+        assert('chart map: nested rows keep the first and warn', mn.config.xAxis === 'COLLEGE' && mn.config.groupBy === 'DEPT' && mn.warnings.length === 1 && mn.warnings[0] === 'Row fields: COLLEGE is the X axis, DEPT the series.', JSON.stringify([mn.config.xAxis, mn.config.groupBy, mn.warnings]));
 
         // An aggregation the builder cannot do (count_blank is pivot-only).
         MC.setStash({ aggTypes: ['count_blank'], aggLabels: ['Blank'], rowFields: ['COLLEGE'], colFields: [], valField: 'AMOUNT' });
@@ -774,8 +777,12 @@
         // Offered variants respect the column's type and granularity.
         assert('axis bucket: a text column offers no buckets', MC.bucketVariants('COLLEGE').length === 0, JSON.stringify(MC.bucketVariants('COLLEGE')));
         var numV = MC.bucketVariants('AMOUNT');
-        assert('axis bucket: a numeric column offers bin + binlog',
-            numV.length === 2 && numV[0].token === 'AMOUNT:bin' && numV[1].token === 'AMOUNT:binlog', JSON.stringify(numV));
+        // (2026-11-17) Since 0c5903e (2026-11-15, numgate) bins are offered only for a measure: a currency column,
+        // a total_exemptions name, or a column with a numeric summary on (penumbraNumBucketEligible). This page's
+        // AMOUNT is a plain number with none of the three, so it offers nothing here. The qualifying case (a
+        // summary switched on -> bin + binlog) is pinned, with mutants, by suite digitcol (G-plainsb-buckets).
+        assert('axis bucket: a plain numeric column offers no buckets (bins are for measures)',
+            numV.length === 0, JSON.stringify(numV));
     } else {
         assert('chart: __PT10 hooks available', false, window.__PT10_ERR || 'n/a');
     }

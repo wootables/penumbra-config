@@ -217,8 +217,11 @@ MUTANTS = {
     'c-prefs': ([("        // and the header holds the snapshot's columns.\n        if (isViewingSnapshot) return;\n",
                   "        // and the header holds the snapshot's columns.\n")], ['K1b', 'K3'], ['ovcol']),
     # (review) the Save's calculated-column strip by the table's map again: during a view the snapshot's numbering
-    'c-strip': ([("            window.PenumbraCalc.stripFromState(stateObject, _pnbStateNameToIndex());\n",
-                  "            window.PenumbraCalc.stripFromState(stateObject, $('#resultsTable').data('columnNameToOriginalIndex'));\n")],
+    # (2026-11-17) re-anchored: savechg (d2fc4a2, 2026-11-16) gave the call two more arguments (preview, keep-unrun) and a
+    # trailing comment; the map argument is still what the mutant swaps. g-view-leave and b-leave-cmp below re-anchored
+    # the same day: $('body') became $(document.body) on those lines (the selector sweep).
+    'c-strip': ([("            window.PenumbraCalc.stripFromState(stateObject, _pnbStateNameToIndex(), preview, _scKeepUnrun);",
+                  "            window.PenumbraCalc.stripFromState(stateObject, $('#resultsTable').data('columnNameToOriginalIndex'), preview, _scKeepUnrun);")],
                 ['E1', 'R-ovcalc-saved'], ['ovcalc', 'R-ovcalc-saved']),
     # (second review) a view with no stash takes the calculated columns out by the table's (the snapshot's) map
     'c-strip2': ([("        if (isViewingSnapshot) return (originalDataBeforeSnapshot && originalDataBeforeSnapshot.nameToIndex) || null;\n",
@@ -243,7 +246,11 @@ MUTANTS = {
 MUTANTS.update({
     # (snapgrp) a capture during a view reads the screen for the grouping / pivot again
     'g-view': ([("        if (isViewingSnapshot) _pnbSnapStateView(state);\n", "")],
-               ['GV1', 'GV2', 'GV3', 'GV4', 'PV1', 'PV2', 'PV3', 'PV4', 'LG1', 'LP1', 'R-gv-saved', 'R-pv-saved'],
+               # (2026-11-17) LG1 out, LG5 in: since savesweep2 (de52b7f, 2026-11-17) buildStateObject's own chain writes the
+               # grouping a state load PARKED (pendingGroupByColumn) when neither a grouping nor a pivot is drawn - which is
+               # a ?snap= tab of the grouped report as it opens, so LG1's capture is right without _pnbSnapStateView. Once
+               # the viewer regroups the frozen rows (LG5) the screen is read again and only _pnbSnapStateView saves it.
+               ['GV1', 'GV2', 'GV3', 'GV4', 'PV1', 'PV2', 'PV3', 'PV4', 'LG5', 'LP1', 'R-gv-saved', 'R-pv-saved'],
                ['gv', 'pv', 'lzg', 'lzp', 'R-gv-saved', 'R-pv-saved']),
     # nothing of the grouping kept as the view opens
     'g-stash-grp': ([("                        grouping: _pnbGroupingRecordNow(),\n", "                        grouping: null,\n")], ['GV1', 'GV6', 'GV7'], ['gv']),
@@ -326,7 +333,7 @@ MUTANTS.update({
                           ['PV7'], ['pv']),
     # (review 2) group mode kept while a view is on screen: no one-click grouping of the snapshot by the report's column,
     # and the LIVE rows under the snapshot's table at a Remove Grouping made in the view
-    'g-view-leave': ([("                if (originalDataBeforeSnapshot) { $('body').removeClass('group-mode-active'); originalMasterRowData = null; }\n", "")],
+    'g-view-leave': ([("                if (originalDataBeforeSnapshot) { $(document.body).removeClass('group-mode-active'); originalMasterRowData = null; }\n", "")],
                      ['GR1', 'GR2'], ['gvr2']),
 })
 MUTANTS.update({
@@ -334,7 +341,7 @@ MUTANTS.update({
     'b-put': ([("                        _pnbSnapPutBackView(originalDataBeforeSnapshot, _snapBack);   // (snapback) its grouped / pivot view on it\n", "")],
               ['GF1', 'GF3', 'PF1', 'GF6'], ['gvf', 'gvfg', 'pvf', 'cmpvf']),
     # ...a comparison opened on the view left on screen
-    'b-leave-cmp': ([("        if ($('body').hasClass('snapshot-comparison-active')) {\n            var sc = sortCriteria;\n            _teardownComparisonState();\n            sortCriteria = sc;\n        }\n", "")],
+    'b-leave-cmp': ([("        if ($(document.body).hasClass('snapshot-comparison-active')) {\n            var sc = sortCriteria;\n            _teardownComparisonState();\n            sortCriteria = sc;\n        }\n", "")],
                     ['GF6'], ['cmpvf']),
     # ...the view's group mode (and the snapshot's rows) left as the view had them
     'b-put-mode': ([("        if (s.isGroupedVisible) _pnbSnapPutBackGrouping(s.grouping, s.groupMode);\n        else _pnbSnapLeaveGroupMode();\n", "")],
@@ -387,7 +394,12 @@ MUTANTS.update({
     'p-allrows': ([("                _pnbPivotAllRows();\n", "")], ['LS1', 'LS1b'], ['cmpvpz']),
     'p-tail': ([("                    _pnbPivotSearchAfterDraw();", "                    void 0;")], ['LS1', 'LS2', 'LP10'], ['cmpvpz', 'cmpvpe', 'lps']),
     'p-arm': ([("            _pnbPivotSearchNext = String($('#tableSearch').val() || '').trim() ? { of: _pnbPivotFields(currentPivotSettings) } : null;\n",
-                "            _pnbPivotSearchNext = null;\n")], ['LS1', 'LS2', 'LP10'], ['cmpvpz', 'cmpvpe', 'lps']),
+                "            _pnbPivotSearchNext = null;\n"),
+               # (2026-11-17) SURVIVOR repaired: since 6471038 (2026-11-12) ANY Generate under a search arms itself, and the
+               # way back draws through the builder's Generate - the edit above alone changed nothing (all green). "Not
+               # armed" now takes both arms out.
+               ("                if (String($('#tableSearch').val() || '').trim()) _pnbPivotSearchNext = { of: _pnbPivotFields(currentPivotSettings) };\n", "")],
+              ['LS1', 'LS2', 'LP10'], ['cmpvpz', 'cmpvpe', 'lps']),
     'p-transfer': ([("        _pnbPivotSearchTail = _pnbPivotSearchNext; _pnbPivotSearchNext = null;", "        void 0;")], ['LS1', 'LS2', 'LP10'], ['cmpvpz', 'cmpvpe', 'lps']),
     # (review) the flat search's marks left off the rows the Generate read; the flat "No rows match" box left beside the
     # pivot's own message; a view over the comparison drops the preset the pivot was

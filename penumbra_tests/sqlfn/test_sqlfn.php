@@ -22,7 +22,10 @@
  * assertions can actually fail. A harness that has never been seen to fail has
  * not been seen to work.
  *
- * EXPECTED TAIL: "PASS 44   FAIL 0". A smaller pass count is a failure too.
+ * EXPECTED TAIL: "PASS 47   FAIL 0". A smaller pass count is a failure too.
+ * (44 until 2026-11-17: 296b5cc, metricsweep5, moved the function onto the shared
+ * scanner penumbraSqlScrub(), which is lifted here too, and made unreadable
+ * quoting fail closed; three assertions were added for that.)
  */
 $CONTROL = in_array('--control', $argv, true);
 $pass = 0; $fail = 0;
@@ -61,6 +64,12 @@ function lift_function($src, $name) {
 
 $buf = lift_function($SRC, 'penumbraSqlForbiddenFunction');
 if ($buf === null) { fwrite(STDERR, "FATAL: could not lift penumbraSqlForbiddenFunction()\n"); exit(2); }
+// (2026-11-17, follows 296b5cc metricsweep5) the function no longer strips literals itself: it
+// calls penumbraSqlScrub(), "the one scanner", defined just above it in db_connection.php. Lift
+// that too, or the lifted function dies on an undefined call. An older build has no such helper.
+$SCRUB = lift_function($SRC, 'penumbraSqlScrub');
+if ($SCRUB === null && strpos($buf, 'penumbraSqlScrub(') !== false) { fwrite(STDERR, "FATAL: could not lift penumbraSqlScrub()\n"); exit(2); }
+if ($SCRUB !== null) eval($SCRUB);
 eval($buf);
 ok(function_exists('penumbraSqlForbiddenFunction'), 'function lifted from the live db_connection.php and defined');
 
@@ -119,6 +128,13 @@ foreach ($allowed as $c) {
     $r = penumbraSqlForbiddenFunction($c[0]);
     ok($r === null, 'ALLOWED ' . $c[1] . ' -> ' . var_export($r, true));
 }
+// (2026-11-17, 296b5cc) what the shared scanner was brought in for.
+$r = penumbraSqlForbiddenFunction("SELECT 1 AS \"a'\", DBMS_XMLGEN.GETXML(:q) AS \"b'\" FROM DUAL");
+ok($r === 'DBMS_XMLGEN', 'BLOCKED a denied name between two quoted aliases that hold an apostrophe (the old strip swallowed it) -> ' . var_export($r, true));
+$r = penumbraSqlForbiddenFunction("SELECT q'[it's]' AS X, UTL_HTTP.REQUEST(:u) AS Y, 'z' AS Z FROM DUAL");
+ok($r === 'UTL_HTTP', 'BLOCKED a denied name after a q-quote with an inner apostrophe -> ' . var_export($r, true));
+$r = penumbraSqlForbiddenFunction("SELECT 'unclosed FROM AWARD");
+ok($r === '__PENUMBRA_PARSE_FAIL__', 'quoting that does not balance fails closed (parse-fail token) -> ' . var_export($r, true));
 ok(penumbraSqlForbiddenFunction(null) === null, 'non-string input is treated as clean (callers validate the type)');
 
 echo "MUTANT (the family pattern broken - must MISS the headline payload)\n";

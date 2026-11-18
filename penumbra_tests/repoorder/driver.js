@@ -5,15 +5,18 @@
  *   P-loaded       the candidate module parsed and exposed window.PenumbraRepo
  *   P-fixture      the opening payload is in neither date nor title order
  *   J-initial      the opening list shows the payload's order (no date re-sort)
+ *   J-loadmore     Load More appends its rows (server order, duplicates skipped)
  *   P-title-asc    a Title header click sorts A-Z (the sort itself works)
- *   J-reset        the third Title click (sort removed) restores the payload order
+ *   J-sortloads    (2026-11-17, metricsweep3 b2de079 / metricsweep4 9829979) a sort is over EVERY report: with
+ *                  reports still unloaded the sort asks for the rest (ONE "load all" request), and the whole
+ *                  list comes out sorted
+ *   J-reset        the third Title click (sort removed) restores the arrival order (payload, then appended rows)
  *   P-rebuild      a column change while sorted keeps the sort + adds the column
  *   J-rebuild      ...and clearing the sort afterwards still restores the payload order
- *   J-loadmore     Load More appends its rows (server order, duplicates skipped)
  *   J-loadmore-reset  sort + clear afterwards = opening rows then appended rows
  *   J-search       search results keep the server's order (2026-10-21, searchrank: the server ranks them by
  *                  relevance, then newest; until then the client re-sorted them newest-updated first)
- *   J-pill / J-cap (2026-10-21)  the count pill: "6 results found (100 total)" when every match is shown;
+ *   J-pill / J-cap (2026-10-21)  the count pill: "6 results found (52 total)" when every match is shown;
  *                  "3 of 62 matches, best first" (+ the order in its title) when the server capped the search
  *   J-restore      clearing the search brings back the pre-search rows in order
  *   K-cancel / K-escape / K-save (2026-10-15, WCAG 2.4.3)  the details pane's inline tag editor
@@ -51,6 +54,14 @@
         var r = rep(2000 + k, 'rb' + pad(k), 'Older ' + String.fromCharCode(90 - k) + pad(k), ora(25 - k, 'AUG'));
         MORE.push(r); MORE_NEW.push(2000 + k); k++;
     }
+    // (2026-11-17) What is left after Load More: 5 rows the list only gets from a "load all" (since metricsweep3,
+    // b2de079, a sort asks for it). Titles chosen to interleave with the others in a title sort.
+    var MORE2 = [], MORE2_NEW = [];
+    ['Alpha', 'Papa', 'Zulu', 'Mike', 'Bravo'].forEach(function (w, m) {
+        MORE2.push(rep(2100 + m, 'rd' + pad(m), w + ' ' + pad(m), ora(10 - m, 'JUL'))); MORE2_NEW.push(2100 + m);
+    });
+    var REST = MORE.concat(MORE2);                                  // mode=loadmore pages through this by offset / limit
+    var TOTAL = INITIAL.length + MORE_NEW.length + MORE2.length;    // 52 reports in all
     // Search: deliberately NOT date ordered - the server's relevance order, which the list keeps
     // (2026-10-21; the date re-sort it replaced would show 3005,3001,3003,3004,3000,3002).
     var SEARCH = [[3000, 5], [3001, 20], [3002, 1], [3003, 15], [3004, 10], [3005, 25]].map(function (p) {
@@ -69,8 +80,13 @@
         calls.push((o && o.url) + ' ' + JSON.stringify(d));
         var resp = { status: 'success', data: [] };
         if (o && o.url === 'get_server_reports.php') {
-            if (d.mode === 'initial') { resp = { status: 'success', data: clone(INITIAL), total_count: 100 }; }
-            else if (d.mode === 'loadmore') { resp = { status: 'success', data: clone(MORE), total_count: 100 }; }
+            // (2026-11-17) The fake pages like the server: offset / limit over the rest of the list, nothing past its
+            // end, and a total the list can reach. It used to answer EVERY loadmore with the same 20 rows of "100":
+            // harmless while only the Load More button asked, but since metricsweep3 (b2de079) a sort with reports
+            // still unloaded asks for all the rest and keeps asking until the list is whole - against the old fake
+            // that never ended, and its batches landed in the search results (J-search / J-pill / J-cap went red).
+            if (d.mode === 'initial') { resp = { status: 'success', data: clone(INITIAL), total_count: TOTAL }; }
+            else if (d.mode === 'loadmore') { var off = +d.offset || 0; resp = { status: 'success', data: clone(REST.slice(off, off + (+d.limit || 20))), total_count: TOTAL }; }
             else if (d.mode === 'search') { resp = d.search === 'zzcap' ? { status: 'success', data: clone(CAP), total_count: 62 } : { status: 'success', data: clone(SEARCH), total_count: 6 }; }
         }
         var dfd = $.Deferred(), aborted = false;
@@ -113,10 +129,27 @@
         var ok = await waitFor(function () { return domIds().length === 30; });
         t('J-initial', ok && same(domIds(), INIT_IDS), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds()) + ' | want ' + show(INIT_IDS));
 
+        // (2026-11-17) Load More comes BEFORE the first sort now: since metricsweep3 (b2de079) the first sort loads
+        // every report that is left, and the Load More button would have nothing to bring.
+        var WANT_MORE = INIT_IDS.concat(MORE_NEW);
+        $('#loadMoreReportsBtn').trigger('click');
+        ok = await waitFor(function () { return domIds().length === WANT_MORE.length; });
+        await sleep(50);
+        t('J-loadmore', ok && same(domIds(), WANT_MORE), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds().slice(28)) + ' (from row 29)');
+
         clickHead('TITLE');
-        t('P-title-asc', same(domIds(), titleOrder(INIT_IDS)), 'got ' + show(domIds()));
+        t('P-title-asc', same(domIds(), titleOrder(WANT_MORE)), 'got ' + show(domIds()));
+        // (2026-11-17, metricsweep3 b2de079: "A sort is over EVERY report, not the page that happens to be loaded";
+        // metricsweep4 9829979: asked ONCE per list) 47 of 52 are listed: the sort asks for the rest in one
+        // "load all" request (limit 999999 from the Load More cursor), and the whole list comes out sorted.
+        var WANT_ALL = WANT_MORE.concat(MORE2_NEW);
+        ok = await waitFor(function () { return domIds().length === WANT_ALL.length; });
+        await sleep(100);
+        var allCalls = calls.filter(function (c) { return /"mode":"loadmore"/.test(c) && /"limit":999999/.test(c); });
+        t('J-sortloads', ok && same(domIds(), titleOrder(WANT_ALL)) && allCalls.length === 1 && /"offset":20[,}]/.test(allCalls[0] || ''),
+          (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds()) + ' | load-all requests ' + allCalls.length + ': ' + allCalls.join(' ; ').slice(0, 160));
         clickHead('TITLE'); clickHead('TITLE');      // desc, then removed
-        t('J-reset', same(domIds(), INIT_IDS), 'got ' + show(domIds()));
+        t('J-reset', same(domIds(), WANT_ALL), 'got ' + show(domIds()));
 
         // A column change while sorted re-renders every row (rebuildTable).
         clickHead('TITLE');
@@ -124,18 +157,15 @@
         await waitFor(function () { return $('.rc-check[data-key="OWNER_ID"]').length > 0; }, 3000);
         $('.rc-check[data-key="OWNER_ID"]').prop('checked', true).trigger('change');
         var hasOwner = $('#serverReportListTable thead th[data-colkey="OWNER_ID"]').length === 1;
-        t('P-rebuild', hasOwner && same(domIds(), titleOrder(INIT_IDS)), 'owner column ' + hasOwner + ', got ' + show(domIds()));
+        // (2026-11-17) every row listed, in title order (the list is whole here on today's build; INIT_IDS until then)
+        var listed = domIds();
+        t('P-rebuild', hasOwner && listed.length >= INIT_IDS.length && same(listed, titleOrder(listed)), 'owner column ' + hasOwner + ', got ' + show(listed));
         clickHead('TITLE'); clickHead('TITLE');
-        t('J-rebuild', same(domIds(), INIT_IDS), 'got ' + show(domIds()));
+        t('J-rebuild', same(domIds(), WANT_ALL), 'got ' + show(domIds()));
         $('#repoColsBtn').trigger('click');
 
-        var WANT_MORE = INIT_IDS.concat(MORE_NEW);
-        $('#loadMoreReportsBtn').trigger('click');
-        ok = await waitFor(function () { return domIds().length === WANT_MORE.length; });
-        await sleep(50);
-        t('J-loadmore', ok && same(domIds(), WANT_MORE), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds().slice(28)) + ' (from row 29)');
         clickHead('TITLE'); clickHead('TITLE'); clickHead('TITLE');
-        t('J-loadmore-reset', same(domIds(), WANT_MORE), 'got ' + show(domIds()));
+        t('J-loadmore-reset', same(domIds(), WANT_ALL), 'got ' + show(domIds()));
 
         $('#reportFilterInput').val('zzq').trigger('keyup');
         ok = await waitFor(function () { var d = domIds(); return d.length === 6 && d[0] >= 3000; });
@@ -143,7 +173,7 @@
         // The count pill (2026-10-21): every match shown = "N results found (T total)"; the server's
         // total_count above the rows it sent (a search answers at most 50) = "N of M matches, best first".
         var pill = function () { return $.trim($('#reportCountDisplay').text()); };
-        t('J-pill', pill() === '6 results found (100 total)', 'pill "' + pill() + '"');
+        t('J-pill', pill() === '6 results found (' + TOTAL + ' total)', 'pill "' + pill() + '"');   // (2026-11-17) 52: the fixture's total
         $('#reportFilterInput').val('zzcap').trigger('keyup');
         ok = await waitFor(function () { var d = domIds(); return d.length === 3 && d[0] >= 4000; });
         var capTip = String($('#reportCountDisplay').attr('title') || '');
@@ -151,8 +181,8 @@
           (ok ? '' : 'TIMEOUT ') + 'pill "' + pill() + '", title "' + capTip.slice(0, 50) + '"');
 
         $('#reportFilterInput').val('').trigger('keyup');
-        ok = await waitFor(function () { return domIds().length === WANT_MORE.length; });
-        t('J-restore', ok && same(domIds(), WANT_MORE), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds()));
+        ok = await waitFor(function () { return domIds().length === WANT_ALL.length; });
+        t('J-restore', ok && same(domIds(), WANT_ALL), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds()));
 
         // ---- W-*: column widths without a mouse (WCAG 2.1.1, 2026-10-15) ----
         // A focused header takes the report grid's keys (+ / - step 20px, 0 drops its saved width);

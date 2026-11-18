@@ -445,8 +445,9 @@ MUTANTS = {
     'tokencount': ([('js', 'var notToken = function(v) { return !isRecipientVarToken(v); };', 'var notToken = function(v) { return true; };')],
                    ['H-count']),
     # Search no longer settles first
-    'nosubmitsettle': ([('js', '            hideAutocompleteDropdown();' + CRLF + '            const query = buildQuery();' + CRLF,
-                         '            const query = buildQuery();' + CRLF)],
+    # (2026-11-17) re-anchored: the grouped-filter guard (751eec3) now sits between the settle and buildQuery()
+    'nosubmitsettle': ([('js', '            hideAutocompleteDropdown();' + CRLF + "            if (typeof _sbGuard === 'string') return;",
+                         "            if (typeof _sbGuard === 'string') return;")],
                        ['S-first']),
     # "Clear selection" ends the session (wipes the typed filter, as before)
     'clearends': ([('js', '            setRowMultiMode($(hostRowEl), [], { open: true, filter: term });' + CRLF,

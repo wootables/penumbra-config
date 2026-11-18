@@ -90,7 +90,8 @@ MUTANTS = {
     'mdblur':    ('sb', "        if (e.button !== 0) return;" + CR + "        e.preventDefault();", "        if (e.button !== 0) return;", ['B3']),
     'altstop':   ('sb', '                event.preventDefault();' + CR + '                event.stopImmediatePropagation();' + CR + '                _openColumnList();',
                   '                event.preventDefault();' + CR + '                _openColumnList();', ['F2']),
-    'althelp':   ('help', 'or <code>Alt+Down</code></td>', 'or <code>Alt+Up</code></td>', ['S3']),
+    # (2026-11-17) re-anchored: the help's keys are <kbd> now (S3 was brought to that on 11-15, this mutant was not)
+    'althelp':   ('help', 'or <kbd>Alt+Down</kbd></td>', 'or <kbd>Alt+Up</kbd></td>', ['S3']),
     # colvals (2026-10-13)
     'valsoff':   ('sb', '            if (_arrowColumn()) {', '            if (false) {', ['V1', 'V3']),
     'valshow':   ('css', '.pnb-sbox.has-text.pnb-sbox-vals > .pnb-sbox-seg.pnb-sbox-cols {' + CR + '    display: flex;',
@@ -115,6 +116,13 @@ MUTANTS = {
 R = []
 def rec(id_, name, ok, detail=''):
     R.append({'id': id_, 'name': name, 'pass': bool(ok), 'detail': str(detail)[:400]})
+
+# (2026-11-17) main.css, index.php and the help went LF (e65935d and after); search_builder.js is still CRLF. A mutant's
+# anchor written with CR LF is read as LF when only that form is in the file (colopt's eol_pair, 2026-11-16).
+def eol_pair(text, old, new):
+    if CR in old and old not in text and old.replace(CR, '\n') in text:
+        return old.replace(CR, '\n'), new.replace(CR, '\n')
+    return old, new
 
 def read(p):
     with open(p, 'rb') as f: return f.read().decode('utf-8')
@@ -208,6 +216,7 @@ def stage(files_src, mutant):
     text = {k: read(p) for k, p in files_src.items()}
     if mutant:
         fk, old, new, _red = MUTANTS[mutant]
+        old, new = eol_pair(text[fk], old, new)
         n = text[fk].count(old)
         if n != 1: raise RuntimeError("mutant '%s' anchor found %d times (needs the FEATURE build): %s" % (mutant, n, old[:80]))
         text[fk] = text[fk].replace(old, new)
@@ -227,7 +236,7 @@ def static_checks(t):
         'arrow=%s/%s badge=%s' % (has('id="tableSearchCols"'), has('id="schedSearchCols"'), 'tableSearchKey' in idx))
     rec('S2', 'main.css: the .pnb-sbox block is there and no #tableSearchKey rule is left', '.pnb-sbox > .pnb-sbox-seg {' in css and '#tableSearchKey' not in css,
         'block=%s key=%s' % ('.pnb-sbox > .pnb-sbox-seg {' in css, '#tableSearchKey' in css))
-    rec('S3', 'help: the search help names the arrow and Alt+Down', 'pnb-help-arrow' in help_ and 'or <kbd>Alt+Down</kbd>' in help_, 'arrow=%s alt=%s' % ('pnb-help-arrow' in help_, 'or <kbd>Alt+Down</kbd>' in help_))
+    rec('S3', 'help: the search help names the arrow and Alt+Down', 'pnb-help-arrow' in help_ and 'or <kbd>Alt+Down</kbd></td>' in help_, 'arrow=%s alt=%s' % ('pnb-help-arrow' in help_, 'or <kbd>Alt+Down</kbd></td>' in help_))   # (2026-11-17) the keys table's own cell: a later paragraph also says "or Alt+Down", which kept althelp green
     # (2026-10-15, WCAG 2.1.1 / 4.1.2) every role=button segment is a tab stop, and both fields name the arrow's Alt+Down twin
     import re as _re
     segs = ['searchHelpIcon', 'searchBuilderIcon', 'tableSearchCols', 'schedSearchBuilderIcon', 'schedSearchCols']
@@ -259,6 +268,8 @@ def static_checks(t):
 
 def close(a, b, tol=0.6): return abs(a - b) <= tol
 
+THEME_OWN_FIELD = {('theme-forest', 'report'): ('rgb(230, 239, 223)', 'rgb(157, 186, 146)')}
+
 def look_checks(br, themes):
     pg = br.pg
     bad = {k: [] for k in ('K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K10')}
@@ -268,6 +279,9 @@ def look_checks(br, themes):
             pg.ev('__combo(%s, %s)' % (json.dumps(th), json.dumps(den)))
             muted = pg.ev("(function(){var d=document.createElement('span'); d.style.color='var(--text-muted)'; document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c;})()")
             brandt = pg.ev("(function(){var d=document.createElement('span'); d.style.color='var(--brand-text, var(--brand-primary))'; document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c;})()")
+            # (2026-11-17) a theme with its own tint ink (Wolfpack Red, f2bb26e 2026-11-16: the brand's 10% read pink on
+            # parchment) tints the magnifier with that ink at 20%; the glyph stays the brand's. '' = no tint ink.
+            inkbg = pg.ev("(function(){if(!getComputedStyle(document.body).getPropertyValue('--pnb-tint-ink').trim()) return ''; var d=document.createElement('span'); d.style.backgroundColor='color-mix(in srgb, var(--pnb-tint-ink) 20%, transparent)'; document.body.appendChild(d); var c=getComputedStyle(d).backgroundColor; d.remove(); return c;})()")
             for text in (False, True):
                 pg.ev('__text(%s)' % ('true' if text else 'false'))
                 for box in ('report', 'sched'):
@@ -290,7 +304,7 @@ def look_checks(br, themes):
                         flat = s['bg'] == 'rgba(0, 0, 0, 0)' or 'pnb-sbox-sb' in s['cls']   # the magnifier's tint is K10
                         if not (flat and s['bt'] == '0px' and s['bb'] == '0px' and side_ok): bad['K3'].append('%s #%s bg=%s bl=%s br=%s' % (k, s['id'], s['bg'], s['bl'], s['br']))
                     # K10 the magnifier is a button: a brand glyph on a 10% brand tint
-                    if not sb or not (sb[0]['color'] == brandt and ('/ 0.1)' in sb[0]['bg'] or ', 0.1)' in sb[0]['bg'])):
+                    if not sb or not (sb[0]['color'] == brandt and ((sb[0]['bg'] == inkbg and '/ 0.2)' in inkbg) if inkbg else ('/ 0.1)' in sb[0]['bg'] or ', 0.1)' in sb[0]['bg']))):
                         bad['K10'].append('%s color=%s (brand %s) bg=%s' % (k, sb[0]['color'] if sb else None, brandt, sb[0]['bg'] if sb else None))
                     if not sb or L['pl'] < sb[0]['left'] + sb[0]['width'] - 0.5 or (right and L['pr'] < L['w'] - min(s['left'] for s in right) - 0.5):
                         bad['K4'].append('%s pl=%s pr=%s w=%s' % (k, L['pl'], L['pr'], L['w']))
@@ -299,6 +313,10 @@ def look_checks(br, themes):
                     else: want = ['clearSchedSearch', 'schedSearchPlay'] if text else ['schedSearchCols']
                     if ids != want: bad['K5'].append('%s %s' % (k, ids))
                     elif not close(sorted(right, key=lambda s: s['right'])[0]['right'], 1): bad['K5'].append('%s %s not at the edge' % (k, ids[0]))
+                    # (2026-11-17) Zen Forest fills the REPORT box itself (9838f80, 2026-11-15: pale culm green #e6efdf, border
+                    # #9dba92, by #tableSearch), so a plain field is not its reference there; the scheduler's box is still judged by it
+                    _own = THEME_OWN_FIELD.get((th, box))
+                    if _own: L = dict(L, plainBg=_own[0], plainBorderColor=_own[1])
                     if not (L['bg'] == L['plainBg'] and L['border'] == '1px solid' and L['borderColor'] == L['plainBorderColor']):
                         bad['K6'].append('%s bg=%s/%s border=%s %s/%s' % (k, L['bg'], L['plainBg'], L['border'], L['borderColor'], L['plainBorderColor']))
                     for s in right:
@@ -544,7 +562,7 @@ def main():
     print('files: ' + ('CONTROL ' if a.control else '') + json.dumps({k: v for k, v in files.items()})[:600])
     if a.mutants:
         text = {k: read(p) for k, p in files.items()}
-        bad = [n for n, m in MUTANTS.items() if text[m[0]].count(m[1]) != 1]
+        bad = [n for n, m in MUTANTS.items() if text[m[0]].count(eol_pair(text[m[0]], m[1], m[2])[0]) != 1]
         if bad: print('ANCHORS missing / repeated: ' + ', '.join(bad)); print('RESULT: RED'); return
         print('ANCHORS all %d mutants apply exactly once' % len(MUTANTS))
         ok = 0

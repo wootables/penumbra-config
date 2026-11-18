@@ -68,11 +68,15 @@ $mutants = @{
   'take'       = @('main', 'var head = (/^(?:__(?:ALL|ROW|SRC)\s+)*/i.exec(q) || [''''])[0];', 'var head = (/^(?:__SRC\s+)*/i.exec(q) || [''''])[0];')
   'email'      = @('main', 'var _aggPreview = emailReading ? null : _previewPivotAggMatch(query, allCols);', 'var _aggPreview = _previewPivotAggMatch(query, allCols);')
   # The removed single-aggregate alias put back, in the search and in the preview.
-  'alias'      = @('main', '                            // No single-aggregate alias (removed 2026-09-28). With one', ('                            else if (postFilterAggLabels.length === 1 && settings.vals && aqPart.column.toUpperCase() === settings.vals.toUpperCase()) { aggOnlyQuery.push(aqPart); }' + "`r`n" + '                            // No single-aggregate alias (removed 2026-09-28). With one'))
+  # (2026-11-17) rewritten: since 2026-10-31 an `else if (_hasUnsafeOr)` branch sits above the old anchor, and the
+  # inserted `else if` was a syntax error (the page died and the run crashed instead of turning its 4 checks red).
+  'alias'      = @('main', 'if (_hasUnsafeOr || aggNamesUpper.indexOf(aqPart.column.toUpperCase()) !== -1) {', 'if (_hasUnsafeOr || aggNamesUpper.indexOf(aqPart.column.toUpperCase()) !== -1 || (postFilterAggLabels.length === 1 && settings.vals && aqPart.column.toUpperCase() === settings.vals.toUpperCase())) {')
   'aliaspreview' = @('main', ('                colToType[lbl] = aggTypes[i]; colToIdx[lbl] = i;' + "`r`n" + '            });'), ('                colToType[lbl] = aggTypes[i]; colToIdx[lbl] = i;' + "`r`n" + '            });' + "`r`n" + '            if (aggLabelsUpper.length === 1 && settings.vals) { colToType[settings.vals.toUpperCase()] = aggTypes[0]; colToIdx[settings.vals.toUpperCase()] = 0; }'))
   'note'       = @('main', 'return $(''<span class="sched-filter-pivot-note"></span>'')', 'return false && $(''<span class="sched-filter-pivot-note"></span>'')')
   'hintemail'  = @('main', 'var result = window._penumbraSearchAPI.countMatchingRows(filterText, { email: true });', 'var result = window._penumbraSearchAPI.countMatchingRows(filterText);')
-  'rowstrip'   = @('main', 'if (/^__ROW\s+/i.test(query)) {', 'if (false) {')
+  # (2026-11-17) re-anchored: the line exists twice now; this is the 12-space copy (countMatchingRows), the one the
+  # checks read. The 8-space copy (the grouped-summary preview, 2026-09-28) turned nothing red when broken.
+  'rowstrip'   = @('main', '            if (/^__ROW\s+/i.test(query)) {', '            if (false) {')
   'allstrip'   = @('main', "if (!emailReading && `$('#pivot-output-container').is(':visible') && /^__ALL\s+/i.test(query)) {", 'if (false) {')
   'list'       = @('sb', 'if (ctx && ctx.pivotSearch && !ctx.srcRows && window._penumbraSearchAPI &&', 'if (false && ctx && ctx.pivotSearch && !ctx.srcRows && window._penumbraSearchAPI &&')
   'reselect'   = @('sb', 'const exact = $opts.filter(function() { return this.value === currentVal; }).length > 0;', 'const exact = true;')

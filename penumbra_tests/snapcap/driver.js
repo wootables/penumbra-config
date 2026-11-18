@@ -1489,10 +1489,15 @@
     INFO[MODE] = { on: box.is(':visible'), text: box.text().replace(/\s+/g, ' ').trim().slice(0, 80), rows: pivotDepts(), count: $('#resultCount').text(),
                    exit: $('#exitPivotModeBtn').is(':visible'), flat: $('#resultsTable').is(':visible'), saved: pivotState(st1) };
     if (none) {
-      rec('LS1 an A-vs-B comparison on a view of the pivot report, its Clear with a search matching no live row: the report\'s pivot, searched in pivot mode ("No results found in pivot data.", of 3 pivot rows), not the flat table; a capture writes the pivot and its sort',
-        b && on && ab && cl && p1 && /No results found in pivot data/.test(INFO[MODE].text) && INFO[MODE].exit && !INFO[MODE].flat && pivotState(st1) === pivotState(st0), J(INFO[MODE]));
-      rec('LS1c ...the pivot\'s own message only: the flat table\'s "No rows match" box hidden', p1 && /No results found in pivot data/.test(INFO[MODE].text) && !$('#pnbNoSearchMatches').is(':visible'),
-        'box=' + $('#pnbNoSearchMatches').is(':visible'));
+      // (2026-11-17, follows errcards 59c6d5f of 2026-11-15) the pivot's own empty message is now a card drawn by
+      // pnbEmptyState in the pivot container (.pnb-empty, title "The pivot has no cells"); it was the bare line
+      // "No results found in pivot data.". Still the pivot's own message, in pivot mode, and the only one.
+      var card = box.find('.pnb-empty'), own = card.length === 1 && card.is(':visible') && card.find('h3').text().trim() === 'The pivot has no cells';
+      INFO[MODE].card = card.length; INFO[MODE].title = card.find('h3').text().trim();
+      rec('LS1 an A-vs-B comparison on a view of the pivot report, its Clear with a search matching no live row: the report\'s pivot, searched in pivot mode (its own empty card "The pivot has no cells", of 3 pivot rows), not the flat table; a capture writes the pivot and its sort',
+        b && on && ab && cl && p1 && own && INFO[MODE].exit && !INFO[MODE].flat && pivotState(st1) === pivotState(st0), J(INFO[MODE]));
+      rec('LS1c ...the pivot\'s own message only: the flat table\'s "No rows match" box hidden', p1 && own && !$('#pnbNoSearchMatches').is(':visible'),
+        'box=' + $('#pnbNoSearchMatches').is(':visible') + ' card=' + card.length);
       $('#tableSearch').val('');
       await H.search();
       var p2 = await waitFor(pivotBack, 8000);

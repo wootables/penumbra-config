@@ -293,6 +293,10 @@
       R.chk.infoBox = !!b && b.classList.contains('sb-rf-info') && /Saved with the row limit on/.test(b.textContent) && /at most 200 of these 300 rows/.test(b.textContent);
       window.__saveClicks = 0;
       $('#saveQuery').off('click').on('click', function () { window.__saveClicks++; });
+      // (2026-11-17) Since 1957a57 (2026-11-16, "Rows card Save") the card opens the Save dialog through the one
+      // shared entry point, window.penumbraOpenSave(), and clicks #saveQuery only where that is missing. Either
+      // route counts, and exactly one of them must be taken once.
+      if (typeof window.penumbraOpenSave === 'function') { window.penumbraOpenSave = function () { window.__saveClicks++; }; }
       $('#sbRfSave').trigger('click');
       await sleep(100);
       R.chk.saveOpens = window.__saveClicks === 1 && !isOpen();

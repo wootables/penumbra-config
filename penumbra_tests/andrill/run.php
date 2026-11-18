@@ -102,7 +102,8 @@ $mutants = array(
     'falsy'    => array('shared', "        if (\$val === null || \$val === false || \$val === '') continue;\n", "        if (\$val === null) continue;\n"),
     'bareup'   => array('all',    "if (\$anReportScope && \$isAdmin && \$formSubmitted) {", "if (\$anReportScope && \$isAdmin) {"),
     'newtab'   => array('all',    "<a class=\"rlink\" href=\"<?php echo \$anDrillHref(\$h['short']); ?>\"", "<a class=\"rlink\" href=\"<?php echo \$anDrillHref(\$h['short']); ?>\" target=\"_blank\" rel=\"noopener\""),
-    'ungated'  => array('all',    "        <?php if (\$anReportScope && \$isAdmin): ?>\n        <span class=\"crumb\">", "        <?php if (\$anReportScope): ?>\n        <span class=\"crumb\">"),
+    // (2026-11-17) re-anchored: the sidebar crumb went 2026-10-03, the way up is the title crumb (the check at "admins only")
+    'ungated'  => array('all',    "<?php if (\$isAdmin): ?><a class=\"an-crumb\" href=\"<?php echo htmlspecialchars(\$anUpHref); ?>\"", "<?php if (true): ?><a class=\"an-crumb\" href=\"<?php echo htmlspecialchars(\$anUpHref); ?>\""),
     'noplatform' => array('all',  "    'platform'        => true,\n", ''),
     'famtheme' => array('all',    "   if (\$anFamilyTheme) penumbra_admin_theme_script();\n   else penumbra_an_report_theme_script(\$anRptTheme);", "   penumbra_an_report_theme_script(\$anRptTheme);"),
     'onecal'   => array('all',    "if (!\$anCalMode && !\$anReportScope && \$reportSearch !== '') {", "if (!\$anReportScope && \$reportSearch !== '') {"),
@@ -381,20 +382,20 @@ $anchorsAll = array(
     // Platform scope $anReportScope is false and $anCanSeePeople is true (the
     // page is admin-only), so the emulation above is still Platform exactly;
     // the pins below follow the new spellings.
-    "\$prefs = \$anReportScope ? array() : penumbra_an_platform_prefs();" => 'Platform reads its cookie through the shared reader (report scope reads none)',
+    "\$prefs = \$anReportScope ? array() : penumbra_an_roll_prefs(penumbra_an_platform_prefs());" => 'Platform reads its cookie through the shared reader (report scope reads none)',
     "setcookie(\$PREF_COOKIE, json_encode(array(" => 'and still writes it under that name',
     "    'excl_automation' => \$excludeAutomation ? 1 : 0," => 'the cookie keeps Hide automation',
     "    'excl_me'         => \$excludeMe         ? 1 : 0," => '... and Hide my own views (since the switch)',
     "\$anWin = penumbra_an_parse_window(\$_GET, \$prefOr, array('last24h' => true));" => 'emulated: window parse with the cookie',
-    "\$excludeAdmins     = \$formSubmitted ? isset(\$_GET['excl_admins'])     : (bool)\$prefOr('excl_admins',     false);" => 'emulated: Hide admins',
-    "\$excludeAutomation = \$formSubmitted ? isset(\$_GET['excl_automation']) : (bool)\$prefOr('excl_automation', false);" => 'emulated: Hide automation',
-    "\$excludeMe         = \$formSubmitted ? isset(\$_GET['excl_me'])         : (bool)\$prefOr('excl_me',         false);" => 'emulated: Hide my own views (Platform, since the switch)',
+    "\$excludeAdmins     = \$anTick('excl_admins');" => 'emulated: Hide admins',
+    "\$excludeAutomation = \$anTick('excl_automation');" => 'emulated: Hide automation',
+    "\$excludeMe         = \$anTick('excl_me');" => 'emulated: Hide my own views (Platform, since the switch)',
     "\$userSearch = (\$anCanSeePeople && isset(\$_GET['user'])) ? trim(\$_GET['user']) : '';" => 'emulated: user',
     "\$oucSearch = (\$anCanSeePeople && isset(\$_GET['ouc'])) ? preg_replace('/\\D/', '', (string)\$_GET['ouc']) : '';" => 'emulated: department',
     "\nif (\$oucSearch !== '' && !preg_match('/^(\\d{2}|\\d{6})\$/', \$oucSearch)) \$oucSearch = '';" => 'emulated: department (shape)',
     "\$actionPreset = isset(\$_GET['actions_preset']) ? strtolower(trim(\$_GET['actions_preset'])) : (string)\$prefOr('actions_preset', \$anReportScope ? 'view' : 'all');" => 'emulated: Activity (Platform scope starts on all)',
     "\$anCanSeePeople = \$isAdmin;" => 'at Platform scope the person filters are the admin\'s (the page is admin-only)',
-    "\$anDrillCarry = penumbra_an_carry_params(\$anWin, array(\n    'excl_admins'     => \$excludeAdmins,\n    'excl_automation' => \$excludeAutomation,\n    'excl_me'         => \$excludeMe,\n    'user'            => \$userSearch,\n    'ouc'             => \$oucSearch,\n    'tag'             => \$tagSearch,\n    'platform'        => true,\n));" => 'the drill-down carries exactly what section 2 tests (plus the report tag since 2026-10-08)',
+    "\$anDrillCarry = penumbra_an_carry_params(\$anWin, array(\n    'excl_admins'     => \$excludeAdmins,\n    'excl_automation' => \$excludeAutomation,\n    'excl_me'         => \$excludeMe,\n    'user'            => \$userSearch,\n    'ouc'             => \$oucSearch,\n    'tag'             => \$anTagCarry,\n    'platform'        => true,\n));" => 'the drill-down carries exactly what section 2 tests (plus the report tag since 2026-10-08)',
     "return htmlspecialchars('analytics.php?' . http_build_query(array('id' => trim((string)\$shortId)) + \$anDrillCarry));" => 'one href builder, escaped, id first',
     "<div class=\"kpi\" data-go=\"url:<?php echo \$anDrillHref('__HOME__'); ?>\"" => 'Home Visits drills into __HOME__ the same way',
 );
@@ -424,7 +425,7 @@ $anchorsAn = array(
     "    \$excludeAutomation = isset(\$_GET['excl_automation']) && (string)\$_GET['excl_automation'] === '1';" => 'emulated: Hide automation (the address alone)',
     "    \$excludeMe         = isset(\$_GET['excl_me'])         && (string)\$_GET['excl_me'] === '1';" => 'emulated: Hide my own views (the address alone)',
     "\$anUpHref = 'analytics_all.php';\nif (\$anReportScope && \$isAdmin && \$formSubmitted) {" => 'the crumb is bare unless a filter was chosen here (a bare visit never overwrites Platform\'s saved window)',
-    "    \$anUpHref .= '?' . http_build_query(penumbra_an_carry_params(\$anWin, array(\n        'excl_admins'     => \$excludeAdmins,\n        'excl_automation' => \$excludeAutomation,\n        'excl_me'         => \$excludeMe,\n        'user'            => \$userSearch,\n        'ouc'             => \$oucSearch,\n        'tag'             => \$tagSearch,\n    )));" => 'emulated: the crumb carries the window, the three toggles, the person filters and the report tag',
+    "    \$anUpHref .= '?' . http_build_query(penumbra_an_carry_params(\$anWin, array(\n        'excl_admins'     => \$excludeAdmins,\n        'excl_automation' => \$excludeAutomation,\n        'excl_me'         => \$excludeMe,\n        'user'            => \$userSearch,\n        'ouc'             => \$oucSearch,\n        'tag'             => \$anTagCarry,\n    )));" => 'emulated: the crumb carries the window, the three toggles, the person filters and the report tag',
     // 2026-10-03 (the user's call): the way up is the page title's breadcrumb -
     // Analytics > All Reports > <report> - and the sidebar crumb is gone.
     "<?php if (\$isAdmin): ?><a class=\"an-crumb\" href=\"<?php echo htmlspecialchars(\$anUpHref); ?>\"" => 'the way up is the title crumb "All Reports", admins only',

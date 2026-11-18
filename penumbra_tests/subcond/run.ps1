@@ -97,7 +97,8 @@ $mutants = @(
        From = 'if ($subCond !== '''' && $action === ''subscribe'' && !$staleSuppressed && !$isTyped) {';
        To   = 'if (false) {';   Expect = 1 },
     @{ Name = 'the card''s "?" jumps back to the narrow condition item'; File = 'index.php';
-       From = 'data-jump-to="schedHelp-subscriptions" title=';   To = 'data-jump-to="schedHelp-subsCondition" title=';   Expect = 2 },
+       # re-anchored 2026-11-17: the icon's title= became a hover card (data-hcard-title=)
+       From = 'data-jump-to="schedHelp-subscriptions" data-hcard-title=';   To = 'data-jump-to="schedHelp-subsCondition" data-hcard-title=';   Expect = 2 },
     @{ Name = 'the option''s tooltip says "can subscribe" again'; File = 'index.php';
        From = 'matches the condition see the Subscribe option for this schedule.';   To = 'matches a condition can subscribe.';   Expect = 1 },
     # Help mutants (2026-10-21): the four help pins were retargeted from the help_content.php shim to

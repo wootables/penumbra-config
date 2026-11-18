@@ -126,7 +126,9 @@ MUTANTS = {
     'ws-dashglobal': ([('ws', "(D ? !!D.isAdmin : ADMIN === '1')", "(D ? false : ADMIN === '1')")], ['G-items', 'G-tools', 'G-recent'], ['ddash']),
     'ws-dashtitle': ([('ws', "            return (dashOpen() && t) ? t : 'Dashboards';", "            return 'Dashboards';")], ['G-title'], ['ddash']),
     'ws-dashlinkurl': ([('ws', "            run: function () { copyText(window.location.href, 'Link copied.'); } };\n    }\n    // Quick actions", "            run: function () { copyText('dashboard.php', 'Link copied.'); } };\n    }\n    // Quick actions")], ['G-copy'], ['ddash']),
-    'ws-viewport': ([('ws', "    function viewW() { return Math.min(document.documentElement.clientWidth || window.innerWidth, window.innerWidth); }", "    function viewW() { return window.innerWidth; }")], ['R-place'], ['rmenu']),
+    # (2026-11-17) re-anchored: since 4863b29 (2026-11-06, popmenu round 2) place() measures the menu's OWN window through
+    # viewWIn(w); viewW() is left to a submenu's flip only, so the old edit applied and changed nothing R-place sees (a survivor)
+    'ws-viewport': ([('ws', "    function viewWIn(w) { return Math.min(w.document.documentElement.clientWidth || w.innerWidth, w.innerWidth); }", "    function viewWIn(w) { return w.innerWidth; }")], ['R-place'], ['rmenu']),
     'ws-themenow': ([('ws', "        if (t) { return t; }\n", "        return 'theme-default';\n")], ['A-theme', 'D-theme'], ['ractions', 'dadmin']),
     'ws-densitynow': ([('ws', "        return b.contains('density-compact') ? 'compact' : (b.contains('density-easy-read') ? 'easy-read' : 'standard');", "        return 'standard';")], ['A-density', 'D-density'], ['ractions', 'dadmin']),
     'ws-themekeep': ([('ws', "            function (v) { return /^theme-/.test(v); }, themeNow);", "            function (v) { return true; }, themeNow);")], ['A-theme', 'D-theme'], ['ractions', 'dadmin']),
@@ -145,8 +147,9 @@ MUTANTS = {
     'ws-fitcan': ([('ws', "        if (!W || !th || typeof W.canFit !== 'function' || !W.canFit(th)) { return out; }", "        if (!W || !th) { return out; }")], ['V-fitRestricted'], ['rviewer']),
     'ws-fitswap': ([('ws', "                run: function () { W.fitAll(th); } });", "                run: function () { W.fitPage(th); } });")], ['F-fitAll', 'F-grouped'], ['rfit']),
     # (cind) back at the foot of the menu, where they were
+    # (2026-11-17) second anchor moved: e8f6467 (2026-11-11, wsclear) put a rule and Clear all customizations... after Consistent row height
     'ws-fitorder': ([('ws', "        if (kind === 'report') { fitItems().forEach(add); rule(); }\n", ""),
-                     ('ws', "            add(rowHeightItem());\n        } else if (kind === 'admin'", "            add(rowHeightItem());\n            fitItems().forEach(add);\n        } else if (kind === 'admin'")], ['R-items', 'F-items'], ['rmenu', 'rfit']),
+                     ('ws', "            add(rowHeightItem());\n            rule();\n            add(clearItem());", "            add(rowHeightItem());\n            fitItems().forEach(add);\n            rule();\n            add(clearItem());")], ['R-items', 'F-items'], ['rmenu', 'rfit']),
     'dp-noload': ([('dash', "<script src=\"js/penumbra_wsmenu.js?v=<?php echo (int)@filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-dashLoads'], []),
     'dp-notools': ([('dash', "<?php if (!empty($isAdmin)): ?><div hidden><?php penumbra_admin_tools_menu(); ?></div><?php endif; ?>", "")], ['S-dashLoads'], []),
     'ix-noload': ([('index', "<script defer src=\"js/penumbra_wsmenu.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-indexLoads'], []),

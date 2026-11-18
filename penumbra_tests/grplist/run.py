@@ -94,9 +94,13 @@ CHK = {
              'rowFlush', 'bandTint', 'oneInset', 'ringOff',   # round 5: the row joins its pane
              'onePill', 'noSep',   # round 6: one vocabulary, no floating bullet
              'noEdgeWhileFits',   # glfit: no second rule beside a list that fits
-             'darkEdge'],   # glsweep: a dark theme draws it anyway, in the grid's colour
+             'darkEdge',   # glsweep: a dark theme draws it anyway, in the grid's colour
+             'headBand', 'headText', 'headOneLine',   # glhead (2026-11-17): the list's header row
+             'footTall',   # glfoot: the All groups footer is 3.5em too
+             'paneTint'],   # gltint: the list's column on a shade of its own
     'many': ['longList', 'listScrolls', 'barUnderList', 'capped', 'edgeWhileScrolls', 'listKeep', 'rowStays',   # gltot
-             'edgeColour'],   # glsweep
+             'edgeColour',   # glsweep
+             'underHead'],   # glhead: a row walked into view stops under the pinned header
     'click': ['shown', 'aria', 'keepOpen', 'fitMoved'],
     'keys': ['down', 'end', 'home', 'upStays', 'shownFollows'],
     'search': ['searchEvent', 'listFollows', 'moved', 'items4', 'count', 'oneShown'],
@@ -108,7 +112,8 @@ CHK = {
     'layoutonly': ['startsStacked', 'noRegroup', 'listOn', 'closed', 'regroup', 'stackedAgain'],
     'wide': ['minWidth', 'scrolls', 'headerSticky', 'headsFit'],   # round 7: no heading cut short
     # stackfit (2026-10-13): Stacked scrolls sideways too (was noMinWidth + noScroll)
-    'widestacked': ['stackRule', 'screenOnly', 'scrolls', 'headerSticky', 'aligned', 'followsDensity', 'keptClosed',
+    'widestacked': ['stackJoin',   # grpjoin (2026-11-17): the stacked groups as one connected table
+                    'stackRule', 'screenOnly', 'scrolls', 'headerSticky', 'aligned', 'followsDensity', 'keptClosed',
                     'dropsStale', 'reopens', 'listOwns', 'headsFit', 'syncCheap'],   # stackfit2: no heading cut short
     # stackfit3: a short group and a tall one, a heading held - neither scrolls
     'fitstacked': ['measured', 'fits', 'tableFills', 'headsFit', 'heldRule', 'mixedHeights', 'mixedHeads',
@@ -602,12 +607,37 @@ MUTANTS = {
     # the band shows no path to a nested group
     'nocrumb': ([('mod', "        if (sel) { sel.classList.toggle('pnb-gl-deep', names.length > 0); }", "")],
                 ['L-nested-crumb'], ['nested']),
+    # ---- glhead (2026-11-17): the list's header row ----
+    # no header: the first row is back at the frame's top, nothing names the grouping
+    'headgone': ([('mod', "        frag.appendChild(headEl(hi));\n", "")],
+                 ['L-boot-rowFlush', 'L-boot-headBand', 'L-boot-headText'], ['boot']),
+    # the header keeps its own 3em: a pixel off the band's bottom line (the band's 1px rule)
+    'headnosync': ([('mod', "            if (lhd && lhd.style.minHeight !== hmh) { lhd.style.minHeight = hmh; }\n", "")],
+                   ['L-boot-headBand'], ['boot']),
+    # columns that never shrink: a narrow list's header spills past its edge instead of ending in an ellipsis
+    'headwrap': ([('css', "    grid-template-columns: minmax(2em, 1fr) minmax(0, max-content);", "    grid-template-columns: max-content max-content;")],
+                 ['L-boot-headOneLine'], ['boot']),
+    # the band back at a row's 3em: shorter than the table's header row under it
+    'bandshort': ([('css', "    padding: 0 1em;\n    min-height: 3.5em;\n    background: var(--bg-surface-alt, #eef1f6);\n}", "    padding: 0 1em;\n    min-height: 3em;\n    background: var(--bg-surface-alt, #eef1f6);\n}")],
+                  ['L-boot-bandTint'], ['boot']),
+    # the All groups footer back at a row's 3em (glfoot)
+    'footshort': ([('css', "    padding: 0 1em;\n    min-height: 3.5em;\n    background: var(--pnb-gl-pane, var(--bg-surface, #ffffff));\n}", "    padding: 0 1em;\n    min-height: 3em;\n    background: var(--pnb-gl-pane, var(--bg-surface, #ffffff));\n}")],
+                  ['L-boot-footTall'], ['boot']),
+    # the list's pane colour gone: the list on the frame's surface again (gltint)
+    'tintgone': ([('css', "    --pnb-gl-pane: color-mix(in srgb, var(--bg-surface, #ffffff) 96.5%, var(--text-main, #222222));\n", "")],
+                 ['L-boot-paneTint'], ['boot']),
+    # (grpjoin) the 12px gap between stacked groups is back
+    'stackgap': ([('mcss', "#groupedResultsContainer .group-wrapper {\n    margin-bottom: 0;", "#groupedResultsContainer .group-wrapper {\n    margin-bottom: 12px;")],
+                 ['L-widestacked-stackJoin'], ['widestacked']),
+    # no scroll padding: a row walked up into view stops behind the pinned header
+    'headnopad': ([('mod', "            if (l.style.scrollPaddingTop !== lsp) { l.style.scrollPaddingTop = lsp; }\n", "")],
+                  ['L-many-underHead'], ['many']),
     # ---- round 5 (grplist5): the selected row joins its pane ----
     # the reserved scrollbar gutter is back: the row stops 11px short of the divider
     'gutterback': ([('css', "    scrollbar-width: thin;\n    /* No reserved gutter (grplist5):", "    scrollbar-width: thin;\n    scrollbar-gutter: stable;\n    /* No reserved gutter (grplist5):")],
                    ['L-boot-rowFlush'], ['boot']),
     # the band keeps the theme's own grey and its 14px padding: not the row's colour or height
-    'bandgrey': ([('css', "    padding: 0 1em;\n    min-height: 3em;\n    background: var(--bg-surface-alt, #eef1f6);\n}", "}")],
+    'bandgrey': ([('css', "    padding: 0 1em;\n    min-height: 3.5em;\n    background: var(--bg-surface-alt, #eef1f6);\n}", "}")],
                  ['L-boot-bandTint'], ['boot']),
     # a flat list keeps the blank twisty slot: names 18px off the inset
     'twistyback': ([('css', "#pnbGroupList:not(:has(.pnb-gl-item[aria-expanded])) .pnb-gl-twisty {\n    display: none;\n}", "")],

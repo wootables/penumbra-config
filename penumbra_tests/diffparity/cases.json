@@ -1,0 +1,198 @@
+[
+  {
+    "name": "identical",
+    "what": "all columns, nothing changed",
+    "keys": null,
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ]
+  },
+  {
+    "name": "allcols-edit",
+    "what": "all columns: an edit is a New + Removed pair, plus one added and one dropped row",
+    "keys": null,
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$250.00", "NOTE": "y"},
+      {"RID": "r4", "ID": "4", "NAME": "Delta", "AMOUNT": "$400.00", "NOTE": "w"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ]
+  },
+  {
+    "name": "key-modified",
+    "what": "key ID: one cell changed, two cells changed, one new, one removed, one unchanged",
+    "keys": ["ID"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$250.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charly", "AMOUNT": "$350.00", "NOTE": "z"},
+      {"RID": "r5", "ID": "5", "NAME": "Echo", "AMOUNT": "$500.00", "NOTE": "v"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"},
+      {"RID": "r4", "ID": "4", "NAME": "Delta", "AMOUNT": "$400.00", "NOTE": "w"}
+    ]
+  },
+  {
+    "name": "duplicate-keys",
+    "what": "key ID with the same key twice on both sides: paired by place",
+    "keys": ["ID"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "a1", "ID": "7", "NAME": "Golf", "AMOUNT": "$10.00", "NOTE": "first"},
+      {"RID": "a2", "ID": "7", "NAME": "Golf", "AMOUNT": "$25.00", "NOTE": "second"},
+      {"RID": "a3", "ID": "7", "NAME": "Golf", "AMOUNT": "$30.00", "NOTE": "third"},
+      {"RID": "b1", "ID": "8", "NAME": "Hotel", "AMOUNT": "$80.00", "NOTE": "only"}
+    ],
+    "snap": [
+      {"RID": "a1", "ID": "7", "NAME": "Golf", "AMOUNT": "$10.00", "NOTE": "first"},
+      {"RID": "a2", "ID": "7", "NAME": "Golf", "AMOUNT": "$20.00", "NOTE": "second"},
+      {"RID": "b1", "ID": "8", "NAME": "Hotel", "AMOUNT": "$80.00", "NOTE": "only"},
+      {"RID": "b2", "ID": "8", "NAME": "Hotel", "AMOUNT": "$81.00", "NOTE": "extra"}
+    ]
+  },
+  {
+    "name": "ignore-with-key",
+    "what": "key ID, NOTE ignored: a row that differs only in NOTE is unchanged; one that also differs in AMOUNT is modified",
+    "keys": ["ID", "!NOTE"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "new note"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$250.00", "NOTE": "new note"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ]
+  },
+  {
+    "name": "ignore-no-key",
+    "what": "no key, NOTE ignored: rows pair on every other shared column",
+    "keys": ["!NOTE"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "new note"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$250.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ]
+  },
+  {
+    "name": "column-added",
+    "what": "all columns, the live side has a column the snapshot lacks: compared on the shared ones",
+    "keys": null,
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$250.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00"}
+    ]
+  },
+  {
+    "name": "key-missing-in-snapshot",
+    "what": "keys ID + NOTE, the snapshot has no NOTE: the scheduler carries on with ID; that must equal the browser compared on ID",
+    "keys": ["ID", "NOTE"],
+    "browserKeys": ["ID"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$250.00", "NOTE": "y"},
+      {"RID": "r5", "ID": "5", "NAME": "Echo", "AMOUNT": "$500.00", "NOTE": "v"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00"}
+    ]
+  },
+  {
+    "name": "key-missing-browser-stops",
+    "what": "the same pair with the keys as given: BY DESIGN the browser stops and names the key (a person can pick again), the scheduler has nobody to ask",
+    "keys": ["ID", "NOTE"],
+    "expect": "browser-stops",
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$250.00", "NOTE": "y"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00"}
+    ]
+  },
+  {
+    "name": "blank-and-null",
+    "what": "key ID: an empty cell against a null one is no change; an empty cell against a value is",
+    "keys": ["ID"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": ""},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": null},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": ""}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": null},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "$200.00", "NOTE": ""},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "was here"}
+    ]
+  },
+  {
+    "name": "spacing-and-case",
+    "what": "key ID: a trailing space, a doubled space and a change of letter case - each side must call them the same thing",
+    "keys": ["ID"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha ", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo  Two", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "CHARLIE", "AMOUNT": "$300.00", "NOTE": "z"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "$100.00", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo Two", "AMOUNT": "$200.00", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "$300.00", "NOTE": "z"}
+    ]
+  },
+  {
+    "name": "numbers-as-text",
+    "what": "key ID: 100 against 100.0 and 1,000 against 1000 - text on both sides, so both must agree",
+    "keys": ["ID"],
+    "cols": ["RID", "ID", "NAME", "AMOUNT", "NOTE"],
+    "live": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "100", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "1,000", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "300", "NOTE": "z"}
+    ],
+    "snap": [
+      {"RID": "r1", "ID": "1", "NAME": "Alpha", "AMOUNT": "100.0", "NOTE": "x"},
+      {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "1000", "NOTE": "y"},
+      {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "300", "NOTE": "z"}
+    ]
+  }
+]

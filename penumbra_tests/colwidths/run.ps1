@@ -163,10 +163,14 @@ $mutantDefs = [ordered]@{
   # (2026-10-18) the fit without its Undo; Shift ignored on the double press
   'nofitundo'   = @{ file = 'module'; edits = @(,@("            if (drill) { setWidth(c, had === null ? 'auto' : had); } else { host.setUser(c.key, had); apply(); }", "")); red = @('D6c') }
   'noshift'     = @{ file = 'module'; edits = @(,@("if (e.shiftKey) { fitAll(c); } else { fitOne(c); }", "fitOne(c);")); red = @('D6d') }
-  'noundo'      = @{ file = 'module'; edits = @(,@("Object.keys(before).forEach(function (k) { host.setUser(k, before[k]); });", "")); red = @('D6b') }
-  'pivotscope'  = @{ file = 'module'; edits = @(,@("return (k.indexOf('PIVOT:') === 0) === pivot;", "return true;")); red = @('M6') }
+  # (2026-11-17) noundo re-anchored to the RESET's undo: Fit all (17bb9c4, 2026-10-18) and the pivot fit (ddc2e47,
+  # 2026-11-04) added the same line twice more. Its check moved too: D6b was re-purposed on 2026-10-18 (the double
+  # press became a fit) and nothing pressed the reset's Undo any more; M6b (new, driver.js) does.
+  'noundo'      = @{ file = 'module'; edits = @(,@("' widths reset', function () {`n            Object.keys(before).forEach(function (k) { host.setUser(k, before[k]); });", "' widths reset', function () {")); red = @('M6b') }
+  # (2026-11-17) pivotscope re-anchored to the reset's own filter: resizedView (f41ef22, 2026-10-22) repeats the test
+  'pivotscope'  = @{ file = 'module'; edits = @(,@("keys = Object.keys(user).filter(function (k) { return (k.indexOf('PIVOT:') === 0) === pivot; });", "keys = Object.keys(user).filter(function (k) { return true; });")); red = @('M6') }
   'noescape'    = @{ file = 'module'; edits = @(,@("if (e.key === 'Escape' || e.key === 'Esc') {", "if (false) {")); red = @('D7') }
-  'escdocument' = @{ file = 'module'; edits = @(,@("        window.addEventListener('keydown', onDragKey, true);", "        document.addEventListener('keydown', onDragKey, true);")); red = @('D7') }
+  'escdocument' = @{ file = 'module'; edits = @(,@("        dw.addEventListener('keydown', onDragKey, true);", "        dd.addEventListener('keydown', onDragKey, true);")); red = @('D7') }   # (2026-11-17) re-anchored: 4863b29 (popmenu round 2) listens on the header's own window (dw) / document (dd)
   'noclamp'     = @{ file = 'module'; edits = @(,@("function clampDrag(w) { return Math.max(drag ? drag.min : host.min, Math.min(drag ? drag.max : host.max, Math.round(w))); }", "function clampDrag(w) { return Math.round(w); }")); red = @('D8','V5','Y4') }
   # module: keys, gate, note, off switch
   'nokeys'      = @{ file = 'module'; edits = @(,@("            row.addEventListener('keydown', onKey);", "")); red = @('K1') }
@@ -180,12 +184,14 @@ $mutantDefs = [ordered]@{
   'noauto'      = @{ file = 'main'; edits = @(,@("if (v === 'auto') { if (allowAuto) out[name] = 'auto'; return; }", "if (v === 'auto') { return; }")); red = @('U2','U3','P1') }
   'nodiffer'    = @{ file = 'main'; edits = @(,@("        userColumnWidths = penumbraColWidthsUserDiff();$NL        if (!currentLoadedStateName) return;", "        if (!currentLoadedStateName) return;")); red = @('P1') }
   'nohydrate'   = @{ file = 'main'; edits = @(,@("        userColumnWidths = penumbraCleanColWidths(prefs && prefs.widths, true);", "")); red = @('P3') }
-  'nocarry'     = @{ file = 'main'; edits = @(,@("        if (existing && existing.widths && typeof existing.widths === 'object') savedData.widths = existing.widths;", "")); red = @('P2') }
+  # (2026-11-17) nocarry was EQUIVALENT since colopt (2026-10-12): Save Column Layout then carries EVERY key it does not
+  # set, so cutting the widths line alone changed nothing (P2 stayed green, rightly). It now cuts both carries.
+  'nocarry'     = @{ file = 'main'; edits = @(@("        if (existing && existing.widths && typeof existing.widths === 'object') savedData.widths = existing.widths;", ""), @("                if (!Object.prototype.hasOwnProperty.call(savedData, k)) savedData[k] = existing[k];", "                if (k !== 'widths' && !Object.prototype.hasOwnProperty.call(savedData, k)) savedData[k] = existing[k];")); red = @('P2') }
   'nosave'      = @{ file = 'main'; edits = @(,@("            state.columnWidths = _colWidths;", "")); red = @('P4','P5') }
   'noforward'   = @{ file = 'main'; edits = @(,@("            if (!ths.length || !(window.Penumbra && window.Penumbra.colWidths)) return stored;", "            if (false) return stored;")); red = @('P5','O2') }
   'nofailsafe'  = @{ file = 'main'; edits = @(,@("        } catch (e) { return stored; }", "        } catch (e) { throw e; }")); red = @('P9') }
   'nosaved'     = @{ file = 'main'; edits = @(,@("        reportColumnWidths = penumbraCleanColWidths(saved, false);", "")); red = @('P7') }
-  'nostateload' = @{ file = 'main'; edits = @(,@("                reportColumnWidths = penumbraCleanColWidths(decodedState ? decodedState.columnWidths : null, false);", "")); red = @('G13') }
+  'nostateload' = @{ file = 'main'; edits = @(,@("                reportColumnWidths = penumbraCleanColWidths(_pnbSettingsState ? _pnbSettingsState.columnWidths : null, false);", "")); red = @('G13') }   # (2026-11-17) re-anchored: d51597b (rerunsettings, 2026-10-13) reads _pnbSettingsState
   'nogatemain'  = @{ file = 'main'; edits = @(,@("        return !penumbra_vars.isAdmin && !!window._penumbraHideColumns;", "        return false;")); red = @('R2') }
   'nopill'      = @{ file = 'main'; edits = @(,@("            var widthsDiff = _ccWidthsDiff();", "            var widthsDiff = null;")); red = @('C1') }
   'pillwhenoff' = @{ file = 'main'; edits = @(,@("            if (!currentLoadedStateName || !(window.Penumbra && window.Penumbra.colWidths)) return null;", "            if (!currentLoadedStateName) return null;")); red = @('C2') }
@@ -204,7 +210,7 @@ $mutantDefs = [ordered]@{
   'drillmark'   = @{ file = 'module'; edits = @(@('        if (table.classList && table.classList.contains(''pnb-breakdown'') && table.ownerDocument === document) {', '        if (table.classList && table.classList.contains(''infobox-drill-table'') && table.ownerDocument === document) {'), @('        return !!th && !!th.closest(''table.pnb-breakdown > thead'');', '        return !!th && !!th.closest(''table.infobox-drill-table > thead'');')); red = @('E6') }
   'drillsession'= @{ file = 'module'; edits = @(,@('        if (key !== drillKey) { drillW = Object.create(null); drillKey = key; }', '')); red = @('E7') }
   'drillopen'   = @{ file = 'module'; edits = @(,@('            document.addEventListener(''penumbra:breakdown-opened'', function () { apply(); });', '')); red = @('E3') }
-  'drillfocus'  = @{ file = 'module'; edits = @(,@(('            stampDrillFocus();' + $LF + '        }' + $LF + '        syncNote();'), ('        }' + $LF + '        syncNote();'))); red = @('E0') }
+  'drillfocus'  = @{ file = 'module'; edits = @(,@(('            stampDrillFocus();' + $LF + '        }' + $LF + '        syncNote();'), ('        }' + $LF + '        syncNote();'))); red = @('E0b') }   # (2026-11-17) was E0 (the tab stop): since the a11y sweep 4780452 (2026-10-15) main.js writes tabindex="0" into a breakdown's headers itself, so what stampDrillFocus still gives alone is the keys hint (E0b)
   # (No mutant for the views switch on breakdowns: it is gated in three places -
   # colOf(), the listeners' registration and apply()'s VIEWS block - so no single
   # edit opens it; W5 holds the combined behaviour.)
@@ -248,11 +254,11 @@ $mutantDefs = [ordered]@{
   'zpickgt'     = @{ file = 'module'; edits = @(,@("            if (tw) { out.push({ value: 'total', field: vf, w: tw }); }", "")); red = @('Z2') }
   'zfloorwhich' = @{ file = 'module'; edits = @(,@("        var v = which === 'total' ? '.' + GT_CLASS : ':not([data-row-field]):not([colspan]):not(.' + GT_CLASS + ')';", "        var v = '.' + GT_CLASS;")); red = @('Z3','Z4','Y4') }
   'zlabelall'   = @{ file = 'module'; edits = @(,@("        else if (c.n > 1) { note = ' (all ' + c.n + ' columns)'; }", "")); red = @('Z5') }
-  'zannounce'   = @{ file = 'module'; edits = @(,@("        var many = c.n > 1;", "        var many = false;")); red = @('Z7') }
+  'zannounce'   = @{ file = 'module'; edits = @(,@("        var many = c.n > 1;`n        say(w ?", "        var many = false;`n        say(w ?")); red = @('Z7') }   # (2026-11-17) re-anchored to announce(): fitPivotOne (ddc2e47, pvfit) has the same line
   # 2026-10-01 - a TWO-row header: groups and leaves (round 5)
   'mnomark'     = @{ file = 'module'; edits = @(,@("                var Gm = P + '[' + GRID_ATTR + ']', lf = L.grid;", "                var Gm = P, lf = L.grid;")); red = @('M11','M13') }
   'mpos'        = @{ file = 'module'; edits = @(,@("            leaves[i].p = n - i;", "            leaves[i].p = n - i + 1;")); red = @('M1') }
-  'mgroupfirst' = @{ file = 'module'; edits = @(,@("            for (var i = 0; i < c.keys.length; i++) { host.setUser(c.keys[i], ws ? ws[i] : 'auto'); }", "            for (var i = 0; i < 1; i++) { host.setUser(c.keys[i], ws ? ws[i] : 'auto'); }")); red = @('M2','M5','M6') }
+  'mgroupfirst' = @{ file = 'module'; edits = @(,@("            for (var i = 0; i < c.keys.length; i++) { host.setUser(c.keys[i], ws ? ws[i] : 'auto'); }", "            for (var i = 0; i < 1; i++) { host.setUser(c.keys[i], ws ? ws[i] : 'auto'); }")); red = @('M2','M5','M14') }   # (2026-11-17) was M2 M5 M6: a pivot's double press is resetAll (since 2026-10-08), which never runs this loop, so M6 cannot see it; M14 (a year dragged far left stores EACH leaf) does and goes red
   'msplitfloor' = @{ file = 'module'; edits = @(,@("                if (!held[i] && mins[i] > left / free) { held[i] = true; out[i] = mins[i]; left -= mins[i]; free--; moved = true; }", "")); red = @('M14') }
   'mbyname'     = @{ file = 'module'; edits = @(,@("            var th = top[i], g = { th: th, id: th.classList.contains(GT_CLASS) ? 'T' : String(gi++), leaves: [] };", "            var th = top[i], g = { th: th, id: th.classList.contains(GT_CLASS) ? 'T' : headText(th), leaves: [] };")); red = @('M4') }
   'mgtindex'    = @{ file = 'module'; edits = @(,@("            var th = top[i], g = { th: th, id: th.classList.contains(GT_CLASS) ? 'T' : String(gi++), leaves: [] };", "            var th = top[i], g = { th: th, id: String(gi++), leaves: [] };")); red = @('M4') }

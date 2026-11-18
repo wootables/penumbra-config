@@ -73,6 +73,13 @@ $MUTANTS = array(
                             array('W-reader-retired', 'B-refused')),
     'decodetoggle' => array('manage_journal.php', " || in_array(\$fkey, \$keys, true)", "",
                             array('F-toggle-wins')),
+    'bulkundo'     => array('manage_journal.php', "\$refusal = journalFieldWriteRefusal(\$report, \$field_key, \$undoTo !== null ? array() : \$wanted, \$currentUserKey, \$isAdmin);",
+                            "\$refusal = journalFieldWriteRefusal(\$report, \$field_key, \$wanted, \$currentUserKey, \$isAdmin);",
+                            array('B-undo-retired')),
+    'undokept'     => array('manage_journal.php', "            if (\$undoTo !== null && \$now !== \$undoTo[\$rk]) { \$kept++; continue; }", "",
+                            array('B-undo-retired')),
+    'samemove'     => array('manage_journal.php', "                            if (\$oldK === \$row_key) { \$movedSame = true; continue; }", "                            if (\$oldK === \$row_key) { continue; }",
+                            array('H-samemove')),
     'editorbypass' => array('manage_journal.php', "    if (journalCallerCanEditReport(\$report, \$uid, \$isAdmin)) return null;\n    if (!is_array(\$f['fields'])) return null;",
                             "    if (!is_array(\$f['fields'])) return null;",
                             array('W-editor', 'D-write-editor')),
@@ -225,7 +232,8 @@ $histIsNew = strpos($mj, "\$fieldHistory = (\$action === 'field_history');") !==
 $fns = array();
 foreach (array('journalReportStateFlags', 'journalFieldValueOf', 'journalFieldWriteRefusal', 'journalFieldAuditContext',
                'journalFieldMergeSql', 'journalFieldCurrent', 'journalIsMissingColumnError', 'journalFieldWriteFailure', 'journalCallerCanEditReport',
-               'journalToggleRowCount', 'journalSanitizeToggleKey', 'journalIsMissingTableError', 'journalInstallStatements') as $fn) {
+               'journalToggleRowCount', 'journalSanitizeToggleKey', 'journalIsMissingTableError', 'journalInstallStatements',
+               'journalFieldUndoKey', 'journalFieldUndoSig') as $fn) {   // (2026-11-17, bulkundo) the Undo's signature
     $fns[$fn] = lift_tokens($mj, "function $fn(", true);
 }
 A('P-lifted', $bodies['set_field'] !== '' && $bodies['set_fields_bulk'] !== '' && $bodies['field_status'] !== '' && $histIsNew
@@ -285,7 +293,7 @@ function queryViaOci8($sql, $binds = array()) {
     }
     if (strpos($sql, 'SELECT DISTINCT TOGGLE_KEY') !== false) return $GLOBALS['USED'];
     if (strpos($sql, 'STATE = 1') !== false && strpos($sql, 'TOGGLE_KEY, ROW_KEY') !== false) return $GLOBALS['TOGGLE_ROWS'];
-    if (strpos($sql, "'JOURNAL_REKEY'") !== false) return array();
+    if (strpos($sql, "'JOURNAL_REKEY'") !== false) return isset($GLOBALS['REKEY_ROWS']) ? $GLOBALS['REKEY_ROWS'] : array();   // (2026-11-17, samemove) a scenario's moves
     throw new Exception('unexpected SQL: ' . substr($sql, 0, 200));
 }
 function queryViaOci8Each($sql, $binds, $cb) {
@@ -293,6 +301,7 @@ function queryViaOci8Each($sql, $binds, $cb) {
     $act = preg_match("/ACTION = '([A-Z_]+)'/", $sql, $m) ? $m[1] : '?';
     foreach ($GLOBALS['AUDIT_ROWS'] as $row) { if ($row['ACTION'] === $act) $cb($row); }
 }
+$config = array('scheduler_secret_key' => 'picklist-suite-secret');   // (bulkundo) the signing key's base, as db_connection.php's
 foreach ($fns as $fn => $code) { if ($code !== '' && !function_exists($fn)) eval($code); }
 // The control has none of the new helpers: what the lifted bodies call must exist.
 if (!function_exists('journalSanitizeToggleKey')) { function journalSanitizeToggleKey($k) { return strtolower((string)$k); } }
@@ -395,6 +404,7 @@ $run = function ($body, $data, $setup) {
     $GLOBALS['COLCNT'] = isset($setup['colcnt']) ? $setup['colcnt'] : 1;
     $GLOBALS['COLERR'] = !empty($setup['colerr']);
     $GLOBALS['AUDIT_ROWS'] = isset($setup['auditRows']) ? $setup['auditRows'] : array();
+    $GLOBALS['REKEY_ROWS'] = isset($setup['rekeyRows']) ? $setup['rekeyRows'] : array();   // (samemove)
     $GLOBALS['EDITOR'] = !empty($setup['editor']);
     $GLOBALS['STATE_RAW'] = state_raw(isset($setup['vo']) ? $setup['vo'] : vo_with(), !empty($setup['enc']));
     $_GET = isset($setup['get']) ? $setup['get'] : array();
@@ -502,6 +512,9 @@ A('B-ok', $keys === array('B', 'C', '123') && $m[0]['binds'][':st'] === 2 && $m[
     && count($r['audit']) === 1 && !empty($au['bulk']) && $au['row_count'] === 3 && $au['changes'][0] === array('row_key' => 'B', 'from' => 'o1', 'to' => 'o3')
     && $au['changes'][2]['row_key'] === '123' && $au['option_labels'] === array('o1' => 'Not started', 'o3' => 'Done'),
     'merged ' . json_encode($keys) . ' ' . $brief($r));
+// (2026-11-17, bulkundo) a bulk set's answer carries the signature its Undo brings back
+A('B-undo-mint', isset($r['j']['undo']['sig']) && is_string($r['j']['undo']['sig']) && strlen($r['j']['undo']['sig']) === 64 && is_int($r['j']['undo']['ts'] ?? null),
+    'the answer signs its changes: ' . json_encode($r['j']['undo'] ?? null));
 $lockSql = '';
 foreach ($r['q'] as $q) if (strpos($q[0], 'TOGGLE_KEY = :tk FOR UPDATE') !== false) $lockSql = $q[0];
 A('B-lock', $lockSql !== '' && strpos($lockSql, 'WAIT 10') !== false, $lockSql);
@@ -512,6 +525,23 @@ $r = $run($SB, array('report_id' => 'rpt', 'toggle_key' => 'status', 'values' =>
 $m = $merges($r);
 A('B-undo', count($m) === 2 && $m[0]['binds'][':v'] === 'o1' && $m[0]['binds'][':st'] === 2 && $m[1]['binds'][':v'] === '' && $m[1]['binds'][':st'] === 0
     && $r['j']['changed'] === array(array('row_key' => 'B', 'prev' => 'o3'), array('row_key' => 'C', 'prev' => 'o3')), $brief($r));
+
+// (2026-11-17, bulkundo) a READER's Undo of their own bulk set: B held the retired o4 before it - a reader may not set a
+// retired option by hand, and the whole Undo was refused; with the set's signature it comes back. C was changed since
+// (o3 -> o1 by someone else): kept, not overwritten.
+$uts = time();
+$uchg = array(array('row_key' => 'B', 'from' => 'o4', 'to' => 'o3'), array('row_key' => 'C', 'from' => null, 'to' => 'o3'));
+$ucur = array(array('ROW_KEY' => 'B', 'STATE' => 2, 'FIELD_VALUE' => 'o3'), array('ROW_KEY' => 'C', 'STATE' => 2, 'FIELD_VALUE' => 'o1'));
+$usig = function_exists('journalFieldUndoSig') ? journalFieldUndoSig((isset($GLOBALS['RID']) ? $GLOBALS['RID'] : 99) + 1, 'status', 'kim', $uts, $uchg) : 'none';
+$r = $run($SB, array('report_id' => 'rpt', 'toggle_key' => 'status', 'values' => array('B' => 'o4', 'C' => null),
+    'undo' => array('ts' => $uts, 'sig' => $usig, 'to' => array('B' => 'o3', 'C' => 'o3'))), array('curRows' => $ucur));
+$m = $merges($r);
+A('B-undo-retired', ($r['j']['status'] ?? '') === 'success' && count($m) === 1 && $m[0]['binds'][':v'] === 'o4' && ($r['j']['kept'] ?? null) === 1,
+    'a reader puts back the retired option; the row changed since is kept: ' . $brief($r));
+$r = $run($SB, array('report_id' => 'rpt', 'toggle_key' => 'status', 'values' => array('B' => 'o4'),
+    'undo' => array('ts' => $uts, 'sig' => str_repeat('0', 64), 'to' => array('B' => 'o3'))), array('curRows' => $ucur));
+A('B-undo-forged', ($r['j']['status'] ?? '') === 'error' && strpos($r['j']['message'] ?? '', 'retired') !== false && !$merges($r),
+    'a signature that does not match gets the usual rules: ' . $brief($r));
 
 // B-toggle: the key holds toggle marks -> nothing written
 $r = $run($SB, $bulk, array('curRows' => array(array('ROW_KEY' => 'A', 'STATE' => 1, 'FIELD_VALUE' => null))));
@@ -557,8 +587,10 @@ A('T-fields', isset($r['j']['fields']['status']['B']) && $r['j']['fields']['stat
     && strpos($fsql, "SUBSTR(ROW_KEY, 1, 1) <> UNISTR('\\2402')") !== false, json_encode(array($r['j'], $fsql)));
 $r = $run($TG, null, array('get' => array('report_id' => 'rpt'), 'vo' => vo_with(array('journalFields' => array())), 'toggleRows' => $togRows, 'fieldRows' => $fRows));
 $fsql = ''; foreach ($r['q'] as $q) if (strpos($q[0], 'FIELD_VALUE') !== false) $fsql = $q[0];
-A('T-nofields', $fsql === '' && isset($r['j']['field_ready']) === false && array_key_exists('field_ready', $r['j']) && $r['j']['fields'] === array() && isset($r['j']['toggles']['done']),
-    'no field read for a report without fields: ' . json_encode($r['j']));
+// (2026-11-17, firstfield) a report with no fields SAVED reads its values too: its first pick list, added on screen and set
+// before the save, came back empty at every reload (the cells went blank, a set again "conflicted" with its own author)
+A('T-nofields', $fsql !== '' && $r['j']['field_ready'] === true && isset($r['j']['fields']['status']) && count($r['j']['fields']['status']) === 2 && isset($r['j']['toggles']['done']),
+    'a report without saved fields still reads the values (its first field, before the save): ' . json_encode($r['j']));
 $r = $run($TG, null, array('get' => array('report_id' => 'rpt'), 'toggleRows' => $togRows, 'noColumn' => true));
 A('T-nocolumn', $r['j']['status'] === 'success' && $r['j']['field_ready'] === false && $r['j']['fields'] === array() && isset($r['j']['toggles']['done']['A']), json_encode($r['j']));
 
@@ -582,6 +614,15 @@ A('H-field-single', count($ev) === 2 && $ev[1] === array('by' => 'lee', 'at' => 
     json_encode($ev));
 A('H-field-bulk', isset($ev[0]) && $ev[0] === array('by' => 'pat', 'at' => '2026-11-11 12:00:00', 'from' => 'o2', 'to' => 'o3', 'from_label' => 'Waiting', 'to_label' => 'Done', 'bulk' => true),
     json_encode($ev));
+// (2026-11-17, samemove) the row's marks were moved "by the same values" when the key columns changed (the move maps P-1 to
+// itself): a change recorded under the OLD key columns is this row's - it was dropped, and the popover said "No changes"
+$smRows = array($aud('JOURNAL_FIELD', array('row_key' => 'P-1', 'toggle_key' => 'status', 'from' => null, 'to' => 'o2', 'key_cols' => array('PROTOCOL NO.')), 'lee', '2026-11-01 09:00:00'));
+$smMove = array(array('AFT' => json_encode(array('from_cols' => array('PROTOCOL NO.'), 'to_cols' => array('ID'), 'marks' => 1, 'notes' => 0, 'moved' => array('P-1' => 'P-1')))));
+$r = $run($HB, null, array('action' => 'toggle_history', 'fieldHistory' => true, 'get' => array('report_id' => 'rpt', 'row_key' => 'P-1', 'toggle_key' => 'status'), 'auditRows' => $smRows, 'rekeyRows' => $smMove));
+$ev = isset($r['j']['events']) ? $r['j']['events'] : array();
+A('H-samemove', count($ev) === 1 && ($ev[0]['to'] ?? null) === 'o2', 'a same-values move keeps the row\'s older history: ' . json_encode($r['j']));
+$r = $run($HB, null, array('action' => 'toggle_history', 'fieldHistory' => true, 'get' => array('report_id' => 'rpt', 'row_key' => 'P-1', 'toggle_key' => 'status'), 'auditRows' => $smRows));
+A('H-samemove-none', isset($r['j']['events']) && count($r['j']['events']) === 0, 'without the move, another key\'s same value stays another row\'s: ' . json_encode($r['j']));
 $r = $run($HB, null, array('action' => 'toggle_history', 'get' => array('report_id' => 'rpt', 'row_key' => 'P-1', 'toggle_key' => 'done'), 'auditRows' => $rows));
 $ev = isset($r['j']['events']) ? $r['j']['events'] : array();
 A('H-toggle', $ev === array(array('by' => 'kim', 'at' => '2026-11-10 07:00:00', 'state' => 1, 'bulk' => false), array('by' => 'pat', 'at' => '2026-11-10 09:00:00', 'state' => 0, 'bulk' => true)),

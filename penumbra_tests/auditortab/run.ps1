@@ -285,6 +285,8 @@ function Invoke-Cases($s) {
   [IO.File]::WriteAllText("$run\main.css", $s.css, $utf8)
   [IO.File]::WriteAllText("$run\main.js", $s.js, $utf8)
   [IO.File]::WriteAllText("$run\index.php", $s.idx, $utf8)
+  # (2026-11-17) the client-error installer lives in its own file now; inst.html follows index.php's call to it
+  if (Test-Path "$app\penumbra_client_errors.php") { Copy-Item "$app\penumbra_client_errors.php" "$run\penumbra_client_errors.php" -Force }
   [IO.File]::WriteAllText("$run\log_client_error.php", $s.log, $utf8)
   [IO.File]::WriteAllText("$run\db_connection.php", $s.db, $utf8)
   foreach ($f in @('ah.html', 'inst.html', 'ev.html', 'cdp.py', 'gen.php', 'benign_test.php')) { Copy-Item "$here\$f" "$run\$f" -Force }

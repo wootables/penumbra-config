@@ -70,6 +70,11 @@ $MUTANTS = array(
     'export-sql'    => array('journal_export.php', " . (\$privCol ? \" AND NVL(IS_PRIVATE, 0) = 0\" : '') . \"", " . \"", null),
     'install-alter' => array('manage_journal.php', "        \$runStmt('journal_private_alter', \$stmts['journal_private_alter']);\n", "", null),
     'install-early' => array('manage_journal.php', "if (\$hasPrivate && in_array('PENUMBRA_JOURNAL', \$inSchema, true)", "if (in_array('PENUMBRA_JOURNAL', \$inSchema, true)", null),
+    'replygone'     => array('manage_journal.php', "            } else {
+                // (2026-11-17, replygone)", "            } elseif (false) {
+                // (2026-11-17, replygone)", null),
+    'flaprace'      => array('manage_journal.php', "                    if (\$rootPriv !== (bool)\$is_private) {", "                    if (false) {", null),
+    'wipepriv'      => array('manage_journal.php', "            if (isset(\$wm['IS_PRIVATE']) && (int)\$wm['IS_PRIVATE'] === 1) {", "            if (false) {", null),
     'bulkmsg'       => array('manage_journal.php', "'That would go past this report\\'s limit of ' . JOURNAL_MAX_NOTES_PER_REPORT . ' journal notes.'", "'That would exceed this report\\'s note limit (' . JOURNAL_MAX_NOTES_PER_REPORT . '). It currently has ' . \$existing . '.'", null),
 );
 // The must-red sets, frozen from the first mutant run (each checked by hand against what the mutant cuts).
@@ -216,6 +221,27 @@ function pick($r, $cols) { $o = array(); foreach ($cols as $c) $o[$c] = array_ke
 function queryViaOci8($sql, $binds = array()) {
     $GLOBALS['Q'][] = array($sql, $binds);
     $N = $GLOBALS['NOTES'];
+    // (2026-11-17, flaprace) add's re-read of the thread root's flag once the reply is written: 'rootflag' = flipped since
+    if (strpos($sql, 'NVL(IS_PRIVATE, 0) AS P FROM PENUMBRA_JOURNAL WHERE ID = :root') !== false) {
+        $r = by_id($binds[':root']);
+        if (!$r) return array();
+        return array(array('P' => (isset($GLOBALS['ROOT_FLAG_NOW']) && $GLOBALS['ROOT_FLAG_NOW'] !== null) ? $GLOBALS['ROOT_FLAG_NOW'] : (int)$r['IS_PRIVATE']));
+    }
+    // (2026-11-18, wipecount) wipe_notes' visible count, read only when expect_total is not the real count: every note
+    if (preg_match('/CREATED_BY, MENTIONS, IS_PRIVATE FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid\s*$/', $sql)) {   // not a thread's read (AND (ID = :root ...))
+        $o = array(); foreach ($N as $r) $o[] = pick($r, array('ID', 'PARENT_ID', 'CREATED_BY', 'MENTIONS', 'IS_PRIVATE')); return $o;
+    }
+    // (2026-11-17, wipepriv) wipe_notes' metadata read: every note, its file's name, and its flag when the SQL asks for it
+    if (strpos($sql, 'DBMS_LOB.GETLENGTH(NOTE_TEXT) AS TEXT_LEN') !== false) {
+        $o = array();
+        foreach ($N as $r) {
+            $x = pick($r, array('ID', 'SCOPE', 'CREATED_BY', 'AUTHOR_NAME', 'CREATED_AT', 'ATTACH_NAME'));
+            $x['TEXT_LEN'] = (string)strlen($r['NOTE_TEXT']);
+            if (strpos($sql, 'IS_PRIVATE') !== false) $x['IS_PRIVATE'] = (string)(int)$r['IS_PRIVATE'];
+            $o[] = $x;
+        }
+        return $o;
+    }
     if (strpos($sql, 'ALL_TAB_COLUMNS') !== false) {
         if (strpos($sql, "'IS_PRIVATE'") !== false) return array(array('CNT' => $GLOBALS['PRIVCOL']));
         return array(array('CNT' => 1));
@@ -382,11 +408,11 @@ require $child . '/journal_export.php';
 
 // the actions and the functions they call, from the build
 $bodies = array();
-foreach (array('summary', 'list', 'row_notes', 'notes_version', 'row_notes_one', 'add', 'attachment', 'edit', 'set_private', 'delete', 'add_notes_bulk', 'install') as $ac) {
+foreach (array('summary', 'list', 'row_notes', 'notes_version', 'row_notes_one', 'add', 'attachment', 'edit', 'set_private', 'delete', 'add_notes_bulk', 'install', 'wipe_notes') as $ac) {
     $bodies[$ac] = lift_tokens($mj, "if (\$action === '$ac') {", false);
 }
 $fns = array();
-foreach (array('journalRowNotesWhere', 'journalRowNotesVersion', 'journalNoteVisibleTo', 'journalParkedNotesVisible', 'journalSharedNoteOf', 'journalInstallStatements') as $fn) {
+foreach (array('journalRowNotesWhere', 'journalRowNotesVersion', 'journalNoteVisibleTo', 'journalParkedNotesVisible', 'journalSharedNoteOf', 'journalInstallStatements', 'journalReadKeyStale') as $fn) {
     $fns[$fn] = lift_tokens($mj, "function $fn(", true);
 }
 foreach ($fns as $fn => $code) { if ($code !== '' && !function_exists($fn)) eval($code); }
@@ -405,6 +431,7 @@ $run = function ($action, $user, $setup = array()) use ($bodies) {
     $GLOBALS['PRIVCOL'] = array_key_exists('privcol', $setup) ? $setup['privcol'] : 1;
     $GLOBALS['SHARED'] = !empty($setup['shared']);
     $GLOBALS['NUMROWS'] = isset($setup['numrows']) ? $setup['numrows'] : 1;
+    $GLOBALS['ROOT_FLAG_NOW'] = array_key_exists('rootflag', $setup) ? $setup['rootflag'] : null;   // (flaprace)
     $_GET = isset($setup['get']) ? $setup['get'] : array();
     $_POST = array(); $_FILES = array();
     $GLOBALS['currentUserKey'] = $user;   // journalRowNotesVersion reads the request's user as manage_journal.php's global
@@ -492,6 +519,13 @@ A('R-row-ready', $RN['ann']['ready'] === true, 'row_notes says private_ready');
 
 $ONE = array(); foreach (array('ann', 'eve') as $u) { $r = $run('row_notes_one', $u, array('get' => array('report_id' => 'rpt', 'kind' => 'row', 'row_key' => 'K1'))); $ONE[$u] = ids($r['j']['notes'] ?? array()); }
 A('R-row-one', $ONE === array('ann' => array(10, 11, 12, 20, 21), 'eve' => array(20, 21)), json_encode($ONE));
+// (2026-11-18, stalekey1) a page whose key columns are not the saved ones (the stub's are ['ID']) gets none of a row's notes
+$rs1 = $run('row_notes_one', 'ann', array('get' => array('report_id' => 'rpt', 'kind' => 'row', 'row_key' => 'K1', 'key_cols' => '["OTHER"]')));
+$rs2 = $run('row_notes_one', 'ann', array('get' => array('report_id' => 'rpt', 'kind' => 'row', 'row_key' => 'K1', 'key_cols' => '["id"]')));
+$rs3 = $run('row_notes_one', 'ann', array('get' => array('report_id' => 'rpt', 'kind' => 'pivot', 'row_key' => 'PK', 'key_cols' => '["OTHER"]')));
+A('R-rowone-stale', ($rs1['j']['key_stale'] ?? null) === true && ($rs1['j']['notes'] ?? null) === array() && ($rs1['j']['status'] ?? '') === 'success'
+    && empty($rs2['j']['key_stale']) && ids($rs2['j']['notes'] ?? array()) === array(10, 11, 12, 20, 21) && ids($rs3['j']['notes'] ?? array()) === array(40),
+    'stale ' . $brief($rs1) . ' | same key ' . json_encode(ids($rs2['j']['notes'] ?? array())) . ' | pivot ' . json_encode(ids($rs3['j']['notes'] ?? array())));
 
 $ver = function ($u, $notes) use ($run) { $r = $run('notes_version', $u, array('get' => array('report_id' => 'rpt'), 'notes' => $notes)); return $r['j']['ver'] ?? ('ERR ' . $r['thrown'] . json_encode($r['j'])); };
 $F2 = fixture(); $F2[0]['NOTE_TEXT'] = 'secret plan, edited @bob';   // a private note changed
@@ -524,12 +558,41 @@ $rm = array(); foreach ($r['mails'] as $mm) if ($mm[0] === 'reply') $rm[] = $mm[
 A('A-add-inherit', ($ins['IS_PRIVATE'] ?? null) === 1 && ($ins['PARENT_ID'] ?? null) === 10 && $rm && $rm[0][7] === true, 'a reply takes the thread\'s flag: ' . $brief($r) . ' ' . json_encode(array_keys($ins)));
 $r = $run('add', 'eve', array('body' => $addBody(array('parent_id' => 10, 'note_text' => 'let me in'))));
 A('A-add-hidden', $r['code'] === 404 && ($r['j']['message'] ?? '') === 'Note not found.' && !$r['inserts'], $brief($r));
+// (2026-11-17, replygone) a reply whose note is gone (deleted while it was written) is refused, not posted as a root
+$r = $run('add', 'bob', array('body' => $addBody(array('parent_id' => 999, 'note_text' => 'into a deleted thread'))));
+A('A-add-gone', $r['code'] === 404 && ($r['j']['code'] ?? '') === 'parent_gone' && !$r['inserts'] && !$r['mails'], $brief($r));
+// (2026-11-17, flaprace) the thread's author flipped it between the reply's thread read and its insert: once written, the
+// thread's replies take the root's flag as it is now (the reply was left public in a private thread, or private in a public one)
+$r = $run('add', 'bob', array('body' => $addBody(array('parent_id' => 20, 'note_text' => 'a reply as the thread goes private')), 'rootflag' => 1));
+$up = $ran($r, 'UPDATE PENUMBRA_JOURNAL SET IS_PRIVATE = :p');
+A('A-add-flip-priv', ($r['j']['status'] ?? '') === 'success' && $up !== null && (int)$up['binds'][':p'] === 1 && ($r['j']['private'] ?? null) === 1
+    && (int)$up['binds'][':root'] === 20, $brief($r) . ' ' . json_encode($up));
+$r = $run('add', 'bob', array('body' => $addBody(array('parent_id' => 11, 'note_text' => 'a reply as the thread goes public')), 'rootflag' => 0));
+$up = $ran($r, 'UPDATE PENUMBRA_JOURNAL SET IS_PRIVATE = :p');
+A('A-add-flip-pub', ($r['j']['status'] ?? '') === 'success' && $up !== null && (int)$up['binds'][':p'] === 0 && ($r['j']['private'] ?? null) === 0, $brief($r) . ' ' . json_encode($up));
+$r = $run('add', 'bob', array('body' => $addBody(array('parent_id' => 11, 'note_text' => 'no flip'))));
+A('A-add-noflip', ($r['j']['status'] ?? '') === 'success' && $ran($r, 'UPDATE PENUMBRA_JOURNAL SET IS_PRIVATE = :p') === null && ($r['j']['private'] ?? null) === 1, $brief($r));
 $r = $run('add', 'ann', array('body' => $addBody(array('private' => 1)), 'shared' => true));
 A('A-add-shared', $r['code'] === 400 && strpos(($r['j']['message'] ?? ''), 'shared') !== false && !$r['inserts'], $brief($r));
 $r = $run('add', 'ann', array('body' => $addBody(array('private' => 1)), 'privcol' => 0));
 A('A-add-nocol', $r['code'] === 400 && strpos(($r['j']['message'] ?? ''), 'journal table update') !== false && !$r['inserts'], $brief($r));
 $r = $run('add', 'ann', array('body' => $addBody(array('private' => 1, 'scope' => 'pivot', 'row_key' => 'PK2')), 'shared' => true));
 A('A-add-pivot-shared', ($r['j']['status'] ?? '') === 'success' && (($r['inserts'][0]['IS_PRIVATE'] ?? null) === 1), 'a pivot thread on a Shared-note report may be private: ' . $brief($r));
+
+// (2026-11-17, wipepriv) the journal wipe's audit row: metadata only, and for a private note no attachment name (D7)
+$r = $run('wipe_notes', 'adm', array('body' => array('report_id' => 'rpt'), 'admin' => true));
+$wa = null; foreach ($r['audit'] as $a0) if (($a0['action'] ?? '') === 'JOURNAL_WIPE') $wa = $a0;
+$wb = $wa ? json_decode((string)$wa['before'], true) : null;
+$w10 = null; $w20 = null; foreach (($wb['notes'] ?? array()) as $wn) { if ((int)$wn['ID'] === 10) $w10 = $wn; if ((int)$wn['ID'] === 20) $w20 = $wn; }
+A('W-wipe-priv', $wa !== null && $w10 !== null && !array_key_exists('ATTACH_NAME', $w10) && ($w10['HAS_ATTACH'] ?? null) === 1
+    && strpos((string)$wa['before'], 'plan.pdf') === false && $w20 !== null && array_key_exists('ATTACH_NAME', $w20),
+    'a private note keeps no file name, a public one keeps its row: ' . json_encode(array($w10, $w20, $r['thrown'])));
+// (2026-11-18, wipecount) the page's count is the admin's visible one (summary): adm sees 20, 21, 51, 60, 61 of the 11 notes
+$r = $run('wipe_notes', 'adm', array('body' => array('report_id' => 'rpt', 'expect_total' => 5), 'admin' => true));
+A('W-wipe-count', $r['code'] === 409 && ($r['j']['code'] ?? '') === 'wipe_count' && ($r['j']['total'] ?? null) === 11 && ($r['j']['hidden'] ?? null) === 6
+    && !$ran($r, 'DELETE FROM PENUMBRA_JOURNAL WHERE') && !$r['audit'], $brief($r));
+$r = $run('wipe_notes', 'adm', array('body' => array('report_id' => 'rpt', 'expect_total' => 11), 'admin' => true, 'numrows' => 11));
+A('W-wipe-expect', $r['code'] === 200 && $ran($r, 'DELETE FROM PENUMBRA_JOURNAL WHERE REPORT_ID') !== null && ($r['j']['deleted'] ?? null) === 11, $brief($r));
 
 // ===== S: set_private =======================================================================================
 $r = $run('set_private', 'ann', array('body' => array('note_id' => 60, 'private' => 1), 'numrows' => 2));

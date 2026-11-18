@@ -81,7 +81,8 @@ $mutants = @{
   # observable (the switch refuses to render); 'promptdisplay' compares only the
   # stored value, so an options= Display:Value answer never reads ON.
   'promptdetect'  = @("|| kind === 'unfilter' || kind === 'prompt';", "|| kind === 'unfilter';")
-  'promptdisplay' = @('(ran.value.trim() === pp.value || ran.display.trim() === pp.value)', '(ran.value.trim() === pp.value)')
+  # (2026-11-17) re-anchored: both sides go through _pnbPromptAnswerKey now
+  'promptdisplay' = @('return _pnbPromptAnswerKey(ran.value) === want || _pnbPromptAnswerKey(ran.display) === want;', 'return _pnbPromptAnswerKey(ran.value) === want;')
   # Column lookup case (2026-10-13, the "cc:" block): 'curcase' puts the
   # upper-case-only lookup back in the pivot currency flags (a quoted "Amount"
   # alias loses its '$'); 'colidscan' drops the case-insensitive key scan from

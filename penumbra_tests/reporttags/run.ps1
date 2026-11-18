@@ -219,7 +219,8 @@ $mutants = @(
     @{ File = 'gsr'; Name = 'the repository hides the reports a held tag reaches';
        From = '            $sql .= " OR EXISTS (SELECT 1 FROM PENUMBRA_REPORT_TAGS gt WHERE gt.REPORT_ID = r.ID AND gt.TAG IN (" . implode('', '', $ph) . "))";';   To = '            $sql .= "";';   Expect = 1 },
     @{ File = 'ss'; Name = 'a Save As audit row stops naming the report (the Tags tool shows "tagged on save" and nothing else)';
-       From = '"$t: tagged $label [Save As]"';   To = '"$t: tagged on save [Save As]"';   Expect = 1 },
+       # re-anchored 2026-11-17: since bulkset (2026-10-13) the bracket is [$via] ('Save As' by default, 'Bulk settings' for a bulk run)
+       From = '"$t: tagged $label [$via]"';   To = '"$t: tagged on save [$via]"';   Expect = 1 },
     @{ File = 'ga';  Name = 'the validator gives an administrator grants (10-09: refused - they reach everything already)';
        From = 'if (in_array(strtolower($uid), pnb_admin_ids(), true)) {';   To = 'if (false) {';   Expect = 3 },
     # section 24, WCAG moderate fixes (2026-10-15): one mutant per fix, each exactly one red

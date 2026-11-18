@@ -27,7 +27,7 @@
 #   & ([scriptblock]::Create([IO.File]::ReadAllText('<dir>\run.ps1'))) -Mutants
 # Stages into %TEMP%; writes nothing to the webroot.
 # =============================================================================
-param([string]$App = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep)
+param([string]$App = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mutants, [switch]$CheckMutants, [string]$Only = '', [switch]$Control, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\fnpop' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
@@ -104,16 +104,18 @@ $mutantDefs = [ordered]@{
   # (fnpop 2) the hover card stays in the document it was first made in
   'hcnorehome' = @{ file = 'main'; edits = @(,@('            if (pop.ownerDocument !== doc || !pop.parentNode) doc.body.appendChild(pop);', '            if (!pop.parentNode) doc.body.appendChild(pop);')); red = @('T9') }
   # (fnpop 2) it closes only on a mouseleave again
-  'hcnogeometry' = @{ file = 'main'; edits = @(,@('                    if (cur.byFocus && cur.t.ownerDocument.activeElement === cur.t) return;
-                    hideSoon();', '                    if (cur.byFocus && cur.t.ownerDocument.activeElement === cur.t) return;')); red = @('T6') }
+  # (2026-11-17) re-anchored: cardtab (6fa30f3) put the tabIn line between the focus test and hideSoon()
+  'hcnogeometry' = @{ file = 'main'; edits = @(,@('however it opened
+                    hideSoon();', 'however it opened')); red = @('T6') }
   # (fnpop 2) no keyboard
-  'hcnofocus'  = @{ file = 'main'; edits = @(,@("            t.addEventListener('focus', function () { if (!t._pnbHcClicked) show(t, opts, true); }, false);", '')); red = @('T5','U4') }
+  # (2026-11-17) re-anchored (and hcclickreopen): the focus listener grew keyFocus (e8f6f30) and the cardtab line (6fa30f3)
+  'hcnofocus'  = @{ file = 'main'; edits = @(,@("                if (!t._pnbHcClicked && !(opts.keyFocus && !keyFocused(t))) show(t, opts, true);", '')); red = @('T5','U4') }
   # (fnpop 3) the Scheduler's data-hcard tips not bound
   'hcnoattachall' = @{ file = 'main'; edits = @(,@("    _pnbHoverCard.attachAll(document.getElementById('scheduler-tab'));", '')); red = @('U2') }
   # (fnpop 3) the focus a ? click gives reopens its card
-  'hcclickreopen' = @{ file = 'main'; edits = @(,@("            t.addEventListener('focus', function () { if (!t._pnbHcClicked) show(t, opts, true); }, false);", "            t.addEventListener('focus', function () { show(t, opts, true); }, false);")); red = @('U4') }
+  'hcclickreopen' = @{ file = 'main'; edits = @(,@("                if (!t._pnbHcClicked && !(opts.keyFocus && !keyFocused(t))) show(t, opts, true);", "                if (!(opts.keyFocus && !keyFocused(t))) show(t, opts, true);")); red = @('U4') }
   # (fnpop 3) option labels open as fast as an icon
-  'hclabeldelay' = @{ file = 'main'; edits = @(,@('}, opts.asLabel ? 400 : 150);', '}, 150);')); red = @('U3') }
+  'hclabeldelay' = @{ file = 'main'; edits = @(,@('}, opts.delay || (opts.asLabel ? 400 : 150));', '}, opts.delay || 150);')); red = @('U3') }   # (2026-11-17) re-anchored: opts.delay (the help tips' hover delay)
   # (fnpop 5) the page's directory answers are not kept
   'rcnocache'  = @{ file = 'main'; edits = @(,@("            if (em.indexOf('@') > 0) _pnbDirCache[em] = penumbraDirVars(it);", '')); red = @('R2','R4','R7') }
   # (fnpop 5) the mapper drops the multi-valued OUCs again
@@ -228,10 +230,22 @@ function Show([object[]]$res, [ref]$pass, [ref]$fail) {
   }
 }
 
+# (2026-11-17) -CheckMutants: every mutant's anchor still applies exactly once (no browser). -Only a,b: just those mutants.
+if ($CheckMutants) {
+  $bad = 0
+  foreach ($name in $mutantDefs.Keys) {
+    try { [void](Apply-Mutant $name) } catch { $bad++; Write-Host ("  BAD   {0}: {1}" -f $name, $_.Exception.Message) -ForegroundColor Red }
+  }
+  Write-Host ("SUMMARY anchors ok={0} bad={1}" -f ($mutantDefs.Count - $bad), $bad)
+  Write-Host $(if ($bad -eq 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+  return
+}
 if ($Mutants) {
   Write-Host "[mutants] app: $App"
   $mOk = 0; $mBad = 0
-  foreach ($name in $mutantDefs.Keys) {
+  $names = @($mutantDefs.Keys)
+  if ($Only) { $names = @($Only.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
+  foreach ($name in $names) {
     $res = Invoke-Pages (Apply-Mutant $name) $name
     $red = @($res | Where-Object { -not $_.pass } | ForEach-Object { ($_.name -split ' ')[0] })
     $missing = @($mutantDefs[$name].red | Where-Object { $red -notcontains $_ })

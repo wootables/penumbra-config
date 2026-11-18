@@ -505,7 +505,8 @@ MUTANTS = {
     # the server gate lifted; the STATE_DATA / recipients surfaces back for non-admins
     'b-noclientgate': ([('pal', "        if (!reportDiscoveryAllowed()) { return; }\n", "")], ['L-pmain-reportsGate', 'S-clientGate'], ['pmain']),
     's-nogate': ([('disc', "        return (bool)$isAdmin;\n", "        return true;\n")], ['S-serverGate', 'S-dashGate'], []),   # (round 13: the gate moved; lifting it opens both lists)
-    's-deepback': ([('gsr', "function penumbraReportTextMatchSql($isAdmin, $p, $searchPattern, $matchTerm) {\n    if (!penumbraReportDiscoveryAllowed($isAdmin)) {", "function penumbraReportTextMatchSql($isAdmin, $p, $searchPattern, $matchTerm) {\n    if (false) {")], ['S-serverGate'], []),
+    # (2026-11-17) re-anchored: a9c04c3 (2026-11-14, likeescape) put the LIKE-escape lines between the function's head and its gate
+    's-deepback': ([('gsr', "(string)$matchTerm) . '%';\n    if (!penumbraReportDiscoveryAllowed($isAdmin)) {\n        return array('sql' => \"UPPER(r.SHORT_ID) LIKE", "(string)$matchTerm) . '%';\n    if (false) {\n        return array('sql' => \"UPPER(r.SHORT_ID) LIKE")], ['S-serverGate'], []),
     'm-noclear': ([('main', "        try { if (window.PenumbraPalette && typeof window.PenumbraPalette.clearRecent === 'function') window.PenumbraPalette.clearRecent(); } catch(e) {}\n", "")],
                   ['L-pmain-clearPrefs'], ['pmain']),
     # --- (round 6) the stub: Ctrl+K taken on a Mac (and the Windows key on Windows); the CodeMirror case
@@ -728,7 +729,8 @@ MUTANTS.update({
     'cb-norow': ([('pal', "            if (cv.length) {\n                out.push({ id: 'combo:chartby:' + col,", "            if (false) {\n                out.push({ id: 'combo:chartby:' + col,")],
                  ['L-pchartby-pcbRow', 'L-pchartby-pcbList', 'L-pchartby-pcbRuns'], ['pchartby']),
     'cb-nopick': ([('pal', "        if (e.pick === 'chartby' && e.th && e.th.isConnected && ui) {", "        if (false) {")], ['L-pchartby-pcbList', 'L-pchartby-pcbRuns'], ['pchartby']),
-    'cb-nosub': ([('pal', "sub: cv.length ? 'opens the chart builder with it on the X axis, grouped by a period that suits its dates' : ", "sub: false ? '' : ")], ['L-pchartby-pcbChartSub'], ['pchartby']),
+    # (2026-11-17) re-anchored: 21b830a (2026-11-05, dtpick Round B) reworded the line to "grouped into periods that suit its dates" (the check had it already)
+    'cb-nosub': ([('pal', " : cv.length ? 'opens the chart builder with it on the X axis, grouped into periods that suit its dates' : ", " : false ? '' : ")], ['L-pchartby-pcbChartSub'], ['pchartby']),
     'cb-noexempt': ([('pal', "return was(act) || /^chartAs-[a-z0-9]+$/.test(String(act)); }; })();", "return was(act); }; })();")], ['L-pmain-coverage', 'L-pwidth-widthCoverage'], ['pmain', 'pwidth']),
 })
 
@@ -994,15 +996,16 @@ JOURNAL_STUB = '{"status": "success", "installed": true, "data": [], "report": {
 # plus every id a JS click handler is bound to, must be an entry point the box offers (the module references the id:
 # tool / toolRun / has / el('id') or '#id') or sit in ENTRY_SKIP with the reason it is not a row. Recomputed on every run
 # from the files under test: a new button without a row (or a reason) is red.
+# (2026-11-17) two controls from intended app changes joined their dialogs' rules: pnbDlRetry (765e5ae, 2026-11-15: the retry link in the failed-download splash) and saveStateLightbox (d2fc4a2, 2026-11-16: the Save dialog itself now takes a delegated click for its change list).
 ENTRY_SKIP_RULES = [
     # (regex over the id, reason) - the first rule that matches wins
     (r'^(aiClearChat|aiClosePanel|aiSendBtn)$', 'the AI panel\'s own controls (the panel is a row)'),
     (r'^audit|^refreshAuditLogBtn$', 'the Auditor tab\'s own controls (the tab is a row)'),
     (r'^(cs[A-Z]|csClear|csLoad|csSave|csCancel|csAdd)', 'the custom sort dialog\'s own steps (a View Options row opens it)'),
-    (r'^(confirm|delete(All|Selected)|export|import|saveJsonStateBtn|saveAsCopyBtn|lastStopToggle|autoTitleBtn|reportTagsContainer|generateRandomIdBtn|resetUserPrefsBtn)', 'a step inside the Save / Manage local data dialogs (each dialog is a row)'),
+    (r'^(confirm|delete(All|Selected)|export|import|saveJsonStateBtn|saveAsCopyBtn|lastStopToggle|autoTitleBtn|reportTagsContainer|generateRandomIdBtn|resetUserPrefsBtn|saveStateLightbox)', 'a step inside the Save / Manage local data dialogs (each dialog is a row)'),
     (r'^(generatePrompt|testPrompt|resetPromptForm|generateSubquery|formatSubquerySql|resetSubqueryForm|promptSwapBoolean|linkToPromptGenerator|retryPromptLink|resetAllPromptsLink|selectDefaultsFromAutofill|sidebarImportPrompt)', 'the Tag Generator / prompt form\'s own steps (the generator is a row)'),
     (r'^(viz|copyChartImage|downloadChart|injectVizInfoboxBtn|removeVizSnippetBtn|updateVizSnippetBtn|copyViz)', 'the chart builder\'s own tabs and steps (the builder is a row)'),
-    (r'^(copy(Copy|Group|Pivot)SnippetBtn|updatePivotSnippetBtn|downloadCopySnippetBtn|confirmCopyBtn|createDownloadLinkBtn|dlLink|pnbDlManual)', 'a step inside the Copy / Download dialogs (each is a row)'),
+    (r'^(copy(Copy|Group|Pivot)SnippetBtn|updatePivotSnippetBtn|downloadCopySnippetBtn|confirmCopyBtn|createDownloadLinkBtn|dlLink|pnbDlManual|pnbDlRetry)', 'a step inside the Copy / Download dialogs (each is a row)'),
     (r'^(generatePivotBtn|modifyPivotBtn|resetPivotBtn|pivotTransposeBtn|closePivotBtn|pivot-agg-table)$', 'the pivot builder\'s own steps (the builder, Exit the pivot view and the pivot rows cover it)'),
     (r'^(resetGroupingBtn|configureGroupingBtn|removeGroupingLink|ungroupBtn)$', 'the Group dialog\'s own steps (Group, Ungroup, Expand / Collapse all groups are rows)'),
     (r'^(snap|dm|pnbSnapHdr|createSnap|compareSnapshot|loadSnapshotBtn|linkToSchedulerFromSnapshot|unifiedSnapshotTableBody|schedOpenSnapshots|createNewSnapshotBtnV2)', 'a step inside the Snapshots dialog (the dialog is a row; a snapshot is created there)'),

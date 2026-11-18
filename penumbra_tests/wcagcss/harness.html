@@ -83,7 +83,9 @@ if (rm) {   // headless Edge may report reduce motion (the cursor is then off): 
         var rules; try { rules = document.styleSheets[si].cssRules; } catch (e) { continue; }
         for (var ri = 0; ri < rules.length; ri++) {
             var ru = rules[ri];
-            if (ru.type === 1 && ru.selectorText === 'body.theme-terminal #mainReportTitle::after' && ru.style.animationName) { an = ru.style.animationName; ac = ru.style.animationIterationCount; }
+            // (2026-11-17 repair, follows 26bf9ed of 2026-11-15) the cursor rule became a selector LIST
+            // (+ body.theme-terminal .main-title .brand a::after): match the title's selector as one of its members
+            if (ru.type === 1 && ru.selectorText.split(',').map(function (s) { return s.trim(); }).indexOf('body.theme-terminal #mainReportTitle::after') >= 0 && ru.style.animationName) { an = ru.style.animationName; ac = ru.style.animationIterationCount; }
         }
     }
 }

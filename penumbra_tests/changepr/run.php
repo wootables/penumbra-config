@@ -238,7 +238,10 @@ function lift_function($src, $name) {
     }
     return null;
 }
-$predicates = array('penumbra_pr_pool', 'penumbra_pr_is_pool_row', 'penumbra_pr_recipient_key', 'penumbra_pr_notes_key', 'penumbra_pr_key_from_notes', 'penumbra_pr_row_visible_to');
+// (2026-11-17, taskcol) + the staged TASK_ID helpers: penumbra_pr_save_baselines() adds penumbra_snaps_task_col()
+// to its insert. The fake table has no TASK_ID column to probe for, so the insert here is what it always was.
+$predicates = array('penumbra_pr_pool', 'penumbra_pr_is_pool_row', 'penumbra_pr_recipient_key', 'penumbra_pr_notes_key', 'penumbra_pr_key_from_notes', 'penumbra_pr_row_visible_to',
+                    'penumbra_snaps_task_ready', 'penumbra_snaps_task_col');
 foreach ($predicates as $fn) {
     $code = lift_function($srcDb, $fn);
     if ($code === null) { fwrite(STDERR, "FATAL: $fn not found in db_connection.php\n"); exit(2); }

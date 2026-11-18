@@ -116,6 +116,9 @@ def run_loop(loop, rows):
     src = ("<?php\n$rows = json_decode(getenv('PH_ROWS'), true); $schedTasks = array(); $currentUserKey = 'jdoe';\n"
            "$schedTypeLabels = array('EMAIL' => 'Email Report', 'SNAPSHOT' => 'Take a Snapshot');\n"
            "$schedActiveCount = 0; $schedPausedCount = 0; $schedMineCount = 0; $schedTypeCounts = array('EMAIL' => 0, 'SNAPSHOT' => 0);\n"
+           # (2026-11-17, follows 5014062 metricsweep2) the loop also keeps active-only twins of the chip
+           # counts; analytics_all.php declares them just above the loop, beside the others.
+           "$schedTypeActive = array(); $schedMineActive = 0;\n"
            "try {\n" + loop + "} catch (Exception $e) {}\n"
            "echo json_encode(array('t' => $schedTasks, 'a' => $schedActiveCount, 'p' => $schedPausedCount));\n")
     d = tempfile.mkdtemp(prefix='pnb_ctr_')

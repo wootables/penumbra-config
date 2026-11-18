@@ -83,7 +83,11 @@ MUTANTS = {
     'strfix': ([("&& scId(x.colIdentifier) &&", "&& !!_pnbViewName(String(x.colIdentifier)) &&"),
                 ("var o = { colIdentifier: x.colIdentifier, direction: x.direction }; if (x.colIndex !== undefined) o.colIndex = x.colIndex; return o; });\r\n            if (scl.length) v.sc = scl;",
                  "var o = { colIdentifier: String(x.colIdentifier), direction: x.direction }; if (x.colIndex !== undefined) o.colIndex = x.colIndex; return o; });\r\n            if (scl.length) v.sc = scl;")],
-               ['A-carries', 'B-sort', 'B-nextClick', 'B-rtView', 'C-numbersKept', 'C-pivotKept', 'C-refusedText', 'C-refusedShape'], ['gA', 'gB', 'gC']),
+               # (2026-11-17) B-sort and B-nextClick left this list: since 52d015b (2026-10-25 23:06, an hour after this suite)
+               # the load names every sort level as its heading carries it (_pnbStateSortByName's heading()), so a link's
+               # TEXT '2021' level is the number again on the opened page and the next click finds it. The link itself
+               # (A-carries), the view captured again (B-rtView) and the validator (C-*) still show the text.
+               ['A-carries', 'B-rtView', 'C-numbersKept', 'C-pivotKept', 'C-refusedText', 'C-refusedShape'], ['gA', 'gB', 'gC']),
     # "anything not text is a number": the global isFinite() coerces, so an array, true and null pass
     'anyshape': ([(SCID, SCID.replace("typeof x === 'number' ?", "typeof x !== 'string' ?"))], ['C-refusedShape'], ['gC']),
     # text unchecked: oversized and empty names pass (tag-shaped text is refused before, by _pnbViewData)

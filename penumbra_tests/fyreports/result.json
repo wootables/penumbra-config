@@ -456,7 +456,7 @@
                     {
                         "name":  "J2 every writer re-applies format(header) rules",
                         "pass":  true,
-                        "detail":  "[{\"line\":47750,\"reapplies\":true},{\"line\":55081,\"reapplies\":true},{\"line\":82172,\"reapplies\":true}]"
+                        "detail":  "[{\"line\":48526,\"reapplies\":true},{\"line\":55954,\"reapplies\":true},{\"line\":83002,\"reapplies\":true}]"
                     },
                     {
                         "name":  "Q1 while a pivot is on screen the bridge lists its columns",
@@ -575,23 +575,23 @@
                     },
                     {
                         "name":  "U18 parsing RowTotals hide ticks Override",
-                        "pass":  true,
-                        "detail":  "expected true got true"
+                        "pass":  false,
+                        "detail":  "expected true got false"
                     },
                     {
                         "name":  "U19 ...with the value boxes present and empty",
-                        "pass":  true,
-                        "detail":  "expected [2,0] got [2,0]"
+                        "pass":  false,
+                        "detail":  "expected [2,0] got [0,0]"
                     },
                     {
                         "name":  "U20 ...so the builder reads [] back",
-                        "pass":  true,
-                        "detail":  "expected [] got []"
+                        "pass":  false,
+                        "detail":  "expected [] got null"
                     },
                     {
                         "name":  "U21 ...and writes hide again (round trip)",
-                        "pass":  true,
-                        "detail":  "expected \"hide\" got \"hide\""
+                        "pass":  false,
+                        "detail":  "expected \"hide\" got \"none\""
                     },
                     {
                         "name":  "U22 saved [] reopens with Override ticked",

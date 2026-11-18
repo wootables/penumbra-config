@@ -160,8 +160,9 @@ if ($Mutant) {
 }
 if ($Mutant2) {
   # The pivot guard fires unconditionally, so the flat table never formats.
-  $old2 = "        if (`$('#pivot-output-container').is(':visible')) {`r`n            return;`r`n        }`r`n`r`n        // Scope to the ACTIVE container's live rows"
-  $new2 = "        if (true) {`r`n            return;`r`n        }`r`n`r`n        // Scope to the ACTIVE container's live rows"
+  # (2026-11-17) re-anchored: the guard lets a breakdown table through (bdhl); the mutant still returns always
+  $old2 = "        if (!bdTable && `$('#pivot-output-container').is(':visible')) {"
+  $new2 = "        if (true) {"
   if (([regex]::Matches($src, [regex]::Escape($old2))).Count -ne 1) { throw 'mutant2 anchor not found exactly once (needs the guarded main.js) - update run.ps1' }
   $src = $src.Replace($old2, $new2)
 }

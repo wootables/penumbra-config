@@ -15,6 +15,8 @@
 #   dlgsb   the same with search_builder.js loaded, as index.php loads it
 #   plainsb no nested-table column (the dialog opened before the fix): the same columns, plus the bin
 #           entries a numeric column named in digits now gets like any numeric column
+#           (since 2026-11-15, numgate 0c5903e: none while the columns are plain numbers, G-plainsb-plain;
+#            the same list for both once each has a numeric summary on, G-plainsb-buckets)
 #   sweep   format() / rewrite() rules, data(colorder|colvisible|colsort|coltotal), the
 #           API snippet's fields, the chart drill breakdown, the scheduler's change-column
 #           list, the copy_distinct| / sort| / group| commands (search builder loaded)
@@ -50,6 +52,9 @@ SWEEP_U = ['F-cf', 'F-rw', 'U-grpcols', 'U-sbfallback', 'U-coltotal', 'U-colorde
            'U-snippetdom', 'U-chartdrill', 'U-sched', 'U-nestplan', 'K-distinct', 'U-copydlg', 'K-sort', 'U-colsort', 'K-group', 'K-pivot']
 # What the pre-fix build gets wrong - and ONLY that (the P-* premises hold on it too).
 # (plainsb: the dialog opened before the fix too - only its bin entries for 2022 were missing)
+# (2026-11-17: G-plainsb-plain stays green there and G-plainsb-buckets is red for a second reason - the control build
+#  is older than the bucket dropdown beside the picker (grpbucket, 2026-10-26), so the driver reads no bucket for
+#  any column on it. The control proves the dialog and sweep asserts; the numgate / numgatesum mutants prove these two.)
 CONTROL_RED = (['G-dlg-open', 'G-dlg-list', 'G-dlg-by2021', 'E-dlg', 'G-dlgsb-open', 'G-dlgsb-list', 'G-dlgsb-by2021', 'E-dlgsb', 'G-plainsb-buckets']
                + SWEEP_U + ['E-sweep'])
 def scn_of(aid):
@@ -107,13 +112,26 @@ MUTANTS = {
                            "                                const name = $(this).data('colname');" + NL + "                                if (name && name.toLowerCase() === pVal")]),
     'copydistinct': ('main', [("                            if (String(dc) === selectedColumn) return true;   " + D,
                                "                            if (dc === selectedColumn) return true;")]),
+    # (2026-11-17) the numeric bucket gate (0c5903e, 2026-11-15), not a digitcol fix site: the two plainsb bucket
+    # asserts state its rule, so each side of the rule gets a mutant. numgate: the gate lets every number column
+    # through (a plain column offers bins again). numgatesum: a numeric summary no longer qualifies a column.
+    'numgate': ('main', [("        var def = eff ? penumbraSummaryDef(eff) : null;" + NL + "        return !!(def && def.numeric);",
+                          "        var def = eff ? penumbraSummaryDef(eff) : null;" + NL + "        return true;")]),
+    'numgatesum': ('main', [("        var def = eff ? penumbraSummaryDef(eff) : null;" + NL + "        return !!(def && def.numeric);",
+                             "        var def = eff ? penumbraSummaryDef(eff) : null;" + NL + "        return false;")]),
     'nestplan': ('main', [("            const _cn = $(this).data('colname'), name = _cn ? String(_cn) : _cn;   " + D + NL + "            const colId = $(this).data('column');" + NL + "            if (!name || name === '#') return;",
                            "            const name = $(this).data('colname');" + NL + "            const colId = $(this).data('column');" + NL + "            if (!name || name === '#') return;")]),
 }
 # (the format() / rewrite() passes and the snippet's own render run again on every redraw - a sort,
 #  a grouping, a copy's notice - so putting one of those readers back reddens the commands too)
 MUTANT_RED = {
-    'sbapi': ['G-dlgsb-open', 'G-dlgsb-list', 'G-dlgsb-by2021', 'E-dlgsb', 'U-grpcols', 'K-group', 'G-plainsb-buckets'],
+    # (2026-11-17) sbapi no longer lists G-plainsb-buckets: since the bucket dropdown (grpbucket, 2026-10-26) the
+    # bin test is handed the picker's token as text (_groupSyncBucketSelect: String(sp.base)) whatever the list's
+    # name was, so this fix site cannot reach it. Checked with the unrepaired suite on 0c5903e^ (before the numeric
+    # bucket gate): the mutant already "stayed GREEN on G-plainsb-buckets" there.
+    'sbapi': ['G-dlgsb-open', 'G-dlgsb-list', 'G-dlgsb-by2021', 'E-dlgsb', 'U-grpcols', 'K-group'],
+    'numgate': ['G-plainsb-plain'],
+    'numgatesum': ['G-plainsb-buckets'],
     'grpfallback': ['G-dlg-open', 'G-dlg-list', 'G-dlg-by2021', 'E-dlg'],
     'sbfallback': ['U-sbfallback'],
     'cfmeta': ['F-cf', 'U-snippetdom', 'K-distinct', 'K-sort', 'K-group', 'E-sweep'],
@@ -135,7 +153,8 @@ MUTANT_RED = {
     'copydistinct': ['U-copydlg'],
     'nestplan': ['U-nestplan'],
 }
-MUTANT_SCN = {k: (['dlg'] if k == 'grpfallback' else ['dlgsb', 'sweep', 'plainsb'] if k == 'sbapi' else ['sweep']) for k in MUTANTS}
+MUTANT_SCN = {k: (['dlg'] if k == 'grpfallback' else ['dlgsb', 'sweep', 'plainsb'] if k == 'sbapi'
+                  else ['plainsb'] if k in ('numgate', 'numgatesum') else ['sweep']) for k in MUTANTS}
 
 # --- args -------------------------------------------------------------------------------------
 args = sys.argv[1:]
@@ -175,6 +194,9 @@ def hook(src):
              'renderReportSnippet', '_showChartDrillBreakdown', 'applyTaskTypeUI', 'executeChainStep', 'getNestedColumnPlan']
     h = ('\r\n;try { window.__JG = { master: function () { try { return eval("masterRowData"); } catch (e) { return null; } },'
          ' sortCrit: function () { try { return eval("sortCriteria"); } catch (e) { return null; } },'
+         # (2026-11-17) a numeric summary on a column, as a footer badge pick stores it: what makes a plain number
+         # column a measure for the bucket gate (numgate, 0c5903e). True when the build took it.
+         ' setSummary: function (n, t) { try { eval("transientColumnSummaries")[String(n).toUpperCase()] = t; return true; } catch (e) { return String(e); } },'
          ' snippetText: function () { try { var e = eval("snippetEditor"); return (e && e.getValue) ? e.getValue() : ""; } catch (x) { return ""; } } }; } catch (e) { window.__JG_ERR = String(e); }\r\n'
          'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__JG[k] = eval(k); } catch (e) { (window.__JG_MISSING = window.__JG_MISSING || []).push(k); } }); } catch (e) { window.__JG_ERR2 = String(e); }\r\n')
     out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
@@ -304,7 +326,7 @@ try:
             else: f += 1; failed.append(aid)
         for s in scns:
             o = obs.get(s) or {}
-            keep_keys = [k for k in ('flatHead', 'level0', 'buckets', 'bands2021', 'sortCrit', 'drillHead', 'bootErrors') if k in o]
+            keep_keys = [k for k in ('flatHead', 'level0', 'bucketsPlain', 'buckets', 'bands2021', 'sortCrit', 'drillHead', 'bootErrors') if k in o]
             if keep_keys: print('  obs %-6s %s' % (s, '; '.join('%s=%s' % (k, json.dumps(o[k])) for k in keep_keys))[:900])
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:

@@ -102,6 +102,9 @@ MUTANTS = {
     'resetgone': ("    .cal-fb-reset[hidden] { display: inline-block; visibility: hidden; }", "    .cal-fb-reset[hidden] { display: none; }", ['Y4']),
     'mineclick': ("    if (mineBtn) mineBtn.addEventListener('click', function () { setOwner(ownerIsMe() ? '' : meKey); });", "", ['Y1']),
     'minedup':   ("        if (ownerQ === '' || ownerIsMe()) { if (chip && chip.parentNode) chip.parentNode.removeChild(chip); return; }", "        if (ownerQ === '') { if (chip && chip.parentNode) chip.parentNode.removeChild(chip); return; }", ['Y1']),
+    # (2026-11-17, 5014062) chips count what the calendar draws
+    'chipact':   ("            el.textContent = el.getAttribute((hideChk && hidePaused) ? 'data-n-act' : 'data-n-all');", "            el.textContent = el.getAttribute('data-n-all');", ['P1', 'Y1', 'Y3']),
+    'mineact':   ("strcasecmp(trim((string)$r['OWNER_ID']), trim($currentUserKey)) === 0) $schedMineActive++;", "strcmp(trim((string)$r['OWNER_ID']), trim($currentUserKey)) === 0) $schedMineActive++;", ['Y1']),
     'minecount': ("strcasecmp(trim((string)$r['OWNER_ID']), trim($currentUserKey)) === 0) $schedMineCount++;", "strcmp(trim((string)$r['OWNER_ID']), trim($currentUserKey)) === 0) $schedMineCount++;", ['Y1']),
     'pausedmem': ("        hidePaused = true;\n        try { localStorage.removeItem('penumbra_cal_hide_paused'); } catch (e) {}", "        try { hidePaused = localStorage.getItem('penumbra_cal_hide_paused') !== '0'; } catch (e) { hidePaused = true; }", ['H2']),
     'pausedclk': ("            hidePaused = !hidePaused;", "            hidePaused = hidePaused;", ['H1']),
@@ -256,6 +259,9 @@ $schedTasks = getenv('CF_EMPTY') === '1' ? array() : json_decode(getenv('CF_TASK
 $schedActiveCount = 0; $schedPausedCount = 0;
 $schedTypeCounts = array('EMAIL' => 0, 'SNAPSHOT' => 0, 'DROP_FILE' => 0, 'DB_DUMP' => 0); $schedMineCount = 0;
 foreach ($schedTasks as &$t) { $t['typeLabel'] = $schedTypeLabels[$t['type']]; if ($t['active']) $schedActiveCount++; else $schedPausedCount++; $schedTypeCounts[$t['type']]++; if (strcasecmp((string)$t['owner'], $currentUserKey) === 0) $schedMineCount++; } unset($t);
+// (2026-11-17, metricsweep2) the page's chips count ACTIVE tasks: the two counts analytics_all.php builds beside the others
+$schedTypeActive = array(); $schedMineActive = 0;
+foreach ($schedTasks as $cfT) { if (!empty($cfT['active'])) { $schedTypeActive[$cfT['type']] = (isset($schedTypeActive[$cfT['type']]) ? $schedTypeActive[$cfT['type']] : 0) + 1; if (strcasecmp((string)$cfT['owner'], $currentUserKey) === 0) $schedMineActive++; } }
 $chips = array(array('k' => 'range', 'label' => 'Range', 'value' => 'Last 30 days', 'on' => false));
 $activeFilterCount = 0;
 if (getenv('CF_SCOPE') === '1') { $chips[] = array('k' => 'report', 'label' => 'Report', 'value' => 'alpha1 (exact)', 'on' => true); $activeFilterCount = 1; }
@@ -300,10 +306,19 @@ def stage(src_text, mutant):
     js = text[js_start:js_end + len('})();\n</script>')]
     prelude = PRELUDE
     if "if ($currentUserKey !== '' && isset($r['OWNER_ID']) && " in text:   # a pre-feature control has no count line
-        cnt = text[text.index("if ($currentUserKey !== '' && isset($r['OWNER_ID']) && "):]
-        cnt = cnt[:cnt.index('$schedMineCount++;') + len('$schedMineCount++;')]
+        # (2026-11-17) the LAST such test before the count: metricsweep2 added the same test, for
+        # $schedMineActive, inside an `if ($active) { ... }` just above, and a slice from the first one
+        # carried that block's closing brace into the page (Parse error: Unmatched '}').
+        _end = text.index('$schedMineCount++;') + len('$schedMineCount++;')
+        cnt = text[text.rindex("if ($currentUserKey !== '' && isset($r['OWNER_ID']) && ", 0, _end):_end]
         prelude = PRELUDE.replace("if (strcasecmp((string)$t['owner'], $currentUserKey) === 0) $schedMineCount++;",
                                   cnt.replace("$r['OWNER_ID']", "$t['owner']"))
+        if '$schedMineActive++;' in text:   # (2026-11-17, 5014062) the active-only twin, lifted the same way
+            _aend = text.index('$schedMineActive++;') + len('$schedMineActive++;')
+            act = text[text.rindex("if ($currentUserKey !== '' && isset($r['OWNER_ID']) && ", 0, _aend):_aend]
+            _old = "if (strcasecmp((string)$cfT['owner'], $currentUserKey) === 0) $schedMineActive++;"
+            if prelude.count(_old) != 1: raise RuntimeError('prelude anchor missing: $schedMineActive')
+            prelude = prelude.replace(_old, act.replace("$r['OWNER_ID']", "$cfT['owner']"))
     tpl = (prelude + SHELL_HEAD + css + '</style></head><body>\n'
            '<form class="console-shell an-cal-mode" method="get" action="calendar.php"><input type="hidden" name="filter_submitted" value="1">\n'
            '<?php if ($activeFilterCount): ?><input type="hidden" name="report_id" id="fReportExact" value="alpha1"><?php endif; ?>\n'
@@ -398,13 +413,22 @@ def checks(br, text):
     # ---- P: the PHP side (static render) ----
     br.load('cal.html')
     bar_html = pg.ev("document.getElementById('calFilterBar') ? document.getElementById('calFilterBar').outerHTML : (document.querySelector('.filter-bar')||{}).outerHTML || ''")
-    chips = pg.ev("Array.from(document.querySelectorAll('.cal-type-chip')).map(function(b){return b.getAttribute('data-cal-type')+':'+b.querySelector('.chip-n').textContent;}).join(' ')")
+    CHIPS_JS = "Array.from(document.querySelectorAll('.cal-type-chip')).map(function(b){return b.getAttribute('data-cal-type')+':'+b.querySelector('.chip-n').textContent;}).join(' ')"
+    chips = pg.ev(CHIPS_JS)
+    # (2026-11-17, follows 5014062 metricsweep2 "calendar chips count what the calendar draws") the chips
+    # count ACTIVE tasks while the paused ones are hidden (the default), every task once Active is
+    # deselected. Fixture: 6 tasks, 2 paused (1 EMAIL, 1 SNAPSHOT). Before that change they always counted all.
+    chips_all = None
+    if pg.ev("!!document.getElementById('calHidePaused')"):
+        pg.click_sel('#calHidePaused'); chips_all = pg.ev(CHIPS_JS); pg.click_sel('#calHidePaused')
+    chips_back = pg.ev(CHIPS_JS)
     rec('S2', 'the ?user= scope chip is labelled Owner in calendar mode (the task query reads it as OWNER_ID)',
         "'label' => $anCalMode ? 'Owner' : 'User', 'value' => $userSearch" in text, 'anchor present=%s' % ("'label' => $anCalMode ? 'Owner' : 'User'" in text))
-    rec('P1', 'calendar mode: no Range chip; 4 type chips with counts; search box; Hide paused; no legend left',
-        'Range' not in bar_html and 'Hiding' not in bar_html and pg.ev(LEAD) == 'unfiltered' and chips == 'EMAIL:2 SNAPSHOT:2 DROP_FILE:1 DB_DUMP:1' and pg.ev("!!document.getElementById('calSearch')") and pg.ev("!!document.getElementById('calHidePaused')")
+    rec('P1', 'calendar mode: no Range chip; 4 type chips with counts (active tasks at load, every task once Active is deselected, back again); search box; Hide paused; no legend left',
+        'Range' not in bar_html and 'Hiding' not in bar_html and pg.ev(LEAD) == 'unfiltered' and chips == 'EMAIL:1 SNAPSHOT:1 DROP_FILE:1 DB_DUMP:1'
+        and chips_all == 'EMAIL:2 SNAPSHOT:2 DROP_FILE:1 DB_DUMP:1' and chips_back == chips and pg.ev("!!document.getElementById('calSearch')") and pg.ev("!!document.getElementById('calHidePaused')")
         and not pg.ev("!!document.querySelector('.cal-legend')") and '<div class="cal-legend">' not in text,
-        'range=%s hiding=%s lead=%s chips=%s legend=%s' % ('Range' in bar_html, 'Hiding' in bar_html, pg.ev(LEAD), chips, '<div class="cal-legend">' in text))
+        'range=%s hiding=%s lead=%s chips=%s chips_all=%s chips_back=%s legend=%s' % ('Range' in bar_html, 'Hiding' in bar_html, pg.ev(LEAD), chips, chips_all, chips_back, '<div class="cal-legend">' in text))
     br.load('scope.html')
     rec('P2', 'an inbound report scope chip still renders first, with its x, and counts toward the lead',
         pg.ev("(function(){var c=document.querySelector('#calFilterBar .chip'); return !!c && c.textContent.indexOf('Report')>=0 && c.textContent.indexOf('alpha1')>=0 && !!c.querySelector('.chip-x[data-clear=\"report\"]');})()")
@@ -615,6 +639,10 @@ def checks(br, text):
 
     # ---- Y: Owned by me ---- (today's day view is still open from O)
     mine0 = pg.ev("(function(){var b=document.getElementById('calMineChip'); return b ? [b.classList.contains('on'), b.getAttribute('aria-pressed'), b.querySelector('.chip-n').textContent, b.getAttribute('data-owner')] : null;})()")
+    # (2026-11-17, follows 5014062) the count is the ACTIVE tasks jdoe owns (2) while paused tasks are
+    # hidden, all 3 once Active is deselected; same for "Not owned by me" (2 active, 3 in all).
+    N_OWN_JS = "['calMineChip','calNotMineChip'].map(function(i){var b=document.getElementById(i); return b ? b.querySelector('.chip-n').textContent : null;})"
+    pg.click_sel('#calHidePaused'); own_all = pg.ev(N_OWN_JS); pg.click_sel('#calHidePaused'); own_act = pg.ev(N_OWN_JS)
     pg.click_sel('#calMineChip')
     rows = pg.ev(DAY_ROWS)
     mine1 = pg.ev("(function(){var b=document.getElementById('calMineChip'); return [b.classList.contains('on'), b.getAttribute('aria-pressed'), !!document.getElementById('calOwnerChip'), document.getElementById('calFbLead').textContent.trim()];})()")
@@ -624,10 +652,10 @@ def checks(br, text):
     mine2 = pg.ev("(function(){var b=document.getElementById('calMineChip'); return [b.classList.contains('on'), !!document.getElementById('calOwnerChip')];})()")
     pg.click_sel('#calFbReset')
     mine3 = pg.ev("document.getElementById('calMineChip').classList.contains('on')")
-    rec('Y1', 'Owned by me (viewer JDoe, 3 owned incl. the paused one): unselected at load with the count; a click keeps only jdoe\'s tasks and reads selected, the generic Owner chip stays away, "1 filter on"; a second click clears; "by jdoe" on a row selects it too (case-insensitive); Reset clears it',
-        mine0 == [False, 'false', '3', 'JDoe'] and rows == ['email:Alpha Weekly Digest', 'db_dump:Delta Dump'] and mine1 == [True, 'true', False, '1 filter on']
+    rec('Y1', 'Owned by me (viewer JDoe, 3 owned incl. the paused one): unselected at load with the count (2 active; 3 with Active deselected); a click keeps only jdoe\'s tasks and reads selected, the generic Owner chip stays away, "1 filter on"; a second click clears; "by jdoe" on a row selects it too (case-insensitive); Reset clears it',
+        mine0 == [False, 'false', '2', 'JDoe'] and own_all == ['3', '3'] and own_act == ['2', '2'] and rows == ['email:Alpha Weekly Digest', 'db_dump:Delta Dump'] and mine1 == [True, 'true', False, '1 filter on']
         and len(rows2) == 4 and mine2 == [True, False] and mine3 is False,
-        'mine0=%s rows=%s mine1=%s rows2=%s mine2=%s mine3=%s' % (mine0, rows, mine1, rows2, mine2, mine3))
+        'mine0=%s own_all=%s own_act=%s rows=%s mine1=%s rows2=%s mine2=%s mine3=%s' % (mine0, own_all, own_act, rows, mine1, rows2, mine2, mine3))
     pg.click_sel('#calDayView .cal-day-ev:nth-child(2) .cal-de-owner')   # Beta: asmith
     other = pg.ev("(function(){var b=document.getElementById('calMineChip'); var c=document.getElementById('calOwnerChip'); return [b.classList.contains('on'), c ? c.textContent : null];})()")
     pg.click_sel('#calOwnerChip .chip-x')
@@ -645,8 +673,8 @@ def checks(br, text):
     nm3 = pg.ev("(function(){var b=document.getElementById('calNotMineChip'), m=document.getElementById('calMineChip'); return [b.classList.contains('on'), m.classList.contains('on')];})()")
     pg.click_sel('#calFbReset')
     nm4 = pg.ev("document.getElementById('calNotMineChip').classList.contains('on')")
-    rec('Y3', 'Not owned by me (3 of 6): unselected at load with the count; a click keeps the other owners\' tasks, "1 filter on", no Owner chip; Owned by me takes over (mutually exclusive) and back; Reset clears it',
-        nm0 == [False, '3'] and rows == ['snapshot:Beta Snapshot', 'drop_file:Gamma Drop'] and nm1 == [True, False, False, '1 filter on']
+    rec('Y3', 'Not owned by me (3 of 6, 2 of the 4 active): unselected at load with the active count (the all count is in Y1); a click keeps the other owners\' tasks, "1 filter on", no Owner chip; Owned by me takes over (mutually exclusive) and back; Reset clears it',
+        nm0 == [False, '2'] and own_all == ['3', '3'] and rows == ['snapshot:Beta Snapshot', 'drop_file:Gamma Drop'] and nm1 == [True, False, False, '1 filter on']
         and nm2 == [False, True] and rows2 == ['email:Alpha Weekly Digest', 'db_dump:Delta Dump'] and nm3 == [True, False] and nm4 is False,
         'nm0=%s rows=%s nm1=%s nm2=%s rows2=%s nm3=%s nm4=%s' % (nm0, rows, nm1, nm2, rows2, nm3, nm4))
     x0 = pg.ev("document.getElementById('calSearch').getBoundingClientRect().left")

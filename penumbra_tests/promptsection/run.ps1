@@ -242,7 +242,9 @@ $mutants = @(
     @{ id = 'A'; name = 'A: section= is part of the answer key again'; file = 'js\main.js'; bar = 19; builder = 0; pins = 0
        from = '? promptString.replace(/;\s*section=[^;\]]*?[ \t]*(?=\s*(?:;|\]|$))/gi, '''')'
        to   = '? promptString' },
-    @{ id = 'B'; name = 'B: a section''s review asks every prompt'; file = 'js\main.js'; bar = 17; builder = 0; pins = 0
+    # (2026-11-17) B: 17 -> 19. The one Cancel check (it passed under B) became two after f02d2be
+    # (reviewkeep, see promptsection_bar_tests.js section F); both list the dialogs asked, so both fail under B.
+    @{ id = 'B'; name = 'B: a section''s review asks every prompt'; file = 'js\main.js'; bar = 19; builder = 0; pins = 0
        from = "prompts = allPrompts.filter(ps => (_sectionOf.get(getPromptStorageKey(ps)) || '') === _want);"
        to   = 'prompts = allPrompts.filter(ps => true);' },
     @{ id = 'C'; name = 'C: a child that names NO section stops following its parent'; file = 'js\main.js'; bar = 2; builder = 0; pins = 0

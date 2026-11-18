@@ -17,7 +17,13 @@
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -App <dir>
 # ONE suite run per PowerShell call, output to a FILE. Prints RESULT: GREEN/RED. Stages into %TEMP%.
 # =============================================================================
-param([string]$App = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep, [string]$Here = '', [int]$Rows = 1500)
+#
+# 2026-11-17 repair (follows adb6299 of 2026-11-16, snipgate): the live-edit pause is cost-based now
+# (_pnbSnipLiveEstimate against _PNB_SNIP_LIVE_BUDGET_MS = 1000), no longer "> 1000 rows", so a vis() alone on
+# 1,500 rows stays live on purpose. The fixture carries a format() rule and -Cols filler columns
+# (1,500 x 121 cells x 7 us = ~1,270 ms) so the pause path is still reached; E0 asserts the new live case,
+# the editlive mutant was re-anchored on the cost gate, and the rowline mutant (the old row line back) guards E0.
+param([string]$App = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep, [string]$Here = '', [int]$Rows = 1500, [int]$Cols = 115)
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\chainlive' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
@@ -32,8 +38,11 @@ $mutantDefs = [ordered]@{
   'trigpause'  = @{ edits = @(,@("renderReportSnippet(null, false);   // (chainlive) a trigger's catch-all render", "renderReportSnippet(null, true);   // (chainlive) a trigger's catch-all render")); red = @('T1') }
   'grppause'   = @{ edits = @(,@("renderReportSnippet(null, false);   // (chainlive) a grouping is no editor", "renderReportSnippet(null, true);   // (chainlive) a grouping is no editor")); red = @('G1') }
   # the over-fix: the editor's own debounced render no longer pauses (E1 guards the intended pause)
-  'editlive'   = @{ edits = @(@("        if (isLiveEdit && rowCount > 1000 && hasComplexFunctions) {", "        if (false && isLiveEdit && rowCount > 1000 && hasComplexFunctions) {"),
-                              @("            if (isLiveEdit && rowCount > 1000 && (localConditionalRules.length > 0", "            if (false && isLiveEdit && rowCount > 1000 && (localConditionalRules.length > 0")); red = @('E1') }
+  # (2026-11-17) re-anchored on the cost gate (adb6299); the old anchors were the "rowCount > 1000" lines
+  'editlive'   = @{ edits = @(@("        if (isLiveEdit && hasComplexFunctions) {", "        if (false && isLiveEdit && hasComplexFunctions) {"),
+                              @("            if (isLiveEdit && !executionBlocked && (localConditionalRules.length > 0", "            if (false && isLiveEdit && !executionBlocked && (localConditionalRules.length > 0")); red = @('E1') }
+  # (2026-11-17) the old row line put back: a vis() alone on 1,500 rows pauses again (E0 guards the intended live case)
+  'rowline'    = @{ edits = @(,@("`n            if (_snipEstMs > _PNB_SNIP_LIVE_BUDGET_MS) executionBlocked = true;", "`n            if (_snipEstMs > _PNB_SNIP_LIVE_BUDGET_MS || rowCount > 1000) executionBlocked = true;")); red = @('E0') }
 }
 
 function Apply-Edits([string]$text, $edits, [string]$name) {
@@ -69,7 +78,7 @@ function Invoke-Browser([string]$mainText, [string]$tag) {
   $patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
   [IO.File]::WriteAllText("$run\main_sm.js", $patched, $utf8)
   $prof = Join-Path $run 'profile'; $dom = Join-Path $run 'dom.txt'
-  $url  = 'file:///' + $run.Replace([char]92, [char]47) + "/harness.html?mode=chainlive&rows=$Rows"
+  $url  = 'file:///' + $run.Replace([char]92, [char]47) + "/harness.html?mode=chainlive&rows=$Rows&cols=$Cols"
   $edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files','--no-first-run','--no-default-browser-check',
                 '--disable-sync','--disable-extensions','--window-size=1400,1000',"--user-data-dir=$prof",'--virtual-time-budget=180000','--dump-dom', $url)
   $pr = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $run 'err.txt') -ArgumentList $edgeArgs

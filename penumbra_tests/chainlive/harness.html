@@ -260,9 +260,21 @@
   window.penumbra_vars.preloadedState.reportSubtitle = '';
   window.penumbra_vars.preloadedState.reportSnippet =
     "vis('bar', 'DEPT')\n" +
+    "format(cell, AMOUNT, AMOUNT > 100, 'font-weight:bold')\n" +   // (2026-11-17) the rule that puts the fixture over the live budget, see below
     "<span id=\"grp\">data(group)</span>\n" +
     "chain('Chain', 'search|beta', 'search|')\n" +
     "action(trigger, 'Find', 'search|alpha') action(trigger, 'Clear', 'search|') action(trigger, 'Group', 'group_by|DEPT')\n";
+  // (2026-11-17 repair, follows adb6299 of 2026-11-16, snipgate) the live-edit pause goes by estimated COST
+  // against a 1,000 ms budget, no longer by "> 1000 rows": a vis() alone on 1,500 rows estimates ~65 ms and
+  // stays live on purpose. A format() rule costs 7 us per table cell (rows x columns, '#' included; a page
+  // only ever learns a HIGHER rate), so ?cols=N adds N filler columns: 1,500 x (5 + 115 + '#') = 181,500
+  // cells = ~1,270 ms, over the budget on any machine. Without this the pause path was not exercised at
+  // all (E1 red, and the chainpause / trigpause / grppause mutants could no longer turn anything red).
+  (function () {
+    var nc = parseInt((/[?&]cols=(\d+)/.exec(location.search) || [])[1], 10) || 0;
+    if (!nc) return;
+    window.__queryResponse.data.forEach(function (r) { for (var k = 1; k <= nc; k++) r['F' + k] = 'f'; });
+  })();
 </script>
 <script src="penumbra_userseg.js"></script>
 <script src="main_sm.js"></script>

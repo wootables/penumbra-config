@@ -65,7 +65,8 @@
   "must": [
    "K-save"
   ]
- }, "js_datesort": {
+ },
+ "js_datesort": {
   "why": "the opening list re-sorted by Last Updated again (skipSort dropped from the list loader) = the old look",
   "file": "js",
   "edits": [
@@ -84,7 +85,7 @@
   ]
  },
  "js_resetdate": {
-  "why": "clearing a sort falls back to newest-arrival first instead of the arrival order (J-initial stays green: the load itself is right; every later list inherits the reversed reset)",
+  "why": "clearing a sort falls back to newest-arrival first instead of the arrival order (J-initial stays green: the load itself is right; every later list inherits the reversed reset) (2026-11-17: J-loadmore left the list - it runs before the first sort now, since a sort loads the rest of the list: metricsweep3, b2de079)",
   "file": "js",
   "edits": [
    [
@@ -95,13 +96,12 @@
   "must": [
    "J-reset",
    "J-rebuild",
-   "J-loadmore",
    "J-loadmore-reset",
    "J-restore"
   ]
  },
  "js_reseq": {
-  "why": "the arrival stamp re-assigned on every render: a column change while sorted makes the SORTED order the new 'as loaded' order (J-reset stays green: it runs before the first column change)",
+  "why": "the arrival stamp re-assigned on every render: a column change while sorted makes the SORTED order the new 'as loaded' order (J-reset stays green: it runs before the first column change) (2026-11-17: J-loadmore left the list - it runs before the first sort now, since a sort loads the rest of the list: metricsweep3, b2de079)",
   "file": "js",
   "edits": [
    [
@@ -111,7 +111,6 @@
   ],
   "must": [
    "J-rebuild",
-   "J-loadmore",
    "J-loadmore-reset",
    "J-restore"
   ]
@@ -186,6 +185,23 @@
   "must": [
    "S-order",
    "S-fewmine"
+  ]
+ },
+ "js_sortnoload": {
+  "why": "2026-11-17 metricsweep3: a sort no longer asks for the reports still unloaded (it sorts the page that happens to be loaded)",
+  "file": "js",
+  "edits": [
+   [
+    "            $(_srLa).trigger('click');",
+    ""
+   ]
+  ],
+  "must": [
+   "J-sortloads",
+   "J-reset",
+   "J-rebuild",
+   "J-loadmore-reset",
+   "J-restore"
   ]
  },
  "js_colw_resetkeep": {

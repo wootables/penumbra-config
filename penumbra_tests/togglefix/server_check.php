@@ -1386,6 +1386,22 @@ function nExec($sql, $b) {
         $GLOBALS['NT'][] = array('REPORT_ID' => (int)$b[':rid'], 'ROW_KEY' => $b[':sig'], 'TOGGLE_KEY' => $b[':kf'], 'STATE' => 9, 'UPDATED_BY' => 'penumbra', 'UPDATED_AT' => nNow());
         return 1;
     }
+    // (2026-11-17, rekeyzero) a cleared plain row (STATE 0) gives way to a mark or value coming onto it: the give-back's
+    // (the filed copy under the tag) and the move's (the old key's row) - each clause as the statement has it
+    if (strpos($s, 'DELETE FROM PENUMBRA_JOURNAL_TOGGLE Z') === 0) {
+        $give = strpos($s, ':ztag || Z.ROW_KEY') !== false;
+        $before = $GLOBALS['NT'];
+        foreach ($before as $i => $r) {
+            if ($r['REPORT_ID'] != $b[':zrid'] || (int)$r['STATE'] !== 0 || $r['TOGGLE_KEY'] === $b[':zkf']) continue;
+            if ($give ? strpos($r['ROW_KEY'], $P) === 0 : $r['ROW_KEY'] !== $b[':znew']) continue;
+            foreach ($before as $r2) {
+                if ($r2['REPORT_ID'] != $b[':zrid2'] || $r2['TOGGLE_KEY'] !== $r['TOGGLE_KEY'] || !in_array((int)$r2['STATE'], array(1, 2), true)) continue;
+                if ($r2['ROW_KEY'] === ($give ? $b[':ztag'] . $r['ROW_KEY'] : $b[':zold'])) { unset($GLOBALS['NT'][$i]); $n++; break; }
+            }
+        }
+        $GLOBALS['NT'] = array_values($GLOBALS['NT']);
+        return $n;
+    }
     if (strpos($s, 'SET ROW_KEY = :knew') !== false) {
         foreach ($GLOBALS['NT'] as $i => $r) {
             if ($r['REPORT_ID'] == $b[':krid'] && $r['TOGGLE_KEY'] === $b[':kkf'] && (int)$r['STATE'] === 9 && $r['ROW_KEY'] === $b[':kold']) {
@@ -1552,6 +1568,18 @@ function nQuery($sql, $binds) {
         $k = array();
         foreach ($NT as $r) if ($r['REPORT_ID'] === $rid && (strpos($s, 'TOGGLE_KEY <> :kf') === false || $r['TOGGLE_KEY'] !== $b[':kf'])) $k[$r['TOGGLE_KEY']] = 1;
         return array_map(function ($x) { return array('TOGGLE_KEY' => (string)$x); }, array_keys($k));
+    }
+    // (2026-11-17, seenasof) the list's read time (what mark_seen marks up to)
+    if (strpos($s, "SELECT TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS.FF6') AS T FROM DUAL") === 0) return array(array('T' => '2026-11-17 12:00:00.000000'));
+    // (2026-11-17, firstfield) the toggles read's field values (STATE 2, FIELD_VALUE), read whether or not fields are saved
+    if (strpos($s, 'SELECT TOGGLE_KEY, ROW_KEY, FIELD_VALUE') === 0) {
+        $plainOnly = strpos($s, 'SUBSTR(ROW_KEY, 1, 1) <> UNISTR') !== false; $out = array();
+        foreach ($NT as $r) {
+            if ($r['REPORT_ID'] !== $rid || (int)$r['STATE'] !== 2 || ($plainOnly && strpos($r['ROW_KEY'], $P) === 0)) continue;
+            $out[] = array('TOGGLE_KEY' => $r['TOGGLE_KEY'], 'ROW_KEY' => $r['ROW_KEY'], 'FIELD_VALUE' => isset($r['FIELD_VALUE']) ? $r['FIELD_VALUE'] : '',
+                           'UPDATED_BY' => $r['UPDATED_BY'], 'UPDATED_AT' => $r['UPDATED_AT']);
+        }
+        return $out;
     }
     if (strpos($s, 'SELECT TOGGLE_KEY, ROW_KEY') === 0) {
         $plainOnly = strpos($s, 'SUBSTR(ROW_KEY, 1, 1) <> UNISTR') !== false; $out = array();

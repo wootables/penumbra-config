@@ -156,7 +156,10 @@ $WANT = array('penumbraWildcardMatch', 'penumbraReportGrantMatches',
               // so the extractor chain and the scope helpers are lifted as well.
               'penumbraExtractReportTables', 'penumbraExtractSqlTables',
               'penumbraExtractSqlTablesUncached', 'penumbraTablesOutOfScope',
-              'penumbraScopeTableSet', 'penumbraHiddenAllowList');
+              'penumbraScopeTableSet', 'penumbraHiddenAllowList',
+              // (2026-11-17, metricsweep4 + 5) the extractors read the SQL through the one shared
+              // scanner now; without it every scope check died "Call to undefined function".
+              'penumbraSqlScrub');
 $lift = pnb_lift($SRC_DB, $WANT);
 
 echo "Lifted from db_connection.php\n";

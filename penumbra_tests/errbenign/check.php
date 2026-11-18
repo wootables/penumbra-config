@@ -102,7 +102,9 @@ if ($haveRule) {
     $want  = "(CASE WHEN ACTION <> 'CLIENT_ERROR' THEN 0 WHEN REGEXP_LIKE(TRIM(JSON_VALUE(SOURCE_DATA, '$.message')), '" . $pat . "', 'i') THEN 1 ELSE 0 END) = 1";
     $wantA = str_replace(array('ACTION <>', 'JSON_VALUE(SOURCE_DATA'), array('a.ACTION <>', 'JSON_VALUE(a.SOURCE_DATA'), $want);
     // QUERY_FAIL joined the set 2026-10-30 (suite qfail).
-    $set   = "'BADPASS','DENIED','DENIED_SCOPE','DENIED_IMPORT','EMAIL_FAIL','SCHEDULE_RUN_FAIL','SCHEDULE_FAIL','SCHEDULE_NOAUTH','QUERY_TIMEOUT','QUERY_TOOBIG','QUERY_FAIL','CLIENT_ERROR'";
+    // (2026-11-17) DB_BACKUP_FAIL, PEOPLE_SYNC_FAIL and PRESET_DENIED joined the set (metricsweep2, 5014062: three
+    // failures no surface counted), then SNAP_ORPHANS_FAIL (the snapshot clean-up job's failure, c1bd07a).
+    $set   = "'BADPASS','DENIED','DENIED_SCOPE','DENIED_IMPORT','EMAIL_FAIL','SCHEDULE_RUN_FAIL','SCHEDULE_FAIL','SCHEDULE_NOAUTH','QUERY_TIMEOUT','QUERY_TOOBIG','QUERY_FAIL','CLIENT_ERROR','DB_BACKUP_FAIL','PEOPLE_SYNC_FAIL','PRESET_DENIED','SNAP_ORPHANS_FAIL'";
     $okB  = penumbraBenignClientErrorSql() === $want;
     $okBA = penumbraBenignClientErrorSql('a') === $wantA;
     $okC  = penumbraErrorCondSql() === "(ACTION IN ($set) AND NOT $want)";

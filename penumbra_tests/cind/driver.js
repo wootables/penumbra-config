@@ -115,6 +115,16 @@
       rclick(td); await sleep(200);
       R.info.cellActs = acts().slice(0, 6);
       R.chk.cellStays = !!menu() && acts().indexOf('gStacked') < 0 && acts().indexOf('gCopyName') < 0;
+      closeMenu(); await sleep(100);
+      // (glmenu, 2026-11-17) the list's header, and the frame's own empty space (the list's column under the
+      // list): the active row's group menu, as the list's rows have it
+      var lhd = document.querySelector('#pnbGroupList > .pnb-gl-head');
+      var p3 = lhd ? rclick(lhd) : false; await sleep(200);
+      R.chk.headMenu = p3 && !!menu() && menu().textContent.indexOf(name) >= 0 && acts().indexOf('gStacked') >= 0;
+      closeMenu(); await sleep(100);
+      var p4 = rclick(document.getElementById('groupedResultsContainer')); await sleep(200);
+      R.chk.fillMenu = p4 && !!menu() && menu().textContent.indexOf(name) >= 0 && acts().indexOf('gStacked') >= 0;
+      R.info.glmenu = { head: !!lhd, p3: p3, p4: p4 };
       closeMenu();
     },
     ggcind: async function () {

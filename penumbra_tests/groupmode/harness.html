@@ -1054,8 +1054,11 @@
         var v3 = window.__GM6.groupsToViz();
         eq('viz 3 levels: X axis unchanged', v3.config.xAxis, 'COLLEGE');
         eq('viz 3 levels: series is still level 2', v3.config.groupBy, 'DEPT');
+        // (2026-11-17, follows 12ec61c "Auto-build heads-up: shorter notes", 2026-11-16) the note was reworded:
+        // "...the deeper level is not plotted." became "Level 1 is the X axis and level 2 the series; level 3 is
+        // not charted." The level is still called out, and by its number now, so the check names it.
         assert('viz 3 levels: the unplottable level is called out, not dropped silently',
-          v3.warnings.some(function (w) { return /not plotted/.test(w); }),
+          v3.warnings.some(function (w) { return /level 3 is not charted/.test(w); }),
           v3.warnings.join(' | '));
 
         // A bucket token must survive into the series slot untouched.

@@ -35,6 +35,14 @@
     var a = idx.indexOf('CLIENT ERROR TELEMETRY');
     // After the PHP comment's own "?>" - the comment's prose mentions "<script>".
     var c = idx.indexOf('?>', a);
+    // (2026-11-17) The installer moved to penumbra_client_errors.php, one copy shared by every page: index.php
+    // now only calls penumbra_client_error_installer() after the comment. Follow it there (run.ps1 stages the
+    // file beside index.php); an older index.php still carries the block inline and is read as before.
+    if (idx.slice(c, c + 400).indexOf('penumbra_client_error_installer') >= 0) {
+      var x2 = new XMLHttpRequest(); x2.open('GET', 'penumbra_client_errors.php', false); x2.send(null);
+      if (x2.status !== 200) throw new Error('penumbra_client_errors.php is not staged');
+      idx = x2.responseText; c = idx.indexOf('?>');
+    }
     var s = idx.indexOf('<script>', c), e = idx.indexOf('<\/script>', s);   // <\/ : a literal close tag would end THIS script
     if (a < 0 || c < 0 || s < 0 || e < 0) throw new Error('installer block not found');
     var code = idx.slice(s + 8, e);

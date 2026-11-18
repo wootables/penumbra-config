@@ -17,6 +17,10 @@
 #
 #   run.ps1                      live js\main.js + css\main.css   EXPECTED: switch 39/0, plain 2/0,
 #                                restore 9/0 (TOTAL 50/0, RESULT: GREEN - measured 2026-09-25)
+#                                2026-11-17: switch 42/0, TOTAL 53/0. Q re-stated after swhold (be594f0,
+#                                2026-11-16): a switch's command runs under its own cover, so a click 250 ms
+#                                in is dropped (new Q0); the DUE rule (Q1/Q2) is tested in the quiet spell
+#                                after the cover lifts. Mutants nodue -> Q1 Q2, noleak -> K1 K2 Q0 Q1 Q2 D1.
 #   V6 = a load that starts under the veil keeps it (a big sort's formatting pass).
 #   restore (2026-09-25, 600 rows): Remove Grouping / Restore Transaction List / sorts
 #   veil the data with no switch involved (showLoading opts.scoped); a dialog-style
