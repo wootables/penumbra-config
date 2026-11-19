@@ -148,7 +148,7 @@ A('I2-enc', isset($r['j']['notes']) && count($r['j']['notes']) === 1, 'an encryp
 // ===== item 5: an encrypted report's mention / reply targets ===============================================
 $rep = array('ID' => 7, 'SHORT_ID' => 'jjornl', 'OWNER_ID' => 'owner1');
 $t = function ($f) use ($rep) { $GLOBALS['FLAGS'] = array_merge($GLOBALS['FLAGS'], $f); $v = journalTargetCanOpenJournal($rep, 'viewer9'); return $v; };
-$enc = $t(array('on' => false, 'enc' => true));
+$GLOBALS['journalEncPageOn'] = true; $enc = $t(array('on' => false, 'enc' => true)); $GLOBALS['journalEncPageOn'] = false;   // (2026-11-18, encoff) the page says its journal is on
 $off = $t(array('on' => false, 'enc' => false));
 $on = $t(array('on' => true, 'enc' => false));
 $own = journalTargetCanOpenJournal($rep, 'owner1');

@@ -63,10 +63,10 @@ $I20 = '                    '
 $ON = 'Object.create(null)'
 $mutants = @{
   # S: Median / Running Count on the specialty types, and the restart at 0
-  'blmedian'  = @("Object.keys(blValsMap).forEach(function (k) { blAgg[k] = _comboAggregateVals(blValsMap[k], 'median'); });", '/* MUTANT */')
-  'fnmedian'  = @("Object.keys(fnValsMap).forEach(function (k) { fnAgg[k] = _comboAggregateVals(fnValsMap[k], 'median'); });", '/* MUTANT */')
-  'wfmedian'  = @("Object.keys(wfValsMap).forEach(function (k) { wfAgg[k] = _comboAggregateVals(wfValsMap[k], 'median'); });", '/* MUTANT */')
-  'mpmedian'  = @("Object.keys(mpVals).forEach(function (k) { mpAgg[k] = _comboAggregateVals(mpVals[k], 'median'); });", '/* MUTANT */')
+  'blmedian'  = @("Object.keys(blValsMap).forEach(function (k) { blAgg[k] = _comboAggregateVals(blValsMap[k], aggregation); });", '/* MUTANT */')
+  'fnmedian'  = @("Object.keys(fnValsMap).forEach(function (k) { fnAgg[k] = _comboAggregateVals(fnValsMap[k], aggregation); });", '/* MUTANT */')
+  'wfmedian'  = @("Object.keys(wfValsMap).forEach(function (k) { wfAgg[k] = _comboAggregateVals(wfValsMap[k], aggregation); });", '/* MUTANT */')
+  'mpmedian'  = @("Object.keys(mpVals).forEach(function (k) { mpAgg[k] = _comboAggregateVals(mpVals[k], aggregation); });", '/* MUTANT */')
   'ggmedian'  = @("case 'median': ggValue = ggVals.length ? _comboAggregateVals(ggVals, 'median') : 0; break;", '/* MUTANT */')
   'blrc'      = @("case 'running_count': blAgg[xVal] = blCount[xVal]; break;", '/* MUTANT */')
   'fnrc'      = @("case 'running_count': fnAgg[xVal] = fnCount[xVal]; break;", '/* MUTANT */')

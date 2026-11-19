@@ -39,7 +39,7 @@ $MUTANTS = array(
     'rule-mentions' => array('journal_export.php', "            foreach (journalMentionUids(isset(\$n['MENTIONS']) ? \$n['MENTIONS'] : '') as \$u) \$aud[\$t][\$u] = true;\n", "", null),
     'rule-writers'  => array('journal_export.php', "            if (\$by !== '') \$aud[\$t][\$by] = true;\n", "", null),
     'rule-anon'     => array('journal_export.php', "(\$me === '' || !isset(\$aud[\$t][\$me]))", "(\$me !== '' && !isset(\$aud[\$t][\$me]))", null),
-    'summary'       => array('manage_journal.php', "                \$rows = array(journalNoteCounts(journalVisibleNotes(queryViaOci8(", "                \$rows = array(journalNoteCounts(pv_all(queryViaOci8(", null),
+    'summary'       => array('manage_journal.php', "                \$visNotes = journalVisibleNotes(queryViaOci8(", "                \$visNotes = pv_all(queryViaOci8(", null),
     'badge'         => array('index.php', "journalVisibleNotes(\$pnbJrnStmt->fetchAll(PDO::FETCH_ASSOC), (string)\$currentUserKey)", "\$pnbJrnStmt->fetchAll(PDO::FETCH_ASSOC)", null),
     'list'          => array('manage_journal.php', "        // Private threads (2026-11-13, privnote): their audience's only.\n        \$rows = journalVisibleNotes(\$rows, \$currentUserKey);\n", "", null),
     'rownotes'      => array('manage_journal.php', "        // Private threads (2026-11-13, privnote): their audience's only - before anything is counted.\n        \$rows = journalVisibleNotes(\$rows, \$currentUserKey);\n", "", null),
@@ -66,7 +66,8 @@ $MUTANTS = array(
                              "        // missing one.\n        \$note_private = journalNoteIsPrivate(\$note);\n        if (false && !journalNoteVisibleTo(", null),
     'delaudit'      => array('manage_journal.php', "        if (\$note_private) {\n            // Metadata only for a private note", "        if (false) {\n            // Metadata only for a private note", null),
     'sharedof'      => array('manage_journal.php', "    if (journalHasPrivateColumn()) \$parentWhere .= \" AND NVL(IS_PRIVATE, 0) = 0\";\n", "", null),
-    'export-php'    => array('journal_export.php', "                    if (function_exists('journalNoteIsPrivate') && journalNoteIsPrivate(\$n)) continue;   // (privnote) never out of the page\n", "", null),
+    'export-php'    => array('journal_export.php', "            if (is_array(\$nr) && \$privCol && function_exists('journalVisibleNotes')) \$nr = journalVisibleNotes(\$nr, '');   // (thrdpriv)\n            if (is_array(\$nr)) {\n                \$byKey = array();\n                foreach (\$nr as \$n) {\n                    if (function_exists('journalNoteIsPrivate') && journalNoteIsPrivate(\$n)) continue;   // (privnote) never out of the page\n",
+                             "            if (is_array(\$nr)) {\n                \$byKey = array();\n                foreach (\$nr as \$n) {\n", null),
     'export-sql'    => array('journal_export.php', " . (\$privCol ? \" AND NVL(IS_PRIVATE, 0) = 0\" : '') . \"", " . \"", null),
     'install-alter' => array('manage_journal.php', "        \$runStmt('journal_private_alter', \$stmts['journal_private_alter']);\n", "", null),
     'install-early' => array('manage_journal.php', "if (\$hasPrivate && in_array('PENUMBRA_JOURNAL', \$inSchema, true)", "if (in_array('PENUMBRA_JOURNAL', \$inSchema, true)", null),
@@ -602,7 +603,7 @@ $aud = array(); foreach (($r['j']['audience'] ?? array()) as $a) $aud[] = $a['us
 A('S-set-make', $up !== null && $up['binds'][':p'] === 1 && $up['binds'][':root'] === 60 && strpos($up['sql'], 'OR PARENT_ID = :root2') !== false
     && ($au['action'] ?? '') === 'JOURNAL_PRIVACY' && json_decode($au['after'], true) === array('id' => 60, 'private' => 1, 'thread_notes' => 2, 'audience_size' => 2)
     && $aud === array('ann=Ann Doe', 'bob=Bob Doe') && !$r['mails'], $brief($r) . ' ' . json_encode($au));
-$r = $run('set_private', 'ann', array('body' => array('note_id' => 12, 'private' => 0), 'numrows' => 3));
+$r = $run('set_private', 'ann', array('body' => array('note_id' => 12, 'private' => 0, 'reply_ids' => array(11, 12)), 'numrows' => 3));
 $up = $ran($r, 'UPDATE PENUMBRA_JOURNAL SET IS_PRIVATE');
 A('S-set-unmake', $up !== null && $up['binds'][':p'] === 0 && $up['binds'][':root'] === 10 && (json_decode($r['audit'][0]['before'] ?? '{}', true)['private'] ?? null) === 1,
     'a reply\'s id flips its root\'s thread: ' . $brief($r));

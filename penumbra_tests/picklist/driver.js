@@ -300,7 +300,19 @@
     clickEl(document.querySelector('#journalFieldList .journal-field-def[data-key="status"] li[data-id="o1"] .journal-field-opt-remove'));
     await sleep(200);
     d1 = window._penumbraJournalFields[0];
-    rec('E-remove', !d1.options.some(function (o) { return o.id === 'o1'; }), JSON.stringify(d1.options.map(function (o) { return o.id; })));
+    // (2026-11-18, optkeep) a saved option is retired, never deleted; only one added on this page and never saved is deleted
+    var o1r = d1.options.filter(function (o) { return o.id === 'o1'; })[0];
+    rec('E-remove-saved', !!o1r && o1r.retired === true && /in the report as saved/.test($('#journalFieldStatus').text()),
+        JSON.stringify(o1r) + ' | ' + $('#journalFieldStatus').text().slice(0, 160));
+    clickEl(document.querySelector('#journalFieldList .journal-field-def[data-key="status"] .journal-field-opt-add'));
+    await sleep(200);
+    d1 = window._penumbraJournalFields[0];
+    var nid = d1.options.filter(function (o) { return !o.retired; }).pop().id;   // the option just added
+    clickEl(document.querySelector('#journalFieldList .journal-field-def[data-key="status"] li[data-id="' + nid + '"] .journal-field-opt-remove'));
+    await sleep(200);
+    d1 = window._penumbraJournalFields[0];
+    rec('E-remove', !d1.options.some(function (o) { return o.id === nid; }) && /never saved/.test($('#journalFieldStatus').text()),
+        nid + ' ' + JSON.stringify(d1.options.map(function (o) { return o.id; })));
     if (JR.buildStateObject) {
       var cm = document.querySelector('.CodeMirror');
       if (cm && cm.CodeMirror) cm.CodeMirror.setValue('SELECT * FROM JR_FIXTURE');

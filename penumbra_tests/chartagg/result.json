@@ -209,9 +209,9 @@
                         "detail":  "got [-5,0.5] | want [-5,0.5]"
                     },
                     {
-                        "name":  "N5 guard: a treemap Other tile is still a size (|-1| + |-8| = 9), like every tile",
+                        "name":  "N5 guard: a treemap Other tile is still a size (|-1| + |-8| = 9), like every tile, and reads its signed value",
                         "pass":  true,
-                        "detail":  "got 9 | want 9"
+                        "detail":  "got [9,-9,-9] | want [9,-9,-9]"
                     }
                 ]
 }

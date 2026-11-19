@@ -70,7 +70,7 @@ CFG = {
     'cprint': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'bar': 'H_NUM', 'fields': ['V_DATE', 'H_TEXT']}, 'gprint': {}, 'pprint': {},
     'cxl2': {'size': 'xl', 'title': 'V_NAME', 'fields': ['V_ID', 'V_STATUS', 'V_DATE', 'V_AMOUNT']}, 'cxl2ph': {'size': 'xl', 'title': 'V_NAME', 'fields': ['V_ID', 'V_STATUS', 'V_DATE', 'V_AMOUNT']},
     # (cfix) a long text field (H_TEXT, hidden) on the card; a report with Pack the cards off; over a pivot
-    'cfix': {'title': 'V_NAME', 'fields': ['H_TEXT', 'V_ID', 'V_DATE']}, 'cfixprint': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'bar': 'H_NUM', 'fields': ['V_DATE', 'H_TEXT']}, 'gfix2': {}, 'cfixB': {'title': 'V_NAME', 'nopack': 1}, 'pfix': {},
+    'cfix': {'title': 'V_NAME', 'fields': ['H_TEXT', 'V_ID', 'V_DATE']}, 'cfixprint': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'bar': 'H_NUM', 'fields': ['V_DATE', 'H_TEXT']}, 'gfix2': {}, 'cfixB': {'title': 'V_NAME', 'nopack': 1}, 'pfix': {}, 'pfixB': {'nopack': 1},
     # (cchips) a list column's values as chips: H_TEXT a semicolon list of "Last, First" names, H_CODE a pipe list of codes,
     # V_NAME a "Last, First" pair (no list), V_STATUS plain text
     'cchips': {'title': 'V_ID', 'fields': ['H_TEXT', 'H_CODE', 'V_NAME', 'V_STATUS']},
@@ -85,7 +85,7 @@ CFG = {
     'copen': {'title': 'V_ID', 'fields': ['V_NAME'], 'open': 1, 'sent': {'title': 'V_ID', 'fields': ['V_NAME']}},
 }
 # the viewer's own saved pick (penumbra_column_prefs.lrfix.view = cards), seeded before boot
-PREF_CARDS = ['cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'cdpack', 'cflt', 'cdens', 'cdensph', 'gbandbig', 'cfmtbig', 'cfmt', 'cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'pvhtml', 'cfields', 'cfieldsB', 'cboard', 'cbarrank', 'cvlC', 'pfsort', 'cvlE', 'pvcfg', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cboardrx', 'cchips', 'cmail', 'gmail', 'csave']
+PREF_CARDS = ['cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'cdpack', 'cflt', 'cdens', 'cdensph', 'gbandbig', 'cfmtbig', 'cfmt', 'cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'pvhtml', 'cfields', 'cfieldsB', 'cboard', 'cbarrank', 'cvlC', 'pfsort', 'cvlE', 'pvcfg', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'pfixB', 'cfixprint', 'gfix2', 'cboardrx', 'cchips', 'cmail', 'gmail', 'csave']
 PREF_CARDS = PREF_CARDS + ['citem']   # (cfsplit 4)
 PREF_CARDS = PREF_CARDS + ['pw3dup', 'gw3agg']   # (cleft)
 PREF_CARDS = PREF_CARDS + ['clay1']   # (clay)

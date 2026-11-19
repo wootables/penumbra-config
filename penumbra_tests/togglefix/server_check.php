@@ -517,6 +517,7 @@ function dAuditAnswer($sql, $binds) {
         if (isset($binds[':needle'])) {
             $any = array($binds[':needle']);
             for ($ni = 0; $ni < 4; $ni++) if (isset($binds[':n' . $ni])) $any[] = $binds[':n' . $ni];
+            for ($ni = 0; $ni < 4; $ni++) if (isset($binds[':na' . $ni])) $any[] = $binds[':na' . $ni];   // (2026-11-18, rowneedle) the key in a bulk row's list
             $rows = array_values(array_filter($rows, function ($r) use ($any) {
                 foreach ($any as $n) if (strpos($r['AFT'], $n) !== false) return true;
                 return false;
@@ -564,7 +565,7 @@ if ($okH) {
     $ev = ($r['resp'] && isset($r['resp']['events'])) ? $r['resp']['events'] : array();
     $sql = $r['audit'] ? preg_replace('/\s+/', ' ', $r['audit']['sql']) : '';
     $nb = ($r['audit'] && isset($r['audit']['binds'][':needle'])) ? $r['audit']['binds'][':needle'] : null;
-    rec('SD-row-sql', !$r['err'] && strpos($sql, 'INSTR("AFTER", :needle) > 0') !== false && $nb === json_encode($TGT)
+    rec('SD-row-sql', !$r['err'] && strpos($sql, 'INSTR("AFTER", :needle) > 0') !== false && $nb === '"row_key":' . json_encode($TGT)
         && count($ev) === 2 && $ev[0]['by'] === 'lee' && $ev[0]['state'] === 0 && !empty($ev[0]['bulk']) && $ev[1]['by'] === 'pat' && $ev[1]['state'] === 1,
         'events ' . json_encode($ev) . ' | needle ' . json_encode($nb) . ' | ' . substr($sql, 0, 160) . ($r['err'] ? ' | threw ' . $r['err'] : ''));
 } else {
@@ -1527,6 +1528,27 @@ function nQuery($sql, $binds) {
     if (strpos($s, 'FROM ALL_TABLES') !== false) return isset($GLOBALS['NTABLES']) ? $GLOBALS['NTABLES'] : array();
     if (strpos($s, 'ALL_TAB_COLUMNS') !== false && isset($GLOBALS['NCNTCOLS'])) return array(array('CNT' => $GLOBALS['NCNTCOLS']));
     if (strpos($s, 'ALL_TAB_COLUMNS') !== false) return array(array('CNT' => 0));
+    // (2026-11-18, rekeyall) rekey step 1's counts by old key: the toggle table's by STATE, the notes'
+    if (strpos($s, 'SELECT SUBSTR(ROW_KEY, :a1) AS K, STATE AS S, COUNT(*) AS N FROM PENUMBRA_JOURNAL_TOGGLE') === 0) {
+        $g = array();
+        foreach ($NT as $r) {
+            if ($r['REPORT_ID'] !== $rid || $r['TOGGLE_KEY'] === $b[':kf'] || strpos($r['ROW_KEY'], $b[':tag']) !== 0) continue;
+            $k = nSubstr($r['ROW_KEY'], (int)$b[':a1']); $gk = $k . '|' . (int)$r['STATE'];
+            if (!isset($g[$gk])) $g[$gk] = array('K' => $k, 'S' => (string)(int)$r['STATE'], 'N' => 0);
+            $g[$gk]['N']++;
+        }
+        return array_values($g);
+    }
+    if (strpos($s, 'SELECT SUBSTR(ROW_KEY, :b1) AS K, COUNT(*) AS N FROM PENUMBRA_JOURNAL WHERE') === 0) {
+        $g = array();
+        foreach ($NN as $r) {
+            if ($r['REPORT_ID'] !== $rid || $r['SCOPE'] !== 'row' || strpos((string)$r['ROW_KEY'], $b[':tag']) !== 0) continue;
+            $k = nSubstr($r['ROW_KEY'], (int)$b[':b1']);
+            if (!isset($g[$k])) $g[$k] = array('K' => $k, 'N' => 0);
+            $g[$k]['N']++;
+        }
+        return array_values($g);
+    }
     if (strpos($s, 'SELECT ROW_KEY FROM PENUMBRA_JOURNAL_TOGGLE WHERE REPORT_ID = :rid AND TOGGLE_KEY = :kf AND STATE = 9') === 0) {
         $out = array();
         foreach ($NT as $r) if ($r['REPORT_ID'] === $rid && $r['TOGGLE_KEY'] === $b[':kf'] && (int)$r['STATE'] === 9) $out[] = $r;
@@ -1537,7 +1559,7 @@ function nQuery($sql, $binds) {
         $notes = strpos($s, 'FROM PENUMBRA_JOURNAL WHERE') !== false; $g = array();
         foreach ($notes ? $NN : $NT as $r) {
             if ($r['REPORT_ID'] !== $rid || $r['ROW_KEY'] === null || strpos($r['ROW_KEY'], $P) !== 0) continue;
-            if ($notes ? ($r['SCOPE'] !== 'row') : ((int)$r['STATE'] !== 1)) continue;
+            if ($notes ? ($r['SCOPE'] !== 'row') : ((int)$r['STATE'] !== (preg_match('/ STATE = (\d)/', $s, $stm) ? (int)$stm[1] : 1))) continue;   // (2026-11-18, parkall) a field value's too
             $e = strpos($r['ROW_KEY'], $C);
             if ($e === false) continue;
             $sig = substr($r['ROW_KEY'], strlen($P), $e - strlen($P));
@@ -1814,7 +1836,7 @@ if ($jeOk) {
     $wantDone = array('Beta', $L); sort($wantDone);
     rec('SN-reads', is_array($tg) && array_keys($tg) === array('done') && $tgDone === $wantDone
         && isset($rt['resp']['used_keys']) && !in_array('__keyfile', $rt['resp']['used_keys'], true) && in_array('sent', $rt['resp']['used_keys'], true)
-        && isset($rt['resp']['parked']) && $rt['resp']['parked'] === array(array('cols' => array('PROTOCOL NO.'), 'marks' => 2), array('cols' => array('TITLE'), 'marks' => 1))
+        && isset($rt['resp']['parked']) && $rt['resp']['parked'] === array(array('cols' => array('PROTOCOL NO.'), 'marks' => 2, 'notes' => 1, 'fields' => 0), array('cols' => array('TITLE'), 'marks' => 1, 'notes' => 0, 'fields' => 0))
         && isset($rn['resp']['counts']) && array_keys($rn['resp']['counts']) === array('Beta') && isset($rn['resp']['pivot_counts']['[["ID","5"]]'])
         && isset($rn['resp']['parked']) && $rn['resp']['parked'] === array(array('cols' => array('PROTOCOL NO.'), 'notes' => 1))
         && is_array($pl) && $pl['ROW_KEY'] === '5' && isset($pl['FILED_UNDER']) && $pl['FILED_UNDER'] === array('PROTOCOL NO.'),
@@ -1833,7 +1855,7 @@ if ($jeOk) {
     $rfSeed(); $rfN = nRun('row_notes', array('report_id' => 'jrkt'), null, 'viewer1');
     $rfTg = isset($rfT['resp']['toggles']) ? $rfT['resp']['toggles'] : null;
     $rfCn = isset($rfN['resp']['counts']) ? $rfN['resp']['counts'] : null;
-    rec('SN-read-files', $rfTg === array() && isset($rfT['resp']['parked']) && $rfT['resp']['parked'] === array(array('cols' => array('ID'), 'marks' => 1))
+    rec('SN-read-files', $rfTg === array() && isset($rfT['resp']['parked']) && $rfT['resp']['parked'] === array(array('cols' => array('ID'), 'marks' => 1, 'notes' => 1, 'fields' => 0))
         && $rfCn === array() && isset($rfN['resp']['parked']) && $rfN['resp']['parked'] === array(array('cols' => array('ID'), 'notes' => 1)),
         'toggles ' . nShow($rfTg) . ' parked ' . nShow(isset($rfT['resp']['parked']) ? $rfT['resp']['parked'] : $rfT['raw'])
         . ' | row notes ' . nShow($rfCn) . ' parked ' . nShow(isset($rfN['resp']['parked']) ? $rfN['resp']['parked'] : $rfN['raw']));

@@ -130,7 +130,7 @@ ok('page: carries the rows (uppercase columns), the props, both slots in order a
     && strpos($pg, '"snippet":' . json_encode('<span class="pnb-vis-slot" data-slot="s0">vis(bar, college, amount)</span>' . "\n" . '<span class="pnb-vis-slot" data-slot="s1">vis(pie, college, amount)</span>', JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES)) !== false
     && strpos($pg, '<script src="js/main_render.js"></script>') !== false && strpos($pg, '<pre id="out">running</pre>') !== false
     && strpos($pg, '<link rel="stylesheet" href="css/main.css">') !== false && strpos($pg, '<body class="theme-default">') !== false && strpos($pg, '"customSorts":{}') !== false
-    && substr_count($pg, '</script>') === 18, is_string($pg) ? substr($pg, strpos($pg, 'window.__PAGE'), 400) : 'false');
+    && substr_count($pg, '</script>') === 19, is_string($pg) ? substr($pg, strpos($pg, 'window.__PAGE'), 400) : 'false');
 // U11b theme + custom sorts ride into the page; a bad theme name falls back
 $pg2 = penumbra_vis_page_html(array($TOK(0) => 'vis(bar, month, amount)'), $rows11, array('college', 'amount', 'note'), array('theme' => 'theme-wolfpack', 'customSorts' => array('MONTH' => array('values' => array('Jul', 'Aug')))));
 $pg3 = penumbra_vis_page_html(array(), $rows11, array('college'), array('theme' => 'theme-x y"><script>'));

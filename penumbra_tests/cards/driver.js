@@ -344,15 +344,41 @@
     var darkC = computed(sw), mc3 = mailCards(mailBox(C().emailHtml({ size: 'standard' }))), mv3 = mc3.filter(function (d) { return /border-left:4px solid/.test(d.getAttribute('style') || ''); });
     R.chk.edgeSwatchTheme = !!dk && darkC !== light && mv3.length > 0 && mv3.every(function (d) { return d.getAttribute('style').indexOf('border-left:4px solid ' + darkC + ';') >= 0; });
     R.info.edgeSwatchTheme = [dk && dk.id, light, darkC, mv3.length, mv3[0] && mv3[0].getAttribute('style')];
+    // (2026-11-19, mut4) the rule's two variables are CHOSEN, no longer fixed to --text-muted on --bg-surface-alt. Under Low Shade
+    // Default (e65935d, 2026-11-11) the page without a theme class gives --text-muted #5a6472: its spread is 24, "colourful" to
+    // the edge's rule, so the light colours kept through a theme change picked the same edge as the dark ones read again and
+    // e2-sig survived. The pair is the first whose edge under the dark theme DIFFERS when the light colours are kept (the
+    // edge's own rule, penumbra_cards.js edgeOf, worked out here from the colours as the page computes them); none: red.
+    var G_VARS = ['var(--text-muted, #666666)', 'var(--bg-surface-alt, #f8f9fa)', 'var(--text-main, #222222)', 'var(--border-color, #dddddd)', 'var(--bg-body, #f0f0f0)'];
+    function gRgb(v) { var m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,\/]\s*([\d.]+)(%?))?\s*\)$/.exec(computed(v) || ''); return m ? [+m[1], +m[2], +m[3], m[4] ? parseFloat(m[4]) / (m[5] ? 100 : 1) : 1] : null; }
+    function gRead() { var o = { base: gRgb('var(--bg-surface, #fff)') || [255, 255, 255, 1] }; G_VARS.forEach(function (v) { o[v] = gRgb(v); }); return o; }
+    function gLum(c) { function f(x) { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); } return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+    function gPick(fl, tx, cols, base) {   // the fill, then the text: the most colourful one (spread >= 24), else the one that stands out most from the card
+      var lb = gLum(base), best = '', bc = -1, grey = '', gk = 0;
+      [fl, tx].forEach(function (v) {
+        var c = cols[v]; if (!c || c[3] < 0.25) return;
+        var l = gLum(c), k = (Math.max(l, lb) + 0.05) / (Math.min(l, lb) + 0.05), ch = Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2]);
+        if (k < 1.05) return;
+        if (ch >= 24) { if (ch > bc) { bc = ch; best = v; } } else if (k > gk) { gk = k; grey = v; }
+      });
+      return best || grey;
+    }
+    var gDark = dk ? gRead() : null;   // (the dark theme is on here)
     document.body.className = cls1; await sleep(600);
-    var gTx = 'var(--text-muted, #666666)', gFl = 'var(--bg-surface-alt, #f8f9fa)';
+    var gLight = gRead(), gPair = null, gTry = [[G_VARS[0], G_VARS[1]]];
+    G_VARS.forEach(function (t) { G_VARS.forEach(function (f) { if (t !== f) gTry.push([t, f]); }); });
+    for (var gi = 0; gDark && gi < gTry.length && !gPair; gi++) {
+      var gL = gPick(gTry[gi][1], gTry[gi][0], gLight, gLight.base), gD = gPick(gTry[gi][1], gTry[gi][0], gDark, gDark.base), gS = gPick(gTry[gi][1], gTry[gi][0], gLight, gDark.base);
+      if (gL && gD && gS !== gD) gPair = { tx: gTry[gi][0], fl: gTry[gi][1], light: gL, dark: gD, kept: gS };
+    }
+    var gTx = gPair ? gPair.tx : G_VARS[0], gFl = gPair ? gPair.fl : G_VARS[1], gWantL = gPair ? gPair.light : gTx, gWantD = gPair ? gPair.dark : gTx;
     window.Penumbra.setColOpt('V_STATUS', 'highlight', [{ id: 'g2', w: 'V_STATUS = //Closed//', css: 'color: ' + gTx + '; background-color: ' + gFl }]);
-    await until(function () { var c = closedCards(); return c.length > 0 && c.every(function (x) { return edgeVar(x) === gTx; }); }, 3000);
+    await until(function () { var c = closedCards(); return c.length > 0 && c.every(function (x) { return edgeVar(x) === gWantL; }); }, 3000);
     var gl = closedCards().slice(0, 3).map(edgeVar), cls2 = document.body.className;
     if (dk) { applyTheme(dk); await sleep(900); }
     var gd = closedCards();
-    R.chk.edgeGreyTheme = !!dk && gl.length > 0 && gl.every(function (v) { return v === gTx; }) && gd.length > 0 && gd.every(function (x) { return edgeVar(x) === gTx; });
-    R.info.edgeGreyTheme = [dk && dk.id, gl, gd.slice(0, 3).map(edgeVar), computed(gTx), computed(gFl)];
+    R.chk.edgeGreyTheme = !!dk && !!gPair && gl.length > 0 && gl.every(function (v) { return v === gWantL; }) && gd.length > 0 && gd.every(function (x) { return edgeVar(x) === gWantD; });
+    R.info.edgeGreyTheme = [dk && dk.id, gPair, gl, gd.slice(0, 3).map(edgeVar), computed(gTx), computed(gFl)];
     document.body.className = cls2; await sleep(600);
   };
   // (cfmt) a cell's highlight worn by its value on the card; changed in the column options while the cards show
@@ -1456,10 +1482,15 @@
     R.chk.menuInside = ev.defaultPrevented && !!menu() && text(q('.pnb-hm-name', menu())) === thName('V_DATE') && td(sr[1], 'V_DATE').classList.contains('pnb-hm-cell') && acts().indexOf('cardOpen') < 0 && acts().indexOf('cardsTable') >= 0;
     var dt0 = dd ? dd.previousElementSibling : null, bg0 = dt0 ? getComputedStyle(dt0).backgroundColor : '';
     R.chk.menuMark = !!dd && dd.classList.contains('is-menu-for') && !!menu() && bg0 !== 'rgba(0, 0, 0, 0)' && bg0 !== 'transparent';
+    var aeD = function (n) { return n ? (n.tagName + '#' + (n.id || '') + '.' + String(n.className || '').slice(0, 60)) : null; }, ae0 = document.activeElement;
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(100);
+    R.info.menuEsc = { before: aeD(ae0), after: aeD(document.activeElement), inMenu: !!(ae0 && ae0.closest && ae0.closest('.pnb-hm')), backInDet: !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('#pnbCardDetails')) };
     R.chk.menuMarkGoes = R.chk.menuMark === true && !!dd && !dd.classList.contains('is-menu-for') && !menu();   // (after the mark: never vacuous)
     R.info.mark = { bg: bg0, cls: dd ? dd.className : null };
-    R.chk.menuEscKeepsOpen = !menu() && detOpen();
+    // (2026-11-19, mut4) ...and the focus is back inside the window (the engine's own close puts it there). The csw2 line
+    // and escMine (ab526da, 2026-11-02) keep the window open even without the menu guard in onHostKey, but then the
+    // cards' listener closes the menu itself and the focus falls to the body under the dialog: that is what m-escmenu breaks now
+    R.chk.menuEscKeepsOpen = !menu() && detOpen() && R.info.menuEsc.inMenu === true && R.info.menuEsc.backInDet === true;
     C().closeDetails(); await sleep(80);
     // Open details from a card's own menu
     ev = rclick(q('.pnb-card-fields dt', cards()[1])); await sleep(100);
@@ -1972,6 +2003,21 @@
     if (nth) { nth.style.display = 'none'; C().redraw(); await sleep(100); }
     R.chk.hiddenNone = !!nth && before > 0 && qa('#pnbCardsHost .journal-rownote-inline').length === 0 && cards().length > 0;
     if (nth) { nth.style.display = ''; C().redraw(); await sleep(100); }
+    // (2026-11-19, mut4) topAligned again with Pack the cards OFF. Packed cards (the default since cfix cc6fc06, 2026-10-31)
+    // are never stretched (align-items: start), so the check above could not see the card's align-content go: m-notetop
+    // survived. In rows, the short card IS stretched to its neighbour with the notes: its parts must still sit at the top.
+    C().openConfig(); await until(cfgShown, 3000); await sleep(100);
+    var pkT = q('#pnbCcfgPack'), wasT = !!pkT && pkT.checked;
+    if (wasT) flip(pkT); await sleep(350);
+    var aT = cardFor(rows[0]), bT = cardFor(rows[1]), uT = null;   // rows[1]: the card with the notes, rows[0] the short one beside it
+    var ttT = aT ? q('.pnb-card-title', aT) : null, bgT = aT ? q('.pnb-card-big', aT) : null, lastT = aT ? aT.lastElementChild : null;
+    if (aT && bT && ttT && bgT && lastT) uT = { packed: host().classList.contains('is-packed'), spans: !!aT.style.gridRowEnd, sameRow: aT.offsetTop === bT.offsetTop, h: [aT.offsetHeight, bT.offsetHeight],
+      free: Math.round(aT.getBoundingClientRect().bottom - lastT.getBoundingClientRect().bottom), gap: Math.round(bgT.getBoundingClientRect().top - ttT.getBoundingClientRect().bottom) };
+    R.info.topRows = { was: wasT, u: uT };
+    // stretched to the taller card (same height, the spare room all under its last part), the title and the big value still together
+    R.chk.topAligned = R.chk.topAligned === true && wasT && !!uT && !uT.packed && !uT.spans && uT.sameRow && uT.h[0] === uT.h[1] && uT.free > 60 && uT.gap < 16;
+    if (wasT) flip(pkT); await sleep(350);
+    C().closeConfig(); await sleep(100);
     if (P.get('shot')) {   // the picture: a card with its notes and the composer open
       if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(200); }
       var ps = panelOf(cardFor(rows[1])); if (ps) { q('.journal-rownote-addbtn', ps).click(); await sleep(150); typeIn(inputOf(ps), 'Sent the revised budget.'); }
@@ -4167,6 +4213,25 @@
     var lay = C().layout(); R.info.pv = { packed0: packed0, shown: shown, lay: lay, packed: host().classList.contains('is-packed') };
     R.chk.pivotPackOff = packed0 && shown && !!lay && lay.nopack === 1 && !host().classList.contains('is-packed') && (mine() || {}).nopack === 1;
     C().closeConfig();
+  };
+
+  // (packfix, 2026-11-18, the user on ?id=int-col-mat: "pack the cards seems to do nothing, and it doesnt even stick after
+  // clicking done") over a pivot, on a report saved with Pack the cards off: ticking it packs the tiles and is kept (pack: 1,
+  // over the report's nopack) - it only dropped the viewer's nopack, so the report's came back
+  S.pfixB = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true; }, 10000); await sleep(200);
+    var rep = C().report(), packed0 = host().classList.contains('is-packed');
+    C().openConfig(); await until(cfgShown, 3000); await sleep(100);
+    var pk = q('#pnbCcfgPack'), box0 = !!pk && pk.checked;
+    if (pk && !pk.checked) flip(pk); await sleep(400);
+    var lay = C().layout(), packed = host().classList.contains('is-packed'), spans = cards().filter(function (c) { return /^span \d+$/.test(c.style.gridRowEnd); }).length;
+    C().closeConfig(); await sleep(200);
+    C().openConfig(); await until(cfgShown, 3000); await sleep(100);
+    var box1 = !!q('#pnbCcfgPack') && q('#pnbCcfgPack').checked;
+    C().closeConfig();
+    R.info.pfixB = { rep: rep, packed0: packed0, box0: box0, lay: lay, packed: packed, spans: spans, box1: box1, mine: mine() };
+    R.chk.pivotPackOn = !!rep && rep.nopack === 1 && !packed0 && box0 === false && packed && spans > 0;
+    R.chk.packKept = !!lay && lay.pack === 1 && !lay.nopack && (mine() || {}).pack === 1 && box1 === true && host().classList.contains('is-packed');
   };
 
   // (cfix2, 2026-10-31) the user's first test of cfix: a repaint (restyle: a theme change) wiped the packing (one squashed

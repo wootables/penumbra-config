@@ -375,8 +375,8 @@
   "edits": [
    [
     "manage_journal.php",
-    "    $f = journalReportStateFlags($report);\n    return $f['enc'];\n",
-    "    return false;\n"
+    "    $f = journalReportStateFlags($report);\n    if ($f['enc']) return true;\n",
+    "    $f = journalReportStateFlags($report);\n"
    ]
   ],
   "must": [

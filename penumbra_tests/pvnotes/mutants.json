@@ -1879,7 +1879,7 @@
   "file": "main",
   "edits": [
    [
-    "        return _chartDrillKeep(rows, [cfg.xAxis, cfg.groupBy], function (pr) {",
+    "        return _chartDrillKeep(rows, keys, function (pr) {",
     "        return _chartDrillKeep(rows, [], function (pr) {"
    ]
   ],

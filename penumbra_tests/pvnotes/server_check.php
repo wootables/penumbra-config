@@ -52,6 +52,10 @@ if ($mode === 'r6') {
     // manage_journal.php on the server): this fixture has no IS_PRIVATE column, so every note is public, as before.
     if (!function_exists('journalHasPrivateColumn')) { function journalHasPrivateColumn() { return false; } }
     if (!function_exists('journalNoteIsPrivate')) { function journalNoteIsPrivate($n) { return false; } }
+    // (2026-11-18, batch 5) the delete now asks whether the caller edits the report (a thread holding other people's
+    // files) and reads the replies' attachment names: this fixture's caller is an editor, and it has no attachment column.
+    if (!function_exists('journalCallerCanEditReport')) { function journalCallerCanEditReport() { return true; } }
+    if (!function_exists('journalHasAttachColumn')) { function journalHasAttachColumn() { return false; } }
     function journalGetReport($c, $id) { return array('ID' => $id, 'SHORT_ID' => 'fixture'); }
     function journalCallerCanView() { return true; }
     function utf8ize($x) { return $x; }

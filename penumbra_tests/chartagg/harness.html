@@ -280,8 +280,11 @@
       return bfOther(cd(RN, 'CAT', 'NUM', 'GRP', 'sum', 'butterfly', oo)); }, [-10, 1]);
     check('N4 older butterfly Other Average per group (G1 -5, G2 0.5)', function () {
       return bfOther(cd(RN, 'CAT', 'NUM', 'GRP', 'avg', 'butterfly', oo)); }, [-5, 0.5]);
-    check('N5 guard: a treemap Other tile is still a size (|-1| + |-8| = 9), like every tile', function () {
-      return pick(cd(RN, 'CAT', 'NUM', 'none', 'sum', 'treemap', oo), 'Other'); }, 9);
+    // (2026-11-18, chartsweep CD-9) the tile's SIZE (_value) stays |-1| + |-8| = 9; what it says (_signed, the a11y row) is -9
+    check('N5 guard: a treemap Other tile is still a size (|-1| + |-8| = 9), like every tile, and reads its signed value', function () {
+      var d = cd(RN, 'CAT', 'NUM', 'none', 'sum', 'treemap', oo);
+      var t = (d._treemapData || []).filter(function (o) { return o._isOther; })[0];
+      return t ? [t._value, t._signed, pick(d, 'Other')] : 'missing'; }, [9, -9, -9]);
 
     report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 8), results: results }));
   }

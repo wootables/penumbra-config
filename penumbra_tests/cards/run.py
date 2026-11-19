@@ -68,7 +68,7 @@ T_NOCV = tok({'v': 1, 'm': 'flat', 'o': 'none'})   # a link without the card vie
 T_XL = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'xl'})   # (cxl) a link to the cards at Extra large
 
 SCN = ['cgbar', 'cfmtbig', 'cfmt', 'cauto', 'cguess', 'cpage', 'cfull', 'chl', 'cbar', 'cesc', 'coff', 'cviewer', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'csize', 'cszvlA', 'cszvlB', 'cnarrowA', 'cnarrowT', 'cnarrowN', 'cauth', 'cauthB', 'cauthM', 'cvlA', 'cvlB', 'cvlT', 'ca11y', 'cphone', 'cperf', 'cmore',
-       'clay1', 'pw3dup', 'gw3agg', 'gw3cnt', 'ct3save', 'cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'ctclear', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'ctsel', 'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl1', 'curl2', 'curl3', 'curl4', 'cshare', 'cnote', 'cnotedet', 'ctmenu', 'ctrow', 'gtrow', 'cflink', 'ckword', 'cfind', 'gfind', 'cbarpick', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'ccolsview', 'pvhtml', 'cfields', 'cfieldsB', 'gboard', 'gboardvl', 'gboardfew', 'gboardbig', 'gbandbig', 'cboard', 'cboardload', 'cboardrx', 'cbarrank', 'cvlC', 'cvlD', 'pfsort', 'cvlE', 'cvlF', 'pvlA', 'pvlB', 'pvcfg', 'pvcfgB', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cchips', 'cmail', 'gmail', 'pmail', 'cdens', 'cdensph', 'gdens', 'cflt', 'csave', 'copen', 'cdpack']
+       'clay1', 'pw3dup', 'gw3agg', 'gw3cnt', 'ct3save', 'cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'ctclear', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'ctsel', 'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl1', 'curl2', 'curl3', 'curl4', 'cshare', 'cnote', 'cnotedet', 'ctmenu', 'ctrow', 'gtrow', 'cflink', 'ckword', 'cfind', 'gfind', 'cbarpick', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'ccolsview', 'pvhtml', 'cfields', 'cfieldsB', 'gboard', 'gboardvl', 'gboardfew', 'gboardbig', 'gbandbig', 'cboard', 'cboardload', 'cboardrx', 'cbarrank', 'cvlC', 'cvlD', 'pfsort', 'cvlE', 'cvlF', 'pvlA', 'pvlB', 'pvcfg', 'pvcfgB', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'pfixB', 'cfixprint', 'gfix2', 'cchips', 'cmail', 'gmail', 'pmail', 'cdens', 'cdensph', 'gdens', 'cflt', 'csave', 'copen', 'cdpack']
 T_CV = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'compact'})   # (curl) a view link asking for compact cards
 CHK = {
     'cauto': ['switchShown', 'tableDefault', 'toCards', 'pagerWord', 'tableKeptForReaders', 'count', 'guessTitle', 'guessBig', 'guessFields', 'guessNoExtras', 'parity', 'linkKept', 'filtered', 'sorted', 'prefSaved',
@@ -306,7 +306,7 @@ CHK = {
     # writes the report's
     'cfix': ['packFills', 'orderKept', 'keysColumn', 'wideStays', 'labelMenu', 'whiteIsCard', 'detCardField', 'detLabelMenu', 'windowWords', 'listsStyled',
              'allNone', 'editorSaves', 'viewerSavesReport', 'savedDropsMine', 'packOff', 'packOn'],
-    'cfixB': ['reportNoPack', 'boxFollows'], 'pfix': ['pivotPackOff'],
+    'cfixB': ['reportNoPack', 'boxFollows'], 'pfix': ['pivotPackOff'], 'pfixB': ['pivotPackOn', 'packKept'],   # (packfix 2026-11-18)
     # (cfix2) a repaint keeps the packing; the window's switches side by side; Download as PDF a card a page, the
     # email's PDF the table; the Download dialog's PDF note; the board's lanes to the status bar
     'cfixprint': ['restyleKeeps', 'switchesRow', 'pdfNote', 'pdfCards', 'pdfTableStays'], 'gfix2': ['lanesFit', 'laneFilled'],
@@ -441,7 +441,7 @@ NEW = ({'L-%s-%s' % (sc, c) for sc in ('cprint', 'gprint', 'pprint') for c in CH
 NEW = set()   # (cprint is LIVE since a70360f, 2026-10-31: old checks now)
 GUARDS |= {'L-cfix-orderKept', 'L-cfix-whiteIsCard', 'L-cfix-viewerSavesReport', 'L-cfix-keysColumn', 'L-cmenu-cardRowOnly', 'L-cnote-menuAddNote', 'L-cnote-cardWording', 'L-cnote-topAligned',
            'L-ckword-copyCardLabel', 'L-ckword-copyCardToast', 'L-ckword-copyFailCard', 'L-cauthB-pendingKept'}   # (hold on live: the keys on rows of one height; the card's padding is its white space there too)   # (hold on live: the order, white space's card menu, a viewer's Save)
-NEW = ({'L-%s-%s' % (sc, c) for sc in ('cfix', 'cfixB', 'pfix') for c in CHK[sc]} | {'S-cfix', 'S-roundN', 'S-detHelp',
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('cfix', 'cfixB', 'pfix', 'pfixB') for c in CHK[sc]} | {'S-cfix', 'S-roundN', 'S-detHelp',
        'L-cfmt-buttonWords', 'L-csize-formSize', 'L-cxl-formXl', 'L-cauth-noDefaultYet', 'L-cauth-notReports', 'L-cauth-fieldLimit', 'L-cauth-makeDefault',
        'L-cauth-defaultClearsMine', 'L-cauthB-editorLine', 'L-cauthB-chipsShow', 'L-cauthB-mineFirst', 'L-cauthB-reedit', 'L-cauthB-pendingKept',
        'L-pvcfg-madeDefault', 'L-cdet-shownColumns', 'L-cdet-values', 'L-cdet-noHidden', 'L-cfields-windowCount', 'L-cfields-labelsDefault',
@@ -809,7 +809,11 @@ MUTANTS = {
     'x-clean': ([('cards', "        if (cfg.nopack === 1 || cfg.nopack === true) o.nopack = 1;", "")], ['L-cfixB-reportNoPack', 'L-cfix-packOff'], ['cfixB', 'cfix']),
     'x-mainset': ([('main', "                if (v && v.nopack) o.nopack = 1;   // (cfix) Pack the cards off\n", "")], ['L-cfix-packOff'], ['cfix']),
     'x-mainlink': ([('main', "        if (c.nopack === 1 || c.nopack === true) o.nopack = 1;   // (cfix)\n", "")], ['L-cfix-packOff'], ['cfix']),
-    'x-pvread': ([('cards', "            delete keep.nopack; if (cfgPackOff()) keep.nopack = 1;   // (cfix) Pack the cards, over a pivot too\n", "")], ['L-pfix-pivotPackOff'], ['pfix']),
+    'x-pvread': ([('cards', "            delete keep.nopack; delete keep.pack; if (cfgPackOff()) keep.nopack = 1;   // (cfix) Pack the cards, over a pivot too\n", "            delete keep.nopack; delete keep.pack; if (false) keep.nopack = 1;   // (cfix) Pack the cards, over a pivot too\n")], ['L-pfix-pivotPackOff'], ['pfix']),   # (2026-11-18) re-anchored: dae10b3 (packfix)
+    # (packfix, 2026-11-18, int-col-mat) Pack the cards ticked over a pivot on a report saved with it off
+    'x-pvpack': ([('cards', "            else if (report && report.nopack) keep.pack = 1;", "")], ['L-pfixB-pivotPackOn', 'L-pfixB-packKept'], ['pfixB']),
+    'x-wvpack': ([('cards', "        else if (v.pack) delete o.nopack;", "")], ['L-pfixB-pivotPackOn', 'L-pfixB-packKept'], ['pfixB']),
+    'x-mainpack': ([('main', "                else if (v && v.pack) o.pack = 1;", "")], ['L-pfixB-pivotPackOn', 'L-pfixB-packKept'], ['pfixB']),
     'x-lclean': ([('cards', "        if (o.nopack) L.nopack = 1;   // (cfix) so does Pack the cards off (set over a pivot)\n", "")], ['L-pfix-pivotPackOff'], ['pfix']),
     'x-all': ([('cards', "if (!bx[i].checked && !bx[i].parentNode.classList.contains('is-missing')) { bx[i].checked = true; n++; }", "if (false) { n++; }")], ['L-cfix-allNone'], ['cfix']),
     'x-select': ([('cardscss', "    appearance: none; -webkit-appearance: none; -moz-appearance: none;\n    height: 28px;", "    height: 28px;")], ['L-cfix-listsStyled'], ['cfix']),
@@ -993,8 +997,14 @@ MUTANTS = {
     'm-sortflip': ([('cards', "        if (A && th) A.sort(th, now.dir === 'asc' ? 'desc' : 'asc');\n", "")], ['L-csort-flip'], ['csort']),
     'm-sortback': ([('cards', "        var want = now ? now.name : '';\n", "        var want = s.value;\n")], ['L-csort-readsBack'], ['csort']),
     # (the sweep) the details window taking an Escape from the engine's menu; the grouped tables' sort unwatched
-    'm-escmenu': ([('cards', "        if (e.target && e.target.closest && e.target.closest('.pnb-hm, .pnb-hp, #pnbFindBar')) return;\n", "")], ['L-cdet-menuEscKeepsOpen', 'L-cfind-findEscKeepsDetails'], ['cdet', 'cfind']),
-    'm-escfind': ([('cards', "e.target.closest('.pnb-hm, .pnb-hp, #pnbFindBar')) return;", "e.target.closest('.pnb-hm, .pnb-hp')) return;")], ['L-cfind-findEscKeepsDetails'], ['cfind']),
+    'm-escmenu': ([('cards', "        if (e.target && e.target.closest && e.target.closest('.pnb-hm, .pnb-hp, #pnbFindBar')) return;\n", "")], ['L-cdet-menuEscKeepsOpen'], ['cdet', 'cfind']),
+    # (2026-11-19, mut4) both were survivors: since ab526da (2026-11-02: escMine, and the csw2 menu line) the details window no
+    # longer closes without this guard. What the guard still gives: the engine closes its own menu and puts the focus back in the
+    # window (without it the cards' listener closes the menu and the focus falls to the body): menuEscKeepsOpen now checks that.
+    # Find's bar is kept by the guard OR by escMine, so m-escfind cuts both (escMine alone is cs-esc's, L-csweep-escOverPopover);
+    # m-escmenu alone cannot turn the Find check red any more: L-cfind-findEscKeepsDetails taken off its list.
+    'm-escfind': ([('cards', "e.target.closest('.pnb-hm, .pnb-hp, #pnbFindBar')) return;", "e.target.closest('.pnb-hm, .pnb-hp')) return;"),
+                   ('cards', "    function escMine(t, sel) {", "    function escMine(t, sel) { return true;")], ['L-cfind-findEscKeepsDetails'], ['cfind']),
     'm-gsortmo': ([('cards', "                    if (t.tagName === 'TBODY' && !t.closest('#pnbCardsHost')) { clearTimeout(sortTimer); sortTimer = setTimeout(function () { if (on()) draw(); }, 40); return; }\n", "")], ['L-gsort-bandsSorted', 'L-gsort-menuSortFollows'], ['gsort']),
     'm-detgone': ([('cards', "        if (det.tr && !(hostApi() && H.inPivot())) {\n            var di = detRows().indexOf(det.tr);", "        if (false) {\n            var di = detRows().indexOf(det.tr);")], ['L-cdetrow-pageCloses', 'L-cdetrow-sortFollows'], ['cdetrow']),   # (no row kept: by position, as live was)
     'm-detfollow': ([('cards', "            det.at = di; det.ri = rowIdx(det.tr);\n        }\n", "            det.ri = rowIdx(det.tr);\n        }\n")], ['L-cdetrow-sortFollows'], ['cdetrow']),   # (2026-11-17) re-anchored: f02d2be added det.ri on the line
@@ -1166,6 +1176,7 @@ MUTANTS = {
     'm-jreply': ([('main', "            if ($panel.hasClass('journal-rownote-inline') && !inlineCompose($panel[0])) return;   // (cardnotes) its composer opens first\n", "")], ['L-cnote-reply'], ['cnote']),
     'm-jedit': ([('main', "            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');   // (cardnotes) or a card's own notes\n            var $panel = $card.find(", "            var $card = $(this).closest('.journal-pvnote-card');\n            var $panel = $card.find(")], ['L-cnote-edit'], ['cnote']),
     'm-jdel': ([('main', "            // view (cardnotes).\n            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');\n            if (!$card.length) return;\n            var kind", "            // view (cardnotes).\n            var $card = $(this).closest('.journal-pvnote-card');\n            if (!$card.length) return;\n            var kind")], ['L-cnote-del'], ['cnote']),   # (2026-11-17) re-anchored with the delete handler's comment line: 6a52fad (privnote) added a Make private handler with the same three lines
+    # (2026-11-19, mut4) m-notetop was a survivor: packed cards (cfix cc6fc06) are never stretched; topAligned now also measures with Pack the cards off
     'm-notetop': ([('cardscss', "    align-content: start;   /* (cardnotes) a card stretched", "    align-content: normal;   /* (cardnotes) a card stretched")], ['L-cnote-topAligned'], ['cnote']),
     'm-jfold': ([('main', "                if (_pgSame && $panel.hasClass('journal-rownote-inline')) inlineClose($panel[0], 'add', true);   // (cardnotes) posted: the card's composer folds away; (typedwhile) not over newer text\n", "")], ['L-cnote-post'], ['cnote']),   # (2026-11-18) re-anchored: the fold waits for an untouched box
     # a card drawn from every row of the table (the rows the search hid, the other pages)
@@ -1340,7 +1351,7 @@ def static_checks(t):
     # keeps the viewer's tiles setup; the README's paragraph
     out.append(('S-cnPvSetup', "function pvSetup() { var e = effective(); return (e && e.pivot) ? e.pivot : ((report && report.pivot) ? report.pivot : null); }" in cards, 'a viewer\'s own setup keeps the report\'s tiles'))
     out.append(('S-cnTotalWord', "bigLabel = pvTotalWord(measures, bmi);" in cards and "bigLabel = 'Total ' + (measures[bmi] || '')" not in cards, 'an unlabelled measure\'s big number named'))
-    out.append(('S-cnResetPv', "(curp.own || curp.title || curp.fields || curp.nopack) ? curp : null" in cards, 'Reset over a pivot keeps Pack the cards off'))
+    out.append(('S-cnResetPv', "(curp.own || curp.title || curp.fields || curp.nopack || curp.pack) ? curp : null" in cards, 'Reset over a pivot keeps Pack the cards off'))
     out.append(('S-cnResetFlat', "H.layoutSet((keepPv && keepPv.pivot) ? { pivot: keepPv.pivot } : null);" in cards and "Object.keys(v).some(function (k) { return k !== 'pivot'; })" in cards, 'the flat Reset keeps the viewer\'s tiles setup'))
     out.append(('S-cnest', 'cnest (2026-11-02' in t['readme'] and 'function clearLast(items)' in t['menu'] and "n.classList.contains('nested-json-container')" in cards, 'cnest: README, Clear all last, nested gaps'))
     out.append(('S-crow', 'crow (2026-11-02' in t['readme'] and 'function openRow(tr, cell)' in cards and 'function tblRows()' in cards and 'function tblBack()' in cards
@@ -1718,6 +1729,7 @@ MUTANTS.update({
                ['L-chl-edgeSwatch', 'L-chl-edgeSwatchMail'], ['chl']),
     'e2-mail': ([('cards', "        function st(td, props) { var s = unVar(styleOf(td, props || MAIL_PROPS), vm); return s ? esc(s) : ''; }", "        function st(td, props) { var s = styleOf(td, props || MAIL_PROPS); return s ? esc(s) : ''; }")],
                 ['L-chl-edgeSwatchMail'], ['chl']),
+    # (2026-11-19, mut4) e2-sig was a survivor: Low Shade Default's --text-muted (e65935d) reads as colourful; edgeGreyTheme now picks a pair of variables that tells kept colours from fresh ones
     'e2-sig': ([('cards', "            if (sig !== edgeSig) { edgeSig = sig; edgeRgbs = Object.create(null); }", "            if (sig !== edgeSig) { edgeSig = sig; }")],
                ['L-chl-edgeGreyTheme'], ['chl']),
     'ed-detcss': ([('cardscss', ".pnb-cdet-card.pnb-card[style*=\"--pnb-card-edge\"] { background-image: none; border-left: 4px solid var(--pnb-card-edge); padding-left: 10px; }\n", "")],
@@ -2156,6 +2168,7 @@ def run_browser(scns):
         out.append(('E-' + s, not r.get('errors'), 'errors %s' % r.get('errors')))
         chk = r.get('chk') or {}; info = r.get('info') or {}
         if r.get('fail'): info = dict(info, scenarioThrew=r['fail'][:400])   # the scenario's own exception (its later checks stay unset = red)
+        if os.environ.get('PNB_INFOKEY'): info = {k: info.get(k) for k in os.environ['PNB_INFOKEY'].split(',') + ['scenarioThrew'] if k in info}   # (2026-11-19) PNB_INFOKEY=a,b: only these info keys (the line is cut at 900)
         for c in CHK[s]:
             v = chk.get(c)
             out.append(('L-%s-%s' % (s, c), v is True, '%s   info %s' % (v, json.dumps(info)[:900]) if (v is not True or os.environ.get('PNB_INFO')) else ''))   # PNB_INFO=1: info on every check

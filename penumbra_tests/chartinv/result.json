@@ -1937,7 +1937,7 @@
     {
         "name":  "B Split by days: the bars add back up to the amounts",
         "pass":  true,
-        "detail":  "846.9999999999999 / 1788"
+        "detail":  "847 / 1788"
     },
     {
         "name":  "B a pie is refused, saying why",
@@ -2092,7 +2092,7 @@
     {
         "name":  "V prorate: the shares add back up to the amounts (X: 832)",
         "pass":  true,
-        "detail":  "831.9999999999999"
+        "detail":  "832"
     },
     {
         "name":  "V collect: the field in Rows works the same",
@@ -2282,7 +2282,7 @@
     {
         "name":  "E @today: every bar ends at the end of today",
         "pass":  true,
-        "detail":  "[{\"label\":\"P-36\",\"start\":1746936000000,\"end\":1794977999999,\"n\":4},{\"label\":\"P-11\",\"start\":1746072000000,\"end\":1794977999999,\"n\":2}]"
+        "detail":  "[{\"label\":\"P-36\",\"start\":1746936000000,\"end\":1795064399999,\"n\":4},{\"label\":\"P-11\",\"start\":1746072000000,\"end\":1795064399999,\"n\":2}]"
     },
     {
         "name":  "E @today rides the groupBy slot of vis()",
@@ -2292,7 +2292,7 @@
     {
         "name":  "E A fixed date: the calendar field shows, prefilled",
         "pass":  true,
-        "detail":  "block / 2026-11-17"
+        "detail":  "block / 2026-11-18"
     },
     {
         "name":  "E a picked date: every bar ends on it",

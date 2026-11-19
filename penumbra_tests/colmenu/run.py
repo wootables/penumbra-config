@@ -458,8 +458,8 @@ MUTANTS = {
     'm-gmsort': ([('main', "                currentGroupSort = { key: key, dir: dir };\n                _sbSortGroups(key, dir);\n                return true;", "                currentGroupSort = { key: key, dir: dir };\n                return true;")], ['L-ggmenu-gmSort'], ['ggmenu']),
     # --- (2026-10-20, grpmenu) the module
     'j-gmband': ([('menu', "        var gb = bandOf(e.target);\n", "        var gb = null;\n")], ['L-ggmenu-gmOpens'], ['ggmenu']),
-    'j-gmrow': ([('menu', "            var row = target.closest('.pnb-gl-item') || (target === list", "            var row = null || (target === list")], ['L-gglist-glRowOpens'], ['gglist']),
-    'j-gmkbdlist': ([('menu', "(target === list ? list.querySelector('.pnb-gl-item.is-active') : null)", "(null)")], ['L-gglist-glKbd'], ['gglist']),
+    'j-gmrow': ([('menu', "            var row = target.closest('.pnb-gl-item')", "            var row = null")], ['L-gglist-glRowOpens'], ['gglist']),
+    'j-gmkbdlist': ([('menu', "((target === list || target.closest('.pnb-gl-head')) ? list.querySelector('.pnb-gl-item.is-active') : null)", "(null)")], ['L-gglist-glKbd'], ['gglist']),
     'j-gmtoggle': ([('menu', "        if (!lo) { items.push({ act: 'gToggle'", "        if (true) { items.push({ act: 'gToggle'")], ['L-gglist-glRowItems'], ['gglist']),
     'j-gmrestricted': ([('menu', "        if (!info.restricted && A) {", "        if (A) {")], ['L-ggmenu-gmRestricted'], ['ggmenu']),
     'j-hdrrestrict': ([('menu', "        if (grpRestricted()) { gi = []; }\n", "")], ['L-ggmenu-gmHdrRestricted'], ['ggmenu']),

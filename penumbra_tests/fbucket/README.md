@@ -133,7 +133,7 @@ changed lines. Fourteen earlier mutants' red sets grew by the sweep's checks tha
 before it was recorded (mutants_expect.before_sweep.json in the kit = the old sets): js-binbake +D25 (a bin's label),
 js-parse +D14 D22 D24 U22 (the builder asks the engine whether a token is a bucket: a double-click joins only a bucket),
 sb-presetsplit / sb-syncafter / sb-token +U22, sb2-box +D22 D23 D24 D25 D27, sb2-brace +D27, sb2-filter +D21 D23 D27,
-sb2-items +D23 D25 D27, sb2-prefix +D23 D27, sb2-render +D25, sb2-row +O6 O7 O8, sb2-tokstart +D21 (year inside D:year),
+sb2-items +D23 D25 D27, sb2-prefix +D23 D27, sb2-render +D25, sb2-row +O6 O7 O8, sb2-tokstart +D21 (year inside D:year), and since 2026-11-17 D21 alone: D2 needed ID:bin as the token with D: in its middle, and the numeric bucket gate (0c5903e) gives ID no bins,
 sb2-trail +D22 D24. Control: CONTROL_RED adds D22-D25, D27, D28, O5-O8, U22 (D21 and D26 green there). The server side (`schedule_runner.php`: a bare `AMOUNT:bin` in a task's band-summary filter is sized from
 the task's rows, as `php_apply_search_filter` sizes it) is proved by the kit's `e2_test.php`, never by requiring the runner
 (it opens Oracle and sends email): it extracts `_cf_apply_group_summary_filter` and runs it on fixture rows.

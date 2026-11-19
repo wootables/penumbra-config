@@ -44,7 +44,7 @@ EXPECT = {
     'who': ['W-cells', 'W-toggle'],
     'notready': ['N-cell', 'N-add'],
     'nofields': ['Z-none'],
-    'setup': ['E-render', 'E-add', 'E-rename', 'E-retire', 'E-remove', 'E-save', 'E-clean'],
+    'setup': ['E-render', 'E-add', 'E-rename', 'E-retire', 'E-remove-saved', 'E-remove', 'E-save', 'E-clean'],
     # (phase 2) a table row's right-click: Progress > its options; a heading: Set Progress for N shown rows > (the
     # confirmation, every kept row's key, the toast, Undo, a filtered count, a name with markup escaped); cards: the pill
     # and a field are the cell's button (the picker), the card's menu and the details window carry it

@@ -126,7 +126,7 @@ M = {
                           "        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n            http_response_code(403);\n",
                           "        if (false) {\n            http_response_code(403);\n")],
                         ['S-gate-off'], ['srv']),
-    'srv-enc': ([('manage_journal.php', "    $f = journalReportStateFlags($report);\n    return $f['enc'];\n", "    return false;\n")],
+    'srv-enc': ([('manage_journal.php', "    $f = journalReportStateFlags($report);\n    if ($f['enc']) return true;\n", "    $f = journalReportStateFlags($report);\n")],   # (2026-11-18, noadmoff) re-anchored: the read gate continues after the encrypted test
                 ['S-gate-enc'], ['srv']),
     'srv-tgby': ([('journal_export.php', "                if (isset($byKey[$k])) $to = (string)$byKey[$k];\n",
                    "                if (false) $to = (string)$byKey[$k];\n")],   # (Round Q: the runner's map is journal_export.php's)

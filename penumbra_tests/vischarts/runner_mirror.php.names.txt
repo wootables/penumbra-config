@@ -302,6 +302,11 @@ _snippet_notes_tree
 _snippet_normalize_toggle_tree
 _snippet_tree_reads_journal
 _snippet_tree_reads_names
+penumbra_sched_jrn_hidden_reset
+penumbra_sched_jrn_fp
+penumbra_sched_jrn_hidden_add
+penumbra_sched_jrn_hidden_names
+penumbra_sched_jrn_hidden_row
 _snippet_toggle_eval_row
 _snippet_filter_rows
 _snippet_strip_scope_arg
@@ -455,6 +460,7 @@ _sr_persist_dbdump_column_readd
 _sr_persist_dbdump_column_drop
 execute_scheduled_report
 penumbra_split_change_columns
+penumbra_task_change_columns
 penumbra_signature_rows
 generate_snapshot_signature
 penumbra_task_snap_tag
