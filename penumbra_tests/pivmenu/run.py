@@ -108,9 +108,9 @@ MUTANTS = {
     # --- (colmenu round 28) the delimiter ignored; the duplicates miscounted in a breakdown's stats
     'b-delim': ([('menu', "                pvCopy(v.join(d[2]), 'Copied ' + v.length + (v.length === 1 ? ' distinct value.' : ' distinct values.'));", "                pvCopy(v.join('\\n'), 'Copied ' + v.length + (v.length === 1 ? ' distinct value.' : ' distinct values.'));")], ['L-pmbreak-bdCopyDistinct'], ['pmbreak']),
     'b-stats': ([('menu', "        freq.forEach(function (c) { if (c > 1) { dRows += c; dExtra += c - 1; dVals++; } });", "        freq.forEach(function (c) { if (c > 1) { dRows += c; dExtra += c; dVals++; } });")], ['L-pmbreak-bdStats'], ['pmbreak']),
-    'b-then': ([('menu', "        if (sortedOther) {\n            items.push({ act: 'bdThenAsc'", "        if (false) {\n            items.push({ act: 'bdThenAsc'")], ['L-pmbreak-bdThen'], ['pmbreak']),
+    'b-then': ([('menu', "        if (!first) {\n            items.push({ act: 'bdThenAsc'", "        if (false) {\n            items.push({ act: 'bdThenAsc'")], ['L-pmbreak-bdThen'], ['pmbreak']),
     # (re-anchored 2026-10-27, copymenu: the cell's copies gather into the Copy list)
-    'b-cell': ([('menu', "        if (t.td) {\n            bcp.push({ act: 'bdCopy',", "        if (false) {\n            bcp.push({ act: 'bdCopy',")], ['L-pmbreak-bdCopyList', 'L-pmbreak-bdCopyValue'], ['pmbreak']),
+    'b-cell': ([('menu', "        if (t.td) {\n            if (nbox) {", "        if (false) {\n            if (nbox) {")], ['L-pmbreak-bdCopyList', 'L-pmbreak-bdCopyValue'], ['pmbreak']),
     # --- (2026-10-27, copymenu) the cell's Copy list at the foot (the heading's place); no This row; '#' in the row; no Copy
     # list on a heading
     'b-cpslot': ([('menu', "        if (t.td) {\n            items.push(copyEntry('bdCopyMenu', bcp));\n            items.push('-');\n        }\n", ""),
@@ -123,8 +123,8 @@ MUTANTS = {
     'm-clear': ([('main', "        if (now === 'ascending' || now === 'descending') $th.trigger($.Event('click.pivotSort', { shiftKey: true }));\n", "")],
                 ['L-pmhead-sortClear'], ['pmhead']),
     # a column value never found: no Filter to / Exclude on a heading
-    'm-colval': ([('menu', "if (!info || info.total || !info.keys.length || !s.cols.length || info.level !== 0) { return null; }",
-                   "if (true) { return null; }")], ['L-pmhead-headItems', 'L-pmhead-colExclude'], ['pmhead']),
+    'm-colval': ([('menu', "var k = pvColField(info, s);\n        if (k < 0 || !info.keys.length) { return null; }",
+                   "var k = pvColField(info, s);\n        if (true) { return null; }")], ['L-pmhead-headItems', 'L-pmhead-colExclude'], ['pmhead']),
     # Undo a no-op
     'm-undo': ([('menu', "offerUndo(function () { var Q = window.Penumbra.pivotMenu; if (Q && Q.on()) { Q.rebuild(before); } })",
                  "offerUndo(function () { })")], ['L-pmhead-shadeUndo', 'L-pmfield-fieldUndo'], ['pmhead', 'pmfield']),
@@ -175,7 +175,7 @@ MUTANTS.update({
                  ['L-pmbreak-bdNumMenu', 'L-pmbreak-bdNumRow'], ['pmbreak']),
     'pf-bdnumrow': ([('menu', "        if (t.td) { items.push(copyEntry('bdCopyMenu', [rowCopyItem('bdCopyRow', function () { return bdRowLines(t); })])); items.push('-'); }", "")], ['L-pmbreak-bdNumRow'], ['pmbreak']),
     # Column stats back at the foot, after the sizes (where it was)
-    'pf-bdorder': ([('menu', "        items.push({ act: 'bdStats', label: 'Column stats', sub: true, items: function () { return statsItems(null, bdProfile(t)); } });\n        var look = [];", "        var look = [];"),
+    'pf-bdorder': ([('menu', "        items.push({ act: 'bdStats', label: 'Column stats', sub: true, items: function () { return statsItems(null, nest ? bdNestedProfile(t) : bdProfile(t)); } });   // (menufix2 I4)\n        var look = [];", "        var look = [];"),
                     ('menu', "        if (look.length) { items.push('-'); items = items.concat(look); }\n", "        if (look.length) { items.push('-'); items = items.concat(look); }\n        items.push({ act: 'bdStats', label: 'Column stats', sub: true, items: function () { return statsItems(null, bdProfile(t)); } });\n")],
                    ['L-pmbreak-bdWidthItems'], ['pmbreak']),
 })

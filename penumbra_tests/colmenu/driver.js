@@ -1154,7 +1154,7 @@
       var hdrCells = td ? td.querySelectorAll('.nested-json-header > *') : [], nameIdx = -1;
       for (var h = 0; h < hdrCells.length; h++) { if (hdrCells[h].textContent.replace(/[▲▼]/g, '').replace(/\s+/g, ' ').trim() === 'SUB_NAME') nameIdx = h; }
       var row0 = td ? td.querySelector('.nested-json-row') : null, subCell = (row0 && nameIdx >= 0) ? row0.children[nameIdx] : null, v = subCell ? subCell.textContent.trim() : '';
-      R.chk.nestSubOpens = !!subCell && rclick(subCell) && !!menu() && !!reach('cellFilter') && item('cellFilter').textContent.indexOf('"' + v + '"') >= 0 && !item('cellExclude') && !!item('copyMenu') && !!reach('cellCopy');   // (2026-10-27, copymenu) in the Copy list
+      R.chk.nestSubOpens = !!subCell && rclick(subCell) && !!menu() && !!reach('cellFilter') && item('cellFilter').textContent.indexOf('"' + v + '"') >= 0 && !!item('cellExclude') && !!item('copyMenu') && !!reach('cellCopy');   // (2026-10-27, copymenu) in the Copy list
       R.info.nestSub = { v: v, acts: acts(), nameIdx: nameIdx, hdr: Array.prototype.map.call(hdrCells, function (x) { return x.textContent.trim().slice(0, 12); }) };
       closeMenu(); rclick(subCell); reach('cellFilter');   // (2026-10-27, fltmenu) through the Filter list (the Copy list opened above)
       if (item('cellFilter')) item('cellFilter').click();
@@ -1349,7 +1349,7 @@
       function key(k) { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
       function over(el) { if (el) el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true })); }
       rclick(fth('V_NAME'));
-      var a = acts(), want = ['sortAsc', 'sortDesc', 'copyMenu', 'filter', 'stats', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'calc', 'groupBy', 'clearPrefs'];   // (copymenu 3) Copy above Filter by value...   // (round 33) the sizes up the menu, one clear-all item at its foot; (2026-10-27, copymenu) Copy
+      var a = acts(), want = ['sortAsc', 'sortDesc', 'copyMenu', 'filter', 'stats', 'width', 'rowHeight', 'options', 'move', 'show', 'freeze', 'hide', 'calc', 'groupBy', 'clearPrefs'];   // (menufix2 P4: Freeze, then Hide) (copymenu 3) Copy above Filter by value...   // (round 33) the sizes up the menu, one clear-all item at its foot; (2026-10-27, copymenu) Copy
       var pos = want.map(function (x) { return (x === 'groupBy' && a.indexOf(x) < 0) ? a.indexOf('groupByList') : a.indexOf(x); });   // (delimgroup) or its list
       R.chk.topOrder = pos.every(function (p, i) { return p >= 0 && (i === 0 || p > pos[i - 1]); })
         && menu().querySelectorAll('.pnb-hm-sep').length === 4 && ['move-left', 'only', 'reset', 'resetAll', 'resets', 'fit', 'fitAll', 'stats-top-0', 'pivot', 'chart', 'copy-comma', 'copy', 'copyName'].every(function (x) { return a.indexOf(x) < 0; });
@@ -3129,7 +3129,7 @@
       R.info.viewLink = { list: vlList, label: vlLab, sep: vlSep, title: vlTitle, calls: vlCalls, head: vlHead, num: vlNum };
       // (fltmenu, 5eae534) the column's name sits above This entire row
       R.chk.cmViewLink = vlList.join() === 'cellCopy,copyName,copyRow,copy,copyViewLink' && vlSep && vlLab === 'Link to this view'
-        && /reopens this report as you see it now/.test(vlTitle) && /It carries no data/.test(vlTitle) && vlCalls === 1
+        && /reopens this report as you see it now/.test(vlTitle) && /It carries no rows/.test(vlTitle) && vlCalls === 1
         && vlHead.join() === 'copyName,copy,copyViewLink' && vlNum.indexOf('copyMenu') >= 0 && vlNum.indexOf('copyRow') < 0;
       // (copymenu 3; the user: "Add a 'Copy' static header in the flyover menu so everything below makes more instant sense",
       // "When right clicking headers, move the copy menu to be above the filter to value item") the Copy list opens under a
@@ -3608,7 +3608,7 @@
       var l11 = subActs(); closeMenu(); rclick(subc); sub('copyMenu'); await sleep(100);
       var l12 = subActs(); closeMenu();
       R.info.nested = { acts: a11, filter: l11, copy: l12 };
-      R.chk.fmNestLists = !!subc && a11[0] === 'filterMenu' && l11.join() === 'cellFilter,clickFilter' && l12.join() === 'cellCopy,copyName,copyRow,copyNestedTable';
+      R.chk.fmNestLists = !!subc && a11[0] === 'filterMenu' && l11.join() === 'cellFilter,cellExclude,clickFilter' && l12.join() === 'cellCopy,copyName,copyRow,copyNestedTable';
       SUBS.copyNestedTable = 'copyMenu';
       var jtr = jtd ? jtd.closest('tr') : null, jr = jtr ? FX[parseInt(jtr.cells[0].textContent, 10) - 1] : null;
       var arr = (jr && jr.H_JSON) ? JSON.parse(jr.H_JSON.substring(6)) : [], ks = arr.length ? Object.keys(arr[0]).filter(function (x) { return x !== '__PNBDIFF'; }) : [];
@@ -3881,6 +3881,7 @@
       try {
         rclick(document.querySelector('#tableHeader th[data-column="#"]'));
         R.info.numHead = acts();
+        sub('copyMenu'); await sleep(100);   // (menufix2 P7) under Copy, as Link to this view
         var nl = item('copyViewLink');
         if (nl) { nl.click(); await sleep(300); }
         R.chk.numLink = !!nl && calls === 1;

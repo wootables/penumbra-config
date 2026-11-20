@@ -248,6 +248,13 @@ foreach ($predicates as $fn) {
     if (!function_exists($fn)) eval($code);
 }
 
+// (2026-11-19, promptfix3 S1) penumbra_pr_compare_url skips reserved URL names through shared_logic.php's one list.
+// Lifted from the app under test when present (older apps keep their own list in the runner).
+$srcShared = (string)@file_get_contents($APP . '/shared_logic.php');
+foreach (array('penumbraUrlReservedNames', 'penumbraUrlNameReserved') as $fn) {
+    $code = lift_function($srcShared, $fn);
+    if ($code !== null && !function_exists($fn)) eval($code);
+}
 require $mirrorPath;
 foreach (array('penumbra_pr_load_pool_index', 'penumbra_fetch_recipient_baseline', 'penumbra_pr_change_analysis', 'penumbra_pr_save_baselines', 'penumbra_pr_prune_orphans', 'penumbra_pr_orphan_ids', 'penumbra_pr_normalize_snapshot_rows', 'penumbra_compute_snapshot_diff', 'penumbra_build_diff_groups', 'penumbra_filter_diff_groups', 'penumbra_extract_snap_type_clauses', 'generate_snapshot_signature', 'penumbra_snaps_pin_supported', 'penumbra_pr_has_recipient_token', 'penumbra_pr_compare_link_allowed', 'penumbra_pr_compare_url', 'penumbra_pr_compare_links_html', 'penumbra_pr_compare_note_html') as $fn) {
     if (!function_exists($fn)) { fwrite(STDERR, "FATAL: $fn missing from the mirror - is the runner change deployed?\n"); exit(2); }

@@ -181,7 +181,7 @@ MUTANTS = {
     # a key dropped from the round trip (frozen columns never captured)
     'm-dropfz': ([('main', "        if (st.frozenCols) v.fz = st.frozenCols;\n", "")], ['L-vcapA-carries', 'L-vcapB-rtFrozen'], ['vcapA', 'vcapB']),
     # a key dropped on the way in (widths never laid over)
-    'm-dropw': ([('main', "        slot('columnWidths', v.w);\n", "")], ['L-vcapB-rtWidths'], ['vcapA', 'vcapB']),
+    'm-dropw': ([('main', "        slot('columnWidths', v.w, 'w');\n", "")], ['L-vcapB-rtWidths'], ['vcapA', 'vcapB']),
     # admin mode unlockable: the link's viewOptions / rowlimit let through
     'm-admin': ([('main', "        var v = { v: 1 };\n        v.m = ", "        var v = { v: 1, viewOptions: d.viewOptions };\n        if (d.rowlimit === false) _penumbraUrlOverrides.rowlimit = false;\n        v.m = "),
                  ('main', "        if (v.r) o.rowsPerPage = v.r;\n        return o;", "        if (v.r) o.rowsPerPage = v.r;\n        if (v.viewOptions) o.viewOptions = v.viewOptions;\n        return o;")],
@@ -232,7 +232,7 @@ MUTANTS = {
     'm-snapvpos': ([('main', "if (v.m === 'flat' && !snapV) {", "if (v.m === 'flat') {")], ['L-vsnapv-snapNoPositions'], ['vsnapv']),
     'm-saveticked': ([('main', "(fromLink ? '' : ' checked')", "' checked'")], ['L-vfmsave-listUnticked'], ['vfmsave']),
     'm-dropgo': ([('main', "['f fi', 'Find'], ['go ga gp', 'open groups'],", "['f fi', 'Find'],")], ['S-dropOrder'], []),
-    'm-feedbackcmp': ([('main', "return (b.token && !b.cmp) ? b.token : '';", "return b.token || '';")], ['S-feedbackNoCmp'], []),
+    'm-feedbackcmp': ([('main', "if (!b.token || b.cmp) return none;", "if (!b.token) return none;")], ['S-feedbackNoCmp'], []),
     # (10-23 c) Stacked groups: the open set never captured / never restored
     'm-nogo': ([('main', "            if (gst) { v.go = gst.go; if (gst.ga) v.ga = true; if (gst.gb) v.gb = gst.gb; if (gst.gt) v.gt = gst.gt; }", "            if (gst) { }")], ['L-ggsA-carriesOpen', 'L-ggsB-rtOpen'], ['ggsA', 'ggsB']),
     'm-nostackapply': ([('main', "                else if (vlg.go || vlg.ga || vlg.gb || vlg.gt) setTimeout(function () { _pnbViewLinkStackTo(vlg); }, 300);\n", "")], ['L-vcmpT-rtOpen'], ['vcmpS', 'vcmpT']),
@@ -278,8 +278,8 @@ def static_checks(t):
     out.append(('S-viewReadOnce', len(re.findall(r"\$_GET\['view'\]", idx)) <= 1 and "$_GET['view']" not in form, "?view= read by PHP only to load pako (no auth path touched)"))
     m = re.search(r"\{ id: 'viewlink', label: 'Copy a link to this view'.*?\},\n", pal, re.S)
     out.append(('S-paletteRow', bool(m) and all(k in m.group(0) for k in ('share', 'link', 'url', 'permalink', 'send view')) and 'PenumbraViewLink' in m.group(0), (m.group(0)[:200] if m else 'no row')))
-    out.append(('S-feedbackLink', "preg_match('/^[A-Za-z0-9_-]+$/', $viewTok)" in form and "rawurlencode(trim((string)$reportRow['SHORT_ID']))\n            . '&view=' . $viewTok" in form
-                and "htmlspecialchars($viewLink, ENT_QUOTES)" in form and "viewlink: ctx.id ? _pnbViewLinkToken() : ''" in main, 'the feedback email builds the link on the report id, token checked'))
+    out.append(('S-feedbackLink', "preg_match('/^[A-Za-z0-9_-]+$/', $viewTok)" in form and "rawurlencode(trim((string)$reportRow['SHORT_ID']))\n            . $vpPart\n            . '&view=' . $viewTok" in form
+                and "htmlspecialchars($viewLink, ENT_QUOTES)" in form and "ctx.id ? _pnbViewLinkFeedback() : { viewlink: '', viewprompts: '' }" in main, 'the feedback email builds the link on the report id, token checked'))
     out.append(('S-emailOption', 'id="emailLinkAsView"' in idx and 'id="emailViewLinkRow"' in idx and "if ($('#emailLinkAsView').is(':checked')) {" in main
                 and '#emailIncludeLink, #emailLinkAsView, #emailShowRecipients' in main and 'id="emailCopyViewLink"' in idx
                 and "$(document).on('click', '#emailCopyViewLink', function (e) {" in main and 'Prepend link' not in idx, 'the Email dialog option, its link, its Copy link'))
@@ -291,7 +291,7 @@ def static_checks(t):
     dro = re.search(r'var PNB_VIEW_DROP_ORDER = \[(.*?)\];', main, re.S)
     dtx = dro.group(1) if dro else ''
     out.append(('S-dropOrder', bool(dtx) and "'go ga gp'" in dtx and "'gb gt gr gc tr lc'" in dtx and dtx.find("'go ga gp'") < dtx.find("['g', 'grouping']"), 'scrolls and open groups drop before the grouping'))
-    out.append(('S-feedbackNoCmp', "return (b.token && !b.cmp) ? b.token : '';" in main, 'no feedback-email token during a comparison'))
+    out.append(('S-feedbackNoCmp', "if (!b.token || b.cmp) return none;" in main, 'no feedback-email token during a comparison'))
     out.append(('S-help', 'viewLinkHelpLightbox' in t['manifest'] and 'Copy a link to this view' in t['topic'] and 'data-tip="us-tip-viewlink"' in t['tip'] and 'data-tip="us-tip-viewlink"' in idx, 'help topic + tip (defined + consumed) + manifest'))
     ui = re.findall(r'(?:Link copied|Opened a shared view|Copy a link to this view|Skipped, no longer|Left out to fit)[^"\n]*', main + idx + pal + t['topic'] + t['tip'])
     out.append(('S-noEmdash', bool(ui) and not any('\u2014' in x or '&mdash;' in x for x in ui) and '\u2014' not in t['topic'] + t['tip'], '%d UI strings' % len(ui)))
@@ -322,7 +322,9 @@ def mutate(texts, name):
 sys.path.insert(0, HERE)
 import mk_harness
 stage = tempfile.mkdtemp(prefix='pnb_vl_')
-for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
+# (2026-11-19, promptfix2 E8) the libs from the build under test when it has them (pick falls back to live): a stage's
+# penumbra_tiles.js holds URL_RESERVED, the list main.js's link builders read; live's would leave it the fallback.
+for f in LIBS: shutil.copyfile(pick(os.path.join('js', f)), os.path.join(stage, f))
 for f in CSS: shutil.copyfile(os.path.join(APP, 'css', f), os.path.join(stage, f))
 open(os.path.join(stage, 'help_stub.js'), 'wb').write(b'window.__HELP_STUB = "";\n')
 for f in ('driver.js', 'seed.js'): shutil.copyfile(os.path.join(HERE, f), os.path.join(stage, f))

@@ -114,7 +114,9 @@ function lift_functions($src, $names, $rename = array()) {
 $PARSERS = array('parseImportFile', 'parseImportCsv', 'parseImportJson', 'parseImportXlsx', '_importXlsxColToIndex',
                  'parseImportXmlSpreadsheet', 'parseImportHtmlTable',
                  // new with the change (absent from the baseline)
-                 '_importStackSheets', '_importXlsxSheetRows', '_importXmlssSheetHidden', '_importXmlssSheetRows');
+                 '_importStackSheets', '_importXlsxSheetRows', '_importXmlssSheetHidden', '_importXmlssSheetRows',
+                 // (2026-11-19, jsonsweep2 B12) parseImportJson keeps nested values as @@JSON through this helper
+                 '_importJsonNestedCells');
 
 // ----------------------------------------------------------------------------
 // Mutants: single-point edits of the candidate. Each must turn EXACTLY its own

@@ -64,8 +64,11 @@ echo "\n=== PROMPT grammar: _sr_resolve_relative_date - still the FULL vocabular
 check('keyword still works',     _sr_resolve_relative_date('TODAY-30'),  d(-30));
 check('yesterday',               _sr_resolve_relative_date('yesterday'), d(-1));
 check('tomorrow',                _sr_resolve_relative_date('tomorrow'),  d(1));
+// (2026-11-19, promptfix2 A3/C7) N years ago is clamped to the target month's last day (moment's rule), so
+// on a 29-FEB it is 28-FEB, not strtotime's 01-MAR: expect the clamped date, whatever day the suite runs.
+$ly = (int)date('Y') - 1; $lm = (int)date('n');
 check('1 year ago',              _sr_resolve_relative_date('1 year ago'),
-      strtoupper(date('d-M-y', strtotime('-1 year'))));
+      strtoupper(date('d-M-y', mktime(0,0,0,$lm,min((int)date('j'),(int)date('t', mktime(0,0,0,$lm,1,$ly))),$ly))));
 check('first day of this month', _sr_resolve_relative_date('first day of this month'),
       strtoupper(date('d-M-y', mktime(0,0,0,(int)date('n'),1,(int)date('Y')))));
 

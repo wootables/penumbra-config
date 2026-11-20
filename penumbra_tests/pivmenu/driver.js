@@ -216,7 +216,7 @@
       closeMenu();
       var lab = Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody td[data-row-field="0"]'), function (td) { return !!td.querySelector('.pivot-collapse-toggle'); })[0] || null;
       var labOpen = !!lab && rclick(lab) && !!menu(), c = acts();
-      R.chk.labelAll = labOpen && c[0] === 'pvToggle' && c[1] === 'pvCollapseAll' && c[2] === 'pvExpandAll';
+      R.chk.labelAll = labOpen && c[0] === 'pvToggle' && c[1] === 'pvExpandAll' && c[2] === 'pvCollapseAll';   // (menufix2 P7) Expand all first, as the band
       if (item('pvCollapseAll')) { item('pvCollapseAll').click(); await sleep(800); }
       R.chk.labelCollapse = labOpen && document.querySelectorAll('#pivotResultTable .pivot-collapse-toggle').length > 0
         && document.querySelectorAll('#pivotResultTable .pivot-collapse-toggle:not(.pivot-group-collapsed)').length === 0;
@@ -366,8 +366,8 @@
       closeMenu();
       var numCell = bt.tBodies[0].rows[0].cells[0], numCellOpen = rclick(numCell) && !!menu(), numCellActs = acts();
       closeMenu();
-      R.chk.bdNumMenu = numOpen && numName === '# (Row Number)' && numActs.indexOf('bdSortAsc') < 0 && numActs.indexOf('rowHeight') >= 0;
-      R.chk.bdNumRow = numCellOpen && numCellActs[0] === 'bdCopyRow' && numCellActs.indexOf('bdSortAsc') < 0;
+      R.chk.bdNumMenu = numOpen && numName === '# (Row Number)' && numActs.indexOf('bdSortAsc') >= 0 && numActs.indexOf('rowHeight') >= 0;   // (menufix2 M6) its sorts
+      R.chk.bdNumRow = numCellOpen && numCellActs[0] === 'bdCopyRow' && numCellActs.indexOf('bdSortAsc') >= 0;   // (menufix2 M6)
       R.info.bdNum = { head: numActs, cell: numCellActs };
       var rB = th.getBoundingClientRect();
       R.chk.bdNativeShift = !th.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true, clientX: Math.round(rB.left + 6), clientY: Math.round(rB.top + 6) })) === false && !menu();

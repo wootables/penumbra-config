@@ -1406,7 +1406,7 @@ if (strpos($src['s_all'], '$anFamilyTheme = ') !== false) {
                    "readClobViaOci8('PENUMBRA_REPORTS', 'STATE_DATA', 'SHORT_ID', \$anScope['row']['SHORT_ID'])" => 'the saved default is the report\'s STATE_DATA theme',
                    "\$anSubCtx     = \$anReportScope ? penumbra_an_report_subscribers(\$oracleConn, \$anScope['row']['SHORT_ID']) : null;" => 'the strip\'s subscriber count is the page\'s builder',
                    "<button type=\"button\" id=\"anRefreshToggle\" class=\"an-refresh-toggle\" aria-pressed=\"false\">Auto-refresh: off</button>" => 'the auto-refresh toggle starts off',
-                   "const REFRESH_ON_KEY = 'pnbAnRefreshOn';" => 'the auto-refresh choice is the report page\'s own browser key',
+                   "const REFRESH_ON_KEY = '<?php echo \$anReportScope ? 'pnbAnRefreshOn' : 'pnbAnPlatRefreshOn'; ?>';" => 'the auto-refresh choice is the report page\'s own browser key (Platform has its own, 2026-11-19)',
                    "function feedEngaged() { return feedFam !== 'all' || feedShown > 50; }" => 'auto-refresh stands down while the Activity feed is being read',
                    "id=\"anLiveDot\"" => 'the sidebar dot is the live indicator',
                    "<a class=\"an-ctx-title\" href=\"index.php?id=" => 'the title is the way back to the report') as $pin12 => $what12)

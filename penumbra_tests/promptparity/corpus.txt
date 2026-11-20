@@ -7,7 +7,7 @@
 #   group: <heading>
 #   case:  <what this case pins>
 #   sql:   the statement, tag(s) included   (\n = a line break)
-#   ans:   name=value&name=value            (empty = nothing answered)
+#   ans:   name=value&name=value            (empty = nothing answered; %26 in a value = a literal &)
 #   mode:  dialogs                          (browser only: run with dialogs ON -
 #                                            needed for forcedefault=, which the
 #                                            browser does not apply with them off)
@@ -251,10 +251,10 @@ sql:  SELECT 1 FROM t WHERE c = 'x' AND e = [PROMPT;type=text;name=x]
 ans:  x=v
 all:  SELECT 1 FROM t WHERE c = 'x' AND e = 'v'
 
-case: a resultif child that is dropped leaves the pair standing (as the browser does)
+case: a resultif child that is dropped takes its clause and both quotes with it (2026-11-19, promptfix2 A5)
 sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c = '[PROMPT;type=text;name=x;resultif=p:y]' AND z = 1
 ans:  p=n&x=v
-all:  SELECT 1 FROM t WHERE 1=1  AND c = '' AND z = 1
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
 
 group: section= is display only - no engine may emit anything different for it (2026-09-24)
 
@@ -309,12 +309,10 @@ browser: SELECT 1 FROM t WHERE (c != 'A')
 runner:  SELECT 1 FROM t WHERE c != 'A'
 json:    SELECT 1 FROM t WHERE (c != 'A')
 
-case: NOT LIKE, nothing picked - the no-answer literals stay as they were
+case: NOT LIKE, nothing picked - excludes nothing (2026-11-19, promptfix2 A8; was c NOT LIKE NULL / '')
 sql:  SELECT 1 FROM t WHERE c NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
 ans:
-browser: SELECT 1 FROM t WHERE (c NOT LIKE NULL)
-runner:  SELECT 1 FROM t WHERE c NOT LIKE NULL
-json:    SELECT 1 FROM t WHERE c NOT LIKE ''
+all:  SELECT 1 FROM t WHERE 1=1
 
 case: logic=or wins over the negated default - "not both"
 sql:  SELECT 1 FROM t WHERE c NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C;logic=or]
@@ -585,3 +583,230 @@ case: options that all carry their own "and", no prompt template - the group tak
 sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=st;options=Open::"and s = 'O'",Closed::"and s = 'C'"] AND z = 1
 ans:  st=Open,Closed
 all:  SELECT 1 FROM t WHERE x = 0 and (s = 'O' OR s = 'C') AND z = 1
+
+group: one tag rule, answers and flags (2026-11-19, prompt sweep)
+
+case: a ] inside validate= stays inside the tag (the browser's tag ended at the first ])
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=zip;validate=/^[0-9]{5}$/] AND z = 1
+ans:  zip=27606
+all:  SELECT 1 FROM t WHERE c = '27606' AND z = 1
+
+case: an apostrophe in message= does not swallow the next tag (the PHP scanner read it as a quote)
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=a;message=Pick the dean's office] AND d = [PROMPT;type=text;name=b] AND z = 1
+ans:  a=X&b=Y
+all:  SELECT 1 FROM t WHERE c = 'X' AND d = 'Y' AND z = 1
+
+case: a space between [ and PROMPT is still a tag
+sql:  SELECT 1 FROM t WHERE c = [ PROMPT;type=text;name=s] AND z = 1
+ans:  s=V
+all:  SELECT 1 FROM t WHERE c = 'V' AND z = 1
+
+case: share after name= is a flag, not part of the name
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=dept;share] AND z = 1
+ans:  dept=ENG
+all:  SELECT 1 FROM t WHERE c = 'ENG' AND z = 1
+
+case: type=boolean;okonly - okonly is a flag (?json=1 refused the tag)
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=boolean;name=ok;okonly;noquote] AND z = 1
+ans:  ok=1
+all:  SELECT 1 FROM t WHERE c = 1 AND z = 1
+
+case: a multi-select value with a comma in it (&#44;) stays one value
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C] AND z = 1
+ans:  m=Smith%26#44; John,Doe
+all:  SELECT 1 FROM t WHERE c IN ('Smith, John', 'Doe') AND z = 1
+
+case: resultif on a multi-select parent - met when one of its values matches
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=multi-select;name=m;options=A,B,C;template=""] [PROMPT;type=text;name=x;resultif=m:B;template="AND c = :val"] AND z = 1
+ans:  m=A,B&x=v
+all:  SELECT 1 FROM t WHERE 1=1  AND c = 'v' AND z = 1
+
+case: ... and not met when none does
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=multi-select;name=m;options=A,B,C;template=""] [PROMPT;type=text;name=x;resultif=m:B;template="AND c = :val"] AND z = 1
+ans:  m=A,C&x=v
+all:  SELECT 1 FROM t WHERE 1=1   AND z = 1
+
+group: a skipped resultif child written in quotes or parentheses takes them with its clause (2026-11-19, promptfix2 A5)
+
+case: ... and kept when its condition is met
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c = '[PROMPT;type=text;name=x;resultif=p:y]' AND z = 1
+ans:  p=y&x=v
+all:  SELECT 1 FROM t WHERE 1=1  AND c = 'v' AND z = 1
+
+case: c IN ([child]) dropped - the parentheses go too (was AND c IN (): ORA-00936)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c IN ([PROMPT;type=multi-select;name=x;options=A,B;resultif=p:y]) AND z = 1
+ans:  p=n&x=A,B
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: c NOT IN ( [child] ) with spaces inside the parentheses, dropped
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c NOT IN ( [PROMPT;type=multi-select;name=x;options=A,B;resultif=p:y] ) AND z = 1
+ans:  p=n&x=A,B
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: c IN ('[child]') dropped - quotes and parentheses go
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c IN ('[PROMPT;type=multi-select;name=x;options=A,B;resultif=p:y]') AND z = 1
+ans:  p=n&x=A,B
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: c IN ([child]) kept when met
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c IN ([PROMPT;type=multi-select;name=x;options=A,B;resultif=p:y]) AND z = 1
+ans:  p=y&x=A,B
+all:  SELECT 1 FROM t WHERE 1=1  AND c IN ('A', 'B') AND z = 1
+
+case: WHERE c IN ([child]) as the first condition becomes WHERE 1=1
+sql:  SELECT 1 [PROMPT;type=select;name=p;options=y,n;template=""] FROM t WHERE c IN ([PROMPT;type=multi-select;name=x;options=A,B;resultif=p:y]) AND z = 1
+ans:  p=n&x=A,B
+all:  SELECT 1  FROM t WHERE 1=1 AND z = 1
+
+case: WHERE c = '[child]' as the first condition becomes WHERE 1=1
+sql:  SELECT 1 [PROMPT;type=select;name=p;options=y,n;template=""] FROM t WHERE c = '[PROMPT;type=text;name=x;resultif=p:y]' AND z = 1
+ans:  p=n&x=v
+all:  SELECT 1  FROM t WHERE 1=1 AND z = 1
+
+case: a quoted child that is not a clause keeps its quotes (only the tag goes, as before)
+sql:  SELECT [PROMPT;type=select;name=p;options=y,n;template=""] '[PROMPT;type=text;name=x;resultif=p:y]' AS lbl FROM t
+ans:  p=n&x=v
+all:  SELECT  '' AS lbl FROM t
+
+group: nothing picked under a negated operator excludes nothing - 1=1 for the comparison (2026-11-19, promptfix2 A8)
+
+case: NOT IN, nothing answered (was NOT IN (NULL): no rows)
+sql:  SELECT 1 FROM t WHERE c NOT IN [PROMPT;type=multi-select;name=m;options=A,B,C] AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1 AND z = 1
+
+case: NOT IN, an EMPTY selection (m= in the link)
+sql:  SELECT 1 FROM t WHERE c NOT IN [PROMPT;type=multi-select;name=m;options=A,B,C] AND z = 1
+ans:  m=
+all:  SELECT 1 FROM t WHERE 1=1 AND z = 1
+
+case: NOT IN with the author's own parentheses
+sql:  SELECT 1 FROM t WHERE c NOT IN ([PROMPT;type=multi-select;name=m;options=A,B,C]) AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1 AND z = 1
+
+case: NOT IN ('[tag]') - quotes and parentheses
+sql:  SELECT 1 FROM t WHERE c NOT IN ('[PROMPT;type=multi-select;name=m;options=A,B,C]') AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1 AND z = 1
+
+case: != , nothing picked
+sql:  SELECT 1 FROM t WHERE c != [PROMPT;type=multi-select;name=m;options=A,B,C] AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1 AND z = 1
+
+case: <> '[tag]', nothing picked
+sql:  SELECT 1 FROM t WHERE c <> '[PROMPT;type=multi-select;name=m;options=A,B,C]' AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1 AND z = 1
+
+case: an expression operand, UPPER(c) NOT IN
+sql:  SELECT 1 FROM t WHERE x = 0 AND UPPER(c) NOT IN [PROMPT;type=multi-select;name=m;options=A,B,C] AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE x = 0 AND 1=1 AND z = 1
+
+case: template="AND c NOT IN (:val)", nothing picked - its connector stays
+sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=m;options=A,B,C;template="AND c NOT IN (:val)"] AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE x = 0 AND 1=1 AND z = 1
+
+case: template="AND c != :val", nothing picked
+sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=m;options=A,B,C;template="AND c != :val"] AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE x = 0 AND 1=1 AND z = 1
+
+case: NOT IN with values picked is unchanged
+sql:  SELECT 1 FROM t WHERE c NOT IN ([PROMPT;type=multi-select;name=m;options=A,B,C]) AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c NOT IN ('A', 'B') AND z = 1
+
+case: the optional-filter idiom, nothing picked - the NOT IN half is 1=1
+sql:  SELECT 1 FROM t WHERE ([PROMPT;type=multi-select;name=m;options=A,B] IS NULL OR c NOT IN ([PROMPT;type=multi-select;name=m;options=A,B])) AND z = 1
+ans:
+browser: SELECT 1 FROM t WHERE (NULL IS NULL OR 1=1) AND z = 1
+runner:  SELECT 1 FROM t WHERE (NULL IS NULL OR 1=1) AND z = 1
+json:    SELECT 1 FROM t WHERE ('' IS NULL OR 1=1) AND z = 1
+
+group: hand-written tags - values trimmed, type= without case, flags with spaces or on their own line (2026-11-19, promptfix2 A7/B6)
+
+case: type=Select in capitals is a select
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=Select;name=s;options=A,B] AND z = 1
+ans:  s=A
+all:  SELECT 1 FROM t WHERE c = 'A' AND z = 1
+
+case: type=Multi-Select in capitals is a multi-select
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=Multi-Select;name=m;options=A,B,C] AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B') AND z = 1
+
+case: type=multi-select with a space before its ;
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select ;name=m;options=A,B,C] AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B') AND z = 1
+
+case: a multi-line tag, one key per line
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;\n   type=multi-select;\n   name=m;\n   options=A,B,C\n] AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B') AND z = 1
+
+case: name= with a space before its ; still takes its answer
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=s ;message=Pick] AND z = 1
+ans:  s=V
+all:  SELECT 1 FROM t WHERE c = 'V' AND z = 1
+
+case: noquote as the last line of the tag is a flag (the browser bound the value)
+sql:  SELECT 1 FROM t ORDER BY [PROMPT;type=select;name=o;options=a_col,b_col;\n   noquote\n]
+ans:  o=b_col
+all:  SELECT 1 FROM t ORDER BY b_col
+
+case: ; noquote ; with spaces is a flag
+sql:  SELECT 1 FROM t ORDER BY [PROMPT;type=select;name=o;options=a_col,b_col; noquote ;message=Sort]
+ans:  o=b_col
+all:  SELECT 1 FROM t ORDER BY b_col
+
+group: R2 - a widened span (A5) or 1=1 (A8) only before the end of a condition (2026-11-19, promptfix2 R2)
+
+case: LIKE '[child]' || '%' skipped - the old valid SQL again (A5 made it WHERE 1=1 || '%')
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND name LIKE '[PROMPT;type=text;name=x;resultif=p:y]' || '%' ORDER BY 1
+ans:  p=n&x=v
+all:  SELECT 1 FROM t WHERE 1=1  AND name LIKE '' || '%' ORDER BY 1
+
+case: ... and kept when its condition is met
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND name LIKE '[PROMPT;type=text;name=x;resultif=p:y]' || '%' ORDER BY 1
+ans:  p=y&x=v
+all:  SELECT 1 FROM t WHERE 1=1  AND name LIKE 'v' || '%' ORDER BY 1
+
+case: WHERE name LIKE '[child]' || '%' as the first condition, skipped - as before
+sql:  SELECT 1 [PROMPT;type=select;name=p;options=y,n;template=""] FROM t WHERE name LIKE '[PROMPT;type=text;name=x;resultif=p:y]' || '%' AND z = 1
+ans:  p=n&x=v
+all:  SELECT 1  FROM t WHERE name LIKE '' || '%' AND z = 1
+
+case: c = '[child]' before ORDER BY - the clause and its quotes go (A5 kept)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c = '[PROMPT;type=text;name=x;resultif=p:y]' ORDER BY 1
+ans:  p=n&x=v
+all:  SELECT 1 FROM t WHERE 1=1  ORDER BY 1
+
+case: c IN ([child]) before a closing parenthesis (A5 kept)
+sql:  SELECT 1 FROM t WHERE (1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c IN ([PROMPT;type=multi-select;name=x;options=A,B;resultif=p:y])) AND z = 1
+ans:  p=n&x=A,B
+all:  SELECT 1 FROM t WHERE (1=1 ) AND z = 1
+
+case: c = '[child]' at the end of the statement (A5 kept)
+sql:  SELECT 1 FROM t WHERE 1=1[PROMPT;type=select;name=p;options=y,n;template=""] AND c = '[PROMPT;type=text;name=x;resultif=p:y]'
+ans:  p=n&x=v
+all:  SELECT 1 FROM t WHERE 1=1
+
+case: c = '[child]' before a line comment (A5 kept)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c = '[PROMPT;type=text;name=x;resultif=p:y]' -- note
+ans:  p=n&x=v
+all:  SELECT 1 FROM t WHERE 1=1  -- note
+
+case: NOT IN [m] before ORDER BY, nothing picked - 1=1 (A8 kept)
+sql:  SELECT 1 FROM t WHERE c NOT IN [PROMPT;type=multi-select;name=m;options=A,B,C] ORDER BY 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1 ORDER BY 1
+
+case: NOT IN ([m]) before a closing parenthesis, nothing picked - 1=1 (A8 kept)
+sql:  SELECT 1 FROM t WHERE (c NOT IN ([PROMPT;type=multi-select;name=m;options=A,B,C])) AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE (1=1) AND z = 1

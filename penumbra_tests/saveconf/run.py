@@ -32,7 +32,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 SCN = ['base', 'conflict', 'self', 'otherid', 'nover', 'validate', 'jsaveas', 'sched', 'encsave']
 CHK = {
-    'encsave': ['bootUnticked', 'firstEncrypted', 'openerRan', 'tickedAfterEncSave', 'secondSaveNotPlain', 'passwordAsked', 'plainSaved', 'untickedAfterPlainSave'],   # 2026-10-21
+    'encsave': ['bootUnticked', 'firstEncrypted', 'openerRan', 'tickedAfterEncSave', 'secondSaveNotPlain', 'passwordAsked', 'plainSaved', 'untickedAfterPlainSave', 'journalFlag'],   # 2026-10-21; journalFlag 2026-11-19 (encflag)
     'base': ['sentBase', 'versionMoved', 'secondSendsNew'],
     'conflict': ['noticeWho', 'noticeButtons', 'dialogStays', 'buttonBack', 'versionKept', 'forceSent', 'forceSaved', 'forceOnce'],
     'self': ['selfWords', 'rollbackWords'],

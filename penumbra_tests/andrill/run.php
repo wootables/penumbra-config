@@ -42,6 +42,8 @@
  *           onecal   the one-report jump also fires in calendar mode
  *           noexit   the jump sends its header but renders the page anyway
  *           refreshdefault auto-refresh is on unless switched off
+ *           platnorefresh  Platform Metrics loses its auto-refresh (2026-11-19)
+ *           nocountdown    the countdown stops counting (2026-11-19)
  *           noautocarry the drill-down forgets Hide automation (the way back
  *                    up would switch Platform's off)
  *           nomeup   the crumb forgets Hide my own views
@@ -109,6 +111,8 @@ $mutants = array(
     'onecal'   => array('all',    "if (!\$anCalMode && !\$anReportScope && \$reportSearch !== '') {", "if (!\$anReportScope && \$reportSearch !== '') {"),
     'noexit'   => array('all',    "true, 302);\n        exit;", "true, 302);"),
     'refreshdefault' => array('all', "return localStorage.getItem(REFRESH_ON_KEY) === '1';", "return localStorage.getItem(REFRESH_ON_KEY) !== '0';"),
+    'platnorefresh'  => array('all', '$anRefreshable = !$anCalMode;', '$anRefreshable = $anReportScope;'),
+    'nocountdown'    => array('all', "refreshNext.innerHTML = 'next in <b>' + fmtLeft(left) + '</b>';", "refreshNext.innerHTML = '';"),
     'noautocarry' => array('all', "\$anDrillCarry = penumbra_an_carry_params(\$anWin, array(\n    'excl_admins'     => \$excludeAdmins,\n    'excl_automation' => \$excludeAutomation,\n", "\$anDrillCarry = penumbra_an_carry_params(\$anWin, array(\n    'excl_admins'     => \$excludeAdmins,\n"),
     'nomeup'   => array('all',    "        'excl_automation' => \$excludeAutomation,\n        'excl_me'         => \$excludeMe,\n", "        'excl_automation' => \$excludeAutomation,\n"),
 );
@@ -493,11 +497,15 @@ t_eq(substr_count($allSrc, "<?php if (isset(\$_GET['platform']) && (string)\$_GE
 section('10. the report page: auto-refresh off by default, remembered per browser');
 $anchorsRefresh = array(
     "aria-pressed=\"false\">Auto-refresh: off</button>" => 'the button renders off',
-    "<span class=\"dot<?php echo \$anReportScope ? ' is-off' : ''; ?>\"<?php if (\$anReportScope): ?> id=\"anLiveDot\"" => 'the live dot renders dimmed at report scope',
+    "<span class=\"dot<?php echo \$anRefreshable ? ' is-off' : ''; ?>\"<?php if (\$anRefreshable): ?> id=\"anLiveDot\"" => 'the live dot renders dimmed wherever auto-refresh is offered',
+    "\$anRefreshable = !\$anCalMode;" => 'auto-refresh at both scopes, never the calendar (Platform since 2026-11-19)',
+    "<?php if (\$anRefreshable) echo \$anRefreshCtl; ?>" => 'Platform\'s head carries the same control',
+    "if (on) refreshDue = Date.now() + REFRESH_MS;" => 'turning it on starts a full 2 minutes',
+    "refreshNext.innerHTML = 'next in <b>' + fmtLeft(left) + '</b>';" => 'the countdown counts down',
     "title=\"Rendered <?php echo htmlspecialchars(\$anRenderedAt); ?> · auto-refresh is off\"" => 'and says so',
-    "const REFRESH_ON_KEY = 'pnbAnRefreshOn';" => 'one per-browser key (the report page\'s own)',
+    "const REFRESH_ON_KEY = '<?php echo \$anReportScope ? 'pnbAnRefreshOn' : 'pnbAnPlatRefreshOn'; ?>';" => 'one per-browser key per scope (the report page keeps its own)',
     "function refreshOn() { try { return localStorage.getItem(REFRESH_ON_KEY) === '1'; } catch (e) { return false; } }" => 'on only when chosen; blocked storage reads as off',
-    "        if (!refreshOn()) return;\n" => 'the reload never runs while it is off',
+    "        if (!refreshOn()) {\n" => 'the reload never runs while it is off',
     ".sidebar h2 .dot.is-off {" => 'the dimmed dot is styled',
 );
 foreach ($anchorsRefresh as $a => $l) t_eq(substr_count($allSrc, $a), 1, $l);

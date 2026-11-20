@@ -1585,18 +1585,18 @@
                     },
                     {
                         "name":  "preview/nested: a summary filter on a nested aggregate does not throw",
-                        "pass":  false,
-                        "detail":  "sharedVals[nGk].push is not a function"
+                        "pass":  true,
+                        "detail":  ""
                     },
                     {
                         "name":  "preview/nested: the two nested groups at or over 300 match",
-                        "pass":  false,
-                        "detail":  "got undefined want 2"
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
                     },
                     {
                         "name":  "preview/nested: one parent row in each",
-                        "pass":  false,
-                        "detail":  "got undefined want 2"
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
                     },
                     {
                         "name":  "preview: nothing was written onto Object.prototype",

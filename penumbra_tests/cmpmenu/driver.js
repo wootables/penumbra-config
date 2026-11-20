@@ -281,7 +281,7 @@
     rclick(hd);
     var a5 = acts();
     rec('C5 a group\'s band opens the comparison menu under the group\'s name: Expand, Show only, Hide this group, then the comparison\'s items',
-      !!menu() && title() === 'Modified Rows' && J(a5) === J(['cmpGroupToggle', 'cmpGroupOnly', 'cmpGroupHide', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']),
+      !!menu() && title() === 'Modified Rows' && J(a5) === J(['cmpGroupToggle', 'cmpGroupOnly', 'cmpGroupHide', 'cmpGroupCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']),   // (menufix2 M8) Copy group name
       'title=' + title() + ' acts=' + J(a5));
     closeMenu();
 
@@ -627,13 +627,22 @@
       && a26[2] === "NAME != 'Zulu' and __SNAP_TYPE = 'Modified Rows'" && a26[3] === J(['3', '4']), 'states=' + J(a26));
 
     // C27 ...and wraps an "or" query in parentheses first (2026-10-30), so the group's condition applies to all of it
-    await search("NAME = 'Alpha' or NAME = 'Bravo'");
+    // (menufix2 I2) Alpha or Bravo alone leaves one group, where Show only is no longer offered: an "or" that keeps them all
+    await search("NAME = 'Alpha' or NAME != 'Zulu'");
     var k27 = J(keys());
     var ran27 = await chooseRerun(bandOf('Unchanged Rows'), 'cmpGroupOnly');
     var a27 = [k27, J(keys()), box().value];
     await search('');
     rec('C27 Show only this group wraps an "or" query in parentheses and adds its condition', ran27 && a27[1] === J(['Unchanged Rows'])
-      && a27[2] === "(NAME = 'Alpha' or NAME = 'Bravo') and __SNAP_TYPE = 'Unchanged Rows'", 'ran=' + ran27 + ' states=' + J(a27));
+      && a27[2] === "(NAME = 'Alpha' or NAME != 'Zulu') and __SNAP_TYPE = 'Unchanged Rows'", 'ran=' + ran27 + ' states=' + J(a27));
+    // C27b (menufix2 I2) the only group shown offers no Show only this group / Hide this group: nothing to show only, nothing left once hidden
+    await search("NAME = 'Alpha' or NAME = 'Bravo'");
+    var k27b = J(keys());
+    closeMenu(); rclick(bandOf('Unchanged Rows'));
+    var a27b = acts(); closeMenu();
+    await search('');
+    rec('C27b the only group shown offers no Show only this group or Hide this group', k27b === J(['Unchanged Rows']) && a27b.indexOf('cmpGroupOnly') < 0 && a27b.indexOf('cmpGroupHide') < 0 && a27b.indexOf('cmpGroupCopyName') >= 0,
+      'keys=' + k27b + ' acts=' + J(a27b));
 
     // C21 Hide this group: the band's x - the group leaves, its condition in the filter box
     var ran21 = await chooseRerun(bandOf('New Rows'), 'cmpGroupHide');

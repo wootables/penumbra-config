@@ -103,7 +103,8 @@
     t('validate: single range unchanged', v('2', 'range(1,3)') === null && typeof v('5', 'range(1,3)') === 'string', j([v('2', 'range(1,3)'), v('5', 'range(1,3)')]));
     t('validate: single regex unchanged', v('ab', '/^ab$/') === null && typeof v('abc', '/^ab$/') === 'string');
     t('validate: regex passes but range fails -> error (AND semantics)', typeof v('x', '/^x$/,range(1,3)') === 'string', j(v('x', '/^x$/,range(1,3)')));
-    t('validate: malformed rule still reports "Invalid regex format"', /Invalid regex format/.test(String(v('1', 'range(1,)'))), j(v('1', 'range(1,)')));
+    // (2026-11-19, promptfix2 A10) a range( that does not parse names range() now (was the regex branch's message)
+    t('validate: malformed rule still reports an error ("Invalid range() in prompt definition."; before promptfix2 "Invalid regex format")', /Invalid range\(\) in prompt definition\.|Invalid regex format/.test(String(v('1', 'range(1,)'))), j(v('1', 'range(1,)')));
     t('validate: no rule -> null', wrap(function () { return V('anything', {}); }) === null);
     if (S) {
       var parts = wrap(function () { return S('/^a,b$/i,range(1,2),min_date(2026-01-01)'); });

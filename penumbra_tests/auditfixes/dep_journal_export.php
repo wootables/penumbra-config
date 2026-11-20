@@ -46,6 +46,15 @@ function journalSharedNoteText($notes) {
     }
 }
 
+if (!function_exists('journalNoteCellSafe')) {
+function journalNoteCellSafe($s) {
+        $s = (string)$s;
+        if (strpos($s, '@@') === false) return $s;
+        $r = preg_replace('/@(?=@(?:HTML|JSON))/i', "@\xE2\x81\xA0", $s);
+        return ($r === null) ? str_replace('@@', "@\xE2\x81\xA0@", $s) : $r;
+    }
+}
+
 if (!function_exists('journalHasPrivateColumn')) {
 function journalHasPrivateColumn() {
         static $has = null;
@@ -142,6 +151,150 @@ function journalNoteCounts($rows) {
             if ($at !== '' && ($latest === null || strcmp($at, $latest) > 0)) $latest = $at;
         }
         return array('TOTAL' => $total, 'UNSEEN' => $unseen, 'LATEST_AT' => $latest);
+    }
+}
+
+if (!function_exists('journalPrivateCapRefusal')) {
+function journalPrivateCapRefusal($reportId, $uid, $adding = 1) {
+        $r = queryViaOci8("SELECT COUNT(*) AS C FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND NVL(IS_PRIVATE, 0) <> 0 AND UPPER(CREATED_BY) = UPPER(:cby)",
+            array(':rid' => (int)$reportId, ':cby' => (string)$uid));
+        $mine = (!empty($r) && isset($r[0]['C'])) ? (int)$r[0]['C'] : 0;
+        if ($mine + max(1, (int)$adding) <= JOURNAL_MAX_PRIVATE_NOTES_PER_AUTHOR) return null;
+        if ((int)$adding > 1) {
+            return 'You can keep at most ' . JOURNAL_MAX_PRIVATE_NOTES_PER_AUTHOR . ' private notes on one report. You have ' . $mine
+                . ' on this one, and making this thread private would add ' . (int)$adding . ' of yours. Delete some of your private notes, or keep this thread visible to everyone.';
+        }
+        return 'You can keep at most ' . JOURNAL_MAX_PRIVATE_NOTES_PER_AUTHOR . ' private notes on one report, and you have ' . $mine
+            . ' on this one. Delete some of them, or make a thread visible to everyone, to add another private note.';
+    }
+}
+
+if (!function_exists('journalNoteMentionTag')) {
+function journalNoteMentionTag($noteId, $uid) {
+        $cfg = (isset($GLOBALS['config']) && is_array($GLOBALS['config'])) ? $GLOBALS['config'] : array();
+        $k = isset($cfg['scheduler_secret_key']) ? (string)$cfg['scheduler_secret_key'] : '';
+        if ($k === '') return null;
+        return substr(hash_hmac('sha256', 'pnb-jmention|' . (int)$noteId . '|' . strtolower(trim((string)$uid)), $k), 0, 24);
+    }
+}
+
+if (!function_exists('journalNoteMentionTags')) {
+function journalNoteMentionTags($noteId, $uids) {
+        $o = array();
+        foreach ((array)$uids as $u) { $t = journalNoteMentionTag($noteId, $u); if ($t !== null && !in_array($t, $o, true)) $o[] = $t; }
+        return $o;
+    }
+}
+
+if (!function_exists('journalNoteMentionHistory')) {
+function journalNoteMentionHistory($reportId, $noteId) {
+        try {
+            $rows = queryViaOci8(
+                "SELECT a.\"BEFORE\" AS B, a.\"AFTER\" AS A FROM NC_REPORTING.PENUMBRA_AUDIT a
+                  WHERE a.ID IN (SELECT ID FROM (SELECT ID FROM NC_REPORTING.PENUMBRA_AUDIT
+                                  WHERE REPORT_ID = :rid AND ACTION = 'JOURNAL_EDIT' AND DBMS_LOB.INSTR(\"AFTER\", :nd) = 1
+                                  ORDER BY \"TIMESTAMP\" DESC, ID DESC) WHERE ROWNUM <= 500)",
+                array(':rid' => (int)$reportId, ':nd' => '{"id":' . (int)$noteId . ','));
+        } catch (Exception $e) {
+            error_log('[PENUMBRA JOURNAL] mention history not read for note ' . (int)$noteId . ': ' . $e->getMessage());
+            return null;
+        }
+        if (!is_array($rows)) return null;
+        $uids = array(); $tags = array();
+        foreach ($rows as $r) {
+            foreach (array('B', 'A') as $side) {
+                $j = json_decode(isset($r[$side]) ? (string)$r[$side] : '', true);
+                if (!is_array($j) || !isset($j['id']) || (int)$j['id'] !== (int)$noteId) continue;
+                if (isset($j['mentions']) && is_string($j['mentions'])) { foreach (journalMentionUids($j['mentions']) as $u) $uids[$u] = true; }
+                if (isset($j['mentions']) && is_array($j['mentions'])) {
+                    foreach ($j['mentions'] as $m) { if (is_array($m) && isset($m['user']) && is_scalar($m['user'])) $uids[strtolower(trim((string)$m['user']))] = true; }
+                }
+                if (isset($j['mt']) && is_array($j['mt'])) { foreach ($j['mt'] as $t) { if (is_string($t)) $tags[$t] = true; } }
+            }
+        }
+        return array('uids' => $uids, 'tags' => $tags);
+    }
+}
+
+if (!function_exists('journalOffSinceScan')) {
+function journalOffSinceScan($reportId) {
+        $needle = '"journalEnabled":true';   // every version is written by PHP's json_encode: no space after the colon
+        // a version's state as a decoded, unencrypted object (the wrappers put 'report' first)
+        $plain = function ($head) {
+            $h = (string)$head;
+            if (strpos($h, '{"report":{"encrypted":true') === 0) return false;
+            return strpos($h, '{"report":{') === 0 || strpos($h, '{"report":[') === 0;
+        };
+        foreach (array(array(0, 12), array(12, JOURNAL_OFF_SINCE_SCAN)) as $win) {
+            $rows = queryViaOci8(
+                "SELECT a.ID, a.ACTION, TO_CHAR(a.\"TIMESTAMP\", 'YYYY-MM-DD HH24:MI:SS') AS AT,
+                        CASE WHEN a.\"BEFORE\" IS NULL THEN -1 WHEN DBMS_LOB.INSTR(a.\"BEFORE\", :n1) > 0 THEN 1 ELSE 0 END AS B_ON,
+                        CASE WHEN a.\"AFTER\" IS NULL THEN -1 WHEN DBMS_LOB.INSTR(a.\"AFTER\", :n2) > 0 THEN 1 ELSE 0 END AS A_ON,
+                        DBMS_LOB.SUBSTR(a.\"BEFORE\", 40, 1) AS B_HEAD, DBMS_LOB.SUBSTR(a.\"AFTER\", 40, 1) AS A_HEAD
+                   FROM NC_REPORTING.PENUMBRA_AUDIT a
+                  WHERE a.ID IN (SELECT ID FROM (SELECT ID, ROWNUM AS RN FROM (SELECT ID FROM NC_REPORTING.PENUMBRA_AUDIT
+                                     WHERE REPORT_ID = :rid AND ACTION IN ('CREATE', 'UPDATE', 'ROLLBACK', 'RESTORE')
+                                     ORDER BY \"TIMESTAMP\" DESC, ID DESC) WHERE ROWNUM <= :hi) WHERE RN > :lo)
+                  ORDER BY a.\"TIMESTAMP\" DESC, a.ID DESC",
+                array(':n1' => $needle, ':n2' => $needle, ':rid' => (int)$reportId, ':hi' => $win[1], ':lo' => $win[0]));
+            if (!is_array($rows)) return null;
+            foreach ($rows as $r) {
+                // off after it, as the live state (or the newer version) is
+                if ((int)$r['A_ON'] !== 0 || !$plain($r['A_HEAD'])) return null;
+                $act = strtoupper(trim((string)$r['ACTION']));
+                if ($act === 'CREATE') return array('off_since' => null, 'never_on' => true);
+                if ($act !== 'UPDATE' && $act !== 'ROLLBACK') return null;   // a RESTORE (a re-insert): what came before it is not here
+                if ((int)$r['B_ON'] === -1 || !$plain($r['B_HEAD'])) return null;
+                if ((int)$r['B_ON'] === 1) return array('off_since' => (string)$r['AT'], 'never_on' => false);
+            }
+            if (count($rows) < $win[1] - $win[0]) return null;   // the whole history read, and no CREATE in it
+        }
+        return null;
+    }
+}
+
+if (!function_exists('journalPublishCounts')) {
+function journalPublishCounts($reportId, $uid) {
+        $out = array('total' => 0, 'since_off' => null, 'off_since' => null, 'never_on' => false);
+        $vis = null;
+        if (journalHasPrivateColumn()) {
+            $rows = array();
+            foreach (array(true, false) as $wp) {   // a table from before threads has no PARENT_ID
+                try {
+                    $rows = queryViaOci8("SELECT ID" . ($wp ? ', PARENT_ID' : '') . ", CREATED_BY, MENTIONS, IS_PRIVATE, TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS') AS CREATED_AT"
+                        . " FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid", array(':rid' => (int)$reportId));
+                    break;
+                } catch (Exception $e) {
+                    if ($wp && stripos($e->getMessage(), 'ORA-00904') !== false) continue;
+                    throw $e;
+                }
+            }
+            $vis = journalVisibleNotes(is_array($rows) ? $rows : array(), $uid);
+            $out['total'] = count($vis);
+        } else {
+            $r = queryViaOci8("SELECT COUNT(*) AS TOTAL FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid", array(':rid' => (int)$reportId));
+            $out['total'] = isset($r[0]['TOTAL']) ? (int)$r[0]['TOTAL'] : 0;
+        }
+        try {
+            $os = journalOffSinceScan($reportId);
+            if (is_array($os) && $os['never_on']) {
+                $out['never_on'] = true; $out['since_off'] = $out['total'];
+            } elseif (is_array($os) && is_string($os['off_since']) && $os['off_since'] !== '') {
+                $n = null;
+                if (is_array($vis)) {
+                    $n = 0;
+                    foreach ($vis as $vn) { if (isset($vn['CREATED_AT']) && strcmp((string)$vn['CREATED_AT'], $os['off_since']) >= 0) $n++; }
+                } else {
+                    $cr = queryViaOci8("SELECT COUNT(*) AS N FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND CREATED_AT >= TO_TIMESTAMP(:os, 'YYYY-MM-DD HH24:MI:SS')",
+                        array(':rid' => (int)$reportId, ':os' => $os['off_since']));
+                    $n = isset($cr[0]['N']) ? (int)$cr[0]['N'] : null;
+                }
+                if ($n !== null) { $out['off_since'] = $os['off_since']; $out['since_off'] = $n; }
+            }
+        } catch (Throwable $e) {
+            error_log('[PENUMBRA JOURNAL] publish gate: off_since read failed: ' . $e->getMessage());
+        }
+        return $out;
     }
 }
 
@@ -316,6 +469,26 @@ function journalFilingLock($reportId, $savedCols) {
     }
 }
 
+if (!function_exists('journalKeyfileEncWrite')) {
+function journalKeyfileEncWrite($reportId, $pageCols) {
+        try {
+            if (!is_array($pageCols)) return;
+            $ps = journalKeySig($pageCols);
+            if ($ps === '' || strlen($ps) > JOURNAL_KEYFILE_MAX_SIG) return;
+            $filed = journalFiledKey($reportId);
+            if ($filed === null || $filed === $ps) return;
+            if (substr($filed, -strlen(JOURNAL_KEYFILE_ENC)) === JOURNAL_KEYFILE_ENC) return;   // marked already
+            $oci = getOci8Connection();
+            journalOciRun($oci, "UPDATE PENUMBRA_JOURNAL_TOGGLE SET ROW_KEY = :mnew WHERE REPORT_ID = :mrid AND TOGGLE_KEY = :mkf AND STATE = "
+                . JOURNAL_KEYFILE_STATE . " AND ROW_KEY = :mold",
+                array(':mnew' => $filed . JOURNAL_KEYFILE_ENC, ':mrid' => (int)$reportId, ':mkf' => JOURNAL_KEYFILE_TK, ':mold' => $filed));
+            oci_commit($oci);
+        } catch (Throwable $e) {
+            error_log('[penumbra] journal key record: the encrypted-write mark failed: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('journalKeyfileInsert')) {
 function journalKeyfileInsert($reportId, $sig) {
         $oci = getOci8Connection();
@@ -371,6 +544,14 @@ function journalRefile($reportId, $fromSig, $toSig) {
                 . " WHERE REPORT_ID = :nrid AND SCOPE = 'row' AND ROW_KEY IS NOT NULL AND SUBSTR(ROW_KEY, 1, 1) <> " . JOURNAL_PARK_OPEN_SQL
                 . " AND LENGTHB(ROW_KEY) <= :nmax",
                 array(':ntag' => $ft, ':nrid' => $rid, ':nmax' => $fmax));
+            // (2026-11-17, rekeyzero) A plain row at STATE 0 - a mark made and cleared under the saved key - gives way to
+            // the filed mark or value coming back onto it: it blocked the give-back below for good, so the mark stayed
+            // filed under the other key and the row read unmarked.
+            journalOciRun($oci, "DELETE FROM PENUMBRA_JOURNAL_TOGGLE Z WHERE Z.REPORT_ID = :zrid AND Z.STATE = 0 AND Z.TOGGLE_KEY <> :zkf"
+                . " AND SUBSTR(Z.ROW_KEY, 1, 1) <> " . JOURNAL_PARK_OPEN_SQL
+                . " AND EXISTS (SELECT 1 FROM PENUMBRA_JOURNAL_TOGGLE T WHERE T.REPORT_ID = :zrid2 AND T.TOGGLE_KEY = Z.TOGGLE_KEY"
+                . " AND T.STATE IN (1, 2) AND T.ROW_KEY = :ztag || Z.ROW_KEY)",   // a mark, a field value - never the filing marker
+                array(':zrid' => $rid, ':zkf' => JOURNAL_KEYFILE_TK, ':zrid2' => $rid, ':ztag' => $tt));
             // Give back: what was filed under the saved key is plain again (a mark the key already
             // holds in that column keeps its place, and the filed one stays filed).
             journalOciRun($oci, "UPDATE PENUMBRA_JOURNAL_TOGGLE T SET ROW_KEY = SUBSTR(T.ROW_KEY, :ufrom)"
@@ -409,6 +590,39 @@ function journalEnsureFiled($reportId, $savedCols, $assumeFrom = null, $fromDb =
                 $filed = journalFiledKey($reportId);
                 if ($filed === null || $filed === $sig) return 'created';
             }
+            // (2026-11-18, encfile) The record is marked: while the report was encrypted, a page wrote under other key columns
+            // than the recorded ones (journalKeyfileEncWrite). Its plain marks and notes are then two keys' - the recorded
+            // key's from before and the encrypted page's - and nothing tells them apart, so NOTHING is filed: they stay
+            // where they are, and the record becomes the key the report is saved with now (the encrypted page's newest
+            // writes read as that key's, as the page showed them). 'held'; audited. A mark whose key did not change is only
+            // taken off.
+            if (is_string($filed) && substr($filed, -strlen(JOURNAL_KEYFILE_ENC)) === JOURNAL_KEYFILE_ENC) {
+                $encBase = (string)substr($filed, 0, -strlen(JOURNAL_KEYFILE_ENC));
+                $oci = getOci8Connection();
+                try {
+                    journalOciRun($oci, "UPDATE PENUMBRA_JOURNAL_TOGGLE SET ROW_KEY = :enew, UPDATED_AT = SYSTIMESTAMP WHERE REPORT_ID = :erid AND TOGGLE_KEY = :ekf AND STATE = "
+                        . JOURNAL_KEYFILE_STATE . " AND ROW_KEY = :eold",
+                        array(':enew' => $sig, ':erid' => (int)$reportId, ':ekf' => JOURNAL_KEYFILE_TK, ':eold' => $filed));
+                    oci_commit($oci);
+                } catch (Exception $e) {
+                    @oci_rollback($oci);
+                    throw $e;
+                }
+                if ($encBase !== $sig) {
+                    $m = 'journal key filing held: the key columns changed while the report was encrypted, so its marks and notes were left as they are (no re-file) and are read as the saved key\'s.';
+                    if (function_exists('log_scheduler')) log_scheduler('  WARNING: ' . $m); else error_log('[penumbra] ' . $m);
+                    if (function_exists('logPenumbraAudit')) {
+                        try {
+                            logPenumbraAudit((int)$reportId, 'JOURNAL_REKEY', null, json_encode(array('held' => true,
+                                'from_cols' => explode("\xE2\x90\x9F", $encBase), 'to_cols' => explode("\xE2\x90\x9F", $sig))),
+                                'Key columns changed while the report was encrypted: its row marks and notes were left as they are (not filed under the old key)');
+                        } catch (Throwable $ae) { }
+                    }
+                }
+                $filed = journalFiledKey($reportId);
+                if ($filed === null) throw new Exception('the key record went missing');
+                if ($encBase !== $sig && $filed === $sig) return 'held';
+            }
             // Another request can move the record between the read and the re-file (2026-10-09): then
             // it is read again, and filed again if it names another key still. This said 'refiled'
             // whatever happened - the marks of whichever key that request filed by read as this one's.
@@ -427,6 +641,80 @@ function journalEnsureFiled($reportId, $savedCols, $assumeFrom = null, $fromDb =
     }
 }
 
+if (!function_exists('journalUnreadCols')) {
+function journalUnreadCols($set = null) {
+        if (is_array($set)) $GLOBALS['penumbra_jt_unread'] = $set;
+        return (isset($GLOBALS['penumbra_jt_unread']) && is_array($GLOBALS['penumbra_jt_unread'])) ? $GLOBALS['penumbra_jt_unread'] : array();
+    }
+}
+
+if (!function_exists('journalUnreadNames')) {
+function journalUnreadNames($vo, $existingCols, $what) {
+        $vo = is_array($vo) ? $vo : array();
+        $have = array();
+        foreach ((array)$existingCols as $c) { $have[journalUpperKey((string)$c)] = true; $have[strtoupper((string)$c)] = true; }
+        $out = array();
+        $add = function ($n) use (&$out, $have) {
+            $n = trim((string)$n);
+            if ($n === '') return;
+            foreach (array(journalUpperKey($n), strtoupper($n)) as $u) { if (!isset($have[$u])) $out[$u] = true; }
+        };
+        $olds = function ($a) { $o = array(); if (is_array($a)) { foreach ($a as $x) { if (is_scalar($x) && trim((string)$x) !== '') $o[] = (string)$x; } } return $o; };
+        $who = !empty($vo['journalToggleWho']);
+        if (in_array('toggles', $what, true)) {
+            $tg = (isset($vo['journalToggles']) && is_array($vo['journalToggles'])) ? $vo['journalToggles'] : array();
+            if (!$tg && !empty($vo['journalToggle'])) $tg = array(is_array($vo['journalToggle']) ? $vo['journalToggle'] : array());
+            foreach ($tg as $t) {
+                $l = (is_array($t) && isset($t['label']) && is_scalar($t['label']) && (string)$t['label'] !== '') ? (string)$t['label'] : 'Done';
+                foreach (array_merge(array($l), $olds(is_array($t) && isset($t['oldLabels']) ? $t['oldLabels'] : null)) as $n) {
+                    $add($n);
+                    if ($who) { $add($n . ' BY'); $add($n . ' ON'); }
+                }
+            }
+        }
+        if (in_array('fields', $what, true) && isset($vo['journalFields']) && is_array($vo['journalFields'])) {
+            foreach ($vo['journalFields'] as $fd) {
+                if (!is_array($fd) || !isset($fd['type']) || ($fd['type'] !== 'pick' && $fd['type'] !== 'date')) continue;
+                $isDate = ($fd['type'] === 'date');
+                $l = (isset($fd['label']) && is_scalar($fd['label']) && trim((string)$fd['label']) !== '') ? (string)$fd['label'] : ($isDate ? 'Due' : 'Status');
+                foreach (array_merge(array($l), $olds(isset($fd['oldLabels']) ? $fd['oldLabels'] : null)) as $n) {
+                    $add($n);
+                    if ($who) { $add($n . ($isDate ? ' SET BY' : ' BY')); $add($n . ($isDate ? ' SET ON' : ' ON')); }
+                }
+            }
+        }
+        if (in_array('notes', $what, true) && !empty($vo['journalRowNotes'])) $add('Notes');
+        return $out;
+    }
+}
+
+if (!function_exists('journalUnreadTree')) {
+function journalUnreadTree($tree, $unread) {
+        if (!is_array($tree) || !$unread) return $tree;
+        foreach ($tree as $k => $node) {
+            if (!is_array($node) || !isset($node['type'])) continue;
+            if ($node['type'] === 'group' && isset($node['parts']) && is_array($node['parts'])) { $tree[$k]['parts'] = journalUnreadTree($node['parts'], $unread); continue; }
+            if ($node['type'] !== 'condition' || !isset($node['column'])) continue;
+            $u = strtoupper(trim((string)preg_replace('/^\{\s*[\'"]?|[\'"]?\s*\}$/', '', (string)$node['column'])));
+            if (!isset($unread[$u])) continue;
+            journalUnreadWarn($u);
+            // "0 = 1": false in both engines, whatever the condition's operator was
+            $tree[$k] = array('type' => 'literal', 'leftValue' => '0', 'op' => '=', 'value' => '1', 'journalUnread' => $u);
+        }
+        return $tree;
+    }
+}
+
+if (!function_exists('journalUnreadWarn')) {
+function journalUnreadWarn($u) {
+        if (!isset($GLOBALS['penumbra_run_journal_warnings']) || !is_array($GLOBALS['penumbra_run_journal_warnings'])) $GLOBALS['penumbra_run_journal_warnings'] = array();
+        if (isset($GLOBALS['penumbra_run_journal_warnings'][$u])) return;
+        $m = 'the journal column ' . $u . ' could not be read this run, so the condition on it matched no row';
+        $GLOBALS['penumbra_run_journal_warnings'][$u] = $m;
+        if (function_exists('log_scheduler')) log_scheduler('  WARNING: ' . $m . '.');
+    }
+}
+
 if (!function_exists('journalExportToggleResolver')) {
 function journalExportToggleResolver($shortId, $state, $existingCols = array()) {
         if (!is_array($state)) return null;
@@ -434,7 +722,13 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         // Off unless the scheduler sets $GLOBALS['penumbra_jt_resolver_memo'] (an array) around that call.
         $memoOn = isset($GLOBALS['penumbra_jt_resolver_memo']) && is_array($GLOBALS['penumbra_jt_resolver_memo']);
         $memoKey = $memoOn ? (string)$shortId . '|' . md5(serialize(array(isset($state['viewOptions']) ? $state['viewOptions'] : null, array_values((array)$existingCols)))) : '';
+        // (2026-11-18, failclosed) the columns THIS call cannot read (journalUnreadCols): none yet - a remembered resolver's own
+        if (function_exists('journalUnreadCols')) {
+            journalUnreadCols(($memoOn && isset($GLOBALS['penumbra_jt_unread_memo'][$memoKey]) && is_array($GLOBALS['penumbra_jt_unread_memo'][$memoKey]))
+                ? $GLOBALS['penumbra_jt_unread_memo'][$memoKey] : array());
+        }
         if ($memoOn && isset($GLOBALS['penumbra_jt_resolver_memo'][$memoKey])) return $GLOBALS['penumbra_jt_resolver_memo'][$memoKey];
+        if (function_exists('journalUnreadCols')) journalUnreadCols(array());   // not remembered: this call's own
 
         $vo = (isset($state['viewOptions']) && is_array($state['viewOptions'])) ? $state['viewOptions'] : array();
         if (empty($vo['journalEnabled'])) return null;
@@ -535,6 +829,7 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
             }
             if ($missingKey) {
                 $m = 'journal toggles not read - the key column(s) ' . implode(', ', $missingKey) . ' are not in this data.';
+                if (function_exists('journalUnreadCols')) journalUnreadCols(journalUnreadNames($vo, $existingCols, array('toggles', 'fields', 'notes')));   // (failclosed)
                 if (function_exists('log_scheduler')) log_scheduler('  WARNING: ' . $m); else error_log('[penumbra] ' . $m);
                 return null;
             }
@@ -554,6 +849,7 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
             } else {
                 error_log('[penumbra] journal toggle lookup failed: ' . $e->getMessage());
             }
+            if (function_exists('journalUnreadCols')) journalUnreadCols(journalUnreadNames($vo, $existingCols, array('toggles', 'fields', 'notes')));   // (failclosed)
             return null;
         }
         if (empty($r) || !isset($r[0]['ID'])) return null;
@@ -567,6 +863,7 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         if ($filing === 'stale' && function_exists('log_scheduler')) {
             log_scheduler('  WARNING: journal toggles not read this run - the report has been saved with other key columns since the run read it.');
         }
+        if (($filing === 'error' || $filing === 'stale') && function_exists('journalUnreadCols')) journalUnreadCols(journalUnreadNames($vo, $existingCols, array('toggles', 'fields', 'notes')));   // (failclosed)
         if ($filing === 'error' || $filing === 'stale') return null;
 
         // Only checked rows are stored (STATE=1); presence == checked. The who and when
@@ -589,6 +886,7 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
             } else {
                 error_log('[penumbra] journal toggle lookup failed: ' . $e->getMessage());
             }
+            if (function_exists('journalUnreadCols')) journalUnreadCols(journalUnreadNames($vo, $existingCols, array('toggles', 'fields', 'notes')));   // (failclosed)
             return null;
         } // e.g. tables not installed
         $stateMap = array(); // toggle_key => { row_key => true }
@@ -622,6 +920,7 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                     ? 'journal pick lists not read - the toggle table has no FIELD_VALUE column; their columns are left out this run.'
                     : 'journal pick lists not read - their columns are left out this run. ' . $e->getMessage();
                 if (function_exists('log_scheduler')) log_scheduler('  WARNING: ' . $m); else error_log('[penumbra] ' . $m);
+                if (function_exists('journalUnreadCols')) journalUnreadCols(journalUnreadCols() + journalUnreadNames($vo, $existingCols, array('fields')));   // (failclosed)
             }
             if (!is_array($fr)) $fieldDefs = array();
             else foreach ($fr as $frow) {
@@ -692,6 +991,7 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         // the labels now ('cur') and the old ones ('old' => the label now), all upper-cased as the page reads them.
         $fieldNames = array();
         $fieldOpts = array();
+        $fieldDates = array();   // (2026-11-18, daysort) a date column's output name => true
         foreach ($fieldDefs as $fd) {
             $fk = $fd['key'];
             $name = journalUpperKey($fd['label']);
@@ -717,6 +1017,7 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                     $outByKey[$fk][$fkind] = $fwn;
                 }
             }
+            if ($fIsDate) $fieldDates[$name] = true;
             if ($fIsDate) continue;   // no options: its order is the days' own (natural text order, chronological for ISO)
             $fLive = array(); $fRet = array(); $fCur = array(); $fOldMap = array();
             foreach ($fd['options'] as $fo) {
@@ -740,13 +1041,21 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
             // scheduled email, task filters, search - for everyone, their audience included: one email body
             // goes to every recipient, and this resolver's memo is shared across a task's recipients.
             $privCol = function_exists('journalHasPrivateColumn') && journalHasPrivateColumn();
+            // (2026-11-18, thrdpriv) ...a WHOLE private thread: the page reads a thread as private when any of its notes is
+            // (journalVisibleNotes), and this read left out the flagged notes only - a public reply in a private thread
+            // (a flag changed under it, a mixed thread) went out in exports, the API, scheduled email and search. The
+            // thread's notes all share its row key, so they are all in this read: the SQL asks for threads with no flagged
+            // note, and the rule itself runs over the rows read (journalVisibleNotes, as nobody: no private thread).
+            $privThreadSql = "AND NOT EXISTS (SELECT 1 FROM PENUMBRA_JOURNAL p WHERE p.REPORT_ID = j.REPORT_ID AND p.IS_PRIVATE <> 0"
+                           . " AND (p.ID = NVL(NULLIF(j.PARENT_ID, 0), j.ID) OR p.PARENT_ID = NVL(NULLIF(j.PARENT_ID, 0), j.ID)))";
             foreach (array(true, false) as $withParent) {   // a table from before threads or attachments has no PARENT_ID / ATTACH_NAME
                 try {
                     $nr = queryViaOci8(
                         "SELECT ID, ROW_KEY, NOTE_TEXT, CREATED_BY, AUTHOR_NAME" . ($withParent ? ', PARENT_ID, ATTACH_NAME' : '') . ($privCol ? ', IS_PRIVATE' : '') . ",
                                 TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS') AS CREATED_AT
-                           FROM PENUMBRA_JOURNAL
+                           FROM PENUMBRA_JOURNAL j
                           WHERE REPORT_ID = :rid AND SCOPE = 'row' AND ROW_KEY IS NOT NULL" . ($privCol ? " AND NVL(IS_PRIVATE, 0) = 0" : '') . "
+                          " . (($privCol && $withParent) ? $privThreadSql : '') . "
                           ORDER BY CREATED_AT ASC, ID ASC",
                         array(':rid' => $reportId));
                     break;
@@ -755,9 +1064,11 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                     if ($withParent && stripos($e->getMessage(), 'ORA-00904') !== false) continue;
                     $m = 'journal row notes not read - the Notes column is left out this run. ' . $e->getMessage();
                     if (function_exists('log_scheduler')) log_scheduler('  WARNING: ' . $m); else error_log('[penumbra] ' . $m);
+                    if (function_exists('journalUnreadCols')) journalUnreadCols(journalUnreadCols() + journalUnreadNames($vo, $existingCols, array('notes')));   // (failclosed)
                     break;
                 }
             }
+            if (is_array($nr) && $privCol && function_exists('journalVisibleNotes')) $nr = journalVisibleNotes($nr, '');   // (thrdpriv)
             if (is_array($nr)) {
                 $byKey = array();
                 foreach ($nr as $n) {
@@ -766,9 +1077,9 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                     if ($rk === '' || (defined('JOURNAL_PARK_OPEN') && strpos($rk, JOURNAL_PARK_OPEN) === 0)) continue;   // filed under another key
                     $byKey[$rk][] = $n;
                 }
-                foreach ($byKey as $rk => $list) { $notesMap[(string)$rk] = journalNotesFlatten($list); $notesCount[(string)$rk] = count($list); }
+                foreach ($byKey as $rk => $list) { $notesMap[(string)$rk] = journalNoteCellSafe(journalNotesFlatten($list)); $notesCount[(string)$rk] = count($list); }   // (notemark)
                 // A Shared note (2026-11-01, sharednote): the row's note as its own text, as the page reads it.
-                if (isset($vo['journalNotesMode']) && $vo['journalNotesMode'] === 'shared') { foreach ($byKey as $rk => $list) $notesMap[(string)$rk] = journalSharedNoteText($list); }
+                if (isset($vo['journalNotesMode']) && $vo['journalNotesMode'] === 'shared') { foreach ($byKey as $rk => $list) $notesMap[(string)$rk] = journalNoteCellSafe(journalSharedNoteText($list)); }   // (notemark)
                 $notesSearch = 'NOTES'; $nn = 2;
                 while (isset($existing[$notesSearch])) { $notesSearch = 'NOTES_' . $nn; $nn++; }
                 $existing[$notesSearch] = true;
@@ -873,6 +1184,12 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         // labels (penumbra_search.php) and the list's sort order (journalExportFieldSortOrders) read them.
         $built['fieldNames'] = $fieldNames;
         $built['fieldOpts'] = $fieldOpts;
+        // (2026-11-18, daysort) ...and the date columns' names: the scheduled sort orders their days as the page does,
+        // a value that is not a day after the days (schedule_runner.php penumbra_sched_sort_rows).
+        $built['fieldDates'] = $fieldDates;
+        // (2026-11-18, failclosed) the pick lists' or notes' names this call could not read: a memo hit sets them again
+        $built['unread'] = function_exists('journalUnreadCols') ? journalUnreadCols() : array();
+        if ($memoOn) $GLOBALS['penumbra_jt_unread_memo'][$memoKey] = $built['unread'];
         if ($memoOn) $GLOBALS['penumbra_jt_resolver_memo'][$memoKey] = $built;
         return $built;
     }
@@ -911,6 +1228,15 @@ function journalExportToggleRowValues($resolver, $row, $withWho = true) {
         $out = array();
         if (!$resolver || !is_array($resolver) || !is_array($row)) return $out;
         $rk = journalExportRowKey($resolver, $row);
+        // (2026-11-17, dupkeys) A key more than one row of this output shares (journalExportToggleColumns counts them): its
+        // marks, values and notes belong to no one row. The page hides the columns then ("N rows share a key"); the API
+        // and the scheduled output marked every such row alike. Such a row reads blank here.
+        if (!empty($resolver['dupKeys']) && isset($resolver['dupKeys'][$rk])) {
+            foreach ($resolver['colMeta'] as $cm) $out[$cm['name']] = '';
+            if ($withWho && !empty($resolver['whoMeta'])) { foreach ($resolver['whoMeta'] as $wm) $out[$wm['name']] = ''; }
+            if ($withWho && !empty($resolver['notesName'])) $out[$resolver['notesName']] = '';
+            return $out;
+        }
         foreach ($resolver['colMeta'] as $cm) {
             $on = isset($resolver['stateMap'][$cm['key']]) && isset($resolver['stateMap'][$cm['key']][$rk]);
             $out[$cm['name']] = $on ? '1' : '0';
@@ -979,6 +1305,114 @@ function journalDecorateRowsWithToggles($rows, $apiResult) {
             if (!is_array($r)) continue;
             foreach (journalExportToggleRowValues($jt, $r, false) as $n => $v) $rows[$i][$n] = $v;
         }
+        // (2026-11-18, chgfields) ...and the pick-list and date columns the running task names in its change columns
+        return function_exists('journalAddNamedFields') ? journalAddNamedFields($rows, $apiResult) : $rows;
+    }
+}
+
+if (!function_exists('journalTaskChangeCols')) {
+function journalTaskChangeCols($set = false) {
+        static $cols = null;
+        if ($set !== false) $cols = is_array($set) ? $set : null;
+        return $cols;
+    }
+}
+
+if (!function_exists('journalWatchedColOf')) {
+function journalWatchedColOf($name, $resolver) {
+        if (!is_array($resolver)) return null;
+        $s = trim((string)$name);
+        if ($s === '') return null;
+        $to = function_exists('journalExportCanonicalCol') ? journalExportCanonicalCol($s, $resolver) : null;
+        $u = journalUpperKey($to !== null ? $to : $s);
+        if (!empty($resolver['whoMeta']) && is_array($resolver['whoMeta'])) {
+            foreach ($resolver['whoMeta'] as $wm) {
+                if (!is_array($wm) || !isset($wm['kind'], $wm['name'], $wm['key']) || $wm['kind'] === 'field') continue;
+                if (journalUpperKey((string)$wm['name']) !== $u) continue;
+                foreach ($resolver['whoMeta'] as $fm) {   // a pick list's or a date column's who / when: the field
+                    if (is_array($fm) && isset($fm['kind'], $fm['key'], $fm['name']) && $fm['kind'] === 'field' && (string)$fm['key'] === (string)$wm['key']) return journalUpperKey((string)$fm['name']);
+                }
+                if (!empty($resolver['colMeta'])) {
+                    foreach ($resolver['colMeta'] as $cm) { if ((string)$cm['key'] === (string)$wm['key']) return journalUpperKey((string)$cm['name']); }
+                }
+            }
+        }
+        return $u;
+    }
+}
+
+if (!function_exists('journalNamedToggleCols')) {
+function journalNamedToggleCols($resolver, $cols) {
+        $out = array();
+        if (!is_array($resolver) || !is_array($cols) || empty($resolver['colMeta']) || !is_array($resolver['colMeta'])) return $out;
+        $tg = array();
+        foreach ($resolver['colMeta'] as $cm) { if (is_array($cm) && isset($cm['name'], $cm['key'])) $tg[journalUpperKey((string)$cm['name'])] = $cm; }
+        $want = array(); $skip = array();
+        foreach ($cols as $c) {
+            if (!is_scalar($c)) continue;
+            $s = trim((string)$c);
+            $ign = ($s !== '' && $s[0] === '!');
+            if ($ign) $s = ltrim(substr($s, 1));
+            $u = journalWatchedColOf($s, $resolver);
+            if ($u === null || !isset($tg[$u])) continue;
+            if ($ign) $skip[$u] = true; else $want[$u] = true;
+        }
+        foreach ($want as $u => $t) { if (!isset($skip[$u])) $out[(string)$tg[$u]['name']] = (string)$tg[$u]['key']; }
+        return $out;
+    }
+}
+
+if (!function_exists('journalNamedFieldCols')) {
+function journalNamedFieldCols($resolver, $cols) {
+        $out = array();
+        if (!is_array($resolver) || !is_array($cols) || empty($resolver['whoMeta']) || !is_array($resolver['whoMeta'])) return $out;
+        $fields = array();
+        foreach ($resolver['whoMeta'] as $wm) {
+            if (is_array($wm) && isset($wm['kind'], $wm['name'], $wm['key']) && $wm['kind'] === 'field') $fields[journalUpperKey((string)$wm['name'])] = $wm;
+        }
+        if (!$fields) return $out;
+        $want = array(); $skip = array();
+        foreach ($cols as $c) {
+            if (!is_scalar($c)) continue;
+            $s = trim((string)$c);
+            $ign = ($s !== '' && $s[0] === '!');
+            if ($ign) $s = ltrim(substr($s, 1));
+            if ($s === '') continue;
+            $to = function_exists('journalExportCanonicalCol') ? journalExportCanonicalCol($s, $resolver) : null;
+            $u = journalUpperKey($to !== null ? $to : $s);
+            if (!isset($fields[$u]) && function_exists('journalWatchedColOf')) $u = (string)journalWatchedColOf($s, $resolver);   // (chgtoggle) "STATUS BY" = STATUS
+            if (!isset($fields[$u])) continue;
+            if ($ign) $skip[$u] = true; else $want[$u] = true;
+        }
+        foreach ($want as $u => $t) {
+            if (!isset($skip[$u])) $out[(string)$fields[$u]['name']] = (string)$fields[$u]['key'];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('journalAddNamedFields')) {
+function journalAddNamedFields($rows, $from) {
+        $res = (is_array($from) && isset($from['journalToggleResolver'])) ? $from['journalToggleResolver'] : $from;
+        if (!is_array($rows) || !$rows || !is_array($res)) return $rows;
+        $named = journalNamedFieldCols($res, journalTaskChangeCols());
+        // (2026-11-18, chgtoggle) ...and the toggle columns it names: a watched toggle the saved layout hides was in no row a
+        // signature read (the processed rows lost it, the unprocessed ones never carry one), so "Skip if no changes"
+        // skipped every run whatever was ticked. '1' / '0' as the output has them ('' for a key rows share).
+        $namedT = function_exists('journalNamedToggleCols') ? journalNamedToggleCols($res, journalTaskChangeCols()) : array();
+        if (!$named && !$namedT) return $rows;
+        foreach ($rows as $i => $r) {
+            if (!is_array($r)) continue;
+            $rk = journalExportRowKey($res, $r);
+            $dup = !empty($res['dupKeys']) && isset($res['dupKeys'][$rk]);
+            foreach ($named as $name => $fk) {
+                $w = (!$dup && isset($res['whoMap'][$fk]) && isset($res['whoMap'][$fk][$rk])) ? $res['whoMap'][$fk][$rk] : null;
+                $rows[$i][$name] = ($w && isset($w['field'])) ? (string)$w['field'] : '';
+            }
+            foreach ($namedT as $name => $tk) {
+                $rows[$i][$name] = $dup ? '' : ((isset($res['stateMap'][$tk]) && isset($res['stateMap'][$tk][$rk])) ? '1' : '0');
+            }
+        }
         return $rows;
     }
 }
@@ -991,6 +1425,10 @@ function journalStripWhoCols($rows, $from) {
         if (!empty($res['whoNames']) && is_array($res['whoNames'])) { foreach ($res['whoNames'] as $n) $drop[strtoupper((string)$n)] = true; }
         // The Notes column too (2026-10-14): a new note is not a change in the data.
         if (!empty($res['notesName'])) $drop[strtoupper((string)$res['notesName'])] = true;
+        // (2026-11-18, chgfields) ...but a pick-list or date column the running task names in its change columns stays
+        if (function_exists('journalNamedFieldCols') && function_exists('journalTaskChangeCols')) {
+            foreach (journalNamedFieldCols($res, journalTaskChangeCols()) as $kn => $kk) unset($drop[strtoupper((string)$kn)]);
+        }
         if (!$drop) return $rows;
         $strip = function ($row) use ($drop) {
             if (!is_array($row)) return $row;
@@ -1090,6 +1528,60 @@ function journalExportFieldSortOrders($customSortOrders, $resolver) {
     }
 }
 
+if (!function_exists('journalExportFieldOrderCmp')) {
+function journalExportFieldOrderCmp($customSortOrders, $resolver, $name) {
+        if (!is_array($resolver) || empty($resolver['fieldOpts']) || !is_array($resolver['fieldOpts']) || $name === null || (string)$name === '') return null;
+        $want = strtoupper((string)$name);
+        $pick = false;
+        foreach ($resolver['fieldOpts'] as $fn => $fo) { if (strtoupper((string)$fn) === $want) { $pick = true; break; } }
+        if (!$pick) return null;
+        $entry = null;
+        foreach (journalExportFieldSortOrders($customSortOrders, $resolver) as $k => $e) { if (strtoupper((string)$k) === $want) { $entry = $e; break; } }
+        if (!is_array($entry) || empty($entry['values']) || !is_array($entry['values'])) return null;
+        $values = array_values($entry['values']);
+        $orderMap = array();
+        foreach ($values as $i => $v) { $k = strtolower(trim((string)$v)); if (!isset($orderMap[$k])) $orderMap[$k] = $i; }   // first one wins
+        $maxIndex = count($values);
+        return function ($a, $b) use ($orderMap, $maxIndex) {
+            $al = strtolower(trim((string)$a)); $bl = strtolower(trim((string)$b));
+            $ai = isset($orderMap[$al]) ? $orderMap[$al] : $maxIndex;
+            $bi = isset($orderMap[$bl]) ? $orderMap[$bl] : $maxIndex;
+            if ($ai !== $bi) return ($ai < $bi) ? -1 : 1;
+            if ($ai === $maxIndex) return strnatcasecmp((string)$a, (string)$b);
+            return 0;
+        };
+    }
+}
+
+if (!function_exists('journalExportDupKeys')) {
+function journalExportDupKeys($resolver, $rows) {
+        $seenK = array(); $dupK = array();
+        if (!is_array($resolver) || empty($resolver['keyUpper']) || !is_array($rows)) return $dupK;
+        foreach ($rows as $r0) {
+            if (!is_array($r0)) continue;
+            $k0 = journalExportRowKey($resolver, $r0);
+            if (str_replace("\xE2\x90\x9F", '', $k0) === '') continue;
+            if (isset($seenK[$k0])) $dupK[$k0] = true; else $seenK[$k0] = true;
+        }
+        return $dupK;
+    }
+}
+
+if (!function_exists('journalExportInternalNameMap')) {
+function journalExportInternalNameMap($resolver) {
+        $map = array();
+        if (!is_array($resolver)) return $map;
+        if (!empty($resolver['colMeta'])) foreach ($resolver['colMeta'] as $cm) $map[strtoupper('__JOURNAL_TOGGLE__' . $cm['key'])] = (string)$cm['name'];
+        if (!empty($resolver['whoMeta'])) {
+            foreach ($resolver['whoMeta'] as $wm) {
+                $map[strtoupper(($wm['kind'] === 'field' ? '__JOURNAL_FIELD__' : ($wm['kind'] === 'by' ? '__JOURNAL_BY__' : '__JOURNAL_ON__')) . $wm['key'])] = (string)$wm['name'];
+            }
+        }
+        if (!empty($resolver['notesName'])) $map['__JOURNAL_NOTES'] = (string)$resolver['notesName'];
+        return $map;
+    }
+}
+
 if (!function_exists('journalExportToggleColumns')) {
 function journalExportToggleColumns($shortId, $state, &$rows) {
         // whoNames (2026-10-08): the who and when columns appended too - kept through a
@@ -1105,6 +1597,9 @@ function journalExportToggleColumns($shortId, $state, &$rows) {
         // The Notes column (2026-10-14) rides with the who / when columns: kept at the end through
         // a reorder or a re-filter, and stripped from a DB dump - the callers' lists are these.
         if (!empty($resolver['notesName'])) $out['whoNames'][] = $resolver['notesName'];
+        // (2026-11-17, dupkeys) The keys more than one row of the output shares: journalExportToggleRowValues reads them blank.
+        // (2026-11-18, pvdupkeys) Counted by journalExportDupKeys, which the scheduled pivot's resolver shares.
+        $resolver['dupKeys'] = journalExportDupKeys($resolver, $rows);
         $out['resolver'] = $resolver;
 
         foreach ($rows as &$row) {

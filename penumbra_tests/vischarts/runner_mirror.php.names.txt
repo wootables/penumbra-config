@@ -21,6 +21,7 @@ _sfe_resolve_recipients
 send_scheduler_failure_email
 handle_missing_report_task
 send_scheduler_success_email
+_sr_task_answers_shown
 process_scheduler_prompts
 render_json_as_html
 repair_truncated_json
@@ -29,6 +30,7 @@ formatCellContent
 formatCellContentPdf
 _renderJsonForPdf
 _renderHtmlTableForPdf
+_email_nested_number
 render_json_table_php
 penumbra_custom_sort_entry
 get_custom_sort_comparator
@@ -131,6 +133,10 @@ penumbra_email_footer_formats
 penumbra_num_text
 penumbra_sched_sort_rows
 apply_state_logic
+penumbra_nest_holders
+penumbra_nest_hidden_reset
+penumbra_nest_hidden_add
+penumbra_nest_hidden_rows
 _cf_group_rows
 _cf_sort_groups
 _cf_sort_group_tree
@@ -282,6 +288,9 @@ _cf_is_numeric_str
 _cf_parse_date
 _cf_date_floor
 _cf_test_condition
+_cf_row_virtual_cols
+_cf_with_nested_names
+_cf_group_agg_key
 evaluate_format_condition
 cf_agg_fn_names
 evaluate_aggregate_condition_php
@@ -292,6 +301,7 @@ parse_rewrite_rules
 prepare_rewrite_rules
 apply_rewrite_to_row
 _snippet_detect_virtual_columns
+_snippet_cond_col_side
 _snippet_expand_virtual_rows
 _snippet_set_expanded_columns
 _snippet_journal_toggles
@@ -397,6 +407,11 @@ _sr_report_last_access_map
 _sr_unity_is_admin
 _snippet_me
 _snippet_data
+_snippet_esc_html
+_snippet_in_engine_call
+_snippet_esc_reader_result
+_snippet_in_raw_element
+_snippet_esc_sweep
 _snippet_info
 _snippet_restore_info_blocks
 penumbra_register_param_pairs
@@ -427,6 +442,7 @@ _xlsx_number_shape
 _xlsx_try_numeric
 _xlsx_html_to_text
 _xlsx_format_json
+_xlsx_cell_cap
 _xlsx_cut_chars
 _xlsx_lower
 _xlsx_col_letter
@@ -435,11 +451,15 @@ apply_search_filter_via_raw
 _cf_resolve_filter_recipient_vars
 _sr_sql_token_sub
 _sr_sql_token_sub_bare
+_sr_sql_token_sub_ident
+_sr_sql_token_sub_inner
 _sr_substitute_recipient_vars_sql
 _sr_substitute_me_map_sql
 _cf_apply_group_summary_filter
 lookup_recipient_coi_details
 db_dump_clean_value
+db_dump_clean_nested
+db_dump_cut_nested
 db_dump_type_from_meta
 db_dump_ddl_type_families
 db_dump_ddl_says_character
@@ -469,8 +489,11 @@ penumbra_task_last_signature
 penumbra_fetch_latest_scheduler_snapshot
 penumbra_dbdump_dest_gone
 penumbra_first_run_baseline_unchanged
+penumbra_diff_xlsx_note
 penumbra_diff_plain_cell
 penumbra_diff_normalize_cell
+penumbra_nested_canon
+penumbra_nested_same_rows
 penumbra_compute_snapshot_diff
 penumbra_diff_counts_text
 penumbra_snaps_pin_supported

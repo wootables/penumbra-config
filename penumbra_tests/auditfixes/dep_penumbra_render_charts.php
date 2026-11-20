@@ -1,5 +1,18 @@
 <?php
 // AUTO-EXTRACTED from penumbra_render_charts.php - do not edit.
+if (!function_exists('penumbra_vis_task_reset')) {
+function penumbra_vis_task_reset() {
+    $GLOBALS['penumbra_vis_render_count'] = 0;
+    $GLOBALS['penumbra_vis_memo'] = array();
+}
+}
+
+if (!function_exists('penumbra_vis_webroot')) {
+function penumbra_vis_webroot() {
+    return isset($GLOBALS['PENUMBRA_VIS_WEBROOT_OVERRIDE']) ? $GLOBALS['PENUMBRA_VIS_WEBROOT_OVERRIDE'] : dirname(__FILE__);
+}
+}
+
 if (!function_exists('penumbra_vis_log')) {
 function penumbra_vis_log($msg) {
     if (function_exists('log_scheduler')) { log_scheduler('  ' . $msg); }
@@ -180,6 +193,348 @@ function penumbra_vis_chart_links($calls, $images, $reportMeta) {
 }
 }
 
+if (!function_exists('penumbra_vis_hidden_tokens')) {
+function penumbra_vis_hidden_tokens($text) {
+    $out = array();
+    $text = (string)$text;
+    if (strpos($text, '__PENUMBRA_VISIMG_') === false) return $out;
+    if (!preg_match_all('/(?<![A-Za-z0-9_])(?:action|chain|slide|layout_switch|toggle_switch|filter_strip)\(/i', $text, $m, PREG_OFFSET_CAPTURE)) return $out;
+    foreach ($m[0] as $hit) {
+        $open = $hit[1] + strlen($hit[0]) - 1;
+        $end = penumbra_vis_call_end($text, $open);
+        if ($end < 0) continue;
+        if (preg_match_all('/__PENUMBRA_VISIMG_[A-Z]+__/', substr($text, $open, $end - $open), $tm)) {
+            foreach ($tm[0] as $t) $out[$t] = true;
+        }
+    }
+    return $out;
+}
+}
+
+if (!function_exists('penumbra_vis_literal')) {
+function penumbra_vis_literal($v) {
+    $v = str_replace('`', '', (string)$v);
+    return preg_match('/[\'",()\\\\\r\n]/', $v) ? '`' . $v . '`' : $v;
+}
+}
+
+if (!function_exists('penumbra_vis_page_call')) {
+function penumbra_vis_page_call($call, $reportMeta) {
+    $call = (string)$call;
+    $bt = (is_array($reportMeta) && isset($reportMeta['visBackticks']) && is_array($reportMeta['visBackticks'])) ? $reportMeta['visBackticks'] : array();
+    $resolve = (is_array($reportMeta) && isset($reportMeta['visResolve']) && is_callable($reportMeta['visResolve'])) ? $reportMeta['visResolve'] : null;
+    $recip = (is_array($reportMeta) && isset($reportMeta['visRecipient']) && is_callable($reportMeta['visRecipient'])) ? $reportMeta['visRecipient'] : null;
+    $head = strpos($call, '(');
+    if ($resolve !== null && $head !== false && preg_match_all('/(?<![A-Za-z0-9_])(data|me)\(/i', $call, $mm, PREG_OFFSET_CAPTURE, $head + 1)) {
+        $out = '';
+        $pos = 0;
+        foreach ($mm[0] as $k => $hit) {
+            $at = $hit[1];
+            if ($at < $pos) continue;                              // inside a call already answered
+            $fn = strtolower($mm[1][$k][0]);
+            if ($fn === 'me' && $recip === null) continue;         // no reader here: as before
+            $open = $at + strlen($hit[0]) - 1;
+            $end = penumbra_vis_call_end($call, $open);
+            if ($end < 0) continue;
+            $args = substr($call, $open + 1, $end - $open - 1);
+            if ($bt) $args = strtr($args, $bt);                    // the engine reads its arguments with backtick text restored
+            $v = call_user_func($resolve, $fn, $args);
+            if ($v === null) continue;
+            $v = str_replace("\x02", '', (string)$v);              // data(promptN)'s number-pass guard
+            if ($recip !== null) $v = (string)call_user_func($recip, $v);
+            $out .= substr($call, $pos, $at - $pos) . penumbra_vis_literal($v);
+            $pos = $end + 1;
+        }
+        $call = $out . substr($call, $pos);
+    }
+    if ($recip !== null && strpos($call, '{') !== false) {
+        $call = preg_replace_callback('/\{[A-Za-z0-9_]+\}/', function ($m) use ($recip) {
+            $v = (string)call_user_func($recip, $m[0]);
+            return $v === $m[0] ? $m[0] : penumbra_vis_literal($v);
+        }, $call);
+    }
+    if ($bt && strpos($call, '__PSTR_') !== false) {
+        $call = preg_replace_callback('/__PSTR_\d+__/', function ($m) use ($bt, $recip) {
+            if (!array_key_exists($m[0], $bt)) return $m[0];
+            $v = (string)$bt[$m[0]];
+            if ($recip !== null && strpos($v, '{') !== false) $v = (string)call_user_func($recip, $v);
+            return '`' . str_replace('`', '', $v) . '`';
+        }, $call);
+    }
+    return $call;
+}
+}
+
+if (!function_exists('penumbra_vis_column_names')) {
+function penumbra_vis_column_names($data, $columns) {
+    $cols = array();
+    foreach ((array)$columns as $c) { $cols[] = (string)$c; }
+    if (!$cols && is_array($data) && $data) {
+        $first = reset($data);
+        if (is_array($first)) foreach (array_keys($first) as $k) { $k = (string)$k; if ($k !== '' && $k[0] !== "\0") $cols[] = $k; }
+    }
+    return $cols;
+}
+}
+
+if (!function_exists('penumbra_vis_used_columns')) {
+function penumbra_vis_used_columns($calls, $data, $allCols) {
+    if (!$allCols) return $allCols;
+    $hay = strtoupper(implode("\n", (array)$calls));
+    $keep = array();
+    $rest = array();
+    foreach ($allCols as $i => $c) {
+        $u = strtoupper((string)$c);
+        if ($u !== '' && strpos($hay, $u) !== false) $keep[$i] = true; else $rest[$i] = (string)$c;
+    }
+    if (!$rest) return $allCols;
+    if (is_array($data)) {
+        $seen = 0;
+        $nested = false;
+        foreach ($data as $row) {
+            if (++$seen > 200 || !$rest) break;
+            if (!is_array($row)) continue;
+            foreach ($rest as $i => $c) {
+                if (isset($row[$c]) && is_string($row[$c]) && strpos($row[$c], '@@JSON') !== false) { $keep[$i] = true; unset($rest[$i]); $nested = true; }
+            }
+        }
+        // (Q4-1) none in the first 200 rows: the browser reads on (to 5,000 rows) and stops at the first row that
+        // holds a nested table, so this does too - one implode + strpos per row, the cells looked at only on that row.
+        // Only when a call names something that is not a report column (a possible sub-column): else nothing to find.
+        if ($rest && !$nested && count($data) > 200 && penumbra_vis_names_unknown_column($calls, $allCols)) {
+            $seen = 0;
+            foreach ($data as $row) {
+                if (++$seen <= 200) continue;
+                if ($seen > 5000) break;
+                if (!is_array($row) || strpos(implode("\x01", $row), '@@JSON') === false) continue;
+                foreach ($rest as $i => $c) {
+                    if (isset($row[$c]) && is_string($row[$c]) && strpos($row[$c], '@@JSON') !== false) { $keep[$i] = true; unset($rest[$i]); }
+                }
+                break;
+            }
+        }
+    }
+    if (!$keep) return $allCols;
+    $out = array();
+    foreach ($allCols as $i => $c) { if (isset($keep[$i])) $out[] = $c; }
+    return $out;
+}
+}
+
+if (!function_exists('penumbra_vis_call_args')) {
+function penumbra_vis_call_args($call) {
+    $call = (string)$call;
+    $open = strpos($call, '(');
+    if ($open === false) return array();
+    $end = penumbra_vis_call_end($call, $open);
+    if ($end < 0) $end = strlen($call);
+    $args = array(); $cur = ''; $depth = 0; $q = '';
+    for ($j = $open + 1; $j < $end; $j++) {
+        $c = $call[$j];
+        if ($q !== '') {
+            $cur .= $c;
+            if ($c === '\\' && $q !== '`' && $j + 1 < $end) { $cur .= $call[++$j]; continue; }
+            if ($c === $q) $q = '';
+            continue;
+        }
+        if ($c === "'" || $c === '"' || $c === '`') { $q = $c; $cur .= $c; continue; }
+        if ($c === '(' || $c === '[' || $c === '{') $depth++;
+        elseif ($c === ')' || $c === ']' || $c === '}') $depth--;
+        if ($c === ',' && $depth === 0) { $args[] = trim($cur); $cur = ''; continue; }
+        $cur .= $c;
+    }
+    $args[] = trim($cur);
+    return $args;
+}
+}
+
+if (!function_exists('penumbra_vis_names_unknown_column')) {
+function penumbra_vis_names_unknown_column($calls, $allCols) {
+    $known = array();
+    foreach ((array)$allCols as $c) $known[strtoupper((string)$c)] = true;
+    static $skip = array('NONE' => 1, 'TRUE' => 1, 'FALSE' => 1, 'AND' => 1, 'OR' => 1, 'NOT' => 1, 'NULL' => 1, 'EMPTY' => 1,
+                         'IN' => 1, 'IS' => 1, 'LIKE' => 1, 'COUNT' => 1, 'SUM' => 1, 'AVG' => 1, 'MIN' => 1, 'MAX' => 1,
+                         'DISTINCT' => 1, 'YEAR' => 1, 'QUARTER' => 1, 'MONTH' => 1, 'WEEK' => 1, 'DAY' => 1, 'FY' => 1);
+    foreach ((array)$calls as $call) {
+        $args = penumbra_vis_call_args($call);
+        foreach (array(1, 2, 3, 30, 34) as $ai) {
+            if (!isset($args[$ai]) || $args[$ai] === '') continue;
+            $a = $args[$ai];
+            // (2026-11-19, chartsweep2 review) the series list is JSON: its words ("col", "agg", "sum", ...) are no
+            // column names - read each series' col and filter instead, or every combo / butterfly chart scanned.
+            if ($ai === 30) {
+                $js = json_decode(trim($a, " \t'`"), true);
+                if (is_array($js)) {
+                    $parts = array();
+                    foreach ($js as $sr) {
+                        if (!is_array($sr)) continue;
+                        if (isset($sr['col']) && is_string($sr['col']) && $sr['col'] !== '') $parts[] = $sr['col'];
+                        if (isset($sr['filterExpression']) && is_string($sr['filterExpression'])) $parts[] = preg_replace('/\'[^\']*\'|"[^"]*"|`[^`]*`/', ' ', $sr['filterExpression']);
+                    }
+                    $a = implode(' ', $parts);
+                    if (trim($a) === '') continue;
+                }
+            }
+            $whole = strtoupper(trim($a, " \t'\"`"));
+            if ($whole === '' || isset($known[$whole]) || isset($skip[$whole])) continue;
+            if ($ai === 34) {
+                // the filter itself rides in quotes; the quoted values inside it are not names
+                if (strlen($a) >= 2 && strpos('\'"`', $a[0]) !== false && substr($a, -1) === $a[0]) $a = substr($a, 1, -1);
+                $a = preg_replace('/\'[^\']*\'|"[^"]*"|`[^`]*`/', ' ', $a);
+            }
+            if (!preg_match_all('/[A-Za-z_][A-Za-z0-9_]*/', $a, $wm)) continue;
+            foreach ($wm[0] as $w) {
+                $w = strtoupper($w);
+                if (!isset($known[$w]) && !isset($skip[$w])) return true;
+            }
+        }
+    }
+    return false;
+}
+}
+
+if (!function_exists('penumbra_vis_row_limit')) {
+function penumbra_vis_row_limit($nAll, $nUse) {
+    $base = (int)PENUMBRA_VIS_MAX_ROWS;
+    $lim = $base;
+    if ($nAll >= 1 && $nUse >= 1 && $nUse < $nAll) $lim = max($base, (int)floor($base * $nAll / $nUse));
+    if ($nUse >= 1) $lim = max($lim, (int)floor((int)PENUMBRA_VIS_MAX_CELLS / $nUse));
+    return (int)min((int)PENUMBRA_VIS_MAX_ROWS_HARD, $lim);
+}
+}
+
+if (!function_exists('penumbra_vis_email_bg')) {
+function penumbra_vis_email_bg($theme) {
+    $eh = (isset($GLOBALS['email_header_themes']) && is_array($GLOBALS['email_header_themes'])) ? $GLOBALS['email_header_themes'] : null;
+    if (!$eh) return '';
+    $t = (string)$theme;
+    $row = isset($eh[$t]) ? $eh[$t] : (isset($eh['theme-default']) ? $eh['theme-default'] : null);
+    $bg = (is_array($row) && isset($row['blockBg'])) ? trim((string)$row['blockBg']) : '';
+    if (!preg_match('/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $bg)) return '';
+    $h = substr($bg, 1);
+    if (strlen($h) === 3) $h = $h[0] . $h[0] . $h[1] . $h[1] . $h[2] . $h[2];
+    $lum = (0.299 * hexdec(substr($h, 0, 2)) + 0.587 * hexdec(substr($h, 2, 2)) + 0.114 * hexdec(substr($h, 4, 2))) / 255;
+    return $lum < 0.45 ? '#' . strtolower($h) : '';
+}
+}
+
+if (!function_exists('penumbra_vis_report_formats')) {
+function penumbra_vis_report_formats($cols) {
+    $raw = (isset($GLOBALS['penumbra_column_formats_raw']) && is_array($GLOBALS['penumbra_column_formats_raw'])) ? $GLOBALS['penumbra_column_formats_raw'] : array();
+    if (!$raw) return array();
+    $want = array();
+    foreach ((array)$cols as $c) { $want[strtoupper((string)$c)] = true; }
+    $out = array();
+    foreach ($raw as $c => $spec) {
+        $u = strtoupper(trim((string)$c));
+        if (isset($want[$u]) && is_string($spec) && $spec !== '' && strlen($spec) <= 60) $out[$u] = $spec;
+    }
+    return $out;
+}
+}
+
+if (!function_exists('penumbra_vis_theme_assets')) {
+function penumbra_vis_theme_assets() {
+    static $memo = null;
+    if ($memo !== null) return $memo;
+    $memo = array('css' => '', 'js' => '');
+    if (!function_exists('penumbra_get_themes')) {
+        foreach (array(dirname(__FILE__), penumbra_vis_webroot()) as $d) {
+            $f = rtrim($d, '/\\') . DIRECTORY_SEPARATOR . 'themes_config.php';
+            if (is_file($f)) { require_once $f; break; }
+        }
+    }
+    if (!function_exists('penumbra_emit_theme_css') || !function_exists('penumbra_emit_themes_js')) return $memo;
+    ob_start();
+    try { penumbra_emit_theme_css(); } catch (\Throwable $e) { }
+    $css = (string)ob_get_clean();
+    ob_start();
+    try { penumbra_emit_themes_js(); } catch (\Throwable $e) { }
+    $js = (string)ob_get_clean();
+    if (substr_count(strtolower($css), '</style') === 1 && stripos($css, '<script') === false) $memo['css'] = $css;
+    if (stripos($js, '</script') === false && $js !== '') $memo['js'] = $js . "\n";
+    return $memo;
+}
+}
+
+if (!function_exists('penumbra_vis_colfmt_on')) {
+function penumbra_vis_colfmt_on() {
+    static $on = null;
+    if ($on === null) $on = !is_file(rtrim(penumbra_vis_webroot(), '/\\') . DIRECTORY_SEPARATOR . 'js' . DIRECTORY_SEPARATOR . 'penumbra_colfmt.off');
+    return $on;
+}
+}
+
+if (!function_exists('penumbra_vis_css_rgb')) {
+function penumbra_vis_css_rgb($v) {
+    $v = strtolower(trim(preg_replace('/!\s*important\s*$/i', '', trim((string)$v))));
+    if ($v === '') return null;
+    if (preg_match('/^(?:none|transparent|inherit|initial|unset|revert|currentcolor)$/', $v)) return false;
+    if (preg_match('/#([0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})(?![0-9a-z])/', $v, $m)) {
+        $h = $m[1];
+        if (strlen($h) <= 4) { $x = ''; for ($k = 0; $k < strlen($h); $k++) $x .= $h[$k] . $h[$k]; $h = $x; }
+        if (strlen($h) === 8 && substr($h, 6, 2) === '00') return false;
+        return array(hexdec(substr($h, 0, 2)), hexdec(substr($h, 2, 2)), hexdec(substr($h, 4, 2)));
+    }
+    if (preg_match('/rgba?\(\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})\s*(?:[,\/]\s*([0-9.]+)\s*(%?))?\s*\)/', $v, $m)) {
+        if (isset($m[4]) && $m[4] !== '' && (float)$m[4] == 0) return false;
+        return array(min(255, (int)$m[1]), min(255, (int)$m[2]), min(255, (int)$m[3]));
+    }
+    static $named = array('white' => array(255, 255, 255), 'snow' => array(255, 250, 250), 'ivory' => array(255, 255, 240),
+        'whitesmoke' => array(245, 245, 245), 'linen' => array(250, 240, 230), 'beige' => array(245, 245, 220),
+        'gainsboro' => array(220, 220, 220), 'lightgray' => array(211, 211, 211), 'lightgrey' => array(211, 211, 211),
+        'silver' => array(192, 192, 192), 'gray' => array(128, 128, 128), 'grey' => array(128, 128, 128),
+        'dimgray' => array(105, 105, 105), 'dimgrey' => array(105, 105, 105), 'black' => array(0, 0, 0),
+        'navy' => array(0, 0, 128), 'darkblue' => array(0, 0, 139), 'midnightblue' => array(25, 25, 112),
+        'darkslategray' => array(47, 79, 79), 'darkslategrey' => array(47, 79, 79));
+    return isset($named[$v]) ? $named[$v] : null;
+}
+}
+
+if (!function_exists('penumbra_vis_tag_surface')) {
+function penumbra_vis_tag_surface($attrs) {
+    $attrs = (string)$attrs;
+    if (stripos($attrs, 'background') !== false && preg_match('/(?<![a-z0-9_-])style\s*=\s*(?:"([^"]*)"|\'([^\']*)\')/i', $attrs, $sm)) {
+        $st = (isset($sm[2]) && $sm[2] !== '') ? $sm[2] : $sm[1];
+        if (preg_match_all('/(?<![a-z-])background(?:-color)?\s*:\s*([^;]*)/i', $st, $dm)) return penumbra_vis_css_rgb(end($dm[1]));
+    }
+    if (stripos($attrs, 'bgcolor') !== false && preg_match('/(?<![a-z0-9_-])bgcolor\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $bm)) {
+        $v = (isset($bm[3]) && $bm[3] !== '') ? $bm[3] : ((isset($bm[2]) && $bm[2] !== '') ? $bm[2] : $bm[1]);
+        return penumbra_vis_css_rgb($v);
+    }
+    return false;
+}
+}
+
+if (!function_exists('penumbra_vis_slot_surfaces')) {
+function penumbra_vis_slot_surfaces($text, $calls) {
+    $out = array();
+    if (!preg_match_all('/<(\/?)([a-z][a-z0-9]*)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>|__PENUMBRA_VISIMG_[A-Z]+__/i', (string)$text, $mm, PREG_SET_ORDER)) return $out;
+    static $void = array('area' => 1, 'base' => 1, 'br' => 1, 'col' => 1, 'embed' => 1, 'hr' => 1, 'img' => 1, 'input' => 1,
+                         'link' => 1, 'meta' => 1, 'source' => 1, 'track' => 1, 'wbr' => 1);
+    $stack = array();
+    foreach ($mm as $m) {
+        if (!isset($m[2]) || $m[2] === '') {                      // a chart token
+            if (!isset($calls[$m[0]])) continue;
+            for ($k = count($stack) - 1; $k >= 0; $k--) {
+                if ($stack[$k][1] === false) continue;             // no surface of its own: look further out
+                if (is_array($stack[$k][1])) $out[$m[0]] = $stack[$k][1];
+                break;                                             // null: a surface this cannot read, leave the chart as it was
+            }
+            continue;
+        }
+        $name = strtolower($m[2]);
+        if ($m[1] === '/') {
+            for ($k = count($stack) - 1; $k >= 0; $k--) { if ($stack[$k][0] === $name) { array_splice($stack, $k); break; } }
+            continue;
+        }
+        if (isset($void[$name]) || substr(rtrim($m[3]), -1) === '/') continue;
+        $stack[] = array($name, penumbra_vis_tag_surface($m[3]));
+    }
+    return $out;
+}
+}
+
 if (!function_exists('penumbra_vis_asset_list')) {
 function penumbra_vis_asset_list() {
     return array(
@@ -191,6 +546,8 @@ function penumbra_vis_asset_list() {
         // lazy chart set (main.js loadScript()s these by their literal js/ paths)
         'js/chart-4.5.1.min.js', 'js/chartjs-plugin-datalabels-2.0.0.min.js', 'js/chartjs-chart-treemap-3.1.0.min.js', 'js/chartjs-chart-sankey-0.19.1.min.js',
         'js/penumbra_charts.js', 'js/penumbra_geo_us.js',
+        // the column formats (Column options) a chart follows as on the page (2026-11-18, chartsweep EM-2)
+        'js/penumbra_colfmt.js',
         // the theme variables
         'css/main.css'
     );
@@ -206,7 +563,7 @@ function penumbra_vis_theme_class($theme) {
 
 if (!function_exists('penumbra_vis_hook_line')) {
 function penumbra_vis_hook_line() {
-    return "\r\n    try { window.__RENDER = { render: renderReportSnippet, setRows: function (r) { masterRowData = r; }, getEditor: function () { return snippetEditor; }, setLoading: function (v) { isStateLoading = !!v; }, setCustomSorts: function (o) { customSortOrders = (o && typeof o === 'object') ? o : {}; _csInvalidateComparators(); }, applyTheme: function (t) { applyTheme(t); } }; } catch (e) { window.__RENDER_ERR = String(e); }\r\n";
+    return "\r\n    try { window.__RENDER = { render: renderReportSnippet, setRows: function (r) { masterRowData = r; }, getEditor: function () { return snippetEditor; }, setLoading: function (v) { isStateLoading = !!v; }, setCustomSorts: function (o) { customSortOrders = (o && typeof o === 'object') ? o : {}; _csInvalidateComparators(); }, applyTheme: function (t) { applyTheme(t); }, setColOpts: function (st) { _pnbReportColOptsFrom(st); }, vcolNames: function () { return buildVirtualColumnNames(); }, vcols: function (m) { return getVirtualColumnsForRow(m); } }; } catch (e) { window.__RENDER_ERR = String(e); }\r\n";
 }
 }
 
@@ -272,7 +629,9 @@ function penumbra_vis_col_props($rows, $cols) {
             if (is_numeric(str_replace(array('$', ',', '%'), '', $v))) $num++;
         }
         $props[$ci + 1] = array(
-            'isCurrency' => ($seen > 0 && $cur > $seen * 0.5),
+            // (2026-11-18, chartsweep EM-11) the page's rule: money only when EVERY sampled value has a '$' (a
+            // column mixing "$1,200" with "TBD" is not money there, and its chart has no "$" on screen)
+            'isCurrency' => ($seen > 0 && $cur === $seen),
             'isNumeric'  => ($seen > 0 && $num > $seen * 0.5),
             'isBoolean'  => false,
             'isDate'     => false
@@ -287,13 +646,36 @@ function penumbra_vis_page_html($calls, $data, $columns, $opts = array()) {
     if (!is_array($opts)) $opts = array();
     $theme = penumbra_vis_theme_class(isset($opts['theme']) ? $opts['theme'] : '');
     $customSorts = (isset($opts['customSorts']) && is_array($opts['customSorts'])) ? $opts['customSorts'] : array();
+    // (2026-11-18, chartsweep EM-2) the report's column formats {COL: 'percent:1'} the charts follow, as on the page
+    $colFormats = array();
+    if (isset($opts['colFormats']) && is_array($opts['colFormats'])) {
+        foreach ($opts['colFormats'] as $fc => $fv) { if (is_string($fv) && $fv !== '') $colFormats[strtoupper((string)$fc)] = $fv; }
+    }
+    // (EM-1) the dark colour the email shows the chart on ('' = the white sheet of before)
+    $bg = (isset($opts['bg']) && preg_match('/^#[0-9a-fA-F]{3,8}$/', (string)$opts['bg'])) ? (string)$opts['bg'] : '';
+    // (EM-5) the rows the caller lets this page take (render_snippet never hands it more)
+    $maxRows = (isset($opts['maxRows']) && (int)$opts['maxRows'] > 0) ? (int)$opts['maxRows'] : (int)PENUMBRA_VIS_MAX_ROWS;
+    // (2026-11-19, chartsweep2 Q4-2) the author's own surface behind a chart (token => rgb), honoured only where its
+    // lightness disagrees with this page's (its $bg, else white), as the browser exports do (BM-13): every chart on
+    // an ordinary page is drawn and captured exactly as before
+    $slotSurf = (isset($opts['slotBg']) && is_array($opts['slotBg'])) ? $opts['slotBg'] : array();
+    $slotBg = array();
+    $slotCss = '';
     $cols = array();
     foreach ((array)$columns as $c) { $cols[] = strtoupper((string)$c); }
     if (!$cols && is_array($data) && $data) { $first = reset($data); if (is_array($first)) foreach (array_keys($first) as $k) $cols[] = strtoupper((string)$k); }
     $rows = array();
     $n = 0;
+    // (2026-11-19, chartsweep2 Q4-5) each row's number (#) as engine C and the report page give it: its place in the
+    // report's rows, kept through a search filter (the engine's "\0#" stamp). The page numbered the kept rows 1..n,
+    // so a chart filtered on # took other rows than the email's own count(# <= 12) and the live link. Built only
+    // when a number differs from the row's place, so an unfiltered page is byte for byte what it was.
+    $nums = null;
     foreach ((array)$data as $r) {
-        if ($n++ >= PENUMBRA_VIS_MAX_ROWS) break;
+        if ($n++ >= $maxRows) break;
+        $rn = (is_array($r) && isset($r["\0#"])) ? (int)$r["\0#"] : $n;
+        if ($nums === null && $rn !== $n) $nums = ($n > 1) ? range(1, $n - 1) : array();
+        if ($nums !== null) $nums[] = $rn;
         $row = array();
         foreach ($cols as $c) {
             $v = null;
@@ -309,7 +691,20 @@ function penumbra_vis_page_html($calls, $data, $columns, $opts = array()) {
     foreach ($cols as $i => $c) { $nameToIndex[$c] = $i + 1; }
     $slots = array();
     $s = 0;
-    foreach ($calls as $tok => $call) { $slots[] = '<span class="pnb-vis-slot" data-slot="s' . $s . '">' . $call . '</span>'; $s++; }
+    foreach ($calls as $tok => $call) {
+        $slots[] = '<span class="pnb-vis-slot" data-slot="s' . $s . '">' . $call . '</span>';
+        // (Q4-2) the slot takes the author's surface through the page's own stylesheet (the snippet text is not touched)
+        if (isset($slotSurf[$tok]) && is_array($slotSurf[$tok]) && count($slotSurf[$tok]) === 3) {
+            $sc = array_values($slotSurf[$tok]);
+            $sl = (0.299 * (int)$sc[0] + 0.587 * (int)$sc[1] + 0.114 * (int)$sc[2]) / 255;
+            if (($sl < 0.45) !== ($bg !== '')) {
+                $hex = sprintf('#%02x%02x%02x', max(0, min(255, (int)$sc[0])), max(0, min(255, (int)$sc[1])), max(0, min(255, (int)$sc[2])));
+                $slotBg['s' . $s] = $hex;
+                $slotCss .= '.pnb-vis-slot[data-slot="s' . $s . '"]{background:' . $hex . ' !important}' . "\n";
+            }
+        }
+        $s++;
+    }
     $payload = array(
         'columns'     => $cols,
         'rows'        => $rows,
@@ -318,8 +713,12 @@ function penumbra_vis_page_html($calls, $data, $columns, $opts = array()) {
         'snippet'     => implode("\n", $slots),
         'rowsTotal'   => is_array($data) ? count($data) : 0,
         'customSorts' => (object)$customSorts,
-        'theme'       => $theme
+        'theme'       => $theme,
+        'colFormats'  => (object)$colFormats,
+        'bg'          => $bg
     );
+    if ($nums !== null) $payload['nums'] = $nums;          // (Q4-5)
+    if ($slotBg) $payload['slotBg'] = $slotBg;             // (Q4-2)
     $json = json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     if ($json === false) return false;
     $scripts = '';
@@ -331,15 +730,21 @@ function penumbra_vis_page_html($calls, $data, $columns, $opts = array()) {
     $bw = (isset($opts['baseWidth']) && (int)$opts['baseWidth'] >= 200 && (int)$opts['baseWidth'] <= 4000) ? (int)$opts['baseWidth'] : (int)PENUMBRA_VIS_BASE_WIDTH;
     // main.css brings the theme classes (body.theme-x sets --brand-primary, the
     // fonts and --text-main the chart code reads); the rules below then pin the
-    // page itself to a white sheet, which is what the email shows the chart on,
-    // and keep the boot DOM out of the picture.
+    // page itself to a white sheet and keep the boot DOM out of the picture.
+    // (2026-11-18, chartsweep EM-1) A dark theme's email shows the chart on its dark
+    // header block, so the snippet output takes that colour ($bg): the chart code
+    // reads the background behind the canvas and draws light labels, and the picture
+    // is captured on that colour. A light theme keeps the white sheet.
+    // (EM-6) the registry themes' variables and the theme registry, as index.php has them.
+    $ta = penumbra_vis_theme_assets();
+    $colfmtTag = penumbra_vis_colfmt_on() ? '<script src="js/penumbra_colfmt.js"></script>' . "\n" : '';
     return '<!doctype html>
 <html><head><meta charset="utf-8"><title>penumbra chart render</title>
 <link rel="stylesheet" href="css/main.css">
-<style>
+' . $ta['css'] . '<style>
 html,body{margin:0 !important;padding:0 !important;background:#ffffff !important;background-image:none !important;font-size:12px}
-#reportSnippetOutput{display:block !important;width:' . $bw . 'px !important;max-width:none !important;min-height:0 !important;margin:0 !important;padding:0 !important;background:transparent !important}
-#editorTabs,#pivotLightbox,#pivot-output-container,#groupedResultsContainer,#errorBox,#mainReportSubtitle,#resultsTable,#tableSearch{display:none !important}
+#reportSnippetOutput{display:block !important;width:' . $bw . 'px !important;max-width:none !important;min-height:0 !important;margin:0 !important;padding:0 !important;background:' . ($bg !== '' ? $bg : 'transparent') . ' !important}
+' . $slotCss . '#editorTabs,#pivotLightbox,#pivot-output-container,#groupedResultsContainer,#errorBox,#mainReportSubtitle,#resultsTable,#tableSearch{display:none !important}
 .CodeMirror{position:absolute !important;left:-9999px !important;top:0 !important;width:600px !important;height:200px !important}
 </style></head>
 <body class="' . htmlspecialchars($theme, ENT_QUOTES) . '">
@@ -378,7 +783,7 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
 <pre id="out">running</pre>
 ' . $scripts . '<script>
   // Boot stubs (same as the harnesses): no server, no animation, no observers.
-  window.penumbra_vars = {
+' . $ta['js'] . '  window.penumbra_vars = {
     isAdmin: true, isGlobalAdmin: true, currentUserKey: "render", shibboleth: { ouc: "", dept: "" },
     tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
     imports: [], reports: [], themes: {}, prompts: {}, grants: []
@@ -406,7 +811,7 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
   window.__PAGE = ' . $json . ';
 </script>
 <script src="js/main_render.js"></script>
-<script>
+' . $colfmtTag . '<script>
 (function () {
   var out = document.getElementById("out");
   function finish(o) { try { o.pageErrors = (window.__errors || []).slice(0, 10); } catch (e) {} out.textContent = "RESULT_JSON:" + JSON.stringify(o); }
@@ -482,7 +887,11 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
           if (ch) { try { ch.stop(); ch.update("none"); } catch (e) {} }
           var cfg = $(cv).data("vizConfig") || {};
           var c2 = document.createElement("canvas"); c2.width = cv.width; c2.height = cv.height;
-          var ctx = c2.getContext("2d"); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c2.width, c2.height); ctx.drawImage(cv, 0, 0);
+          // (EM-1) on a dark email block the picture is the chart on that colour (PNG and JPEG alike), so it
+          // reads the same wherever it is shown (a PDF that takes the themed chart, a client that drops the block)
+          // (2026-11-19, chartsweep2 Q4-2) a chart on a surface of the snippet (P.slotBg) is captured on that colour
+          var sbg = (P.slotBg && P.slotBg[rec.slot]) || "";
+          var ctx = c2.getContext("2d"); ctx.fillStyle = sbg || P.bg || "#ffffff"; ctx.fillRect(0, 0, c2.width, c2.height); ctx.drawImage(cv, 0, 0);
           rec.w = Math.round(ch && ch.width ? ch.width : cv.width); rec.h = Math.round(ch && ch.height ? ch.height : cv.height);
           rec.title = String(cfg.title || "");
           rec.alt = chartAlt(cv, ch, rec.title);
@@ -492,7 +901,7 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
           if (isBlank(cv)) {
             rec.error = "blank canvas (nothing drawn" + (ch ? "" : ", no chart instance") + ")";
           } else {
-            rec.png = b64(cv.toDataURL("image/png"));
+            rec.png = b64(((sbg || P.bg) ? c2 : cv).toDataURL("image/png"));
             rec.jpeg = b64(c2.toDataURL("image/jpeg", 0.92));
             rec.ok = rec.png.length > 0;
           }
@@ -513,7 +922,7 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
     var R = window.__RENDER;
     if (!R || typeof R.render !== "function") { finish({ fatal: "render hook unavailable: " + (window.__RENDER_ERR || "n/a") }); return; }
     var maps = P.rows.map(function (r, i) {
-      var m = new Map(); m.set("#", String(i + 1));
+      var m = new Map(); m.set("#", String(P.nums ? P.nums[i] : i + 1));   // (Q4-5) the row numbers of the report
       for (var c = 0; c < P.columns.length; c++) { m.set(P.columns[c], r[c] == null ? "" : String(r[c])); }
       return m;
     });
@@ -533,6 +942,21 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
     } catch (e) {}
     R.setRows(maps);
     try { if (typeof R.setCustomSorts === "function") R.setCustomSorts(P.customSorts || {}); } catch (e) {}
+    // (2026-11-18, chartsweep EM-2) the column formats of the report, through the code the report page runs
+    try { if (typeof R.setColOpts === "function") R.setColOpts({ columnFormats: P.colFormats || {} }); } catch (e) {}
+    // (EM-10) the report page gives the rows a snippet sees the sub-columns of nested tables (@@JSON), each the
+    // nested values joined by ", " (the row copy renderReportSnippet makes); this page hands its rows straight
+    // in, so the same copy is made here - only when the rows hold a nested table at all.
+    var src = maps;
+    try {
+      if (typeof R.vcolNames === "function" && typeof R.vcols === "function" && R.vcolNames().length) {
+        src = maps.map(function (m) {
+          var c = new Map(m);
+          R.vcols(m).forEach(function (vals, name) { if (!c.has(name)) c.set(name, vals.join(", ")); });
+          return c;
+        });
+      }
+    } catch (e) { src = maps; }
     $("#resultsTable").data("columnNameToOriginalIndex", P.nameToIndex).data("columnProperties", P.props);
     var ed = R.getEditor();
     if (!ed || typeof ed.setValue !== "function") { finish({ fatal: "snippet editor unavailable" }); return; }
@@ -554,7 +978,7 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
     } catch (e) {}
     ed.setValue(P.snippet);
     var p;
-    try { p = R.render(maps, false, { ignorePendingViewState: true }); } catch (e) { finish({ fatal: "render threw: " + (e && e.message ? e.message : e) }); return; }
+    try { p = R.render(src, false, { ignorePendingViewState: true }); } catch (e) { finish({ fatal: "render threw: " + (e && e.message ? e.message : e) }); return; }
     Promise.resolve(p)
       .then(settle)
       .then(collect, function (e) { finish({ fatal: "render rejected: " + (e && e.message ? e.message : e) }); });
@@ -588,16 +1012,67 @@ function penumbra_vis_parse_dom($dom) {
 if (!function_exists('penumbra_vis_render_calls')) {
 function penumbra_vis_render_calls($calls, $data, $columns, $webroot = null, $pageOpts = array()) {
     $t0 = microtime(true);
-    $q = penumbra_render_queue_dir();
-    if ($webroot === null) {
-        // The app root (this file lives in it); a test points it at the live app.
-        $webroot = isset($GLOBALS['PENUMBRA_VIS_WEBROOT_OVERRIDE']) ? $GLOBALS['PENUMBRA_VIS_WEBROOT_OVERRIDE'] : dirname(__FILE__);
+    $html = penumbra_vis_page_html($calls, $data, $columns, $pageOpts);
+    if ($html === false) return array('ok' => false, 'error' => 'the report rows could not be encoded for the render page', 'images' => array(), 'ms' => 0);
+    return penumbra_vis_render_page($calls, $html, $webroot, $t0);
+}
+}
+
+if (!function_exists('penumbra_vis_render_counted')) {
+function penumbra_vis_render_counted($calls, $data, $columns, $pageOpts, $pdfCopy = false) {
+    // (2026-11-19, chartsweep2 Q4-6) the caps are tested FIRST: a capped call with nothing drawn earlier in the task
+    // to reuse returns at once; it built, encoded and hashed the whole page (up to ~10 MB) and threw it away, once
+    // per recipient past the 40th render. With pictures to reuse the page is still built, to find them.
+    $cap = $pdfCopy ? (int)floor(PENUMBRA_VIS_MAX_RENDERS / 2) : (int)PENUMBRA_VIS_MAX_RENDERS;
+    $capErr = '';
+    if ($GLOBALS['penumbra_vis_render_count'] >= $cap) {
+        $capErr = 'the render cap for this task (' . ($pdfCopy ? $cap . ' of ' . PENUMBRA_VIS_MAX_RENDERS . ' renders for PDF copies' : $cap) . ') was reached';
+    } elseif ($GLOBALS['penumbra_vis_render_count_run'] >= PENUMBRA_VIS_MAX_RENDERS_RUN) {
+        $capErr = 'the render cap for this run (' . PENUMBRA_VIS_MAX_RENDERS_RUN . ', every task together) was reached';
     }
+    if ($capErr !== '' && empty($GLOBALS['penumbra_vis_memo'])) {
+        return array('ok' => false, 'capped' => true, 'images' => array(), 'ms' => 0, 'error' => $capErr);
+    }
+    $html = penumbra_vis_page_html($calls, $data, $columns, $pageOpts);
+    if ($html === false) return array('ok' => false, 'error' => 'the report rows could not be encoded for the render page', 'images' => array(), 'ms' => 0);
+    $key = md5($html);
+    if (isset($GLOBALS['penumbra_vis_memo'][$key]) && is_array($GLOBALS['penumbra_vis_memo'][$key])) {
+        $hit = $GLOBALS['penumbra_vis_memo'][$key];
+        // the same page has the same calls in the same order; their tokens are this call's
+        $toks = array_keys($calls);
+        if (isset($hit['_toks']) && $hit['_toks'] !== $toks && count($hit['_toks']) === count($toks)) {
+            $remap = array();
+            foreach ($hit['_toks'] as $i => $ot) { if (isset($hit['images'][$ot])) $remap[$toks[$i]] = $hit['images'][$ot]; }
+            $hit['images'] = $remap;
+        }
+        $hit['ms'] = 0;
+        $hit['reused'] = true;
+        return $hit;
+    }
+    if ($capErr !== '') {
+        return array('ok' => false, 'capped' => true, 'images' => array(), 'ms' => 0, 'error' => $capErr);
+    }
+    $GLOBALS['penumbra_vis_render_count']++;
+    $GLOBALS['penumbra_vis_render_count_run']++;
+    $r = penumbra_vis_render_page($calls, $html);
+    if (!empty($r['ok'])) {
+        if (!isset($GLOBALS['penumbra_vis_memo']) || !is_array($GLOBALS['penumbra_vis_memo'])) $GLOBALS['penumbra_vis_memo'] = array();
+        $r['_toks'] = array_keys($calls);
+        $GLOBALS['penumbra_vis_memo'][$key] = $r;
+        while (count($GLOBALS['penumbra_vis_memo']) > PENUMBRA_VIS_MEMO_MAX) array_shift($GLOBALS['penumbra_vis_memo']);
+    }
+    return $r;
+}
+}
+
+if (!function_exists('penumbra_vis_render_page')) {
+function penumbra_vis_render_page($calls, $html, $webroot = null, $t0 = null) {
+    if ($t0 === null) $t0 = microtime(true);
+    $q = penumbra_render_queue_dir();
+    if ($webroot === null) $webroot = penumbra_vis_webroot();
     $sync = penumbra_vis_assets_sync($q, $webroot);
     if (!$sync['ok']) return array('ok' => false, 'error' => 'render assets: ' . $sync['error'], 'images' => array(), 'ms' => 0);
     if ($sync['copied']) penumbra_vis_log('Charts: refreshed render assets (' . implode(', ', $sync['copied']) . ')');
-    $html = penumbra_vis_page_html($calls, $data, $columns, $pageOpts);
-    if ($html === false) return array('ok' => false, 'error' => 'the report rows could not be encoded for the render page', 'images' => array(), 'ms' => 0);
     $r = penumbra_render_html_to_dom($html, array('budget' => PENUMBRA_VIS_BUDGET_MS, 'width' => 1200, 'height' => 900), PENUMBRA_VIS_TIMEOUT_SEC);
     if (!$r['ok']) return array('ok' => false, 'error' => $r['error'], 'images' => array(), 'ms' => $r['ms']);
     $p = penumbra_vis_parse_dom($r['dom']);
@@ -650,6 +1125,7 @@ function penumbra_vis_render_calls($calls, $data, $columns, $webroot = null, $pa
 if (!function_exists('penumbra_vis_render_snippet')) {
 function penumbra_vis_render_snippet($text, $data, $columns, $reportMeta = array()) {
     $GLOBALS['penumbra_vis_images'] = array();
+    $GLOBALS['penumbra_vis_used'] = array();
     $ex = penumbra_vis_extract($text);
     if (empty($ex['calls'])) return $text;
     $n = count($ex['calls']);
@@ -657,20 +1133,46 @@ function penumbra_vis_render_snippet($text, $data, $columns, $reportMeta = array
     $why = '';
     $r = null;
     $fluid = penumbra_vis_fluid_layout();
+    // (2026-11-18, chartsweep EM-4) a chart inside action(), slide(), chain() ... leaves the email with that call:
+    // not drawn. (EM-3, EM-7) The rest go to the page with their data() / me() / {VARS} / backtick text resolved.
+    $hidden = penumbra_vis_hidden_tokens($ex['text']);
+    $pageCalls = array();
+    foreach ($ex['calls'] as $tok => $call) {
+        if (!isset($hidden[$tok])) $pageCalls[$tok] = penumbra_vis_page_call($call, $reportMeta);
+    }
+    if ($hidden) penumbra_vis_log('Charts: ' . count($hidden) . ' of ' . $n . ' vis() call' . ($n === 1 ? '' : 's') . ' sit inside action(), slide() or another call the email leaves out - not drawn');
+    if (!$pageCalls) {
+        foreach ($ex['calls'] as $tok => $call) { $GLOBALS['penumbra_vis_images'][$tok] = null; }
+        return $ex['text'];
+    }
+    // (EM-5) only the columns the calls read go to the page, which may then carry more rows; a report with more
+    // rows than the page may take is not drawn (a chart over part of the rows shows wrong totals), and says so.
+    $allCols = penumbra_vis_column_names($data, $columns);
+    $useCols = penumbra_vis_used_columns($pageCalls, $data, $allCols);
+    $rowLimit = penumbra_vis_row_limit(count($allCols), count($useCols));
+    $rowsAll = is_array($data) ? count($data) : 0;
     if (!function_exists('penumbra_render_html_to_dom')) {
         $why = 'the render client is missing';
     } elseif (!penumbra_render_worker_alive()) {
         $why = 'the render worker is not running (stale heartbeat in ' . penumbra_render_queue_dir() . ')';
-    } elseif ($GLOBALS['penumbra_vis_render_count'] >= PENUMBRA_VIS_MAX_RENDERS) {
-        $why = 'the render cap for this run (' . PENUMBRA_VIS_MAX_RENDERS . ') was reached';
+    } elseif ($rowsAll > $rowLimit) {
+        $why = 'the report has ' . number_format($rowsAll) . ' rows and the render page takes ' . number_format($rowLimit)
+             . ' with the ' . count($useCols) . ' column(s) the charts read; a chart over part of the rows would show wrong totals';
     } else {
-        $GLOBALS['penumbra_vis_render_count']++;
         // The report's theme (its palettes derive from the theme's brand colour)
         // and its saved custom sort orders (a label-sorted axis follows them).
         $pageOpts = array(
             'theme'       => isset($reportMeta['theme']) ? $reportMeta['theme'] : '',
-            'customSorts' => (isset($reportMeta['customSortOrders']) && is_array($reportMeta['customSortOrders'])) ? $reportMeta['customSortOrders'] : array()
+            'customSorts' => (isset($reportMeta['customSortOrders']) && is_array($reportMeta['customSortOrders'])) ? $reportMeta['customSortOrders'] : array(),
+            // (EM-1) a dark theme's header block colour, the chart's background in the email
+            'bg'          => penumbra_vis_email_bg(isset($reportMeta['emailTheme']) ? $reportMeta['emailTheme'] : (isset($reportMeta['theme']) ? $reportMeta['theme'] : '')),
+            // (EM-2) the report's column formats for the columns the page carries
+            'colFormats'  => penumbra_vis_report_formats($useCols),
+            'maxRows'     => $rowLimit,
+            // (2026-11-19, chartsweep2 Q4-2) the author's inline background around each chart, when the snippet has one
+            'slotBg'      => (stripos($ex['text'], 'background') !== false || stripos($ex['text'], 'bgcolor') !== false) ? penumbra_vis_slot_surfaces($ex['text'], $pageCalls) : array()
         );
+        if (count($useCols) < count($allCols)) penumbra_vis_log('Charts: the render page carries ' . count($useCols) . ' of ' . count($allCols) . ' columns (the ones the charts read)');
         // Dashboard layout: the snippet has a row of its own as wide as the email, so a
         // "%" chart is drawn against the larger fluid reference and shown at that share
         // of whatever width the reader's window gives it (2026-10-06).
@@ -680,16 +1182,16 @@ function penumbra_vis_render_snippet($text, $data, $columns, $reportMeta = array
         // and isset() kept quiet about it).
         penumbra_vis_log('Charts: theme ' . penumbra_vis_theme_class($pageOpts['theme']) . ', custom sort orders for '
             . (count($pageOpts['customSorts']) ? implode(', ', array_keys($pageOpts['customSorts'])) : 'no column'));
-        $r = penumbra_vis_render_calls($ex['calls'], $data, $columns, null, $pageOpts);
+        $r = penumbra_vis_render_counted($pageCalls, $data, $useCols, $pageOpts, false);
         if ($r['ok']) $images = $r['images']; else $why = $r['error'];
         // The PDF is not themed (its table is plain), so when one is attached
         // and the email theme is not the default, draw the charts a second time
         // in the default theme for the PDF's chart pages (pdfpng / pdfjpeg).
         if ($r['ok'] && !empty($reportMeta['pdfCharts']) && $images && penumbra_vis_theme_class($pageOpts['theme']) !== 'theme-default') {
-            if ($GLOBALS['penumbra_vis_render_count'] < PENUMBRA_VIS_MAX_RENDERS) {
-                $GLOBALS['penumbra_vis_render_count']++;
-                $pdfOpts = $pageOpts; $pdfOpts['theme'] = 'theme-default';
-                $p2 = penumbra_vis_render_calls($ex['calls'], $data, $columns, null, $pdfOpts);
+            $pdfOpts = $pageOpts; $pdfOpts['theme'] = 'theme-default'; $pdfOpts['bg'] = '';   // the PDF page is white
+            unset($pdfOpts['slotBg']);   // (2026-11-19, chartsweep2 review) ...so no chart is drawn on its email card colour there
+            $p2 = penumbra_vis_render_counted($pageCalls, $data, $useCols, $pdfOpts, true);
+            if (empty($p2['capped'])) {
                 if ($p2['ok']) {
                     $got = 0;
                     foreach ($p2['images'] as $tok => $pimg) {
@@ -699,12 +1201,13 @@ function penumbra_vis_render_snippet($text, $data, $columns, $reportMeta = array
                         $images[$tok]['pdfcolors'] = $pimg['colors'];
                         $got++;
                     }
-                    penumbra_vis_log('Charts: PDF copies drawn in the default theme (' . $got . ' of ' . count($images) . ') in ' . $p2['ms'] . ' ms');
+                    penumbra_vis_log('Charts: PDF copies drawn in the default theme (' . $got . ' of ' . count($images) . ') in ' . $p2['ms'] . ' ms'
+                        . (!empty($p2['reused']) ? ' (the same page was drawn earlier in this task: reused)' : ''));
                 } else {
                     penumbra_vis_log('Charts: PDF copies not drawn (' . $p2['error'] . ') - the PDF takes the themed charts');
                 }
             } else {
-                penumbra_vis_log('Charts: PDF copies skipped - the render cap for this run was reached; the PDF takes the themed charts');
+                penumbra_vis_log('Charts: PDF copies skipped - ' . $p2['error'] . '; the PDF takes the themed charts');
             }
         }
     }
@@ -712,7 +1215,8 @@ function penumbra_vis_render_snippet($text, $data, $columns, $reportMeta = array
         penumbra_vis_log('Charts: ' . $n . ' vis() call' . ($n === 1 ? '' : 's') . ' dropped from the email - ' . $why);
     } else {
         penumbra_vis_log('Charts: rendered ' . count($images) . ' of ' . $n . ' vis() call' . ($n === 1 ? '' : 's') . ' in ' . $r['ms'] . ' ms'
-            . ' (page brand ' . ($r['brand'] !== '' ? $r['brand'] : 'unset') . ', body class "' . $r['bodyClass'] . '")');
+            . ' (page brand ' . ($r['brand'] !== '' ? $r['brand'] : 'unset') . ', body class "' . $r['bodyClass'] . '")'
+            . (!empty($r['reused']) ? ' - the same page was drawn earlier in this task, its pictures reused' : ''));
     }
     // A drawn chart that is a page of its own on the live report links to that
     // page's full-screen view (2026-10-06); the rest keep the plain picture.
@@ -901,7 +1405,8 @@ function penumbra_vis_apply_tokens($text) {
         $j = $i + 1;
         while ($j + 1 < $n && preg_match('/^\s*$/', $parts[$j]) && $isTok($parts[$j + 1])) { $run[] = $parts[$j + 1]; $j += 2; }
         $imgs = array();
-        foreach ($run as $tok) { if (is_array($store[$tok])) $imgs[] = $store[$tok]; }
+        // (2026-11-18, chartsweep EM-4) each picture the email shows is marked: the PDF takes those and no other
+        foreach ($run as $tok) { if (is_array($store[$tok])) { $imgs[] = $store[$tok]; $GLOBALS['penumbra_vis_used'][$tok] = true; } }
         if (count($imgs) >= 2) $out .= penumbra_vis_row_html($imgs);
         elseif (count($imgs) === 1) $out .= (!empty($imgs[0]['fluid']) && !empty($imgs[0]['wpct'])) ? penumbra_vis_row_html($imgs) : penumbra_vis_img_tag($imgs[0]);
         $i = $j;
@@ -913,8 +1418,10 @@ function penumbra_vis_apply_tokens($text) {
 if (!function_exists('penumbra_vis_take_images')) {
 function penumbra_vis_take_images() {
     $out = array();
-    foreach ($GLOBALS['penumbra_vis_images'] as $img) { if (is_array($img)) $out[] = $img; }
+    $used = (isset($GLOBALS['penumbra_vis_used']) && is_array($GLOBALS['penumbra_vis_used'])) ? $GLOBALS['penumbra_vis_used'] : array();
+    foreach ($GLOBALS['penumbra_vis_images'] as $tok => $img) { if (is_array($img) && isset($used[$tok])) $out[] = $img; }
     $GLOBALS['penumbra_vis_images'] = array();
+    $GLOBALS['penumbra_vis_used'] = array();
     return $out;
 }
 }

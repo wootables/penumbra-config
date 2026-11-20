@@ -127,7 +127,7 @@
         var tr = row(0), rid = tr.getAttribute('data-report-id'), rtitle = tr.getAttribute('data-title');
         pv = rclick(tr, { target: tr.querySelector('td[data-col="TITLE"]') || tr });
         a = acts();
-        t('R-row', pv && a.join() === 'repoOpen,repoOpenTab,repoCopyLink,repoCopyId,repoFav,repoMetrics,repoCalendar,repoColumns' && /Add to favorites/.test(item('repoFav').textContent), a.join());   // (menufix2: the panel's tools, Columns)
+        t('R-row', pv && a.join() === 'repoOpen,repoOpenTab,repoCopyLink,repoCopyId,repoFav,repoMetrics,repoColumns' && /Add to favorites/.test(item('repoFav').textContent), a.join());   // (menufix2: the panel's tools, Columns)
         t('R-title', name() === rtitle + ' (' + rid + ')', name());
         close();
         ok = await pick(tr, 'repoOpenTab');
@@ -149,7 +149,8 @@
         if (starred) { $(tr.querySelector('.favorite-icon')).trigger('click'); await sleep(50); }
         // a global admin: Metrics
         // (menufix2) a global admin: the owner, the Tags and Grants tools, Manage mode - none for anyone else
-        var ADM = ['repoOwner', 'repoTagsAdmin', 'repoGrants', 'repoManage'];
+        // (2026-11-19, menufix B1) Show in the task calendar too: calendar.php answers 403 to anyone but an admin
+        var ADM = ['repoOwner', 'repoTagsAdmin', 'repoGrants', 'repoManage', 'repoCalendar'];
         rclick(row(1)); var va = acts(); var noAdmin = ADM.every(function (x) { return va.indexOf(x) < 0; }); close();
         penumbra_vars.isGlobalAdmin = true;
         rclick(row(1));

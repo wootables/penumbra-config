@@ -195,6 +195,8 @@
       $('#serverSavePassword').val('pw-encsave-21'); $('#serverSavePasswordConfirm').val('pw-encsave-21');
       var b1 = await save();
       R.chk.firstEncrypted = sealed(b1);
+      // (2026-11-19, encflag) the envelope carries the journal switch in the clear, as the page holds it
+      R.chk.journalFlag = (function () { try { var e = JSON.parse(b1.state_data); R.info.envKeys = Object.keys(e); return Object.keys(e)[0] === 'encrypted' && typeof e.journal === 'boolean'; } catch (e2) { return false; } })();
       var o2 = await openDlg();
       R.chk.openerRan = o2.pw === '';
       R.chk.tickedAfterEncSave = o2.pw === '' && o2.ticked === true;

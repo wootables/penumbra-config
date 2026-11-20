@@ -104,7 +104,8 @@
         'reconfigureSinglePrompt', 'reconfigureAllPrompts'
     ];
     // New with section=; a build without them still compiles (and goes red below).
-    var OPTIONAL = ['promptSectionKey', 'promptSectionMap'];
+    var OPTIONAL = ['promptSectionKey', 'promptSectionMap', '_pnbPromptListJoin', '_pnbPromptListSplit', '_pnbUnlockUrlAnswer',   // the last three: promptfix 2026-11-19
+        '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor'];   // promptfix2 2026-11-19
     var HANDLER_BAR = "$(document).on('click', '#resetAllPromptsLink', function (e) {";
     var HANDLER_SECTION = "$(document).on('click', '#promptInfoList .prompt-section-review', function (e) {";
 
@@ -124,6 +125,13 @@
             // older than 780f66e has no such line and does not call it.
             + 'var _pnbViewLink = false;\nvar _pnbVlPromptSaves = {};\n'
             + ((/\n    function _pnbPromptStored\(k\) \{[^\n]+\}\n/.exec(src) || [''])[0])
+            // (2026-11-19, promptfix #2/#7) the write/remove twins of _pnbPromptStored (one-liners, lifted the same way)
+            // and the SQL pass record processPrompts keeps (a closure let in main.js).
+            + ((/\n    function _pnbPromptWrite\(k, s\) \{[^\n]+\}\n/.exec(src) || [''])[0])
+            + ((/\n    function _pnbPromptRemove\(k\) \{[^\n]+\}\n/.exec(src) || [''])[0])
+            + 'var _pnbPromptSqlPass = { n: 0, keys: new Set(), names: new Set() };\n'
+            // (2026-11-19, promptfix2 E8-E10/C10) the reserved-name list (closure vars) and the URL / label / default-mark helpers
+            + ((/\n    var _PNB_URL_RESERVED = [^;]*;\n/.exec(src) || [''])[0]) + ((/\n    var _pnbReservedWarned = [^\n]+\n/.exec(src) || [''])[0])
             + names.map(function (n) { return grabFn(src, n); }).join('\n');
         var found = { bar: false, section: false };
         if (withHandlers) {

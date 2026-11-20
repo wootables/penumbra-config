@@ -54,10 +54,11 @@ $mPdo     = "    // size: say the run failed, and why in a word (2026-10-30, QUE
 $mPdo0    = "    // size: say the run failed, and why in a word (2026-10-30, QUERY_FAIL)." + $L + "    (function () {})("
 $mExc     = "    error_log(`"PENUMBRA Exception for user `$currentUserKey: `" . `$e->getMessage());" + $L + "    penumbraAuditQueryFail("
 $mExc0    = "    error_log(`"PENUMBRA Exception for user `$currentUserKey: `" . `$e->getMessage());" + $L + "    (function () {})("
-$mCte     = "        error_log(`"CTE Subquery Failed: `" . `$e->getMessage());" + $L + "        penumbraAuditQueryFail("
-$mCte0    = "        error_log(`"CTE Subquery Failed: `" . `$e->getMessage());" + $L + "        (function () {})("
-$mSub     = "        error_log(`"Subquery Failed: `" . `$e->getMessage());" + $L + "        penumbraAuditQueryFail("
-$mSub0    = "        error_log(`"Subquery Failed: `" . `$e->getMessage());" + $L + "        (function () {})("
+# (subqsweep 41364e4) one catch block for both tag kinds: both mutants cut its audit call
+$mCte     = "        error_log((`$pnbSqIsCte ? `"CTE Subquery Failed: `" : `"Subquery Failed: `") . `$e->getMessage());" + $L + "        penumbraAuditQueryFail("
+$mCte0    = "        error_log((`$pnbSqIsCte ? `"CTE Subquery Failed: `" : `"Subquery Failed: `") . `$e->getMessage());" + $L + "        (function () {})("
+$mSub     = $mCte
+$mSub0    = $mCte0
 $mStream  = "                    penumbraAuditQueryFail(isset("
 $mStream0 = "                    (function () {})(isset("
 $mJson    = "echo json_encode([`"error`" => `"Failed to encode query results as JSON.`"]);" + $L + "        penumbraAuditQueryFail("
@@ -82,8 +83,8 @@ $mutantDefs = [ordered]@{
   'nopins'     = @{ t = 'db';  edits = @(,@($mPins, '')); red = @('D1') }
   'pdonocall'  = @{ t = 'q';   edits = @(,@($mPdo, $mPdo0)); red = @('Q1') }
   'excnocall'  = @{ t = 'q';   edits = @(,@($mExc, $mExc0)); red = @('Q2') }
-  'ctenocall'  = @{ t = 'q';   edits = @(,@($mCte, $mCte0)); red = @('Q3') }
-  'subnocall'  = @{ t = 'q';   edits = @(,@($mSub, $mSub0)); red = @('Q4') }
+  'ctenocall'  = @{ t = 'q';   edits = @(,@($mCte, $mCte0)); red = @('Q3', 'Q4') }
+  'subnocall'  = @{ t = 'q';   edits = @(,@($mSub, $mSub0)); red = @('Q3', 'Q4') }
   'streamnone' = @{ t = 'q';   edits = @(,@($mStream, $mStream0)); red = @('Q5') }
   'jsonnone'   = @{ t = 'q';   edits = @(,@($mJson, $mJson0)); red = @('Q5') }
   'cardbucket' = @{ t = 'sh';  edits = @(,@($mCard, '')); red = @('C2') }

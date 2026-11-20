@@ -107,6 +107,21 @@ $optionParserShared = lift_present($F_SHARED, array('penumbraPromptOptionTemplat
     'penumbraPromptUnquotedDoubleColon', 'penumbraPromptUnquotedColon'));
 // Third pass (2026-09-29): the join of several per-option pieces.
 $joinPiecesShared = lift_present($F_SHARED, array('penumbraPromptJoinPieces'));
+// (2026-11-19, promptfix sweep) helpers both PHP engines call since then: a tag in a SQL comment emits '' (scanner +
+// q-quote reader), multi-select values split then decoded, resultif decided in SQL order, the noquote option reader,
+// the query.php param_types store. Lifted when present, so older files still run.
+lift_present($F_SHARED, array('penumbraSqlQQuoteClose', 'penumbraPromptTagsInComments', 'penumbraMultiValueList',
+    'penumbraResultIfCheck', 'penumbraNoQuoteOptionValues', 'penumbraParamTypes',
+    'penumbraPromptOptionGroups'));   // W6 review #2: every options= group in the noquote check
+// (2026-11-19, promptfix2 A5/A8) a skipped resultif child's quote/paren span, and nothing picked under a negated
+// operator (1=1): both PHP engines call these since round 2. Lifted when present.
+lift_present($F_SHARED, array('penumbraResultIfSkipSpan', 'penumbraPromptEmptyExclude'));
+// (2026-11-19, promptfix3 S1) ?json=1 never reads a reserved URL name as a prompt answer: one PHP list. Lifted when present.
+lift_present($F_SHARED, array('penumbraUrlReservedNames', 'penumbraUrlNameReserved'));
+// (2026-11-19) subqsweep (41364e4 / 26e5cba): both PHP engines ask penumbraOffsetInMssqlTag whether a tag sits inside an
+// MS-SQL [SUBQUERY]; it and the subquery tag readers it leans on, lifted when present.
+lift_present($F_SHARED, array('penumbraOffsetInMssqlTag', 'penumbraFindSubqueryTags', 'penumbraSubqueryTagFields', 'penumbraTagCloseAt',
+    'penumbraSelectListNames', 'penumbraGateDropCteReads', 'penumbraRepairJsonCellsUtf8'));
 require_once $APP . '/penumbra_search.php';     // _sr_resolve_relative_date(): pure, no I/O
 eval(lift($F_RUNNER, array('process_scheduler_prompts')));
 lift_present($F_RUNNER, array('penumbra_parse_per_option_templates', 'penumbra_split_options_value',
@@ -162,7 +177,7 @@ function load_corpus($file) {
         elseif ($k === 'ans') {
             foreach (($v === '' ? array() : explode('&', $v)) as $pair) {
                 $eq = strpos($pair, '=');
-                $cur['answers'][substr($pair, 0, $eq)] = substr($pair, $eq + 1);
+                $cur['answers'][substr($pair, 0, $eq)] = str_replace('%26', '&', substr($pair, $eq + 1));   // (2026-11-19) %26 = a literal & in a value
             }
         }
         elseif ($k === 'mode') { $cur['mode'] = $v; }

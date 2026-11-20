@@ -119,7 +119,8 @@ function penumbra_tpl_classify_arg($raw) {
         return array('type' => 'literal', 'value' => substr($t, 1, -1), 'raw' => $t);
     }
     // \z, not $: a PHP $ also matches before a trailing newline, a JS $ does not.
-    if (preg_match('/^\{[^}]+\}\z/', $t)) {
+    // (2026-11-19, copyfix #6) innermost braces, as penumbra_tpl_subst reads them
+    if (preg_match('/^\{[^{}]+\}\z/', $t)) {
         return array('type' => 'ref', 'name' => substr($t, 1, -1), 'raw' => $t);
     }
     if (preg_match('/^(string|data|calc)\(/', $t, $m)) {
@@ -563,7 +564,10 @@ function penumbra_tpl_nested_value($v) {
     }
     $sv = (string)$v;
     if (substr($sv, 0, 6) === '@@HTML') {
-        $sv = penumbra_tpl_js_trim(preg_replace('/<[^>]*>/', '', substr($sv, 6)));
+        // (2026-11-19, copyfix #17) ...and its entities decoded, as the browser's template does (main.js generateTemplateOutput)
+        $sv = preg_replace('/<[^>]*>/', '', substr($sv, 6));
+        if (strpos($sv, '&') !== false) $sv = html_entity_decode($sv, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $sv = penumbra_tpl_js_trim($sv);
     }
     return $sv;
 }
@@ -651,6 +655,29 @@ function penumbra_tpl_flat_source($apiResult) {
             $aliases[penumbra_tpl_upper($a)] = penumbra_tpl_upper($to);
         }
     }
+    // (2026-11-18, tplnames) The journal's page names, as the page's template reads them (main.js keys its journal cells by
+    // their internal data-colname, and the friendly name with them): {__JOURNAL_TOGGLE__done}, {__JOURNAL_FIELD__status3},
+    // {__JOURNAL_BY__done} / {__JOURNAL_ON__done} and {__JOURNAL_NOTES} read their output columns (they printed as written).
+    // And {Notes} when the report keeps notes out of downloads (no Notes column in the output): nothing, as the page's copy
+    // of the column gives - it printed "{Notes}". A column of the rows' own by any of these names keeps its value.
+    $blanks = array();   // UPPER name => the name as the page's header shows it
+    if (isset($apiResult['journalToggleResolver']) && is_array($apiResult['journalToggleResolver'])) {
+        $tplRes = $apiResult['journalToggleResolver'];
+        $tplHave = array();
+        foreach ($columns as $c) $tplHave[penumbra_tpl_upper($c)] = true;
+        if (function_exists('journalExportInternalNameMap')) {
+            foreach (journalExportInternalNameMap($tplRes) as $a => $to) {
+                $au = penumbra_tpl_upper($a); $tu = penumbra_tpl_upper($to);
+                if (!isset($tplHave[$au]) && isset($tplHave[$tu]) && !isset($aliases[$au])) $aliases[$au] = $tu;
+            }
+        }
+        if (empty($tplRes['notesName']) && !empty($tplRes['notesSearch'])) {
+            foreach (array((string)$tplRes['notesSearch'] => 'Notes', '__JOURNAL_NOTES' => 'Notes') as $bn => $bh) {
+                $bu = penumbra_tpl_upper($bn);
+                if (!isset($tplHave[$bu]) && !isset($aliases[$bu])) $blanks[$bu] = $bh;
+            }
+        }
+    }
 
     // getNestedColumnPlan(): sub-keys discovered from the first 50 rows.
     $plan = array();
@@ -669,7 +696,7 @@ function penumbra_tpl_flat_source($apiResult) {
     }
 
     return array('mode' => 'flat', 'columns' => array_map('strval', $columns), 'rows' => $rows,
-                 'rowNums' => $rowNums, 'nested' => $plan, 'count' => count($rows), 'aliases' => $aliases);
+                 'rowNums' => $rowNums, 'nested' => $plan, 'count' => count($rows), 'aliases' => $aliases, 'blanks' => $blanks);
 }
 }
 
@@ -771,7 +798,8 @@ function penumbra_tpl_build_source($apiResult, $themeName = 'theme-default') {
 if (!function_exists('penumbra_tpl_subst')) {
 function penumbra_tpl_subst($txt, $lookup) {
     if (strpos($txt, '{') === false) return $txt;
-    return preg_replace_callback('/\{[^}]+\}/', function ($m) use ($lookup) {
+    // (2026-11-19, copyfix #6) Innermost braces: {[^}]+} took '{"id":"{ID}' as one token and left {ID} unfilled.
+    return preg_replace_callback('/\{[^{}]+\}/', function ($m) use ($lookup) {
         $v = call_user_func($lookup, penumbra_tpl_upper(substr($m[0], 1, -1)));
         return ($v === null) ? $m[0] : $v;
     }, $txt);
@@ -830,7 +858,7 @@ function penumbra_tpl_render_body($template, $source, $resolveData, $budgetSecon
     $referenced = array();     // parentName -> plan entry, in template order
     if (!empty($nestedKeys)) {
         $used = array();
-        if (preg_match_all('/\{[^}]+\}/', $template, $mm)) {
+        if (preg_match_all('/\{[^{}]+\}/', $template, $mm)) {   // (copyfix #6) innermost braces
             foreach ($mm[0] as $ph) $used[] = penumbra_tpl_upper(substr($ph, 1, -1));
         }
         if ($hasCalls) { foreach (penumbra_tpl_collect_refs($segments) as $r) $used[] = $r; }
@@ -859,6 +887,9 @@ function penumbra_tpl_render_body($template, $source, $resolveData, $budgetSecon
             foreach ($source['aliases'] as $a => $to) {
                 if (!array_key_exists($a, $plain) && array_key_exists($to, $plain)) $plain[$a] = $plain[$to];
             }
+        }
+        if (!empty($source['blanks'])) {   // (2026-11-18, tplnames) {Notes} with notes kept out of downloads
+            foreach ($source['blanks'] as $b => $bh) { if (!array_key_exists($b, $plain)) $plain[$b] = ''; }
         }
         $mk = function ($extra) use ($plain, $nestedKeys) {
             return function ($key) use ($extra, $plain, $nestedKeys) {
@@ -924,6 +955,9 @@ function penumbra_tpl_render_header($headerStr, $source, $resolveData) {
     foreach ($source['nested'] as $p) {
         foreach ($p['subNames'] as $sub) $names[penumbra_tpl_upper($p['parentName'] . '-' . $sub)] = $p['parentName'] . '-' . $sub;
     }
+    // (2026-11-18, tplnames) the journal's page names emit their column's name, as the page's header line does
+    if (!empty($source['aliases'])) { foreach ($source['aliases'] as $a => $to) { if (strpos((string)$a, '__JOURNAL') === 0 && !array_key_exists($a, $names) && array_key_exists($to, $names)) $names[$a] = $names[$to]; } }
+    if (!empty($source['blanks'])) { foreach ($source['blanks'] as $b => $bh) { if (!array_key_exists($b, $names)) $names[$b] = $bh; } }
     $lookup = function ($key) use ($names) { return array_key_exists($key, $names) ? $names[$key] : null; };
     $out = '';
     foreach (penumbra_tpl_parse($headerStr) as $seg) {

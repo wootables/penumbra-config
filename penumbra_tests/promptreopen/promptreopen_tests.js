@@ -72,7 +72,8 @@
         // section= (2026-09-24): updatePromptDisplay and reconfigureAllPrompts call
         // these from then on; lifted only when the main.js under test has them, so
         // this suite runs against builds from before AND after.
-        ['promptSectionKey', 'promptSectionMap'].forEach(function (n) {
+        ['promptSectionKey', 'promptSectionMap', '_pnbPromptListJoin', '_pnbPromptListSplit', '_pnbUnlockUrlAnswer',   // the last three: promptfix 2026-11-19
+         '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor'].forEach(function (n) {   // promptfix2 2026-11-19
             if (new RegExp('\\n    function ' + n + '\\(').test(code)) names.push(n);
         });
         var src = "var PNB_DATE_RANGE_SEP = '..';\n"
@@ -84,6 +85,13 @@
             // when the main.js under test has it; there is no link visit here.
             + 'var _pnbViewLink = null; var _pnbVlPromptSaves = {};\n'
             + ((/\n    function _pnbPromptStored\([^\n]*\}\n/.exec(code) || [''])[0])
+            // (2026-11-19, promptfix #2/#7) the write/remove twins (one-liners, lifted the same way) and the SQL pass
+            // record processPrompts keeps (a closure let in main.js).
+            + ((/\n    function _pnbPromptWrite\([^\n]*\}\n/.exec(code) || [''])[0])
+            + ((/\n    function _pnbPromptRemove\([^\n]*\}\n/.exec(code) || [''])[0])
+            + 'var _pnbPromptSqlPass = { n: 0, keys: new Set(), names: new Set() };\n'
+            // (2026-11-19, promptfix2 E8-E10/C10) the reserved-name list (closure vars) and the URL / label / default-mark helpers
+            + ((/\n    var _PNB_URL_RESERVED = [^;]*;\n/.exec(code) || [''])[0]) + ((/\n    var _pnbReservedWarned = [^\n]+\n/.exec(code) || [''])[0])
             + names.map(grabFn).join('\n')
             + '\nreturn {'
             + names.map(function (n) { return n + ':' + n; }).join(',')

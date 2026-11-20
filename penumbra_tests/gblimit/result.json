@@ -35,8 +35,8 @@
                     },
                     {
                         "name":  "T7 control: doughnut keeps the all-rows count (warns at Limit 3)",
-                        "pass":  true,
-                        "detail":  "got true | want true"
+                        "pass":  false,
+                        "detail":  "got false | want true"
                     },
                     {
                         "name":  "T8 control: bar with no Group By draws normally",

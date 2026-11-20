@@ -1441,7 +1441,7 @@
                     {
                         "name":  "chart map: a bucketed column field is passed through as the series token",
                         "pass":  true,
-                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"AWARD_DATE:fy\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"filterExpression\":\"\",\"groupBy\":\"AWARD_DATE:fy\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
                     },
                     {
                         "name":  "chart map: bucketed columns no longer warn",
@@ -1546,17 +1546,17 @@
                     {
                         "name":  "chart map: a percentile pivot keeps its aggregation",
                         "pass":  true,
-                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"p90\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"filterExpression\":\"\",\"groupBy\":\"none\",\"agg\":\"p90\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
                     },
                     {
                         "name":  "chart map: a weighted-average pivot keeps its weight",
                         "pass":  true,
-                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"wavg@COUNT\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"filterExpression\":\"\",\"groupBy\":\"none\",\"agg\":\"wavg@COUNT\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
                     },
                     {
                         "name":  "chart map: a text-only aggregation still falls back to Sum and says so",
                         "pass":  true,
-                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[\"A chart cannot show Antimode, so it shows Sum.\"]}"
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"filterExpression\":\"\",\"groupBy\":\"none\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[\"A chart cannot show Antimode, so it shows Sum.\"]}"
                     },
                     {
                         "name":  "axis bucket: a text column offers no buckets",

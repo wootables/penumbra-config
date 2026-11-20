@@ -173,8 +173,10 @@ if ($ex0 !== false) { $excBody = substr($qp, $ex0); $excBody = substr($excBody, 
 $strip = function ($b, $head) { return $b === null ? null : substr($b, strpos($b, $head) + strlen($head)); };
 $pdoRun = $strip($pdoBody, "} catch (PDOException \$e) {\n");
 $excRun = $strip($excBody, "} catch (Exception \$e) {\n");
-$cteBody = between($qp, "    } catch (Exception \$e) {\n        error_log(\"CTE Subquery Failed: ", "\n        exit;\n    }", true);
-$subBody = between($qp, "    } catch (Exception \$e) {\n        error_log(\"Subquery Failed: ", "\n        exit;\n    }", true);
+// (subqsweep 41364e4) ONE catch block serves both tag kinds now (it branches on
+// $pnbSqIsCte and $tag['type']); Q3 and Q4 each run it with their own kind.
+$cteBody = between($qp, "    } catch (Exception \$e) {\n        // A failed subquery ABORTS", "\n        exit;\n    }", true);
+$subBody = $cteBody;
 $cteRun = $cteBody === null ? null : str_replace('exit;', 'return;', substr($cteBody, strpos($cteBody, "{\n") + 2, -strlen("\n    }")));
 $subRun = $subBody === null ? null : str_replace('exit;', 'return;', substr($subBody, strpos($subBody, "{\n") + 2, -strlen("\n    }")));
 if (!function_exists('penumbraSubqueryErrorMessage')) { function penumbraSubqueryErrorMessage($t, $d, $e) { return "Cross-database $t failed on db=$d: $e"; } }
@@ -211,7 +213,8 @@ if ($have && $excRun !== null) {
 
 foreach (array(array('Q3', 'CTE_SUBQUERY', $cteRun), array('Q4', 'SUBQUERY', $subRun)) as $sq) {
     if ($have && $sq[2] !== null) {
-        $err = run_block($sq[2], $viewer + array('e' => new PDOException($OUTAGE), 'tag' => array('db' => 'infoed', 'query' => 'SELECT 1')));
+        $err = run_block($sq[2], $viewer + array('e' => new PDOException($OUTAGE), 'pnbSqIsCte' => ($sq[1] === 'CTE_SUBQUERY'),
+            'tag' => array('db' => 'infoed', 'query' => 'SELECT 1', 'type' => $sq[1])));
         $ok = !$err && count($AUD) === 1 && $AUD[0] === array(1234, 'QUERY_FAIL', null, null, 'Could not connect to InfoEd MS-SQL (SQLSTATE 08001).')
               && strpos($GLOBALS['__out'], 'Cross-database ' . $sq[1] . ' failed on db=infoed') !== false;
         T($sq[0], 'a failed [' . $sq[1] . ':infoed] tag, RUN: the QUERY_FAIL row names InfoEd, the 400 answer unchanged', $ok, $err ?: (json_encode($AUD) . ' | ' . $GLOBALS['__out']));

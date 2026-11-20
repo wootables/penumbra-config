@@ -141,7 +141,7 @@
         // writes an empty search= so a reload keeps it cleared.
         var def = defaultFilterText();
         if (URL_SEARCH && URL_SEARCH !== def) { parts.push('search=' + encodeURIComponent(URL_SEARCH)); }
-        /* mutant: a cleared address bare */
+        else if (!URL_SEARCH && def) { parts.push('search='); }
         return 'dashboard.php' + (parts.length ? '?' + parts.join('&') : '');
     }
     // A tile's effective prompt answers: its own, with the URL's on top.

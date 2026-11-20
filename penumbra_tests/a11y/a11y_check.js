@@ -517,7 +517,7 @@
         var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
         function focusablesIn(ov) {
             return Array.prototype.filter.call(ov.querySelectorAll(FOCUSABLE), function (el) {
-                return el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden';
+                return el.offsetParent !== null && viewOf(el).getComputedStyle(el).visibility !== 'hidden';
             });
         }
         function onOpen(ov) {
@@ -530,7 +530,8 @@
                 if (!h.id) { h.id = 'pnbDlgT' + (++seqM); }
                 ov.setAttribute('aria-labelledby', h.id);
             }
-            ov.__pnbTrigger = lastFocusBeforeModal || document.activeElement;
+            // the last focus outside a prompt IN THIS dialog's document (the tab's or the popped-out console's)
+            ov.__pnbTrigger = (lastFocusBeforeModal && lastFocusBeforeModal.ownerDocument === ov.ownerDocument) ? lastFocusBeforeModal : ov.ownerDocument.activeElement;
             if (stealsHostFocus()) { return; }   // see stealsHostFocus()
             // Initial focus: prefer an explicit [autofocus] target, then a data-entry
             // field. Otherwise focus the dialog CONTAINER - NOT the first focusable,
@@ -547,8 +548,20 @@
                 try { target.focus(); } catch (e) { if (f.length) { f[0].focus(); } }
             }, 30);
         }
-        function start() {
-            if (!document.body) { return; }
+        // (2026-11-19, promptfix2 B9) bound per DOCUMENT: while the admin console is popped out its prompt dialogs
+        // live in that window (_pnbModalHost), and these are native listeners, which main.js does not forward. The
+        // pop-out is attached when main.js announces it (penumbra:console-window); nothing extra runs while docked.
+        function attachPrompts(doc) {
+            if (!doc || doc.__pnbPromptA11y) { return; }
+            doc.__pnbPromptA11y = true;
+            if (doc === document) { onReady(function () { observePrompts(doc); }); } else { observePrompts(doc); }
+            doc.addEventListener('focusin', function (e) {
+                if (!e.target.closest || !e.target.closest('.modal-prompt-overlay')) { lastFocusBeforeModal = e.target; }
+            }, true);
+            doc.addEventListener('keydown', function (e) { trapTab(e, doc); }, true);
+        }
+        function observePrompts(doc) {
+            if (!doc.body) { return; }
             new MutationObserver(function (muts) {
                 for (var m = 0; m < muts.length; m++) {
                     var ad = muts[m].addedNodes;
@@ -567,28 +580,26 @@
                         }
                     }
                 }
-            }).observe(document.body, { childList: true });
+            }).observe(doc.body, { childList: true });
         }
-        onReady(start);
-        document.addEventListener('focusin', function (e) {
-            if (!e.target.closest || !e.target.closest('.modal-prompt-overlay')) { lastFocusBeforeModal = e.target; }
-        }, true);
-        document.addEventListener('keydown', function (e) {
+        attachPrompts(document);
+        document.addEventListener('penumbra:console-window', function (e) { attachPrompts(e.detail && e.detail.doc); });
+        function trapTab(e, doc) {
             if (!isTab(e)) { return; }
-            var ovs = document.querySelectorAll('.modal-prompt-overlay'), ov = null;
+            var ovs = doc.querySelectorAll('.modal-prompt-overlay'), ov = null;
             // (2026-11-13, traplive) shown(), not offsetParent: the overlay is position:fixed, whose offsetParent is always
             // null, so no open dialog was ever found and Tab walked out into the page behind it
             for (var i = ovs.length - 1; i >= 0; i--) { if (shown(ovs[i])) { ov = ovs[i]; break; } }
             if (!ov) { return; }
             var f = focusablesIn(ov);
             if (!f.length) { e.preventDefault(); return; }
-            var first = f[0], last = f[f.length - 1];
-            if (!ov.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+            var first = f[0], last = f[f.length - 1], ae = doc.activeElement;
+            if (!ov.contains(ae)) { e.preventDefault(); first.focus(); return; }
             // ...and Shift+Tab from the dialog's own box (where a click on its text leaves focus): to the last control
-            if (e.shiftKey && f.indexOf(document.activeElement) < 0) { e.preventDefault(); last.focus(); return; }
-            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }, true);
+            if (e.shiftKey && f.indexOf(ae) < 0) { e.preventDefault(); last.focus(); return; }
+            if (e.shiftKey && ae === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && ae === last) { e.preventDefault(); first.focus(); }
+        }
     })();
 
     // ------------------------------------------------------------ role=menu
@@ -846,8 +857,11 @@
                 var grp = Array.isArray(ds0.groups) ? ds0.groups : [];
                 var labelF = grp.length ? grp[grp.length - 1] : '_label';
                 var groupF = grp.length > 1 ? grp[0] : null;
+                // (2026-11-19, chartsweep2 Q3-2) a tile is SIZED by |value| (_value); its value is _signed (main.js
+                // chartsweep CD-9), as the tile label and the tooltip say: a -220 tile was read as 220.
+                var tmVal = function (o) { return (keyF === '_value' && o._signed != null) ? o._signed : o[keyF]; };
                 custom = { columns: groupF ? ['Label', 'Group', 'Value'] : ['Label', 'Value'], rows: tree.map(function (o) {
-                    return groupF ? [o[labelF], o[groupF], o[keyF]] : [o[labelF], o[keyF]]; }) };
+                    return groupF ? [o[labelF], o[groupF], tmVal(o)] : [o[labelF], tmVal(o)]; }) };
             }
             var hasData = custom ? true : !!(labels.length && datasets.length);
             var rowCount = custom ? custom.rows.length : labels.length;
@@ -864,14 +878,53 @@
                         h += '</tr>';
                     }
                 } else {
+                    // (2026-11-19, chartsweep2 Q5-3) The values the tooltip and the chart CSV give (main.js
+                    // _penumbraChartToCsv, chartsweep BM-2/BM-4 and csvstack): a funnel plots [-v/2, v/2] and keeps its
+                    // values in data._funnelValues; a "Stack to 100%" chart plots shares and keeps the aggregates in
+                    // _rawData; a Largest / Smallest-first stack's datasets are POSITIONS (_pos_0...) whose group is per
+                    // bar (_groupNames): one column per group again, the groups in their natural order.
+                    var ds0v = datasets[0];
+                    var valAt = function (ds, i) {
+                        if (ds === ds0v && Array.isArray(data._funnelValues)) { return data._funnelValues[i]; }
+                        if (Array.isArray(ds._rawData) && ds._rawData[i] != null) { return ds._rawData[i]; }
+                        return (ds.data && ds.data[i] != null) ? ds.data[i] : '';
+                    };
+                    var sds = datasets.filter(function (ds) { return ds && !ds._isTrendLine; });
+                    var gList = null, gTab = null;
+                    if (sds.length && sds.every(function (ds) { return Array.isArray(ds._groupNames); })) {
+                        var gSeen = Object.create(null);
+                        gList = []; gTab = [];
+                        for (var gi = 0; gi < labels.length; gi++) {
+                            gTab[gi] = Object.create(null);
+                            for (var gd = 0; gd < sds.length; gd++) {
+                                var g = sds[gd]._groupNames[gi];
+                                if (g === null || g === undefined || g === '') { continue; }
+                                g = String(g);
+                                if (!gSeen[g]) { gSeen[g] = 1; gList.push(g); }
+                                gTab[gi][g] = valAt(sds[gd], gi);
+                            }
+                        }
+                        gList.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }); });
+                    }
                     h += '<th scope="col">Category</th>';
-                    for (var d = 0; d < datasets.length; d++) { h += '<th scope="col">' + esc(datasets[d].label || ('Series ' + (d + 1))) + '</th>'; }
+                    if (gList) {
+                        for (var gh = 0; gh < gList.length; gh++) { h += '<th scope="col">' + esc(gList[gh]) + '</th>'; }
+                    } else {
+                        for (var d = 0; d < datasets.length; d++) { h += '<th scope="col">' + esc(datasets[d].label || ('Series ' + (d + 1))) + '</th>'; }
+                    }
                     h += '</tr></thead><tbody>';
                     for (var i = 0; i < labels.length; i++) {
                         h += '<tr><th scope="row">' + esc(String(labels[i])) + '</th>';
-                        for (var d2 = 0; d2 < datasets.length; d2++) {
-                            var v = (datasets[d2].data && datasets[d2].data[i] != null) ? datasets[d2].data[i] : '';
-                            h += '<td>' + esc(cellText(v)) + '</td>';
+                        if (gList) {
+                            for (var gc = 0; gc < gList.length; gc++) {
+                                var gv = gTab[i][gList[gc]];
+                                h += '<td>' + esc(cellText(gv === undefined ? '' : gv)) + '</td>';
+                            }
+                        } else {
+                            for (var d2 = 0; d2 < datasets.length; d2++) {
+                                var v = valAt(datasets[d2], i);
+                                h += '<td>' + esc(cellText(v)) + '</td>';
+                            }
                         }
                         h += '</tr>';
                     }

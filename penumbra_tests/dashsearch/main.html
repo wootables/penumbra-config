@@ -84,6 +84,9 @@
   window.__errors = [];
   window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
 </script>
+<!-- (2026-11-19, promptfix2 E8) index.php loads js/penumbra_tiles.js BEFORE main.js: main.js reads the app's reserved
+     link parameters from PenumbraTiles.URL_RESERVED (fallback id/state/view only). The run stages the tiles under test. -->
+<script src="penumbra_tiles.js"></script>
 <script src="main_patched.js"></script>
 <script>
 (function () {

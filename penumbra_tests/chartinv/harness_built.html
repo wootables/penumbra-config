@@ -1941,8 +1941,14 @@
         // "Drill down..." = the canvas click: the column popup (or the breakdown where it cannot drill).
         $sub = openMenu(rr.canvas);
         nOver = $('.infobox-overlay').length; $('.chart-drill-popup').remove();
-        $sub.children('li.ctx-drill-cat').first().find('.ctx-point-act[data-act="open"]').trigger('click');
-        assert('K ' + cs[0] + ': "Drill down" opens what a click opens', $('.chart-drill-popup').length === 1 || $('.infobox-overlay').length === nOver + 1, '');
+        var $kOpen = $sub.children('li.ctx-drill-cat').first().find('.ctx-point-act[data-act="open"]');
+        if (cs[0] === 'map') {
+          // (2026-11-19, menufix B8) a map cannot drill (chartsweep MN-8): its "Drill down" only repeated Show source rows, so it is gone
+          assert('K map: no "Drill down" (a map cannot drill; Show source rows is its click)', $kOpen.length === 0, $kOpen.length + ' found');
+        } else {
+          $kOpen.trigger('click');
+          assert('K ' + cs[0] + ': "Drill down" opens what a click opens', $('.chart-drill-popup').length === 1 || $('.infobox-overlay').length === nOver + 1, '');
+        }
         $('.chart-drill-popup').remove(); $('.infobox-overlay').remove();
         // Notes: treemap is a notes type; the others are not (and must not offer any).
         $sub = openMenu(rr.canvas);

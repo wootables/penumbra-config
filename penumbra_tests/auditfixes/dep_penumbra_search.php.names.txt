@@ -17,9 +17,19 @@ _php_evaluate_search_row_with_virtual
 _php_evaluate_with_row_match
 _search_get_virtual_columns
 _search_virtual_column_names
+_search_nested_qual
+_search_nested_qualify
+_search_parse_nested
+_search_repair_truncated_json
+_search_nested_keys
+_search_own_nested_values
+_search_is_empty_kw
+_search_nested_match
 _search_get_structured_virtual_data
 _search_get_cell_value
 _search_nested_value
+_search_js_string
+_search_js_number
 _search_decode_entities
 _search_decode_entity
 _search_join_surrogates
@@ -48,6 +58,7 @@ php_apply_search_filter
 penumbra_route_dash_search
 penumbra_search_known_columns
 penumbra_search_columns_from_meta
+penumbra_nested_at
 penumbra_nested_row_count
 _penumbra_json_rows
 _search_bucket_suffix

@@ -748,7 +748,7 @@ MUTANTS = {
     'cf-medium': ([('cardscss', "#pnbCardsHost:not(.is-large):not(.is-xl) .journal-rownote-inline .journal-rownote-input { grid-row: 2; grid-column: 1 / -1; }\n", "")], ['L-cnote-btnsUnder'], ['cnote']),
     'cf-sharedlbl': ([('cards', "var lb = window._penumbraJournalNotesMode === 'shared' ? 'Edit note...' :", "var lb = false ? 'Edit note...' :")], ['L-cnote-sharedEditLabel'], ['cnote']),
     'cf-sizelbl': ([('cards', "var SIZE_LABELS = { compact: 'Small', standard: 'Medium',", "var SIZE_LABELS = { compact: 'Compact', standard: 'Standard',")], ['L-cnote-sizeWords'], ['cnote']),
-    'cf-cardboard': ([('cards', "        if (bd) out.push({ act: 'cardsStacked',", "        if (!bd && !t.pivot) out.push({ act: 'cardsBoard', label: 'Show as a board', run: function () { showBoard(); } });\n        if (bd) out.push({ act: 'cardsStacked',")], ['L-cboard-menuNoBoard'], ['cboard']),
+    'cf-cardboard': ([('cards', "        if (bd && !inWin) out.push({ act: 'cardsStacked',", "        if (!bd && !t.pivot) out.push({ act: 'cardsBoard', label: 'Show as a board', run: function () { showBoard(); } });\n        if (bd && !inWin) out.push({ act: 'cardsStacked',")], ['L-cboard-menuNoBoard'], ['cboard']),
     'cm-optback': ([('main', "        if (longS) delete v.s;\n", "        if (longS) delete v.s;\n        if (opts && opts.cards) { v.cv = 1; v.cz = opts.size; }\n")], ['L-cshare-optGone'], ['cshare']),
     'cm-seensize': ([('main', "            if (czNow === 'compact' || czNow === 'large' || czNow === 'xl') v.cz = czNow;\n", "")], ['L-cshare-asSeenSize'], ['cshare']),
     'cm-handler': ([('main', "#emailLinkAsView, #emailShowRecipients', updateEmailWarnings);", "#emailLinkAsView, #emailShowRecipients, #emailLinkAsCards', updateEmailWarnings);")], ['S-emailCards'], []),
@@ -897,10 +897,10 @@ MUTANTS = {
     'b-greyed': ([('cards', "        if (v === 'table' && boardOn()) return;   // (bdlay) a board is cards: the switch's Table is greyed, Configure Grouping's Layout leaves it\n", "")], ['L-gboard-tableGreyed'], ['gboard']),
     'b-offui': ([('cards', "var ov = opts[i].getAttribute('data-view'), off = bd && ov === 'table',", "var ov = opts[i].getAttribute('data-view'), off = false,")], ['L-gboard-tableGreyed'], ['gboard']),
     'b-arrows': ([('cards', "            else if (!boardOn()) {   // (round S) through every option the switch has; (bdlay) a board: Cards alone (Table greyed)", "            else {")], ['L-gboard-tableGreyed'], ['gboard']),
-    'b-cardmenu': ([('cards', "        if (bd) out.push({ act: 'cardsStacked',", "        if (false) out.push({ act: 'cardsStacked',")], ['L-gboard-cardMenu'], ['gboard']),
+    'b-cardmenu': ([('cards', "        if (bd && !inWin) out.push({ act: 'cardsStacked',", "        if (false) out.push({ act: 'cardsStacked',")], ['L-gboard-cardMenu'], ['gboard']),
     'b-tablemenu': ([('cards', "        } }]);   // (cfb8, the user: not worth a menu slot)", "        } }, { act: 'showBoard', label: 'Show as a board', run: function () { showBoard(); } }]);   // (cfb8, the user: not worth a menu slot)")], ['L-gboard-tableMenuNoBoard'], ['gboard']),   # (cfb8: the item back; re-anchored, crow)
     'b-menu': ([('menu', "            view.push({ act: 'gBoard', label: 'Switch to Board view',", "            if (false) view.push({ act: 'gBoard', label: 'Switch to Board view',")], ['L-gboard-backToBoard'], ['gboard']),
-    'b-gmnorm': ([('main', "            layout = _groupLayoutNorm(layout);\n            // (bdlay) a board only where the card view can draw it\n", "            layout = (layout === 'list') ? 'list' : 'stacked';\n            // (bdlay) a board only where the card view can draw it\n")], ['L-gboard-backToBoard', 'L-gfix2-lanesFit'], ['gboard', 'gfix2']),
+    'b-gmnorm': ([('main', "            layout = _groupLayoutNorm(layout);\n            if (_gmCmp && layout === 'board') return false;\n            // (bdlay) a board only where the card view can draw it\n", "            layout = (layout === 'list') ? 'list' : 'stacked';\n            if (_gmCmp && layout === 'board') return false;\n            // (bdlay) a board only where the card view can draw it\n")], ['L-gboard-backToBoard', 'L-gfix2-lanesFit'], ['gboard', 'gfix2']),
     'b-gmguard': ([('main', "            if (layout === 'board' && !(window.Penumbra.cards && typeof window.Penumbra.cards.canBoard === 'function' && window.Penumbra.cards.canBoard())) return false;", "            if (layout === 'board') return false;")], ['L-gboard-backToBoard'], ['gboard']),
     'b-radio': ([('main', "        $('#groupLayoutRow .grp-lb-board').toggle(v === 'board' || !!(C && typeof C.canBoard === 'function' && C.canBoard()));", "        $('#groupLayoutRow .grp-lb-board').toggle(v === 'board');")], ['L-cboard-dialogOpens'], ['cboard']),
     'b-dialog': ([('cards', "            if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }\n", "")], ['L-cboard-dialogOpens', 'L-cboard-applyMakesBoard'], ['cboard']),
@@ -1327,7 +1327,10 @@ def static_checks(t):
     out.append(('S-emailCards', 'emailLinkAsCards' not in idx and 'emailLinkCardSize' not in idx and 'emailCardsLinkRow' not in idx and 'emailLinkAsCards' not in main and 'emailLinkCardSize' not in main
                 and '_pnbEmailLinkOpts' not in main and '_pnbEmailCardSize' not in main and "if (opts && opts.cards) {\n            v.cv = 1;" not in main.replace('\r\n', '\n')
                 and "'#emailIncludeSnippet, #emailInsertData, #emailIncludeLink, #emailLinkAsView, #emailShowRecipients', updateEmailWarnings" in main
-                and "urlParams.delete('cards'); urlParams.delete('cardsize');" in main and "_DL_RESERVED_PARAMS = { cards: 1, cardsize: 1," in main,
+                and (("urlParams.delete('cards'); urlParams.delete('cardsize');" in main and "_DL_RESERVED_PARAMS = { cards: 1, cardsize: 1," in main)
+                     # (2026-11-19, promptfix2 E8/E9) one cleaner that drops every reserved name, one list in penumbra_tiles.js
+                     or ("const urlParams = _pnbPromptUrlParams(true);" in main and "_DL_RESERVED_PARAMS = _PNB_URL_RESERVED;" in main
+                         and bool(re.search(r'var URL_RESERVED = \{[^}]*\bcards: 1, cardsize: 1\b', open(pick(os.path.join('js', 'penumbra_tiles.js')), 'rb').read().decode('utf-8', 'replace'))))),
                 'no Open as cards in the email dialog or main.js; the URL cleaner and the reserved params know cards / cardsize'))
     out.append(('S-urlHelp', '&amp;cards=1' in t['topic'] and 'Open as cards' not in t['topic'] and 'with <strong>As you see it now</strong> ticked while cards show' in t['topic'] and 'curl' in t['readme'] and 'var urlAsk' in cards, 'help + README name the URL parameters; the module reads them'))
     # (cmsize) the email cards' size table (the PHP twin is the csched suite's), the email help's sizes, README
@@ -1519,7 +1522,7 @@ def static_checks(t):
                 and 'id="sbGrpSizeRow"' in t['index'] and 'id="sbGrpCardSize"' in t['index'] and "On a board the grouping chip sorts the lanes" in t['pal']
                 and 'Cards chip steps aside' in t['ustopic'],
                 'bdlay3: the board fits the window, no Cards chip on a board (the grouping chip has the card size), one layout switch per band menu, a lane counts its cards'))
-    out.append(('S-cband', 'cband (2026-11-01' in t['readme'] and 'function bandDraw(el, r, max)' in cards and 'function gcHome()' in cards and 'function gcIn(el)' in cards
+    out.append(('S-cband', 'cband (2026-11-01' in t['readme'] and 'function bandDraw(el, r' in cards and 'function gcHome()' in cards and 'function gcIn(el)' in cards
                 and 'function groupHtml(' not in cards and '.pnb-cards-inband' in css and 'body.pnb-cards-on.pnb-cards-inband #groupedResultsContainer {' in css
                 and "Grouped <strong>Stacked</strong>, the cards sit in the grouping" in t['ustopic'],
                 'cband: Stacked draws the cards into the grouped view\'s own bands (gcIn / bandDraw / gcHome), the copied bands gone'))
@@ -1619,7 +1622,7 @@ MUTANTS.update({
 MUTANTS.update({
     'mf-gap': ([('cards', "        if (!t) { gapMenu(e); return; }", "        if (!t) return;")], ['L-cgapm-gapMenu', 'L-cgapm-gapSizes', 'L-cgapm-gapTable'], ['cgapm']),
     'mf-gapitems': ([('cards', "        CM.openItems('Cards', menuExtras({ kind: 'gap', card: null, pivot: false }, false), e.clientX, e.clientY, { kbd: kbd });", "        CM.openItems('Cards', [], e.clientX, e.clientY, { kbd: kbd });")], ['L-cgapm-gapMenu', 'L-cgapm-gapSizes'], ['cgapm']),
-    'mf-boardword': ([('cards', "        if (bd) out.push({ act: 'cardsStacked', label: 'Show as table',", "        if (bd) out.push({ act: 'cardsStacked', label: 'Switch to Stacked view',")], ['L-gboard-cardTableWord'], ['gboard']),
+    'mf-boardword': ([('cards', "        if (bd && !inWin) out.push({ act: 'cardsStacked', label: 'Show as table',", "        if (bd && !inWin) out.push({ act: 'cardsStacked', label: 'Switch to Stacked view',")], ['L-gboard-cardTableWord'], ['gboard']),
     'mf-laneclear': ([('menu', "        if (!c && cur && !cur.bd && !cur.cmp && !cur.noClear) { c = clearItem(); }", "        if (false) { c = clearItem(); }")], ['L-gboard-laneClear', 'L-cgapm-gapMenu'], ['gboard', 'cgapm']),   # (2026-11-17) re-anchored: 10970ef (menufix4) added noClear
 })
 

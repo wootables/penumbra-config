@@ -32,7 +32,7 @@
             if (k === 'case') { if (cur) cases.push(cur); cur = { group: group, label: v, sql: null, answers: [], mode: '', expect: {} }; return; }
             if (!cur) throw new Error("corpus: '" + k + ":' before any case:");
             if (k === 'sql') cur.sql = v.split(BS + 'n').join('\n');
-            else if (k === 'ans') { if (v !== '') v.split('&').forEach(function (p) { var eq = p.indexOf('='); cur.answers.push([p.substring(0, eq), p.substring(eq + 1)]); }); }
+            else if (k === 'ans') { if (v !== '') v.split('&').forEach(function (p) { var eq = p.indexOf('='); cur.answers.push([p.substring(0, eq), p.substring(eq + 1).split('%26').join('&')]); }); }   // (2026-11-19) %26 = a literal & in a value
             else if (k === 'mode') cur.mode = v;
             else if (k === 'all') cur.expect = { browser: v, runner: v, json: v };
             else if (k === 'browser' || k === 'runner' || k === 'json') cur.expect[k] = v;
@@ -67,14 +67,23 @@
         // _pnbPromptStored (a link visit's own first). The real helpers are lifted when the main.js under test has
         // them (the two one-liners by their line); there is no link visit here, so a stored answer is localStorage's.
         if (has('_pnbViewPromptNote')) names.push('_pnbViewPromptNote');
-        var viewLinkLines = ['_pnbViewPromptReset', '_pnbPromptStored'].map(function (n) {
+        // (2026-11-19, promptfix #2/#4/#7) writes and removals through _pnbPromptWrite / _pnbPromptRemove (one-liners),
+        // the multi-select list join/split, and the SQL pass record processPrompts keeps (a closure let in main.js).
+        ['_pnbPromptListJoin', '_pnbPromptListSplit', '_pnbUnlockUrlAnswer',
+         '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor'].forEach(function (n) { if (has(n)) names.push(n); });   // the second line: promptfix2 2026-11-19
+        // (2026-11-19, promptfix3 B2) validatePromptInput reads min_date()/max_date() through these; lifted when present.
+        ['penumbraPromptDateLimit', 'penumbraPromptDateLimitArg', '_pnbPgDateRead'].forEach(function (n) { if (has(n)) names.push(n); });
+        var viewLinkLines = ['_pnbViewPromptReset', '_pnbPromptStored', '_pnbPromptWrite', '_pnbPromptRemove'].map(function (n) {
             var m1 = new RegExp(BS + 'n    function ' + n + BS + '([^' + BS + 'n]*' + BS + '}' + BS + 'n').exec(code);
             return m1 ? m1[0] : '';
         }).join('');
         var src = "var PNB_DATE_RANGE_SEP = '..';\n" + (kw ? kw[0] : '') +
             'var _forceDefaultApplied = new Set(); var allResolvedPrompts = [];\n' +
             'var _pnbViewPrompts = Object.create(null); var _pnbViewLink = null; var _pnbVlPromptSaves = {};' +
-            ' var _pnbPromptRanByName = Object.create(null);\n' +   // what each prompt ran with (a const at the top of main.js's closure)
+            ' var _pnbPromptRanByName = Object.create(null);\n' +
+            'var _pnbPromptSqlPass = { n: 0, keys: new Set(), names: new Set() };\n' +   // what each prompt ran with (a const at the top of main.js's closure)
+            // (2026-11-19, promptfix2 E8-E10/C10) the reserved-name list (closure vars) and the URL / label / default-mark helpers
+            ((/\n    var _PNB_URL_RESERVED = [^;]*;\n/.exec(code) || [''])[0]) + ((/\n    var _pnbReservedWarned = [^\n]+\n/.exec(code) || [''])[0]) +
             viewLinkLines +
             names.map(grabFn).join('\n') +
             '\nreturn { processPrompts: processPrompts, forced: _forceDefaultApplied };';

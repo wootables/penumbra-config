@@ -48,6 +48,7 @@ MUTANTS = {
     'rm-link': ([('repo', "run: function () { repoCopy(abs, 'Link copied.'); } });", "run: function () { repoCopy(url, 'Link copied.'); } });")], ['R-link']),
     'rm-tab': ([('repo', "run: function () { window.open(url + noadm, '_blank'); } });", "run: function () { window.open(url + noadm, '_self'); } });")], ['R-tab']),
     'rm-fav': ([('repo', "run: function () { $(star).trigger('click'); } });", "run: function () { } });")], ['R-fav']),
+    'mfx-cal': ([('repo', "        if (V.isGlobalAdmin) out.push({ act: 'repoCalendar'", "        if (true) out.push({ act: 'repoCalendar'")], ['R-admin', 'R-row']),   # (2026-11-19, menufix B1)
     'rm-admin': ([('repo', "        if (V.isGlobalAdmin) {\n            out.push({ act: 'repoOwner'", "        if (true) {\n            out.push({ act: 'repoOwner'")], ['R-admin']),   # (menufix2: the admin's tools)
     'rm-deleted': ([('repo', "            if (!deleted) {\n                items.push({ act: 'repoOpen'", "            if (true) {\n                items.push({ act: 'repoOpen'")], ['R-deleted']),
     'rm-shift': ([('repo', "            if (e.shiftKey && e.button === 2) { return; }   // the browser's own menu, as every other menu leaves it", "")], ['R-shift']),

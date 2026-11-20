@@ -367,7 +367,7 @@ $fnResolver = lift_function($SHARED, 'resolveImportDataTags');
 // every JSON test would quietly take the literal path and pass vacuously. The
 // lane-engaged assertions below are the backstop for exactly that.
 eval(lift_class($SHARED, 'PenumbraClobBind'));
-foreach (array('extractSubqueryTags', 'penumbraOracleLiteralBody', 'penumbraUtf8SafeCut', 'penumbraNormalizeUtf8',
+foreach (array('extractSubqueryTags', 'penumbraTagCloseAt', 'penumbraSubqueryTagFields', 'penumbraOracleLiteralBody', 'penumbraUtf8SafeCut', 'penumbraNormalizeUtf8',
                'penumbraSubqueryTransportPref', 'penumbraByteSafeChunks', 'penumbraBuildOracleJsonRowset') as $h) {
     eval(lift_function($SHARED, $h));
 }

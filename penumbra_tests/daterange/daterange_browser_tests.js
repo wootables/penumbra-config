@@ -78,7 +78,9 @@
         // section= (2026-09-24): updatePromptDisplay calls these from then on;
         // lifted only when the main.js under test has them, so this suite runs
         // against builds from before AND after.
-        ['promptSectionKey', 'promptSectionMap'].forEach(function (n) {
+        ['promptSectionKey', 'promptSectionMap', '_pnbPromptListJoin', '_pnbPromptListSplit', '_pnbUnlockUrlAnswer',
+         '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor',
+         'penumbraPromptDateLimit', 'penumbraPromptDateLimitArg', '_pnbPgDateRead'].forEach(function (n) {   // the second line: promptfix2 2026-11-19; the third: promptfix3 B2 (min_date/max_date)
             if (new RegExp('\\n    function ' + n + '\\(').test(code)) names.push(n);
         });
         var src = "var PNB_DATE_RANGE_SEP = '..';\n"
@@ -93,6 +95,12 @@
             + 'var _pnbViewLink = null, _pnbVlPromptSaves = {}, _pnbPromptRanByName = Object.create(null);\n'
             + 'function _pnbViewPromptReset() {}\nfunction _pnbViewPromptNote() {}\n'
             + 'function _pnbPromptStored(k) { return localStorage.getItem(k); }\n'
+            // (2026-11-19, promptfix #2/#7) writes/removals through these two (no view link: plain localStorage), and
+            // the SQL pass record processPrompts keeps (a closure let in main.js).
+            + 'function _pnbPromptWrite(k, s) { localStorage.setItem(k, s); }\nfunction _pnbPromptRemove(k) { localStorage.removeItem(k); }\n'
+            + 'var _pnbPromptSqlPass = { n: 0, keys: new Set(), names: new Set() };\n'
+            // (2026-11-19, promptfix2 E8-E10/C10) the reserved-name list (closure vars) and the URL / label / default-mark helpers
+            + ((/\n    var _PNB_URL_RESERVED = [^;]*;\n/.exec(code) || [''])[0]) + ((/\n    var _pnbReservedWarned = [^\n]+\n/.exec(code) || [''])[0])
             + names.map(grabFn).join('\n')
             + '\nreturn {'
             + names.map(function (n) { return n + ':' + n; }).join(',')

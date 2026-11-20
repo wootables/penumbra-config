@@ -13,13 +13,18 @@ function _sr_resolve_keyword_date($raw) {
 }
 
 if (!function_exists('_sr_resolve_relative_date')) {
-function _sr_resolve_relative_date($raw) {
+function _sr_resolve_relative_date($raw, $type = null) {
     $trimVal = trim((string)$raw);
     if ($trimVal === '') return null;
 
     // 1. Strict keywords (TODAY, SYSDATE-7, NOW+1)
     $kw = _sr_resolve_keyword_date($trimVal);
     if ($kw !== null) return $kw;
+
+    // 1a. (2026-11-19, promptfix #10) Already YYYY-MM-DD: left as it is, as resolveParamDateExpression
+    // (shared_logic.php step 3) does - it was rewritten to DD-MON-YY, which broke
+    // TO_DATE('[PROMPT...]','YYYY-MM-DD') in the email while the browser ran it.
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimVal)) return null;
 
     // 1b. Fiscal year (NC State: FY runs Jul 1 -> Jun 30, labeled by the calendar
     // year it ENDS). Optional "first|last day of" + a FY reference; with the
@@ -59,7 +64,21 @@ function _sr_resolve_relative_date($raw) {
                preg_match('/^(?:yesterday|tomorrow)$/i', $trimVal)
             || preg_match('/^(?:first|last)\s+day\s+of\s+(?:last|this|next)\s+(?:month|year|quarter)$/i', $trimVal)
             || preg_match('/^(?:last|next)\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday)$/i', $trimVal);
-        if ($isRelativeDatePhrase || preg_match('/\d/', $trimVal)) {
+        // (2026-11-19, promptfix #16, review #1) A known type other than date / date-range skips only the
+        // "carries a digit" guess (and keeps "N days|weeks|months|years ago|ahead|from now"), the rule the
+        // browser's query.php and ?json=1 apply: "March 2020" for a type=text prompt stayed text there and
+        // became 01-MAR-20 in the email.
+        $digitGuess = true;
+        if ($type !== null && trim((string)$type) !== '') {
+            $tl = strtolower(trim((string)$type));
+            if ($tl !== 'date' && $tl !== 'date-range') {
+                $digitGuess = false;
+                if (!$isRelativeDatePhrase) {
+                    $isRelativeDatePhrase = preg_match('/^\d+\s+(?:day|week|month|year)s?\s+(?:ago|ahead|from\s+(?:now|today))(?:\s+from\s+(?:now|today))?$/i', $trimVal);
+                }
+            }
+        }
+        if ($isRelativeDatePhrase || ($digitGuess && preg_match('/\d/', $trimVal))) {
             // Year/quarter boundaries computed explicitly - strtotime's
             // 'first day of last year' is month arithmetic and 'quarter' is not
             // a relunit at all (the client resolves these via moment startOf/endOf).
@@ -78,12 +97,36 @@ function _sr_resolve_relative_date($raw) {
                 }
                 return strtoupper(date('d-M-y', $flTs));
             }
+            // (2026-11-19, promptfix2 A3/C7) "N days|weeks|months|years ago|ahead|from now|from today" counted here as
+            // moment counts it in the browser: a month or year step keeps the day number, CLAMPED to the target
+            // month's last day (31-MAR less 1 month = 28/29-FEB, where strtotime ran on to 03-MAR; 29-FEB less 1
+            // year = 28-FEB, not 01-MAR), and "ahead", which strtotime cannot read, resolves as it does there.
+            if (preg_match('/^(\d+)\s+(day|week|month|year)s?\s+(ago(?:\s+from\s+(?:today|now))?|ahead|from\s+(?:now|today))$/i', $trimVal, $nu)) {
+                $nuN = (int)$nu[1] * ((strtolower(substr($nu[3], 0, 3)) === 'ago') ? -1 : 1);
+                $nuUnit = strtolower($nu[2]);
+                $nuY = (int)date('Y'); $nuM = (int)date('n'); $nuD = (int)date('j');
+                if ($nuUnit === 'day' || $nuUnit === 'week') {
+                    $nuTs = mktime(0, 0, 0, $nuM, $nuD + $nuN * ($nuUnit === 'week' ? 7 : 1), $nuY);
+                } else {
+                    $nuK = $nuY * 12 + ($nuM - 1) + $nuN * ($nuUnit === 'year' ? 12 : 1);
+                    $nuY = intdiv($nuK, 12); $nuM = $nuK % 12 + 1;
+                    $nuTs = mktime(0, 0, 0, $nuM, min($nuD, (int)date('t', mktime(0, 0, 0, $nuM, 1, $nuY))), $nuY);
+                }
+                return strtoupper(date('d-M-y', $nuTs));
+            }
             // Normalize: strip a trailing "from today"/"from now"
             // (e.g. "3 years ago from today" -> "3 years ago")
             $strtotimeVal = preg_replace('/\s+from\s+(?:today|now)\s*$/i', '', $trimVal);
             $ts = strtotime($strtotimeVal);
             if ($ts !== false) {
-                return strtoupper(date('d-M-y', $ts));
+                // (2026-11-19, promptfix #10) Only a reading that NAMES A DAY (a year, month, day or
+                // relative offset) - the 2026-11-13 idnotdate guard of resolveParamDateExpression.
+                // strtotime also reads a bare time or zone: "A123456", "Z1234", "T12", "12:30" came
+                // back as today's date, so an ID answer filtered on a date in the email.
+                $dp = date_parse($strtotimeVal);
+                if ($dp['year'] !== false || $dp['month'] !== false || $dp['day'] !== false || !empty($dp['relative'])) {
+                    return strtoupper(date('d-M-y', $ts));
+                }
             }
         }
     }
@@ -140,6 +183,18 @@ function php_parse_search_query($query, $columns) {
     $operatorKeys = array_keys($operators);
     // Already sorted longest-first above, but be explicit
     usort($operatorKeys, '_search_sort_by_length_desc');
+
+    // (2026-11-18, failclosed) The journal columns this run could not read (journal_export.php journalUnreadCols): known
+    // to the parser, so "Done != (ticked)" is a condition on Done - made a false one below - not a literal comparison of
+    // the word "Done", which kept every row. A name the rows have stays theirs.
+    $pqUnread = function_exists('journalUnreadCols') ? journalUnreadCols() : array();
+    if ($pqUnread) {
+        $pqHave = array();
+        foreach ($columns as $c) $pqHave[strtoupper((string)$c)] = true;
+        foreach (array_keys($pqUnread) as $u) {
+            if (isset($pqHave[(string)$u])) unset($pqUnread[$u]); else $columns[] = (string)$u;
+        }
+    }
 
     // --- Build column map (uppercase key → original name), sorted longest-first ---
     $columnMap = array();
@@ -475,6 +530,8 @@ function php_parse_search_query($query, $columns) {
     }
     // An empty group at the start or end (`() and A`, `A and ()`) left a dangling and / or (2026-10-31)
     if ($pqGroups) $queryTree = _search_trim_logicals($queryTree);
+    // (2026-11-18, failclosed) a condition on a column the run could not read matches no row, whatever its operator
+    if ($pqUnread && function_exists('journalUnreadTree')) $queryTree = journalUnreadTree($queryTree, $pqUnread);
 
     return $queryTree;
 }
@@ -777,16 +834,28 @@ function _php_evaluate_search_row_with_virtual($row, $parsedQuery, $columns, $vi
 
             // Virtual columns take priority over main columns (matches JS behavior)
             if (!empty($virtualCols) && isset($virtualCols[$upperCol])) {
-                // Match if ANY nested value satisfies the condition
-                foreach ($virtualCols[$upperCol] as $vVal) {
-                    if (php_test_search_condition($part['op'], $part['value'], $vVal, $row, $columns)) {
-                        $matched = true;
-                        break;
-                    }
-                }
+                // ANY nested value satisfies a positive condition; != <> !/ hold only when NO value satisfies the
+                // positive form (jsonsweep N3, _search_nested_match)
+                $matched = _search_nested_match($part['op'], $part['value'], $virtualCols[$upperCol], $row, $columns);
             } elseif (($_snc = _search_notes_col()) && $upperCol === $_snc['name']) {
                 // The journal's Notes (2026-10-14): the count or the text, as on the page.
                 $matched = _search_notes_condition($part, $rowUpper, $row, $columns);
+            } elseif (empty($part['journalToggle']) && isset($rowUpper[$upperCol]) && is_string($rowUpper[$upperCol])
+                    && strpos($rowUpper[$upperCol], '@@JSON') === 0
+                    && ($_own = _search_own_nested_values($rowUpper[$upperCol])) !== null) {
+                // (jsonsweep N1) the nested column's OWN name: its sub-table's values, as the sub-columns read them.
+                // `= empty`: no value that is not blank ([] included); `!= empty`: one that is not.
+                if (_search_is_empty_kw($part['value'])) {
+                    $_filled = false;
+                    foreach ($_own as $_ov) { if (trim($_ov) !== '') { $_filled = true; break; } }
+                    $matched = ($part['op'] === '=') ? !$_filled : $_filled;
+                } else {
+                    $matched = _search_nested_match($part['op'], $part['value'], $_own, $row, $columns);
+                }
+                // the raw-text reading still counts, as on the page: added to (positive) or required too (!= <> !/)
+                $_rawCell = _search_get_cell_value($colName, $rowUpper);
+                $_rawPass = php_test_search_condition($part['op'], $part['value'], $_rawCell, $row, $columns);
+                $matched = in_array($part['op'], array('!=', '<>', '!/'), true) ? ($_rawPass && $matched) : ($_rawPass || $matched);
             } else {
                 // Fall back to main column
                 $cellText = _search_get_cell_value($colName, $rowUpper);
@@ -899,18 +968,37 @@ function _php_evaluate_with_row_match($row, $parsedQuery, $columns) {
 if (!function_exists('_search_get_virtual_columns')) {
 function _search_get_virtual_columns($row) {
     $virtualCols = array();
+    // (jsonsweep2 U1/U2) the result's shared sub-column names (_search_nested_qual, set by _search_virtual_column_names;
+    // empty on a result without one, which reads as before): such a sub-column is also PARENT.KEY, and a bare name a
+    // real column has stays that column's. Twin: main.js getVirtualColumnsForRow.
+    $q = _search_nested_qual();
     foreach ($row as $colName => $cellValue) {
         $strVal = ($cellValue === null) ? '' : (string)$cellValue;
         $jsonIdx = strpos($strVal, '@@JSON');
         if ($jsonIdx === false) continue;
 
         $jsonStr = substr($strVal, $jsonIdx + 6);
-        $jsonData = json_decode($jsonStr, true);
+        $jsonData = _search_parse_nested($jsonStr);   // jsonsweep2 U7: a cell cut short reads its whole sub-rows
         if (!is_array($jsonData) || !isset($jsonData[0]) || !is_array($jsonData[0])) continue;
 
-        $keys = array_keys($jsonData[0]);
+        $keys = _search_nested_keys($jsonData);   // jsonsweep N8: every sub-row's keys, not the first one's
+        $_uc = $q ? strtoupper((string)$colName) : '';
+        $qc = ($q && isset($q[$_uc])) ? $q[$_uc] : null;   // jsonsweep2 U1/U2
         foreach ($keys as $key) {
             $upperKey = strtoupper($key);
+            $qk = ($qc !== null && isset($qc[$upperKey])) ? $qc[$upperKey] : 0;
+            if ($qk) {
+                // jsonsweep2 U1/U2: PARENT.KEY (this table's values); the bare name too unless a real column has it (1)
+                $vals = array();
+                foreach ($jsonData as $jsonRow) {
+                    $vals[] = _search_nested_value(isset($jsonRow[$key]) ? $jsonRow[$key] : '');
+                }
+                $virtualCols[$_uc . '.' . $upperKey] = $vals;
+                if ($qk === 1) continue;
+                if (!isset($virtualCols[$upperKey])) $virtualCols[$upperKey] = array();
+                foreach ($vals as $v) $virtualCols[$upperKey][] = $v;
+                continue;
+            }
             if (!isset($virtualCols[$upperKey])) {
                 $virtualCols[$upperKey] = array();
             }
@@ -927,43 +1015,298 @@ if (!function_exists('_search_virtual_column_names')) {
 function _search_virtual_column_names($rows) {
     $names = array();
     $n = 0;
+    // (jsonsweep N2/N7) ...and on past row 10 while a column that holds a nested table has shown only EMPTY ones
+    // ([]): fi-epa-c's Active / Proposals are 76-82% empty, so one of the two often gave no name in ten rows and
+    // its sub-columns were unknown to the filter (PT_ID = X matched nothing). Past row 10 only those columns are
+    // read, so the scan costs less than before once every nested column has shown a sub-row. Twin: main.js
+    // buildVirtualColumnNames (W1).
+    $seen = array();
+    $pending = array();
+    $gave = array();
+    $byCol = array();   // jsonsweep2 U1/U2: UPPER column => array(UPPER name => true), the names its tables gave
+    // (jsonsweep2 B3) $blank: the columns blank (NULL / '') in every one of the first 10 rows. A nested column blank
+    // in its leading rows (MS-SQL '@@JSON' + NULL is NULL) never showed @@JSON there, so the reading stopped without
+    // it once the other nested columns had given names. Past row 10 only those columns are looked at until each
+    // shows a value ($bNow: read this row): plain text drops it, @@JSON is read as below. A rowset with no nested
+    // column reads as before. Twin: main.js _pnbNestedScan.
+    $blank = null;
     foreach ((array)$rows as $row) {
-        // (2026-11-17, nestsample parity) The first ten rows, and on past them (to 5,000) until one holds a nested
-        // table - the rule main.js buildVirtualColumnNames() has had since 2026-11-14 (nestsample). This reader still
-        // stopped at ten, so where the first nested table came later the report page knew SPECIES as a column and
-        // this engine (the scheduled filter, index.php's ?json=1 dashboard routing) did not: the same filter kept
-        // rows on the page and was skipped, or matched nothing, here.
-        if ($n >= 5000 || ($n >= 10 && $names)) {
+        if ($n >= 5000 || ($n >= 10 && $names && !$pending && !$blank)) {
             break;
         }
         $n++;
         if (!is_array($row)) {
             continue;
         }
-        foreach (_search_get_virtual_columns($row) as $vName => $vValues) {
-            $vName = (string)$vName;
-            if (!in_array($vName, $names, true)) {
-                $names[] = $vName;
+        $all = ($n <= 10 || !$names);
+        $bNow = array();   // jsonsweep2 B3
+        if ($n <= 10) {
+            if ($blank === null) {
+                $blank = array();
+                foreach ($row as $col => $cell) { if ($cell === null || $cell === '') $blank[$col] = true; }
+            } elseif ($blank) {
+                foreach ($blank as $col => $unused) { if (isset($row[$col]) && $row[$col] !== '') unset($blank[$col]); }
+            }
+        } elseif ($blank && !$all) {
+            foreach ($blank as $col => $unused) {
+                if (isset($row[$col]) && $row[$col] !== '') { unset($blank[$col]); $bNow[$col] = true; }
+            }
+            if (!$pending && !$bNow) continue;
+        }
+        foreach ($row as $col => $cell) {
+            // (jsonsweep2 B3) past row 10 a column that already gave names is not read again - as the page's visit()
+            if (!$all && !isset($pending[$col]) && !(isset($bNow[$col]) && !isset($gave[$col]))) continue;
+            $strVal = ($cell === null) ? '' : (string)$cell;
+            $jsonIdx = strpos($strVal, '@@JSON');
+            if ($jsonIdx === false) continue;
+            $jsonData = json_decode(substr($strVal, $jsonIdx + 6), true);
+            if (is_array($jsonData) && isset($jsonData[0]) && is_array($jsonData[0])) {
+                $_bc = strtoupper((string)$col);   // jsonsweep2 U1/U2
+                foreach (_search_nested_keys($jsonData) as $vName) {
+                    $vName = strtoupper((string)$vName);
+                    if (!isset($seen[$vName])) {
+                        $seen[$vName] = true;
+                        $names[] = $vName;
+                    }
+                    $byCol[$_bc][$vName] = true;   // jsonsweep2 U1/U2
+                }
+                unset($pending[$col]);
+                $gave[$col] = true;
+            } elseif (($jsonData === array() || trim(substr($strVal, $jsonIdx + 6)) === '') && !isset($gave[$col])) {   // jsonsweep N7: a bare '@@JSON' is an empty table too
+                $pending[$col] = true;
             }
         }
     }
-    return $names;
+    return _search_nested_qualify($names, $byCol, $rows);   // jsonsweep2 U1/U2: shared names also as PARENT.KEY
+}
+}
+
+if (!function_exists('_search_nested_qual')) {
+function _search_nested_qual($set = null) {
+    static $q = array();
+    if ($set === false) {
+        $q = array();
+    } elseif (is_array($set)) {
+        foreach ($set as $c => $ks) {
+            foreach ((array)$ks as $k => $f) {
+                if (!isset($q[$c][$k]) || $f === 1) $q[$c][$k] = $f;
+            }
+        }
+    }
+    return $q;
+}
+}
+
+if (!function_exists('_search_nested_qualify')) {
+function _search_nested_qualify($names, $byCol, $rows) {
+    if (!$names) return $names;
+    $top = array();
+    $first = is_array($rows) ? reset($rows) : null;
+    if (is_array($first)) {
+        foreach ($first as $k => $unused) $top[strtoupper((string)$k)] = true;
+    }
+    unset($top['#']);
+    $holders = array();
+    foreach ($byCol as $c => $ks) {
+        foreach ($ks as $k => $unused) $holders[(string)$k][] = (string)$c;
+    }
+    $mine = array();
+    foreach ($holders as $k => $cs) {
+        $k = (string)$k;
+        foreach ($cs as $c) {
+            $f = (isset($top[$k]) && $k !== $c) ? 1 : (count($cs) > 1 ? 2 : 0);
+            if ($f) $mine[$c][$k] = $f;
+        }
+    }
+    $q = _search_nested_qual($mine);
+    if (!$q) return $names;
+    $out = array();
+    foreach ($names as $k) {
+        $k = (string)$k;
+        $cs = isset($holders[$k]) ? $holders[$k] : array();
+        $bare = !$cs;
+        $qs = array();
+        foreach ($cs as $c) {
+            $fl = isset($q[$c][$k]) ? $q[$c][$k] : 0;
+            if ($fl !== 1) $bare = true;
+            if ($fl) $qs[] = $c . '.' . $k;
+        }
+        if ($bare) $out[] = $k;
+        foreach ($qs as $qn) $out[] = $qn;
+    }
+    return $out;
+}
+}
+
+if (!function_exists('_search_parse_nested')) {
+function _search_parse_nested($s) {
+    $d = json_decode($s, true);
+    if ($d !== null || json_last_error() === JSON_ERROR_NONE) return $d;
+    if (substr(_search_js_trim((string)$s), 0, 1) !== '[') return null;
+    return _search_repair_truncated_json($s);
+}
+}
+
+if (!function_exists('_search_repair_truncated_json')) {
+function _search_repair_truncated_json($str) {
+    $str = (string)$str;
+    if (strlen($str) < 5) return null;
+    $s = _search_js_trim($str);
+    $c0 = substr($s, 0, 1);
+    if ($c0 !== '[' && $c0 !== '{') return null;
+    $open = '';
+    $inStr = false;
+    $esc = false;
+    $cut = -1;
+    $cutClose = '';
+    $n = strlen($s);
+    for ($i = 0; $i < $n; $i++) {
+        $ch = $s[$i];
+        if ($inStr) {
+            if ($esc) $esc = false;
+            elseif ($ch === '\\') $esc = true;
+            elseif ($ch === '"') $inStr = false;
+            continue;
+        }
+        if ($ch === '"') $inStr = true;
+        elseif ($ch === '{') $open = '}' . $open;
+        elseif ($ch === '[') $open = ']' . $open;
+        elseif ($ch === '}' || $ch === ']') {
+            $open = (string)substr($open, 1);
+            if (strlen($open) <= 1) { $cut = $i + 1; $cutClose = $open; }
+            if ($open === '') break;
+        } elseif ($ch === ',' && strlen($open) === 1) {
+            $cut = $i;
+            $cutClose = $open;
+        }
+    }
+    if ($cut < 1) {
+        // jsonsweep2 B4: main.js repairTruncatedJson's lone-object rule (jsonsweep2 V4), ported - a lone object cut inside
+        // its ONLY value (@@JSON{"Abstract":"long text...) keeps that pair, its value as far as it got (the one-row
+        // key/value table the page shows). An object of several pairs still leaves its cut pair out (cut >= 1 above). The
+        // emails and PDFs read this port too (schedule_runner.php repair_truncated_json); _search_parse_nested asks it for
+        // lists only, so the search never sees this branch. Failure path only.
+        if ($c0 === '{' && $inStr && $open === '}') {
+            $t1 = $esc ? substr($s, 0, -1) : $s;                                                   // a cut-off backslash escape
+            $t1 = preg_replace('/(^|[^\\\\])((?:\\\\\\\\)*)\\\\u[0-9a-fA-F]{0,3}$/D', '$1$2', $t1);   // a cut-off \uXXXX escape
+            // a UTF-8 character the cut split in two (bytes here; the page's text never holds half of one): its lead off
+            if ($t1 !== null) $t1 = preg_replace('/(?:[\xC2-\xDF]|[\xE0-\xEF][\x80-\xBF]?|[\xF0-\xF4][\x80-\xBF]{0,2})$/D', '', $t1);
+            if ($t1 !== null) {
+                $one = json_decode($t1 . '"}', true);
+                if (is_array($one) && count($one) === 1) return $one;
+            }
+        }
+        return null;
+    }
+    $parsed = json_decode(substr($s, 0, $cut) . $cutClose, true);
+    return (is_array($parsed) && count($parsed) > 0) ? $parsed : null;
+}
+}
+
+if (!function_exists('_search_nested_keys')) {
+function _search_nested_keys($list) {
+    $keys = array();
+    foreach ((array)$list as $item) {
+        if (!is_array($item)) continue;
+        foreach ($item as $k => $unused) {
+            if (!isset($keys[$k]) && $k !== '__PNBDIFF') $keys[$k] = true;
+        }
+    }
+    return array_keys($keys);
+}
+}
+
+if (!function_exists('_search_own_nested_values')) {
+function _search_own_nested_values($raw) {
+    static $memo = array();
+    $raw = (string)$raw;
+    if (array_key_exists($raw, $memo)) return $memo[$raw];
+    $vals = null;
+    if (strpos($raw, '@@JSON') === 0) {
+        $body = trim(substr($raw, 6));
+        $d = ($body === '') ? array() : _search_parse_nested($body);   // jsonsweep2 U7: a cell cut short reads its whole sub-rows
+        if ($d === array()) {
+            $vals = array();
+        } elseif (is_array($d) && isset($d[0]) && is_array($d[0])) {
+            $vals = array();
+            foreach ($d as $item) {
+                if (!is_array($item)) continue;
+                foreach ($item as $k => $v) {
+                    if ($k === '__PNBDIFF' || is_array($v)) continue;
+                    $vals[] = _search_nested_value($v);
+                }
+            }
+        }
+    }
+    if (count($memo) >= 2000) $memo = array();
+    $memo[$raw] = $vals;
+    return $vals;
+}
+}
+
+if (!function_exists('_search_is_empty_kw')) {
+function _search_is_empty_kw($value) {
+    return strtolower(trim(preg_replace('/^[\'"]|[\'"]$/', '', (string)$value))) === 'empty';
+}
+}
+
+if (!function_exists('_search_nested_match')) {
+function _search_nested_match($op, $value, $vals, $row, $columns) {
+    $neg = ($op === '!=' || $op === '<>' || $op === '!/') && !_search_is_empty_kw($value);
+    if ($neg) {
+        foreach ($vals as $v) {
+            if ($op === '!/' ? !php_test_search_condition('!/', $value, $v, $row, $columns)
+                             : php_test_search_condition('=', $value, $v, $row, $columns)) return false;
+        }
+        return true;
+    }
+    foreach ($vals as $v) {
+        if (php_test_search_condition($op, $value, $v, $row, $columns)) return true;
+    }
+    return false;
 }
 }
 
 if (!function_exists('_search_get_structured_virtual_data')) {
 function _search_get_structured_virtual_data($row) {
     $sources = array();
+    $q = _search_nested_qual();   // jsonsweep2 U1/U2: the result's shared sub-column names (array() = none)
     foreach ($row as $colName => $cellValue) {
         $strVal = ($cellValue === null) ? '' : (string)$cellValue;
         $jsonIdx = strpos($strVal, '@@JSON');
         if ($jsonIdx === false) continue;
 
         $jsonStr = substr($strVal, $jsonIdx + 6);
-        $jsonData = json_decode($jsonStr, true);
-        if (!is_array($jsonData) || empty($jsonData) || !is_array($jsonData[0])) continue;
+        $jsonData = _search_parse_nested($jsonStr);   // jsonsweep2 U7: a cell cut short reads its whole sub-rows
+        if (!is_array($jsonData) || !isset($jsonData[0]) || !is_array($jsonData[0])) continue;
 
-        $keys = array_keys($jsonData[0]);
+        $keys = _search_nested_keys($jsonData);   // jsonsweep N8: every sub-row's keys, not the first one's
+        $_uc = $q ? strtoupper((string)$colName) : '';
+        $qc = ($q && isset($q[$_uc])) ? $q[$_uc] : null;
+        if ($qc !== null) {
+            // jsonsweep2 U1/U2: per key 0 (the bare name), 1 (PARENT.KEY only) or 2 (both), as _search_get_virtual_columns
+            $qf = array();
+            $columns = array();
+            foreach ($keys as $i => $k) {
+                $u = strtoupper($k);
+                $qf[$i] = isset($qc[$u]) ? $qc[$u] : 0;
+                if ($qf[$i] !== 1) $columns[] = $u;
+                if ($qf[$i]) $columns[] = $_uc . '.' . $u;
+            }
+            $rows = array();
+            foreach ($jsonData as $jsonRow) {
+                $rowMap = array();
+                foreach ($keys as $i => $k) {
+                    $u = strtoupper($k);
+                    $v = _search_nested_value(isset($jsonRow[$k]) ? $jsonRow[$k] : '');
+                    if ($qf[$i] !== 1) $rowMap[$u] = $v;
+                    if ($qf[$i]) $rowMap[$_uc . '.' . $u] = $v;
+                }
+                $rows[] = $rowMap;
+            }
+            $sources[] = array('columns' => $columns, 'rows' => $rows);
+            continue;
+        }
         $columns = array();
         foreach ($keys as $k) {
             $columns[] = strtoupper($k);
@@ -1004,11 +1347,83 @@ function _search_get_cell_value($colName, $rowUpper) {
 
 if (!function_exists('_search_nested_value')) {
 function _search_nested_value($val) {
-    $s = ($val === null) ? '' : (string)$val;
+    // jsonsweep2 B11: a value that is not text reads as the page's String(v) reads it (_search_js_string): true / false
+    // (they read '1' / ''), a list's items joined by ',' (it read 'Array', with a PHP warning per value), an object
+    // '[object Object]', a float in its shortest round-trip form (3.14159265358979, not 3.1415926535898). Text and
+    // whole numbers read as before.
+    $s = ($val === null) ? '' : (is_string($val) ? $val : _search_js_string($val));
     if (strpos($s, '@@HTML') !== 0) {
         return $s;
     }
     return _search_js_trim(preg_replace('/<[^>]*>/', '', substr($s, 6)));
+}
+}
+
+if (!function_exists('_search_js_string')) {
+function _search_js_string($v) {
+    if ($v === null) return '';
+    if (is_string($v)) return $v;
+    if (is_bool($v)) return $v ? 'true' : 'false';
+    if (is_int($v)) return ($v > 9007199254740992 || $v < -9007199254740992) ? _search_js_number((float)$v) : (string)$v;
+    if (is_float($v)) return _search_js_number($v);
+    if (is_array($v)) {
+        if (!$v) return '';
+        $i = 0;
+        foreach ($v as $k => $unused) {
+            if ($k !== $i++) return '[object Object]';
+        }
+        $out = array();
+        foreach ($v as $item) $out[] = _search_js_string($item);
+        return implode(',', $out);
+    }
+    return is_object($v) ? '[object Object]' : (string)$v;
+}
+}
+
+if (!function_exists('_search_js_number')) {
+function _search_js_number($f) {
+    $f = (float)$f;
+    if ($f == 0) return '0';
+    if (is_nan($f)) return 'NaN';
+    if (is_infinite($f)) return ($f > 0) ? 'Infinity' : '-Infinity';
+    static $fast = null, $sp = false;
+    if ($fast === null) {
+        $p = (int)ini_get('precision');
+        $fast = ($p === -1 || ($p >= 1 && $p <= 15));   // up to 15 digits: a cast that reads back is the shortest form
+        $sp = ((int)ini_get('serialize_precision') === -1);
+    }
+    if ($fast) {
+        $s = (string)$f;
+        if ((float)$s === $f && strpbrk($s, 'EeN') === false) return $s;
+    }
+    $r = '';
+    if ($sp) {
+        $r = var_export($f, true);   // serialize_precision -1: the shortest round-trip digits, as JavaScript's
+    } else {
+        for ($d = 0; $d <= 16; $d++) {
+            $r = sprintf('%.' . $d . 'e', $f);
+            if ((float)$r === $f) break;
+        }
+    }
+    if (!preg_match('/^(-?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/', $r, $m)) return (string)$f;
+    $digits = $m[2] . (isset($m[3]) ? $m[3] : '');
+    $n = strlen($m[2]) + ((isset($m[4]) && $m[4] !== '') ? (int)$m[4] : 0);   // the decimal point's place in $digits
+    $lz = strlen($digits) - strlen(ltrim($digits, '0'));
+    $digits = rtrim(substr($digits, $lz), '0');
+    $n -= $lz;
+    if ($digits === '') return '0';
+    $k = strlen($digits);
+    if ($k <= $n && $n <= 21) {
+        $o = $digits . str_repeat('0', $n - $k);
+    } elseif (0 < $n && $n <= 21) {
+        $o = substr($digits, 0, $n) . '.' . substr($digits, $n);
+    } elseif (-6 < $n && $n <= 0) {
+        $o = '0.' . str_repeat('0', -$n) . $digits;
+    } else {
+        $e = $n - 1;
+        $o = $digits[0] . ($k > 1 ? '.' . substr($digits, 1) : '') . 'e' . ($e >= 0 ? '+' : '-') . abs($e);
+    }
+    return $m[1] . $o;
 }
 }
 
@@ -1298,6 +1713,13 @@ function _search_parse_date($str) {
     if (preg_match('/^\d{2}-[A-Za-z]{3}-\d{2}\s/', $probe)) {
         $probe = substr($probe, 0, 9);
     }
+    // (jsonsweep N20) ISO with a T, as Oracle JSON_OBJECT and MS-SQL FOR JSON write dates in nested tables:
+    // 2025-03-01T08:30[:15[.123]][Z|+hh[:mm]] reads as "Y-m-d H:i:s" (seconds 00 when missing, the fraction and
+    // the zone dropped - the time as written). Behind a one-byte check. Twin: main.js _parseDateFormats (W1).
+    if (isset($probe[10]) && $probe[10] === 'T'
+            && preg_match('/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.(\d+))?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/', $probe, $isoM)) {
+        $probe = $isoM[1] . ' ' . $isoM[2] . ':' . ((isset($isoM[3]) && $isoM[3] !== '') ? $isoM[3] : '00');
+    }
 
     static $formats = array(
         array('Y-m-d H:i:s.u', 'second'),
@@ -1510,6 +1932,10 @@ if (!function_exists('_journal_alias_toggle_conditions')) {
 function _journal_alias_toggle_conditions($parsedQuery, $aliasCols) {
     if (empty($parsedQuery) || empty($aliasCols)) return $parsedQuery;
     foreach ($parsedQuery as $i => $part) {
+        if (isset($part['type']) && $part['type'] === 'group' && isset($part['parts']) && is_array($part['parts'])) {
+            $parsedQuery[$i]['parts'] = _journal_alias_toggle_conditions($part['parts'], $aliasCols);
+            continue;
+        }
         if (!isset($part['type']) || $part['type'] !== 'condition' || !isset($part['column'])) continue;
         $bare = strtoupper(trim((string)preg_replace('/^\{\s*[\'"]?|[\'"]?\s*\}$/', '', (string)$part['column'])));
         if (isset($aliasCols[$bare])) $parsedQuery[$i]['column'] = $aliasCols[$bare];
@@ -1651,7 +2077,7 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
             foreach ($groupRows as $groupRow) {
                 if (is_array($groupRow)) {
                     $sampleRows[] = $groupRow;
-                    if (count($sampleRows) >= 10) {
+                    if (count($sampleRows) >= 5000) {   // jsonsweep N7: _search_virtual_column_names decides where to stop
                         break 2;
                     }
                 }
@@ -1923,12 +2349,20 @@ function penumbra_search_columns_from_meta($meta) {
 }
 }
 
+if (!function_exists('penumbra_nested_at')) {
+function penumbra_nested_at($s) {
+    $s = (string)$s;
+    $p = strspn($s, " \t\r\n");
+    return (substr($s, $p, 6) === '@@JSON') ? $p : -1;
+}
+}
+
 if (!function_exists('penumbra_nested_row_count')) {
 function penumbra_nested_row_count($value) {
     if ($value === null) return 0;
     $s = (string)$value;
-    $p = strpos($s, '@@JSON');
-    if ($p === false) return 0;
+    $p = penumbra_nested_at($s);   // jsonsweep2 B16: at the start only, as the page
+    if ($p < 0) return 0;
     $d = json_decode(substr($s, $p + 6));
     if (json_last_error() === JSON_ERROR_NONE) {
         if (is_array($d)) return count($d);
@@ -2264,12 +2698,44 @@ function _search_bucket_part($part, $rowUpper, $row, $columns, $virtualCols) {
     $b = $part['bucket'];
     $up = strtoupper((string)$b['base']);
     if (!empty($virtualCols) && isset($virtualCols[$up])) {
+        // (jsonsweep N3) a negation holds only when it holds for EVERY nested value (no value's bucket is the one
+        // excluded); `!= empty` stays "any value"
+        $neg = ($part['op'] === '!=' || $part['op'] === '<>' || $part['op'] === '!/') && !_search_is_empty_kw($part['value']);
         foreach ($virtualCols[$up] as $vVal) {
-            if (_search_bucket_test($b, $part['op'], $part['value'], $vVal, $row, $columns)) return true;
+            $ok = _search_bucket_test($b, $part['op'], $part['value'], $vVal, $row, $columns);
+            if ($ok && !$neg) return true;
+            if (!$ok && $neg) return false;
         }
-        return false;
+        return $neg;
     }
-    return _search_bucket_test($b, $part['op'], $part['value'], _search_get_cell_value($b['base'], $rowUpper), $row, $columns);
+    $_raw = _search_bucket_test($b, $part['op'], $part['value'], _search_get_cell_value($b['base'], $rowUpper), $row, $columns);
+    // (jsonsweep2 U5) a nested table's OWN column (keyword_category:dsemi = USDA): its tables' values too, as a plain
+    // condition reads them (jsonsweep N1). Positive operators: the text OR any value; != <> !/: the text AND no value
+    // passing the positive form (= for != <>, the pattern for !/); `= empty` / `!= empty`: no value / one is filled.
+    // Twin: main.js penumbraSearchBucketPart (_epqNestedAny, own).
+    if (isset($rowUpper[$up]) && is_string($rowUpper[$up]) && strpos($rowUpper[$up], '@@JSON') === 0
+            && ($_own = _search_own_nested_values($rowUpper[$up])) !== null) {
+        $_op = $part['op'];
+        $_neg = ($_op === '!=' || $_op === '<>' || $_op === '!/');
+        if (_search_is_empty_kw($part['value'])) {
+            $_filled = false;
+            foreach ($_own as $_ov) { if (trim($_ov) !== '') { $_filled = true; break; } }
+            $_n = ($_op === '=') ? !$_filled : $_filled;
+        } elseif ($_neg) {
+            $_n = true;
+            foreach ($_own as $_ov) {
+                if ($_op === '!/' ? !_search_bucket_test($b, '!/', $part['value'], $_ov, $row, $columns)
+                                  : _search_bucket_test($b, '=', $part['value'], $_ov, $row, $columns)) { $_n = false; break; }
+            }
+        } else {
+            $_n = false;
+            foreach ($_own as $_ov) {
+                if (_search_bucket_test($b, $_op, $part['value'], $_ov, $row, $columns)) { $_n = true; break; }
+            }
+        }
+        return $_neg ? ($_raw && $_n) : ($_raw || $_n);
+    }
+    return $_raw;
 }
 }
 

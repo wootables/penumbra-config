@@ -158,6 +158,20 @@ foreach (array('penumbraPromptUnquoteTemplate', 'penumbraPromptSplice', 'penumbr
                'penumbraPromptJoinPieces') as $ph) {
     if (strpos($sharedText, 'function ' . $ph . '(') !== false) { $promptHelpers[] = $ph; }
 }
+// (2026-11-19, promptfix sweep) the comment scanner + q-quote reader, the multi-select list reader, the resultif
+// rule and the noquote option reader the engines call since then - also lifted only when present.
+foreach (array('penumbraSqlQQuoteClose', 'penumbraPromptTagsInComments', 'penumbraMultiValueList', 'penumbraResultIfCheck',
+               'penumbraNoQuoteOptionValues', 'penumbraParamTypes',
+               'penumbraResultIfSkipSpan', 'penumbraPromptEmptyExclude',   // (2026-11-19, promptfix2 A5/A8)
+               'penumbraUrlReservedNames', 'penumbraUrlNameReserved') as $ph) {   // (2026-11-19, promptfix3 S1: ?json=1 skips reserved names)
+    if (strpos($sharedText, 'function ' . $ph . '(') !== false) { $promptHelpers[] = $ph; }
+}
+// (2026-11-19) subqsweep (41364e4 / 26e5cba): the engines ask penumbraOffsetInMssqlTag whether a tag sits inside an
+// MS-SQL [SUBQUERY]; it and the subquery tag readers it leans on, also lifted only when present.
+foreach (array('penumbraOffsetInMssqlTag', 'penumbraFindSubqueryTags', 'penumbraSubqueryTagFields', 'penumbraTagCloseAt',
+               'penumbraSelectListNames', 'penumbraGateDropCteReads', 'penumbraRepairJsonCellsUtf8') as $ph) {
+    if (strpos($sharedText, 'function ' . $ph . '(') !== false) { $promptHelpers[] = $ph; }
+}
 if ($promptHelpers) { eval(lift($F_SHARED, $promptHelpers)); }
 require_once $F_SEARCH;   // pure declarations: _sr_resolve_relative_date()
 // The runner's own copy of the per-option parser exists only before 2026-09-29.

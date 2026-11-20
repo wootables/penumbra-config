@@ -1529,7 +1529,8 @@ function nQuery($sql, $binds) {
     if (strpos($s, 'ALL_TAB_COLUMNS') !== false && isset($GLOBALS['NCNTCOLS'])) return array(array('CNT' => $GLOBALS['NCNTCOLS']));
     if (strpos($s, 'ALL_TAB_COLUMNS') !== false) return array(array('CNT' => 0));
     // (2026-11-18, rekeyall) rekey step 1's counts by old key: the toggle table's by STATE, the notes'
-    if (strpos($s, 'SELECT SUBSTR(ROW_KEY, :a1) AS K, STATE AS S, COUNT(*) AS N FROM PENUMBRA_JOURNAL_TOGGLE') === 0) {
+    // (2026-11-19) 809a74c groups outside an inline view (a bind in GROUP BY is ORA-00979)
+    if (strpos($s, 'SELECT K, S, COUNT(*) AS N FROM (SELECT SUBSTR(ROW_KEY, :a1) AS K, STATE AS S FROM PENUMBRA_JOURNAL_TOGGLE') === 0) {
         $g = array();
         foreach ($NT as $r) {
             if ($r['REPORT_ID'] !== $rid || $r['TOGGLE_KEY'] === $b[':kf'] || strpos($r['ROW_KEY'], $b[':tag']) !== 0) continue;
@@ -1539,7 +1540,7 @@ function nQuery($sql, $binds) {
         }
         return array_values($g);
     }
-    if (strpos($s, 'SELECT SUBSTR(ROW_KEY, :b1) AS K, COUNT(*) AS N FROM PENUMBRA_JOURNAL WHERE') === 0) {
+    if (strpos($s, 'SELECT K, COUNT(*) AS N FROM (SELECT SUBSTR(ROW_KEY, :b1) AS K FROM PENUMBRA_JOURNAL WHERE') === 0) {
         $g = array();
         foreach ($NN as $r) {
             if ($r['REPORT_ID'] !== $rid || $r['SCOPE'] !== 'row' || strpos((string)$r['ROW_KEY'], $b[':tag']) !== 0) continue;
@@ -2875,7 +2876,8 @@ if (function_exists('_snippet_tree_reads_journal')) {
 $fa = strpos($sr, "\nfunction _snippet_filter_rows(");
 $fbb = ($fa === false) ? null : braceBlock($sr, $fa);
 $fsrc = $fbb ? substr($sr, $fa, $fbb[1] - $fa) : '';
-$la = strpos($sr, "\n    \$data = _snippet_expand_virtual_rows(\$data, \$returnCol, \$conditionStr, \$columns);");
+// (2026-11-19, jsonsweep N10) the call gained a 5th argument (lookup is first-match: no parent tag) - anchor on its prefix
+$la = strpos($sr, "\n    \$data = _snippet_expand_virtual_rows(\$data, \$returnCol, \$conditionStr, \$columns");
 $lsrc = ($la === false) ? '' : substr($sr, $la, 1800);
 $wire = function ($src) { return strpos($src, '$jtRead = $jt && _snippet_tree_reads_journal($parsed, $jt);') !== false && strpos($src, '$jtRead ? _snippet_toggle_eval_row($row, $jt) : $row') !== false && strpos($src, '$jt ? _snippet_toggle_eval_row($row, $jt) : $row') === false; };
 rec('ST-c8-wire', $fsrc !== '' && $lsrc !== '' && $wire($fsrc) && $wire($lsrc), '_snippet_filter_rows ' . ($fsrc !== '' && $wire($fsrc) ? 'reads first' : 'copies every row') . ', lookup ' . ($lsrc !== '' && $wire($lsrc) ? 'reads first' : 'copies every row'));

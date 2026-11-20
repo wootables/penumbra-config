@@ -119,7 +119,7 @@
       await until(function () { return bodyText().indexOf('Link copied.') >= 0; }, 3000);
       var t = bodyText();
       R.info.toast = t.slice(t.indexOf('Link copied.'), t.indexOf('Link copied.') + 400);
-      R.chk.toast = /Link copied\./.test(t) && /filter/.test(t) && /carries no data/.test(t) && !/—/.test(t);
+      R.chk.toast = /Link copied\./.test(t) && /filter/.test(t) && /carries no rows/.test(t) && !/—/.test(t);
       R.chk.noNoteWithoutLink = bodyText().indexOf('Opened a shared view') < 0 && !V().active();
     } else if (SCN === 'vcapB' || SCN === 'vgrpB' || SCN === 'vpivB' || SCN === 'pflatB') {
       if (SCN === 'vgrpB') await until(function () { return document.querySelectorAll('#groupedResultsContainer tbody tr td').length > 0; }, 20000);

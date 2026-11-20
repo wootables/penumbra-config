@@ -567,7 +567,9 @@
     keyEl(boxIn(), 'Enter'); await sleep(200);
     rec('X-bad', boxSays() === 'Not a date' && saveB.disabled && !!box() && posts() === n0, boxSays());
     typeBox('next friday'); await sleep(50);
-    var nf = window.moment().add(1, 'week').day(5).format('YYYY-MM-DD');
+    // (2026-11-19, promptfix2 A3) next <weekday> = the first such day AFTER today (strtotime's reading, all engines agree):
+    // on a Thursday 'next friday' is tomorrow; it was the Friday of next week.
+    var _d0 = window.moment(), nf = _d0.clone().add(((5 - _d0.day() + 7) % 7) || 7, 'days').format('YYYY-MM-DD');
     rec('X-nextfri', boxSays().indexOf(dLong(nf)) === 0, boxSays() + ' | the grammar\'s next friday ' + nf);
     typeBox('TODAY+14'); await sleep(50);   // a phrase is saved as its day (DD4)
     keyEl(boxIn(), 'Enter');

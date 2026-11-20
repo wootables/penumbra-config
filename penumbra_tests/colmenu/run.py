@@ -462,7 +462,7 @@ MUTANTS = {
     'j-gmkbdlist': ([('menu', "((target === list || target.closest('.pnb-gl-head')) ? list.querySelector('.pnb-gl-item.is-active') : null)", "(null)")], ['L-gglist-glKbd'], ['gglist']),
     'j-gmtoggle': ([('menu', "        if (!lo) { items.push({ act: 'gToggle'", "        if (true) { items.push({ act: 'gToggle'")], ['L-gglist-glRowItems'], ['gglist']),
     'j-gmrestricted': ([('menu', "        if (!info.restricted && A) {", "        if (A) {")], ['L-ggmenu-gmRestricted'], ['ggmenu']),
-    'j-hdrrestrict': ([('menu', "        if (grpRestricted()) { gi = []; }\n", "")], ['L-ggmenu-gmHdrRestricted'], ['ggmenu']),
+    'j-hdrrestrict': ([('menu', "        if (grpRestricted()) { gi = []; ungrp = null; }\n", "")], ['L-ggmenu-gmHdrRestricted'], ['ggmenu']),
     'j-gmused': ([('menu', "if (!shown(t) || c === '#' || isJournal(c) || used.indexOf(String(c).toUpperCase()) >= 0) { continue; }", "if (!shown(t) || c === '#' || isJournal(c)) { continue; }")], ['L-ggmenu-gmAddUsed'], ['ggmenu']),
     'j-gmtick': ([('menu', "        return { act: 'gby:' + c, label: nm, checked: mine,", "        return { act: 'gby:' + c, label: nm, checked: false,")], ['L-ggmenu-gmTick', 'L-gnnestbd-nbPickTick'], ['ggmenu', 'gnnestbd']),
     'j-gmlevel': ([('menu', "colLabel(info.col) + (info.levels.length > 1 ? ', level ' + (info.depth + 1) + ' of ' + info.levels.length : '')", "colLabel(info.col)")], ['L-ggmenu-gmLevelMenu'], ['ggmenu']),
@@ -602,7 +602,7 @@ MUTANTS = {
     'm-planlis': ([('main', "        for (var t = tails.length ? tailIdx[tails.length - 1] : -1; t >= 0; t = prevIdx[t]) stay[ids[t]] = true;",
                     "        for (var t = -1; t >= 0; t = prevIdx[t]) stay[ids[t]] = true;")], ['L-mflat-moveMinimal'], ['mflat']),
     # --- (round 12) the lists under one item
-    'u-noshowall': ([('menu', "        body.push({ act: 'showAll', label: 'Show all columns', disabled: !hidden.length, why: 'Every column is shown', run: function () {\n            var l = copyLayout(api().layout());\n            l.cols.forEach(function (c) { c.visible = true; });\n            applyWithUndo(l, 'Showing all ' + l.cols.length + ' columns.', false);\n        } });\n", "")],
+    'u-noshowall': ([('menu', "        body.push({ act: 'showAll', label: 'Show all columns', disabled: !hidden.length && !showNum, why: 'Every column is shown', run: function () {\n            var l = copyLayout(api().layout());\n            l.cols.forEach(function (c) { c.visible = true; });\n            if (l.num) { l.num.visible = true; }\n            applyWithUndo(l, 'Showing all ' + l.cols.length + ' columns.', false);\n        } });\n", "")],
                     ['L-msubs-showList'], ['msubs']),
     # (2026-11-17) re-anchored: viewstrict (2026-11-05) gave Leave the shared view the same run; the item's own (after its title) is the one
     'u-clear': ([('menu', "then clears it once you confirm',\n                run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } };",
@@ -633,13 +633,13 @@ MUTANTS = {
     # --- (round 21) Column stats, the notes button, Remove calculated column
     's-noflyout': ([('menu', "            look.push({ act: 'stats', label: 'Column stats', sub: true, items: function () { return statsItems(col); } });\n", "")], ['L-mflat-statsLine'], ['mflat']),
     's-topnofilter': ([('menu', "run: function () { A.filterAdd(col, t.v, false); } }); }", "run: function () { } }); }")], ['L-mflat-statsTop'], ['mflat']),
-    'c-noremove': ([('menu', "            if (typeof C.isCalc === 'function' && C.isCalc(col) && typeof C.remove === 'function') {", "            if (false) {")], ['L-mcalc-calcRemoveItem'], ['mcalc']),
+    'c-noremove': ([('menu', "        if (def && typeof C.isCalc === 'function' && C.isCalc(col) && typeof C.remove === 'function') {", "        if (false) {")], ['L-mcalc-calcRemoveItem'], ['mcalc']),
     'j-innote': ([('menu', "        var onNotes = target.closest('button.journal-notes-btn');", "        var onNotes = null;")], ['L-mjournal-jrnInNote'], ['mjournal']),
     # --- (round 20) the '#' menu, Add a note, the fiscal year
-    'n-native': ([('menu', "        if (!th) { return null; }   // (round 20) the '#' heading has a short menu of its own", "        if (!th || th.getAttribute('data-column') === '#') { return null; }")], ['L-mnum-numOpens'], ['mnum']),
+    'n-native': ([('menu', "        if (!th) { return null; }   // (round 20) the '#' heading is one too (data-colname '#'): buildItems' isNum items", "        if (!th || th.getAttribute('data-column') === '#') { return null; }")], ['L-mnum-numOpens'], ['mnum']),
     # (2026-10-27, notescroll) Add a note to this row... brings the row's Notes button into the table's box first
     'j-noscroll': ([('menu', "run: function () { intoView(nb); nb.click(); } });", "run: function () { nb.click(); } });")], ['L-mjournal-jrnAddNoteScrolled'], ['mjournal']),
-    'j-nonote': ([('menu', "            if (nb && !nb.disabled) {   // (a row whose key is empty cannot take notes: its button is disabled)\n                items.push({ act: 'addNote',", "            if (false) {\n                items.push({ act: 'addNote',")], ['L-mjournal-jrnAddNote'], ['mjournal']),
+    'j-nonote': ([('menu', "        if (nb && !nb.disabled) {   // (a row whose key is empty cannot take notes: its button is disabled)\n            items.push({ act: 'addNote',", "        if (false) {\n            items.push({ act: 'addNote',")], ['L-mjournal-jrnAddNote'], ['mjournal']),
     'f-fy': ([('main', "var fy = m >= PNB_FY_START_MONTH ? y + 1 : y;", "var fy = y;")], ['L-mbucket-dtUnits'], ['mbucket']),
     # --- (round 19) date Ranges, Fit all
     'k-nodate': ([('main', "        if (days.length >= 2 && days.length === nonEmpty) {", "        if (false) {")], ['L-mbucket-dtModes'], ['mbucket']),

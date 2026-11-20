@@ -115,7 +115,10 @@
       grab('    function getPivotDataAsArray() {', '    // ===== END: ADD THIS NEW HELPER FUNCTION ====='),
       grab('    function getExpandedResultCount() {', '    // Renders the prompt list (#promptInfoList) as themed pills.'),
       grab('    function penumbraCloneForExport($el) {', '    // True when the subtitle contains a snippet function'),
-      grab('    function extractHeaderDataForExcel(', '    // --- UPDATE THE DOWNLOAD FUNCTION ---')
+      grab('    function extractHeaderDataForExcel(', '    // --- UPDATE THE DOWNLOAD FUNCTION ---'),
+      // (2026-11-19, jsonsweep N11) readExportCell reads a cell's raw copy through _pnbExportRawJson
+      // (comparison cells: the now view); it and _pnbOwnRawJson sit just ahead of getRowNestedArray.
+      grab('    function _pnbOwnRawJson(cell) {', '    function getRowNestedArray($row, colId) {')
     ].join('\n');
   } catch (e) { flush('EXTRACT_ERROR ' + e.message); return; }
   out.push('extracted ' + lifted.length + ' chars from ' + srcFile + ' (' + code.length + ')');

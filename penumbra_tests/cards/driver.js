@@ -1210,7 +1210,11 @@
     var exp = tot.map(function (td, k) { return [want[k], td.cellIndex, text(td)]; }).filter(function (x, k) { return k !== bi; });
     R.info.gt = { keyless: keyless, tot: tot.length, want: want, got: got.slice(0, 9), big: bv ? [bigWord(gt), text(bv), bi] : null, leaf: tileDts(leafPv()) };
     R.chk.gtKeyless = keyless && tot.length === 9 && want.length === 9 && same(got, exp);
-    R.chk.bigKeyless = keyless && bi >= 0 && bigWord(gt) === want[bi] && text(bv) === text(tot[bi]);
+    // (cardsweep 5, 2026-11-19) no breakdown: the big number is the row total (the footer's own total cell, found by its
+    // class and place - it carries no keys), not the first column's value
+    var gtc = ft ? qa('td.pivot-grand-total', ft).filter(function (td) { return !td.hasAttribute('data-row-field') && !td.hasAttribute('colspan'); }) : [];
+    R.info.gt.rowTotal = gtc.length ? [gtc[0].cellIndex, text(gtc[0])] : null;
+    R.chk.bigKeyless = keyless && !!bv && gtc.length > 0 && +bv.getAttribute('data-pvc') === gtc[0].cellIndex && text(bv) === text(gtc[0]) && /^Total/.test(bigWord(gt));
     var lf = tileDts(leafPv());
     R.chk.bodyKeyless = lf.length >= 6 && lf.every(function (t) { return /^(Closed|Open|Pending) (Amt|N|Mean)$/.test(t); });   // (holds on live: the body's cells carry data-pv-ck + data-pv-ai)
     // Find on a keyless total no other cell holds: marked on the Grand Total tile's value (the hit went to its title)
@@ -1301,9 +1305,10 @@
     R.chk.moreText = text(q('.pnb-cards-moretxt')) === '1,000 of 2,500 cards drawn';
     if (btn) btn.click(); await until(function () { return cards().length === 2000; }, 8000);
     R.chk.moreDraws = cards().length === 2000 && text(q('.pnb-cards-moretxt')) === '2,000 of 2,500 cards drawn';
-    // 2,500 rows kept: main.js defers its format pass, so the cards are drawn a second time after it
-    await until(function () { return !!(C().state() && C().state().again); }, 3000);
-    R.chk.deferredDraw = !!(C().state() && C().state().again) && cards().length === 2000;
+    // (cardsweep 8, 2026-11-19) 2,500 rows kept: no second draw 160 ms after every draw any more - main.js's deferred
+    // format / rewrite passes call cards.formatted() themselves; a Show more is not a data change, so one draw
+    await sleep(700);
+    R.chk.deferredDraw = !!C().state() && !C().state().again && cards().length === 2000;
   };
 
   // (cxl) the Extra large size: the author's default, the size list, one or two cards per row at 1500px, every field,
@@ -1479,7 +1484,7 @@
     R.info.filtered = [sr.length, detTitle(), tdText(sr[1], 'V_NAME'), detPos()];
     // a right-click on a value inside: that cell's menu (the engine's), the menu's Escape closes the menu alone
     var dd = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_DATE"]'), ev = rclick(dd); await sleep(100);
-    R.chk.menuInside = ev.defaultPrevented && !!menu() && text(q('.pnb-hm-name', menu())) === thName('V_DATE') && td(sr[1], 'V_DATE').classList.contains('pnb-hm-cell') && acts().indexOf('cardOpen') < 0 && acts().indexOf('cardsTable') >= 0;
+    R.chk.menuInside = ev.defaultPrevented && !!menu() && text(q('.pnb-hm-name', menu())) === thName('V_DATE') && td(sr[1], 'V_DATE').classList.contains('pnb-hm-cell') && acts().indexOf('cardOpen') < 0 && acts().indexOf('cardsTable') < 0 && acts().indexOf('cardConfig') >= 0;
     var dt0 = dd ? dd.previousElementSibling : null, bg0 = dt0 ? getComputedStyle(dt0).backgroundColor : '';
     R.chk.menuMark = !!dd && dd.classList.contains('is-menu-for') && !!menu() && bg0 !== 'rgba(0, 0, 0, 0)' && bg0 !== 'transparent';
     var aeD = function (n) { return n ? (n.tagName + '#' + (n.id || '') + '.' + String(n.className || '').slice(0, 60)) : null; }, ae0 = document.activeElement;
@@ -2358,7 +2363,7 @@
     q('.pnb-card-fields dt', cards()[2]).click(); await sleep(200);
     rclick(q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_DATE"]')); await sleep(100);
     var da = acts(); R.info.detActs = da;
-    R.chk.detNoSort = !!menu() && SORTS.every(function (x) { return da.indexOf(x) < 0; }) && da.indexOf('cardsTable') >= 0 && da.indexOf('stats') >= 0;
+    R.chk.detNoSort = !!menu() && SORTS.every(function (x) { return da.indexOf(x) < 0; }) && da.indexOf('cardsTable') < 0 && da.indexOf('cardConfig') >= 0 && da.indexOf('stats') >= 0;   // (menufix2 I1)
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
     // a number field's menu: its sorts sit between two separators (no Filter by value, no stats after them)
     rclick(q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_AMOUNT"]')); await sleep(100);
@@ -2818,7 +2823,8 @@
     q('.pnb-card-fields dt', c).click(); await until(function () { return detOpen(); }, 3000); await sleep(150);
     var ddd = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_DATE"]'), dtr = textRect(ddd), dbox = ddd.getBoundingClientRect(), dmy = (dtr.top + dtr.bottom) / 2;
     m = await menuAt(ddd, dtr.left + 3, dmy);
-    R.chk.detTextField = fieldMenu(m.a) && detOpen();
+    // (menufix2 I1) the details window's field menu: the cell's items with Configure cards, never Show as table
+    R.chk.detTextField = (m.a.indexOf('cellFilter') >= 0 || m.a.indexOf('filterMenu') >= 0) && m.a.indexOf('cardConfig') >= 0 && m.a.indexOf('cardsTable') < 0 && detOpen();
     m = await menuAt(ddd, Math.min(dbox.right - 2, dtr.right + 30), dmy);
     R.chk.detWhiteCard = dbox.right - 2 > dtr.right + 6 && m.a.indexOf('sortAsc') < 0 && m.a.indexOf('cellFilter') < 0 && m.a.indexOf('hide') < 0 && detOpen();
     R.info.detWhite = { acts: m.a.slice(0, 8), text: dtr, box: [dbox.left, dbox.right] };
@@ -3693,8 +3699,8 @@
     var ddd = q('#pnbCardDetails dd[data-col="H_TEXT"]'), dbox = ddd ? q('.nested-json-container', ddd) : null, dgp = dbox ? gapPoint(dbox) : null;
     if (dgp) { rclick(dgp.el, dgp); await sleep(120); }
     R.info.detMenu = menuInfo();
-    R.chk.nestGapDetails = !!dgp && !!menu() && text(q('.pnb-hm-name', menu())) === thName('H_TEXT') && acts().indexOf('sortAsc') < 0 && acts().indexOf('cardSize') >= 0;
-    R.chk.clearLastDetails = clearOk('cardSize');
+    R.chk.nestGapDetails = !!dgp && !!menu() && text(q('.pnb-hm-name', menu())) === thName('H_TEXT') && acts().indexOf('sortAsc') < 0 && acts().indexOf('cardSize') < 0 && acts().indexOf('cardConfig') >= 0;   // (menufix2 I1)
+    R.chk.clearLastDetails = clearOk('cardConfig');   // (menufix2 I1)
     await escMenu(); C().closeDetails(); await sleep(100);
   };
   S.ctclear = async function () {
@@ -4857,7 +4863,7 @@
     kept = ccKept();
     R.info.c1 = { label: o1.label, notes: o1.notes, types: o1.types, n: [cs1.length, kept.length, cards().length], lazy0: lazy0, head: (o1.html || '').slice(0, 300) };
     R.chk.noteCards = o1.label === 'Copy Cards As-Is (HTML)' && o1.notes.length === 1 && /^Cards show, so this copies the cards: every page, at the card size shown, laid out as an emailed report shows them\. Best for pasting into email and documents\. For Excel, use Copy Table as TSV\.$/.test(o1.notes[0]);
-    R.chk.htmlOnly = same(o1.types, ['text/html']);
+    R.chk.htmlOnly = same(o1.types, ['text/html', 'text/plain']);
     R.chk.copiedCards = cs1.length > 0 && !b1.querySelector('thead, th, #resultsTable') && !/<button|<svg|<script|<input/i.test(o1.html || '');
     R.chk.allPages = kept.length === 300 && cs1.length === 300 && cards().length === 25;
     R.chk.inOrder = cs1.length === kept.length && cs1.every(function (c, i) { return ccTitle(c) === text(td(kept[i], 'V_NAME')); });
@@ -4941,7 +4947,7 @@
     R.chk.tilesTotalLast = tiles.length > 0 && tiles[tiles.length - 1].classList.contains('is-total') && /Grand Total/.test(cs.length ? ccTitle(cs[cs.length - 1]) : '');
     R.chk.tilesParts = !!c0 && ccBig(c0) !== '' && ccBig(c0) === text(q('.pnb-card-bigval', t0)) && tl.length > 0 && JSON.stringify(tl) === JSON.stringify(ml);
     R.chk.tilesMailSafe = cs.length > 0 && !/\sclass=/.test(o.html) && o.html.indexOf('var(--') < 0 && !/<dl[\s>]/i.test(o.html) && !/\sdata-/.test(o.html);
-    R.chk.tilesHtmlOnly = JSON.stringify(o.types) === JSON.stringify(['text/html']);
+    R.chk.tilesHtmlOnly = JSON.stringify(o.types) === JSON.stringify(['text/html', 'text/plain']);
     R.chk.tilesToast = cs.length > 0 && ccSaid(new RegExp('SUCCESS: Copied ' + cs.length + ' cards to the clipboard\\.'));
   };
   // (pvsched, 2026-11-05, the user: "Email + PDF tiles") over a pivot's tiles the Save records the tiles drawn - their
