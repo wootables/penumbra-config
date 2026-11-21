@@ -4,4 +4,4 @@ REM Exists so the schtasks /TR argument is ONE unquoted path - nesting quotes
 REM inside /TR is the classic way to get a task that registers cleanly and then
 REM fails instantly on every run, logging nothing.
 REM Pass-through args (%*) so --test and --verbose still work by hand.
-"D:\Utilities\PHP_8.6-p\php.exe" "D:\Utilities\PHP_penumbra\penumbra_monitor.php" %*
+"D:\Utilities\PHP_penumbra\php.exe" "D:\Utilities\PHP_penumbra\penumbra_monitor.php" %*
