@@ -92,6 +92,9 @@ if ($Mutant -and $Mutant -ne 'planweb') {
 }
 [IO.File]::WriteAllText((Join-Path $mod 'penumbra_render_charts.php'), $src)
 Copy-Item $Client (Join-Path $mod 'penumbra_render_client.php') -Force
+# the client loads penumbra_home() from beside itself (2026-11-20); a pre-helper client has none to copy
+$homePhp = Join-Path (Split-Path $Client) 'penumbra_home.php'
+if (Test-Path $homePhp) { Copy-Item $homePhp (Join-Path $mod 'penumbra_home.php') -Force }
 Copy-Item $Pdf (Join-Path $mod 'plugins\pdf_generator.php') -Force
 # TCPDF rides beside the plugin copy (the plugin loads __DIR__/lib/tcpdf); one-time cache.
 if (-not (Test-Path (Join-Path $mod 'plugins\lib\tcpdf\tcpdf.php'))) {

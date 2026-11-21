@@ -219,6 +219,9 @@ $stub = '<?php function penumbra_health_cache_file($c) { return ' . var_export($
       . ' function penumbra_log_web_account_note() { return "the application pool identity"; } ?>';
 file_put_contents($TMP . DIRECTORY_SEPARATOR . 'block.php', $stub . "\n<?php\n" . substr($src, $start, $end - $start) . "\n");
 require $TMP . DIRECTORY_SEPARATOR . 'block.php';
+// The packet names the watchdog log under penumbra_home() (2026-11-20): load the real
+// helper from beside the file under test (a pre-helper penumbra_health.php needs none).
+if (is_file(dirname($HEALTH) . DIRECTORY_SEPARATOR . 'penumbra_home.php')) require_once dirname($HEALTH) . DIRECTORY_SEPARATOR . 'penumbra_home.php';
 file_put_contents($TMP . DIRECTORY_SEPARATOR . 'packet.php', "<?php\n" . lift($src, array('penumbra_outage_packet')));
 require $TMP . DIRECTORY_SEPARATOR . 'packet.php';
 if ($MUTANT7) {

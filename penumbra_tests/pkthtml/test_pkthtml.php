@@ -50,6 +50,9 @@ if ($MUTANT) {
     $fn = str_replace($needle, 'foreach (array() as $h) {', $fn);
     echo "MUTANT: the packet ignores its history\n";
 }
+// The packet names the watchdog log under penumbra_home() (2026-11-20): load the real
+// helper from the app under test (a pre-helper app has none and needs none).
+if (is_file("$APP/penumbra_home.php")) require_once "$APP/penumbra_home.php";
 eval($fn);
 
 $T = mktime(14, 0, 0, 11, 4, 2026);
