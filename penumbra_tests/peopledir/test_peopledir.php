@@ -350,7 +350,7 @@ if ($missing) {
                                                           'php_test_search_condition', '_search_get_cell_value', '_search_is_numeric_str', '_search_num_in_range_list', '_sr_resolve_keyword_date'),
                                                           // php_test_search_condition's value helpers since 2026-09-24 (accounting
                                                           // negatives, strict browser dates) - lifted when present.
-                                                          array_values(array_filter(array('_search_parse_num', '_search_parse_date', '_search_date_floor'),
+                                                          array_values(array_filter(array('_search_parse_num', '_search_parse_date', '_search_date_floor', '_sr_rr_year', '_sr_rr_date'),   // the last two: promptfix4 Z3 2026-11-20 (RR read)
                                                               function ($fn) use ($src) { return strpos($src['penumbra_search.php'], 'function ' . $fn . '(') !== false; }))));
     $tmpf = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_peopledir_lift_' . getmypid() . '.php';
     file_put_contents($tmpf, "<?php\n" . $lifted);

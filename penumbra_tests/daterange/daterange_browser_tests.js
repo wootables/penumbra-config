@@ -80,7 +80,9 @@
         // against builds from before AND after.
         ['promptSectionKey', 'promptSectionMap', '_pnbPromptListJoin', '_pnbPromptListSplit', '_pnbUnlockUrlAnswer',
          '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor',
-         'penumbraPromptDateLimit', 'penumbraPromptDateLimitArg', '_pnbPgDateRead'].forEach(function (n) {   // the second line: promptfix2 2026-11-19; the third: promptfix3 B2 (min_date/max_date)
+         'penumbraPromptDateLimit', 'penumbraPromptDateLimitArg', '_pnbPgDateRead',
+         'penumbraOracleDateLiteral', 'penumbraOracleRRYear', '_pnbDpOracleYear',   // the fourth line: promptfix4 Z1 2026-11-20 (RR-safe literals)
+         '_pnbRdrClean', '_pnbRdrCleanAns', '_pnbRRMoment'].forEach(function (n) {   // the fifth: promptfix4 Z3 2026-11-20 (reader values cleaned; RR reads)   // the second line: promptfix2 2026-11-19; the third: promptfix3 B2 (min_date/max_date)
             if (new RegExp('\\n    function ' + n + '\\(').test(code)) names.push(n);
         });
         var src = "var PNB_DATE_RANGE_SEP = '..';\n"

@@ -46,7 +46,8 @@ if not os.path.exists(EDGE):
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_tiles.js']
-REL = {'main': 'js/main.js', 'sb': 'js/search_builder.js', 'css': 'css/search_builder.css', 'search': 'penumbra_search.php'}
+REL = {'main': 'js/main.js', 'sb': 'js/search_builder.js', 'css': 'css/search_builder.css', 'search': 'penumbra_search.php',
+       'runner': 'schedule_runner.php'}   # runner: promptfix4 Z3 2026-11-20 (was always the live file)
 # The build before this round: live when the round was staged; '<deploy sha>^' once installed.
 CONTROL_REV = '4b725a0^'
 CR = '\r\n'
@@ -303,7 +304,7 @@ def server_half(F):
     try:
         sp = os.path.join(tmp, 'penumbra_search.php'); rp = os.path.join(tmp, 'schedule_runner.php'); mp = os.path.join(tmp, 'mirror.php')
         open(sp, 'wb').write(F['search'].encode('utf-8', 'surrogateescape'))
-        shutil.copyfile(os.path.join(APP, 'schedule_runner.php'), rp)
+        open(rp, 'wb').write(F['runner'].encode('utf-8', 'surrogateescape'))   # (2026-11-20, promptfix4 Z3) the staged runner, not always live
         r = subprocess.run([PHP, '-n', '-d', 'memory_limit=512M', EXTRACT, rp, mp], capture_output=True, timeout=300)
         if r.returncode != 0 or not os.path.isfile(mp):
             return {'fatal': 'extract_mirror: ' + (r.stdout + r.stderr).decode('utf-8', 'replace')[:1500]}

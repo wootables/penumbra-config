@@ -78,6 +78,9 @@ try {
   var pieces = [
     ['dateDeps', dateDeps],
     ['parseDate', grab('function parseDate(')],
+    // (promptfix4 Z3, 2026-11-20) parseDate's RR read of DD-MMM-YY - lifted only where the code has them
+    ['_pnbRRMoment', code.indexOf('function _pnbRRMoment(') !== -1 ? grab('function _pnbRRMoment(') : ''],
+    ['penumbraOracleRRYear', code.indexOf('function penumbraOracleRRYear(') !== -1 ? grab('function penumbraOracleRRYear(') : ''],
     ['_vizDateMs', grab('function _vizDateMs(')],
     ['_vizGanttTickFmt', grab('function _vizGanttTickFmt(')],
     ['_vizGanttMarker', grab('function _vizGanttMarker(')],

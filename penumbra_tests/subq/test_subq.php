@@ -128,6 +128,11 @@ foreach (array('penumbraHiddenAllowList', 'penumbraSqlReadsColumnStats', 'penumb
 }
 function penumbraExtractSqlTables($s) { return penumbraExtractSqlTablesUncached($s); }
 eval(lift_class($SRC['S'], 'PenumbraClobBind'));
+// (2026-11-20, promptfix4 Z1) resolveParamDateExpression writes Oracle literals through penumbraOracleDateLiteral /
+// penumbraOracleRRYear and reads an MS-SQL DD-MON-YY through penumbraDateRangeParseEnd (RR): lifted when present.
+foreach (array('penumbraOracleDateLiteral', 'penumbraOracleRRYear', 'penumbraDateRangeParseEnd') as $f) {
+    if (preg_match('/\nfunction ' . $f . '\(/', $SRC['S'])) eval(lift_function($SRC['S'], $f));
+}
 foreach (array('extractSubqueryTags', 'penumbraTagCloseAt', 'penumbraSubqueryTagFields', 'penumbraFindSubqueryTags',
                'penumbraOffsetInMssqlTag', 'penumbraSelectListNames', 'penumbraGateDropCteReads', 'penumbraSubqueryErrorMessage',
                'penumbraSubqueryTransportPref', 'penumbraOciSessionDateFormat', 'penumbraPrepareSubqueryStmt', 'penumbraNormalizeUtf8',

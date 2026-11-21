@@ -14,6 +14,13 @@ require_once __DIR__ . '/pivot_mirror.php';
 // the mirror (run.ps1 passes it). Without it every text-valued filter died in the driver.
 $__app = (isset($argv[1]) && $argv[1] !== '') ? rtrim($argv[1], '/\\')
        : '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+// (2026-11-20, promptfix4 Z1) the runner loads shared_logic.php first, so its Oracle literal helpers are there when
+// penumbra_search.php's _sr_oracle_date() asks; lift them by name from the same tree, when present.
+$__shared = @file_get_contents($__app . DIRECTORY_SEPARATOR . 'shared_logic.php');
+foreach (array('penumbraOracleRRYear', 'penumbraOracleDateLiteral') as $__fn) {
+    if (!function_exists($__fn) && $__shared && preg_match('/\nfunction ' . $__fn . '\(.*?\n\}\n/s', $__shared, $__m)) { eval($__m[0]); }
+}
+unset($__shared, $__m, $__fn);
 if (!function_exists('_sr_resolve_keyword_date')) require $__app . DIRECTORY_SEPARATOR . 'penumbra_search.php';
 
 /** One row through the Search Filter engine exactly as php_apply_search_filter does: parse over the row's keys, evaluate. */

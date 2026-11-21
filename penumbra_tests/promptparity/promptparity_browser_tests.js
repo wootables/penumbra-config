@@ -73,6 +73,10 @@
          '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor'].forEach(function (n) { if (has(n)) names.push(n); });   // the second line: promptfix2 2026-11-19
         // (2026-11-19, promptfix3 B2) validatePromptInput reads min_date()/max_date() through these; lifted when present.
         ['penumbraPromptDateLimit', 'penumbraPromptDateLimitArg', '_pnbPgDateRead'].forEach(function (n) { if (has(n)) names.push(n); });
+        // (2026-11-20, promptfix4 Z1) every Oracle date literal and the calendars' year read go through these; lifted when present.
+        ['penumbraOracleDateLiteral', 'penumbraOracleRRYear', '_pnbDpOracleYear'].forEach(function (n) { if (has(n)) names.push(n); });
+        // (2026-11-20, promptfix4 Z3) processPrompts / _pnbPromptUrlParams clean reader values through these; lifted when present.
+        ['_pnbRdrClean', '_pnbRdrCleanAns', '_pnbRRMoment'].forEach(function (n) { if (has(n)) names.push(n); });
         var viewLinkLines = ['_pnbViewPromptReset', '_pnbPromptStored', '_pnbPromptWrite', '_pnbPromptRemove'].map(function (n) {
             var m1 = new RegExp(BS + 'n    function ' + n + BS + '([^' + BS + 'n]*' + BS + '}' + BS + 'n').exec(code);
             return m1 ? m1[0] : '';

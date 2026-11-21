@@ -73,7 +73,9 @@
         // these from then on; lifted only when the main.js under test has them, so
         // this suite runs against builds from before AND after.
         ['promptSectionKey', 'promptSectionMap', '_pnbPromptListJoin', '_pnbPromptListSplit', '_pnbUnlockUrlAnswer',   // the last three: promptfix 2026-11-19
-         '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor'].forEach(function (n) {   // promptfix2 2026-11-19
+         '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor',   // promptfix2 2026-11-19
+         'penumbraOracleDateLiteral', 'penumbraOracleRRYear', '_pnbDpOracleYear',   // promptfix4 Z1 2026-11-20 (RR-safe literals)
+         '_pnbRdrClean', '_pnbRdrCleanAns', '_pnbRRMoment'].forEach(function (n) {   // promptfix4 Z3 2026-11-20 (reader values cleaned; RR reads)
             if (new RegExp('\\n    function ' + n + '\\(').test(code)) names.push(n);
         });
         var src = "var PNB_DATE_RANGE_SEP = '..';\n"

@@ -23,9 +23,20 @@ require __DIR__ . '/mirror.php';
 // 2026-09-05: the search engine and the keyword-date resolvers live in
 // penumbra_search.php (pure declarations, safe to require directly). A mirror
 // lifted from an older runner still carries them, hence the guard.
+$PNB_SEARCH_FILE = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra\\penumbra_search.php';
 if (!function_exists('php_apply_search_filter')) {
-    require_once '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra\\penumbra_search.php';
+    require_once $PNB_SEARCH_FILE;
 }
+// (2026-11-20, promptfix4 Z1) Oracle literals go through shared_logic.php's penumbraOracleDateLiteral / penumbraOracleRRYear
+// (four digits only when Oracle's RR rule would misread two). penumbra_search.php falls back to the old d-M-y without them,
+// so lift them by name from the shared_logic.php beside the search file, when present (a build before Z1 has neither).
+$PNB_ORACLE_HELPERS = array();
+$sharedSrc = @file_get_contents(dirname($PNB_SEARCH_FILE) . DIRECTORY_SEPARATOR . 'shared_logic.php');
+foreach (array('penumbraOracleRRYear', 'penumbraOracleDateLiteral') as $fn) {
+    if (!function_exists($fn) && $sharedSrc && preg_match('/\nfunction ' . $fn . '\(.*?\n\}\n/s', $sharedSrc, $m)) { eval($m[0]); }
+    if (function_exists($fn)) $PNB_ORACLE_HELPERS[] = $fn;
+}
+unset($sharedSrc);
 
 $pass = 0; $fail = 0;
 function check($label, $got, $want) {
@@ -79,6 +90,19 @@ check('this fiscal year (number)',     _sr_resolve_relative_date('this fiscal ye
 check('last fiscal year (number)',     _sr_resolve_relative_date('last fiscal year'), (string)$fyStart);
 check('first day of this fiscal year', _sr_resolve_relative_date('first day of this fiscal year'),
       strtoupper(date('d-M-y', mktime(0,0,0,7,1,$fyStart))));
+// (2026-11-20, promptfix4 Z1) a date the RR rule would misread in two digits is written in four; recent dates keep two.
+if (count($PNB_ORACLE_HELPERS) === 2 && function_exists('_sr_oracle_date')) {
+    $cy = (int)date('Y') - 100; $cm = (int)date('n');
+    $c100 = mktime(0,0,0,$cm,min((int)date('j'),(int)date('t', mktime(0,0,0,$cm,1,$cy))),$cy);
+    check('100 years ago is four-digit',  _sr_resolve_relative_date('100 years ago'), strtoupper(date('d-M-', $c100)) . date('Y', $c100));
+    $c36500 = strtotime('-36500 days');
+    check('TODAY-36500 is four-digit',    _sr_resolve_relative_date('TODAY-36500'), strtoupper(date('d-M-', $c36500)) . date('Y', $c36500));
+    check('TODAY-36500 search keyword too', _sr_resolve_keyword_date('TODAY-36500'), strtoupper(date('d-M-', $c36500)) . date('Y', $c36500));
+    check('1 year ago stays two-digit',   strlen((string)_sr_resolve_relative_date('1 year ago')), 9);
+    check('TODAY-30 stays two-digit',     _sr_resolve_relative_date('TODAY-30'), d(-30));
+} else {
+    echo "  note four-digit century checks skipped: no penumbraOracleDateLiteral / _sr_oracle_date in this build\n";
+}
 // Still not a blanket strtotime: a surname or bare weekday is text.
 check('prompt: literal May stays text',    _sr_resolve_relative_date('May'), null);
 check('prompt: literal Friday stays text', _sr_resolve_relative_date('Friday'), null);

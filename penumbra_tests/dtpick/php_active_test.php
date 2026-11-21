@@ -4,6 +4,12 @@
 // <mirror.php> = pivotparity\extract_mirror.php of the runner under test (its functions only: the runner
 // itself must never be included - it opens Oracle and SENDS EMAIL).
 require $argv[1];
+// (2026-11-20, promptfix4 Z3) the runner requires penumbra_search.php unconditionally and _cf_parse_date now calls its
+// _sr_rr_date (DD-MON-YY by RR). Optional 2nd argument = the app dir; else the live file. Only when the mirror needs it.
+if (!function_exists('_sr_rr_date') && strpos((string)@file_get_contents($argv[1]), '_sr_rr_date(') !== false) {
+    $__app = (isset($argv[2]) && $argv[2] !== '') ? rtrim($argv[2], '/\\') : '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+    if (!function_exists('_search_get_virtual_columns')) require $__app . DIRECTORY_SEPARATOR . 'penumbra_search.php';
+}
 $P = 0; $F = 0; $LOG = array();
 function ok($n, $c, $x = '') { global $P, $F, $LOG; if ($c) { $P++; $LOG[] = "PASS  $n"; } else { $F++; $LOG[] = "FAIL  $n" . ($x !== '' ? "   >> $x" : ''); } }
 function eqv($n, $g, $w) { ok($n, $g === $w, 'got=' . json_encode($g) . ' want=' . json_encode($w)); }

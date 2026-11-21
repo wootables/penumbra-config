@@ -810,3 +810,31 @@ case: NOT IN ([m]) before a closing parenthesis, nothing picked - 1=1 (A8 kept)
 sql:  SELECT 1 FROM t WHERE (c NOT IN ([PROMPT;type=multi-select;name=m;options=A,B,C])) AND z = 1
 ans:
 all:  SELECT 1 FROM t WHERE (1=1) AND z = 1
+
+group: far dates keep a four-digit year where Oracle's RR rule would misread two (2026-11-20, promptfix4 Z1)
+
+case: typed 1/5/1926 binds 05-JAN-1926 (it was 05-JAN-26, which RR reads as 2026)
+sql:  SELECT 1 FROM t WHERE d >= TO_DATE('[PROMPT;type=date;name=d]', 'DD-MON-YY')
+ans:  d=1/5/1926
+all:  SELECT 1 FROM t WHERE d >= TO_DATE('05-JAN-1926', 'DD-MON-YY')
+# The browser sends a typed date as typed (:p1 = the answer); query.php's resolveParamDateExpression writes the Oracle
+# literal from it, the same function ?json=1 uses. This harness writes binds back as sent, so browser: is the raw answer.
+browser: SELECT 1 FROM t WHERE d >= TO_DATE('1/5/1926', 'DD-MON-YY')
+
+case: typed 01-JAN-1926 passes through unchanged
+sql:  SELECT 1 FROM t WHERE d >= TO_DATE('[PROMPT;type=date;name=d]', 'DD-MON-YY')
+ans:  d=01-JAN-1926
+all:  SELECT 1 FROM t WHERE d >= TO_DATE('01-JAN-1926', 'DD-MON-YY')
+
+case: a year typed in two digits keeps two (01/05/55 -> 05-JAN-55, as before)
+sql:  SELECT 1 FROM t WHERE d >= TO_DATE('[PROMPT;type=date;name=d]', 'DD-MON-YY')
+ans:  d=01/05/55
+all:  SELECT 1 FROM t WHERE d >= TO_DATE('05-JAN-55', 'DD-MON-YY')
+# The browser sends a typed date as typed (:p1 = the answer); query.php's resolveParamDateExpression writes the Oracle
+# literal from it, the same function ?json=1 uses. This harness writes binds back as sent, so browser: is the raw answer.
+browser: SELECT 1 FROM t WHERE d >= TO_DATE('01/05/55', 'DD-MON-YY')
+
+case: a date range from 1926 keeps the four-digit end and the two-digit one as typed
+sql:  SELECT 1 FROM t WHERE d BETWEEN [PROMPT;type=date-range;name=r] AND z = 1
+ans:  r=20-NOV-1926..20-NOV-26
+all:  SELECT 1 FROM t WHERE d BETWEEN '20-NOV-1926' AND '20-NOV-26' AND z = 1

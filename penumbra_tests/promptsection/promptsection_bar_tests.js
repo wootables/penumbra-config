@@ -105,7 +105,9 @@
     ];
     // New with section=; a build without them still compiles (and goes red below).
     var OPTIONAL = ['promptSectionKey', 'promptSectionMap', '_pnbPromptListJoin', '_pnbPromptListSplit', '_pnbUnlockUrlAnswer',   // the last three: promptfix 2026-11-19
-        '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor'];   // promptfix2 2026-11-19
+        '_pnbReservedNameMsg', '_pnbWarnReservedName', '_pnbPromptUrlParams', '_pnbUrlAnswerLabeler', '_pnbDefaultMark', '_pnbPromptOptionFor',   // promptfix2 2026-11-19
+        'penumbraOracleDateLiteral', 'penumbraOracleRRYear', '_pnbDpOracleYear',   // promptfix4 Z1 2026-11-20 (RR-safe literals)
+        '_pnbRdrClean', '_pnbRdrCleanAns', '_pnbRRMoment'];   // promptfix4 Z3 2026-11-20 (reader values cleaned; RR reads)
     var HANDLER_BAR = "$(document).on('click', '#resetAllPromptsLink', function (e) {";
     var HANDLER_SECTION = "$(document).on('click', '#promptInfoList .prompt-section-review', function (e) {";
 

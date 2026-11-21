@@ -118,6 +118,8 @@ lift_present($F_SHARED, array('penumbraSqlQQuoteClose', 'penumbraPromptTagsInCom
 lift_present($F_SHARED, array('penumbraResultIfSkipSpan', 'penumbraPromptEmptyExclude'));
 // (2026-11-19, promptfix3 S1) ?json=1 never reads a reserved URL name as a prompt answer: one PHP list. Lifted when present.
 lift_present($F_SHARED, array('penumbraUrlReservedNames', 'penumbraUrlNameReserved'));
+// (2026-11-20, promptfix4 Z1) every Oracle date literal goes through these (four digits only when RR would misread two).
+lift_present($F_SHARED, array('penumbraOracleDateLiteral', 'penumbraOracleRRYear'));
 // (2026-11-19) subqsweep (41364e4 / 26e5cba): both PHP engines ask penumbraOffsetInMssqlTag whether a tag sits inside an
 // MS-SQL [SUBQUERY]; it and the subquery tag readers it leans on, lifted when present.
 lift_present($F_SHARED, array('penumbraOffsetInMssqlTag', 'penumbraFindSubqueryTags', 'penumbraSubqueryTagFields', 'penumbraTagCloseAt',

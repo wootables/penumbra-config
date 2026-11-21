@@ -163,7 +163,8 @@ foreach (array('penumbraPromptUnquoteTemplate', 'penumbraPromptSplice', 'penumbr
 foreach (array('penumbraSqlQQuoteClose', 'penumbraPromptTagsInComments', 'penumbraMultiValueList', 'penumbraResultIfCheck',
                'penumbraNoQuoteOptionValues', 'penumbraParamTypes',
                'penumbraResultIfSkipSpan', 'penumbraPromptEmptyExclude',   // (2026-11-19, promptfix2 A5/A8)
-               'penumbraUrlReservedNames', 'penumbraUrlNameReserved') as $ph) {   // (2026-11-19, promptfix3 S1: ?json=1 skips reserved names)
+               'penumbraUrlReservedNames', 'penumbraUrlNameReserved',   // (2026-11-19, promptfix3 S1: ?json=1 skips reserved names)
+               'penumbraOracleDateLiteral', 'penumbraOracleRRYear') as $ph) {   // (2026-11-20, promptfix4 Z1: RR-safe Oracle date literals)
     if (strpos($sharedText, 'function ' . $ph . '(') !== false) { $promptHelpers[] = $ph; }
 }
 // (2026-11-19) subqsweep (41364e4 / 26e5cba): the engines ask penumbraOffsetInMssqlTag whether a tag sits inside an

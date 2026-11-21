@@ -30,7 +30,10 @@ param(
     # Only the extract reads it - run_engine_c.php still requires penumbra_search.php and
     # penumbra_render_charts.php from the live $app, so a change that also touches those
     # two needs a stage tree, not this switch.
-    [string]$RunnerSrc
+    [string]$RunnerSrc,
+    # (2026-11-20, promptfix4 Z3) the tree run_engine_c.php requires penumbra_search.php and penumbra_render_charts.php
+    # from: pass the stage tree when the change also touches penumbra_search.php. Default: the live $app.
+    [string]$AppDir
 )
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity' }   # empty when run as a scriptblock: never fall back to the caller's cwd
@@ -57,7 +60,9 @@ Write-Host "[2/6] running engine C corpus ..."
 # 2026-09-29) penumbra_render_charts.php from the SAME tree the functions were
 # extracted from - schedule_runner.php require_once's both, the extract cannot (see
 # run_engine_c.php). It exits 1 with a FATAL line if it cannot.
-& $php -n "$here\run_engine_c.php" "$app" | Out-Host
+$cApp = if ($AppDir) { $AppDir.TrimEnd('\') } else { $app }
+if ($AppDir) { Write-Host "    penumbra_search.php / penumbra_render_charts.php from -AppDir (NOT the live tree): $cApp" }
+& $php -n "$here\run_engine_c.php" "$cApp" | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "engine C runner failed (exit $LASTEXITCODE) - see its FATAL line above; result_c.json is STALE" }
 
 Write-Host "[3/6] staging JS + patching main.js ..."
