@@ -40,7 +40,7 @@
 #   -SkipPhp / -SkipBrowser      one half only;  -Keep keeps the staging dir.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\flatfreeze'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\flatfreeze'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Stages into %TEMP%; writes nothing to the webroot.
@@ -53,16 +53,16 @@ param([string]$MainJs = '', [string]$MainCss = '', [string]$IndexPhp = '', [stri
       [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$SkipPhp, [switch]$SkipBrowser, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (see the UNC note).
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\flatfreeze' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\flatfreeze' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if ($Control) {
   # The files the deploy of this feature replaced (byte-identical to the pre-feature build).
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   function LastBak($pattern) { Get-BakItem $pattern | Select-Object -Last 1 }
   $bm = LastBak "$js\main.js.bak-*-flatfreeze"; $bc = LastBak "$app\css\main.css.bak-*-flatfreeze"
   $bi = LastBak "$app\index.php.bak-*-flatfreeze"; $br = LastBak "$app\schedule_runner.php.bak-*-flatfreeze"
@@ -271,7 +271,7 @@ if (-not $SkipBrowser) {
 
 if (-not $SkipPhp -and -not $Mutant) {
   Write-Host "[2/2] runner half    schedule_runner.php: $Runner"
-  $ext = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext'
+  $ext = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext'
   # NOT $args - that is an automatic variable in PowerShell.
   $phpArgs = @('-n', '-d', 'memory_limit=1024M', '-d', 'date.timezone=America/New_York', '-d', "extension_dir=$ext",
                '-d', 'extension=zip', '-d', 'extension=mbstring', (Join-Path $here 'test_flatfreeze.php'),

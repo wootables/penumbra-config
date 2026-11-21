@@ -20,13 +20,13 @@
 #   Control = -MainJs/-Css <the pre-change files>.
 #
 # UNC .ps1 files are GPO-blocked: run the BODY as a scriptblock, never piped:
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\celltoggle'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\celltoggle'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -MainJs <p> -Css <p>
 # Writes nothing to the webroot. Exit 1 when any assertion fails.
 # =============================================================================
 param([string]$MainJs = '', [string]$Css = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\celltoggle' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\celltoggle' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }

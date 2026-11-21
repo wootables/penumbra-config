@@ -23,7 +23,7 @@
 # The app before 7c (live before 2026-11-01) fails 15: the 466px and 386px room and edge checks.
 #
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\narrowrows\run.ps1'))
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\narrowrows\run.ps1'))
 #   & $sb -App <stage>
 # Never add a bare `exit` (it would kill the caller), and do not pipe the invocation.
 # =============================================================================
@@ -33,7 +33,7 @@ param(
     [switch]$Mutants,
     [switch]$Show,
     # Hard-coded default, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
-    [string]$SuiteDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\narrowrows'
+    [string]$SuiteDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\narrowrows'
 )
 
 $ErrorActionPreference = 'Stop'

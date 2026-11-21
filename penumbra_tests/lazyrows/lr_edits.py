@@ -620,9 +620,9 @@ edit('js/main.js', 'lr-fill-plaintext', crlf(r"""    function _pnbFillLazyCell(t
 
 # --- README.md ---------------------------------------------------------------------------
 
-edit('README.md', 'readme-lazyrows-suite', r"""py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\copyhtml\run.py --mutants
+edit('README.md', 'readme-lazyrows-suite', r"""py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\copyhtml\run.py --mutants
 ```
-""", r"""py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\copyhtml\run.py --mutants
+""", r"""py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\copyhtml\run.py --mutants
 
 # Lazy rows (2026-09-30): rows past the first page are built as their <tr>, their '#' cell and
 # EMPTY cells - see section 5. DIFFERENTIAL, like hiddencols: every scenario loads the REAL
@@ -642,8 +642,8 @@ edit('README.md', 'readme-lazyrows-suite', r"""py -3 \\oitras\d$\Utilities\PHP_8
 # L-prepall; --mutants 16/16 (12 fill sites bite; eq-nononefill, eq-noviewrows, eq-nofasttext and
 # eq-nocellof are redundant by design). Runners that rewrite ONE main_hc.js per build turn the
 # browser cache off (Network.setCacheDisabled): heuristic freshness once served the previous build.
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\lazyrows\run.py
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\lazyrows\run.py --mutants
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\lazyrows\run.py
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\lazyrows\run.py --mutants
 ```
 """)
 

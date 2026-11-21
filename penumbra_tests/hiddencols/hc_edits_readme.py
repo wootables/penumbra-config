@@ -2,9 +2,9 @@
 # switch, the capacity note, the landmines, and the one related follow-up.
 # Raw strings: README text holds backslashed UNC paths.
 
-edit('README.md', 'readme-suite', r'''& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\switchmotion\run.ps1'))) -Mutants
+edit('README.md', 'readme-suite', r'''& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\switchmotion\run.ps1'))) -Mutants
 ```
-''', r'''& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\switchmotion\run.ps1'))) -Mutants
+''', r'''& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\switchmotion\run.ps1'))) -Mutants
 
 # Hidden columns built EMPTY (2026-09-30): a hidden column's cells are created empty
 # (data-pnb-lazy) and filled from masterRowData the moment anything needs their content - see
@@ -23,8 +23,8 @@ edit('README.md', 'readme-suite', r'''& ([scriptblock]::Create([IO.File]::ReadAl
 # "eq-" layers are redundant by design and stay green). Python + websocket-client over CDP, ~3 min.
 # bench.py + bench_harness.html in the same folder are the timing harness behind the numbers in
 # section 5 (py -3 bench.py <label> <main.js> "rows=2000&cols=150&vis=10&html=0.1" --ops).
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hiddencols\run.py
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hiddencols\run.py --mutants
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\hiddencols\run.py
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\hiddencols\run.py --mutants
 ```
 ''')
 

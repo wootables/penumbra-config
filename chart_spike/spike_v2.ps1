@@ -1,8 +1,8 @@
 # spike_v2.ps1 - three bounded headless-Edge attempts; called by penumbra_chart_spike.cmd
-$D = 'D:\Utilities\PHP_8.2-p\chart_spike'
+$D = 'D:\Utilities\PHP_penumbra\chart_spike'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
-$url = 'file:///D:/Utilities/PHP_8.2-p/chart_spike/chart.html'
+$url = 'file:///D:/Utilities/PHP_penumbra/chart_spike/chart.html'
 "edge: $edge  exists=$(Test-Path $edge)"
 "session: $([System.Diagnostics.Process]::GetCurrentProcess().SessionId)  interactive=$([Environment]::UserInteractive)  user=$([Environment]::UserName)"
 $base = @('--disable-gpu','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-sync','--disable-background-networking','--hide-scrollbars','--mute-audio','--window-size=900,450','--virtual-time-budget=3000','--enable-logging=stderr','--v=1')

@@ -306,7 +306,7 @@ cards, a stale runner notice, the SSH key) are in the report and were not change
 ## Running
 
 ```
-$d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpv2'
+$d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpv2'
 & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -App <stage> -Orig <orig> -Mutants
 & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))                      # live as app and orig
 ```

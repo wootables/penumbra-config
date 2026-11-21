@@ -37,13 +37,15 @@ $FORCE   = in_array('--force', $argvRaw, true);
 // where a bare C:\ would silently mean the WORKSTATION's C: drive and the
 // script would either fail loudly (as it did) or, worse, read the wrong file.
 $APP     = 'C:\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
-$logFile = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor.log';
+$logFile = null;   // default: logs\penumbra_monitor.log in penumbra_home(), resolved below once --app= is known
 $ledgerOverride = null;
 foreach ($argvRaw as $a) {
     if (strpos($a, '--app=')    === 0) $APP            = rtrim(substr($a, 6),  '\\/');
     if (strpos($a, '--log=')    === 0) $logFile        = substr($a, 6);
     if (strpos($a, '--ledger=') === 0) $ledgerOverride = substr($a, 9);
 }
+if (!function_exists('penumbra_home')) require_once $APP . DIRECTORY_SEPARATOR . 'penumbra_home.php';
+if ($logFile === null) $logFile = penumbra_home() . '\\logs\\penumbra_monitor.log';
 
 /* THE CONFIG IS OPTIONAL, ON PURPOSE. This is a pure file-to-file transform:
    it reads a log and writes a JSON ledger, and it touches no database. The

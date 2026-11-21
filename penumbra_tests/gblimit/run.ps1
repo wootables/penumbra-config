@@ -16,7 +16,7 @@
 # =============================================================================
 param([string]$MainJs = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\gblimit' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\gblimit' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }

@@ -28,13 +28,13 @@
 #   .bak files back while the live files are still exactly that deploy; later, the full -Restore.
 #
 # UNC NOTE: run the body as a scriptblock (the share is RemoteSigned):
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grplist'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\grplist'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\rollback.ps1"))) -Disable
 # =============================================================================
 param([switch]$Status, [switch]$Disable, [switch]$Enable, [switch]$Restore, [switch]$DryRun,
       [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grplist' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\grplist' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 $off     = Join-Path $app 'js\penumbra_grouplist.off'
 $modules = @('js\penumbra_grouplist.js', 'css\penumbra_grouplist.css')

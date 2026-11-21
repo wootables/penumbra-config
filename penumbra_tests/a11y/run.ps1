@@ -9,7 +9,7 @@
 #                  keys, enhanceChartA11y tables (44 assertions).
 #
 # Run the BODY as a scriptblock (UNC scripts are GPO-blocked):
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\a11y\run.ps1')); & $sb
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\a11y\run.ps1')); & $sb
 # Never pipe the invocation (a lingering Edge child keeps stdout open).
 #
 # Pass 1 runs the LIVE module (or $env:PNB_A11Y_SRC). Pass 2 runs a TARGETED
@@ -18,7 +18,7 @@
 # No `exit` here on purpose: a scriptblock's exit kills the caller's session.
 # =============================================================================
 $ErrorActionPreference = 'Stop'
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\a11y'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\a11y'
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }

@@ -619,10 +619,10 @@ REPL
 // README.md - a tests entry (section 3), a landmine (section 5), an open item (6)
 // =============================================================================
 edit('README.md', <<<'ANCHOR'
-& \\oitras\d$\Utilities\PHP_8.2-p\php.exe -n \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
+& \\oitras\d$\Utilities\PHP_8.6-p\php.exe -n \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
 ANCHOR
 , <<<'REPL'
-& \\oitras\d$\Utilities\PHP_8.2-p\php.exe -n \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
+& \\oitras\d$\Utilities\PHP_8.6-p\php.exe -n \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
 # SFTP/SCP private key at rest (2026-10-16, "sftpkey") - see section 5. A Drop-a-File task's SSH
 # private key is encrypted like the password (manage_schedule.php, its own POST field; blank keeps
 # the stored key, "Remove the saved key" drops it), stripped from the task list (has_drop_sftp_key),
@@ -633,7 +633,7 @@ ANCHOR
 # -Mutants runs four (a plaintext save, a transport reading the stored key, a list that leaks it, a
 # reader that does not decrypt), each must go red with its exact count. -App <stage> tests a stage;
 # patch.php re-applies the change to a fresh copy of live.
-$d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\sftpkey'
+$d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sftpkey'
 & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 REPL
 );

@@ -15,12 +15,12 @@
 # option, and with the console docked or undocked every path is stock jQuery UI.
 #
 # UNC NOTE: run the body as a scriptblock (-File on a UNC path is GPO-blocked here):
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiphost'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tiphost'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\rollback.ps1"))) -Here $d -Restore -DryRun
 # =============================================================================
 param([switch]$Status, [switch]$Restore, [switch]$DryRun, [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiphost' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tiphost' }
 # -App: rehearse against a scratch copy of the app folder.
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 $patcher = Join-Path $here 'patch_tiphost.py'

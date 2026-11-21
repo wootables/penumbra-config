@@ -19,8 +19,8 @@
 # =============================================================================
 param([string]$App = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra',
       [switch]$Control, [int]$Mutant = 0)
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\notice' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\notice' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $a = @('-n', '-d', 'date.timezone=America/New_York', (Join-Path $here 'test_notice.php'), "--app=$($App -replace '\\','/')")
 if ($Control) { $a += '--control' }
 if ($Mutant)  { $a += "--mutant=$Mutant" }

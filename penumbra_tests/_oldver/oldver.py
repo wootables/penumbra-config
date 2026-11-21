@@ -14,7 +14,7 @@
 # New-style controls (no .bak ever existed) use git_show(rev, rel): the file at a
 # commit, e.g. git_show('abc1234^', 'js/main.js') = the build before commit abc1234.
 #
-#   import sys; sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver')
+#   import sys; sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver')
 #   from oldver import bak_glob, bak_path, git_show
 # =============================================================================
 import fnmatch, glob, hashlib, os, subprocess

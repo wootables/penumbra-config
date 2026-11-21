@@ -90,8 +90,8 @@ ok(!in_array('', $allow), 'empty string never becomes a member (would match a bl
 ok(count($allow) === 2, 'normalization adds no members');
 
 // ---- 6. The real config, end to end ----
-$cfgPath = 'D:/Utilities/PHP_8.2-p/penumbra_config.php';
-if (!is_file($cfgPath)) { $cfgPath = '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_config.php'; }
+$cfgPath = 'D:/Utilities/PHP_penumbra/penumbra_config.php';
+if (!is_file($cfgPath)) { $cfgPath = '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra\\penumbra_config.php'; }
 if (is_file($cfgPath)) {
     $raw = file_get_contents($cfgPath);
     // The entry had TWO defects: lowercase "v2", and "PROPOSALS" where the real

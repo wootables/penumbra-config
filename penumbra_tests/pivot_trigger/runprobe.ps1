@@ -1,5 +1,5 @@
 param([string]$Label='run')
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivot_trigger'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivot_trigger'
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $src = [IO.File]::ReadAllText("$app\js\main.js", (New-Object System.Text.UTF8Encoding($false)))
 $anchor = '$(document).ready(function () {'

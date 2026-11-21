@@ -11,7 +11,7 @@
 // it (tplparity's extract_mirror.php), with the build's journal_export.php and
 // penumbra_search.php. Only the database is faked (queryViaOci8).
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=mbstring snip.php [--app DIR] [--control]
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring snip.php [--app DIR] [--control]
 //   --control: the build before (expects RED on exactly CONTROL_RED)
 // =============================================================================
 error_reporting(E_ALL);
@@ -41,7 +41,7 @@ $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_notescol_snip_' . getmypi
 if (!preg_match('/pnb_notescol_snip_\d+\.php$/', $tmp)) { fwrite(STDERR, "bad temp\n"); exit(2); }
 $php = PHP_BINARY;
 $runner = $pick('schedule_runner.php');
-exec('"' . $php . '" -n "//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/penumbra_tests/tplparity/extract_mirror.php" "' . $runner . '" "' . $tmp . '"', $o, $rc);
+exec('"' . $php . '" -n "//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/penumbra_tests/tplparity/extract_mirror.php" "' . $runner . '" "' . $tmp . '"', $o, $rc);
 if ($rc !== 0 || !is_file($tmp)) { fwrite(STDERR, "mirror failed: " . implode("\n", $o) . "\n"); exit(2); }
 require $pick('journal_export.php');
 require $tmp;

@@ -11,7 +11,7 @@ param(
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
 )
 $ErrorActionPreference = 'Stop'
-$tests = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests'
+$tests = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests'
 $dir = Join-Path $tests $Suite
 $src = Join-Path $dir 'run.ps1'
 if (-not (Test-Path -LiteralPath $src)) { throw "no run.ps1 in $dir" }

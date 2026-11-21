@@ -53,7 +53,7 @@
 #   describes new behaviour must FAIL there.
 #
 # UNC .ps1 files are GPO-blocked: run the BODY as a scriptblock, never piped:
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\fyreports'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\fyreports'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 # Writes nothing to the webroot. Exit 1 when any assertion fails.
 # PHP side (runner builders): php -n test_rowtotals.php [--runner=<path>] [--mutant]
@@ -72,7 +72,7 @@
 # =============================================================================
 param([string]$MainJs = '', [string]$Css = '', [string]$Mutant = '', [string]$SnipHelp = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\fyreports' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\fyreports' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }

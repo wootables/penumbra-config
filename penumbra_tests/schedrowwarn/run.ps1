@@ -31,7 +31,7 @@
 #   -Keep keeps the staging dirs.  -Here <dir> runs a copy of the suite from somewhere else.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\schedrowwarn'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\schedrowwarn'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Stages into %TEMP%; writes nothing to the webroot.
@@ -40,7 +40,7 @@ param([string]$MainJs = '', [string]$MainCss = '', [string]$IndexPhp = '', [stri
       [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Control2, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (see the UNC note).
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\schedrowwarn' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\schedrowwarn' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
@@ -49,7 +49,7 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 if ($Control -or $Control2) {
   # The files a deploy of this change replaced: round 1 (-Control) or round 2 (-Control2,
   # which left index.php alone - the live one is used).
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   function LastBak($pattern) { Get-BakItem $pattern | Select-Object -Last 1 }
   $tagB = if ($Control2) { 'schedrowdump' } else { 'schedrowwarn' }
   $bm = LastBak "$js\main.js.bak-*-$tagB"; $bi = LastBak "$app\index.php.bak-*-$tagB"; $bh = LastBak "$app\help_content.php.bak-*-$tagB"

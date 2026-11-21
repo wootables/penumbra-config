@@ -33,7 +33,7 @@
 #   -Keep keeps the staging dir.  -Here <dir> runs a copy.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\chgfoot'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\chgfoot'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Needs py -3 with websocket-client and the PHP 8.2 CLI. Writes nothing to the webroot.
@@ -41,14 +41,14 @@
 param([string]$MainCss = '', [string]$MainJs = '', [string]$IndexPhp = '', [string]$App = '', [string]$Here = '',
       [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\chgfoot' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\chgfoot' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $env:PYTHONIOENCODING = 'utf-8'
 
 if ($Control) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   $MainCss = Resolve-Bak "$app\css\main.css.bak-20260928-chgfoot"; $MainJs = Resolve-Bak "$app\js\main.js.bak-20260928-chgfoot"
   if (-not $MainCss -or -not $MainJs) { throw "-Control: no css\main.css / js\main.js .bak-20260928-chgfoot" }
 }

@@ -13,7 +13,7 @@
 #   & ([scriptblock]::Create([IO.File]::ReadAllText('<kit>\deploy2.ps1'))) -DryRun
 param([switch]$DryRun)
 $ErrorActionPreference = 'Stop'
-$KitDir  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\find'
+$KitDir  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\find'
 $SetDir  = Join-Path $KitDir 'stage5'
 $FromDir = Join-Path $KitDir 'orig5'
 $LiveDir = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'

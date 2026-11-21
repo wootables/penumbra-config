@@ -121,7 +121,7 @@
 #   range parity (default: the live one).
 #
 # If the UNC execution policy refuses the script, run its body as a scriptblock:
-#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\filterstrip'
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\filterstrip'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'"))) -MainJs <path>
 # Output also lands in summary.txt (the console truncates long runs).
 # Rebuilds from the LIVE app files each run; writes nothing to the webroot.
@@ -129,7 +129,7 @@
 # =============================================================================
 param([string]$MainJs = '', [string]$MainCss = '', [string]$TilesJs = '', [string]$Mutant = '', [string]$SearchPhp = '')
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\filterstrip' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\filterstrip' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }
@@ -304,7 +304,7 @@ if ($Mutant) {
 # The server half of the range parity (section J): the corpus through the REAL
 # php_apply_search_filter, written as window.RANGE for the page.
 Write-Host "      penumbra_search.php (range parity): $SearchPhp"
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $rangeJs = & $php -n "$here\range_php.php" $SearchPhp "$here\range_corpus.json" 2>&1 | Out-String
 if ($rangeJs -notmatch '^window\.RANGE = ') { throw "range_php.php failed: $rangeJs" }
 [IO.File]::WriteAllText("$here\range_php.js", $rangeJs, $utf8)

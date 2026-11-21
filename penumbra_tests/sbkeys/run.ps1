@@ -39,7 +39,7 @@
 #   -SkipReal / -SkipBrowser     one half only;  -Keep keeps the staging dir.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\sbkeys'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sbkeys'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Stages into %TEMP%\pnb_sbk_*; writes nothing to the webroot.
@@ -48,7 +48,7 @@ param([string]$MainJs = '', [string]$MainCss = '', [string]$IndexPhp = '', [stri
       [string]$Mutant = '', [switch]$Mutants, [switch]$SkipReal, [switch]$SkipBrowser, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (see the UNC note).
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\sbkeys' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sbkeys' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'

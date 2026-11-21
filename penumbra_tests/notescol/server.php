@@ -9,7 +9,7 @@
 // DB dump). And manage_journal.php's new 'edit' action: the author rewrites their
 // own NEWEST note on a row.
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=mbstring server.php
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring server.php
 //        [--app DIR]        the build under test (default: the live webroot)
 //        [--mutant NAME]    a single-point revert of that build: exactly its asserts must go red
 //        [--mutants]        every mutant
@@ -715,7 +715,7 @@ function run_build_child($files, $flatOut = null) {
     $runner = $GLOBALS['RUNNER_PATH'];
     if (isset($files['schedule_runner.php'])) { $runner = $dir . '/schedule_runner.php'; file_put_contents($runner, $files['schedule_runner.php']); }
     $php = PHP_BINARY;
-    $cmd = '"' . $php . '" -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=mbstring "' . __FILE__ . '"';
+    $cmd = '"' . $php . '" -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring "' . __FILE__ . '"';
     $env = array('PNB_SEARCH' => $GLOBALS['SEARCH_PATH'], 'PNB_RUNNER' => $runner, 'PNB_LAYOUT' => $GLOBALS['LAYOUT_PATH'], 'PNB_NOTESCOL_CHILD' => $dir, 'PNB_FLAT_OUT' => (string)$flatOut, 'SystemRoot' => getenv('SystemRoot'), 'TEMP' => getenv('TEMP'), 'TMP' => getenv('TMP'));
     $p = proc_open($cmd, array(1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, $env);
     $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]);
@@ -752,7 +752,7 @@ if ($allMutants || $oneMutant) {
 $RUNNER_PATH = file_exists($app . '/schedule_runner.php') ? $app . '/schedule_runner.php' : $APP . '/schedule_runner.php';
 $files = lift_build($app, null, $MUTANTS);
 if ($control && $app === $APP) {
-    require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
+    require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
     foreach (array('journal_export.php', 'manage_journal.php') as $f) {
         $baks = oldver_glob($APP . '/' . $f . '.bak-*-notescol'); sort($baks);
         if (!$baks) { fwrite(STDERR, "no $f.bak-*-notescol: pass --app <the pre-change build>

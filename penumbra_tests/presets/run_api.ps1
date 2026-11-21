@@ -34,8 +34,8 @@ param([switch]$Control)
 
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when this body runs as a scriptblock (the GPO workaround).
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\presets' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\presets' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $app  = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 
 # NOT $args - that is an automatic variable in PowerShell.

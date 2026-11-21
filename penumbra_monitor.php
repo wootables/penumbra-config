@@ -74,8 +74,11 @@ $FLAP_WINDOW_MINS  = isset($MON['flap_window_mins']) ? (int)$MON['flap_window_mi
 $CORRELATED_MIN      = isset($MON['correlated_min'])      ? (int)$MON['correlated_min']      : 2;
 $CORRELATED_GAP_MINS = isset($MON['correlated_gap_mins']) ? (int)$MON['correlated_gap_mins'] : 60;
 
-$stateFile = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor_state.json';
-$logFile   = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor.log';
+// logs\ in Penumbra's own folder (this script's, D:\Utilities\PHP_penumbra): penumbra_home(),
+// which db_connection.php has loaded already.
+if (!function_exists('penumbra_home')) require_once $APP . DIRECTORY_SEPARATOR . 'penumbra_home.php';
+$stateFile = penumbra_home() . '\\logs\\penumbra_monitor_state.json';
+$logFile   = penumbra_home() . '\\logs\\penumbra_monitor.log';
 
 /**
  * Keep the site-wide notice banner in step with what the watchdog sees, so users
@@ -631,7 +634,7 @@ $CB_STALE_HOURS  = isset($MON['cfgbak_stale_hours'])  ? (int)$MON['cfgbak_stale_
 $CB_REMIND_HOURS = isset($MON['cfgbak_remind_hours']) ? (int)$MON['cfgbak_remind_hours']  : 24;
 if ($CB_LOG !== '' && !$TESTMODE && !$SIMULATE) {
     try {
-        $cbStateFile = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor_cfgbak.json';
+        $cbStateFile = penumbra_home() . '\\logs\\penumbra_monitor_cfgbak.json';
         $cbFlag = dirname($CB_LOG) . DIRECTORY_SEPARATOR . 'SEND_TEST_EMAIL';
         $cbPrev = json_decode((string)@file_get_contents($cbStateFile), true);
         if (!is_array($cbPrev)) { $cbPrev = array(); }

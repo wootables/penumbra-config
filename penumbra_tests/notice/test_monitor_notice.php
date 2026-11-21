@@ -18,8 +18,8 @@
 $APP = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
 // D:\ is the SERVER's drive when this runs on the box and the WORKSTATION's when
 // run from a desk, so try the local path first and fall back to the UNC share.
-$MONITOR = 'D:\\Utilities\\PHP_8.2-p\\penumbra_monitor.php';
-if (!is_file($MONITOR)) { $MONITOR = '\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_monitor.php'; }
+$MONITOR = 'D:\\Utilities\\PHP_penumbra\\penumbra_monitor.php';
+if (!is_file($MONITOR)) { $MONITOR = '\\\\oitras\\d$\\Utilities\\PHP_penumbra\\penumbra_monitor.php'; }
 
 $stateFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_monnotice_' . getmypid() . '.json';
 $config = array('notice_state_file' => $stateFile);

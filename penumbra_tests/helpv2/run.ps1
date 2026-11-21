@@ -14,7 +14,7 @@
 # at other help sizes, 2026-10-21), A1-A11 + H1 the Ask page; the coverage map is printed, never red.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpv2'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpv2'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # from a LOCAL current directory (Set-Location $env:TEMP first): from a UNC cwd php's exec()
 # starts cmd.exe, whose "UNC paths are not supported" line on stderr stopped this script under
@@ -25,9 +25,9 @@
 param([string]$App = '', [string]$Orig = '', [string]$Live = '', [string]$Out = '', [string]$Here = '',
       [switch]$Mutants, [switch]$SkipCoverage)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpv2' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpv2' }
 $webroot = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 if (-not $App)  { $App = $webroot }
 if (-not $Orig) { $Orig = $App }
 if (-not $Live) { $Live = $webroot }

@@ -79,7 +79,7 @@ The dashboard harness (D0..D8): stage = the patched penumbra_dashboard.js, orig 
 From PowerShell (the execution policy refuses `.ps1` files on the share; invoke the text, as a child
 powershell for a long run):
 
-    & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpanchor\run.ps1'))) -MainJs <stage>\js\main.js -DashJs <stage>\js\penumbra_dashboard.js [-OrigMainJs <f>] [-OrigDashJs <f>] [-Out <dir>]
+    & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpanchor\run.ps1'))) -MainJs <stage>\js\main.js -DashJs <stage>\js\penumbra_dashboard.js [-OrigMainJs <f>] [-OrigDashJs <f>] [-Out <dir>]
 
 `-OrigMainJs` / `-OrigDashJs` default to the LIVE files (right before the deploy). After the deploy run
 it with the live files as `-MainJs` / `-DashJs` and `git show <rev before>:js/main.js` /

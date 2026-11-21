@@ -38,16 +38,16 @@
 #   -Keep                                keeps the staging dir
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\ufilter'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\ufilter'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # =============================================================================
 param([string]$UsersegJs = '', [string]$MainCss = '', [string]$ChromePhp = '', [string]$Here = '',
       [switch]$Control, [string]$ControlRev = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\ufilter' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\ufilter' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -62,7 +62,7 @@ if (-not $UsersegJs) { $UsersegJs = "$app\js\penumbra_userseg.js" }
 if (-not $MainCss)   { $MainCss   = "$app\css\main.css" }
 if (-not $ChromePhp) { $ChromePhp = "$app\penumbra_admin_chrome.php" }
 if ($Control) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))
   $UsersegJs = Get-GitVersion $ControlRev 'js/penumbra_userseg.js'
   $ChromePhp = Get-GitVersion $ControlRev 'penumbra_admin_chrome.php'
 }

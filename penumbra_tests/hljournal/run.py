@@ -13,7 +13,7 @@ import websocket
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 MIRROR = os.path.join(HERE, '..', 'pivotparity', 'extract_mirror.php')
 COLMENU = os.path.join(HERE, '..', 'colmenu')
 _spec = importlib.util.spec_from_file_location('colmenu_mk_harness', os.path.join(COLMENU, 'mk_harness.py'))

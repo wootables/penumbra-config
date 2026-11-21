@@ -27,7 +27,7 @@
 param([Parameter(Mandatory = $true)][string]$Stage, [Parameter(Mandatory = $true)][string]$Expect,
       [string]$Stamp = '', [switch]$DryRun, [switch]$Rollback, [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colopt' }
+$here = if ($Here) { $Here } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colopt' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 if (-not $Stamp) {
   if ($Rollback) { throw '-Rollback needs the -Stamp of the deploy to undo' }

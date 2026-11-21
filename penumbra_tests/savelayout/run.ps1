@@ -32,7 +32,7 @@
 #   -Keep keeps the staging dir.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\savelayout'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\savelayout'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Stages into %TEMP%; writes nothing to the webroot.
@@ -40,14 +40,14 @@
 param([string]$MainJs = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (see the UNC note).
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\savelayout' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\savelayout' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if ($Control -and -not $MainJs) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   $bm = Get-BakItem "$js\main.js.bak-*-savelayout" | Select-Object -Last 1
   if (-not $bm) { throw '-Control needs js\main.js.bak-*-savelayout (made by the deploy), or pass -MainJs <pre-fix copy>' }
   $MainJs = $bm.FullName

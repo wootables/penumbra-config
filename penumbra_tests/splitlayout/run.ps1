@@ -42,7 +42,7 @@
 #   -Keep keeps the staging dirs.  -Here <dir> runs a copy of the suite from somewhere else.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\splitlayout'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\splitlayout'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Stages into %TEMP%; writes nothing to the webroot.
@@ -56,7 +56,7 @@ param([string]$MainJs = '', [string]$MainCss = '', [string]$IndexPhp = '', [stri
       [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (see the UNC note).
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\splitlayout' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\splitlayout' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
@@ -64,7 +64,7 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if ($Control) {
   # The files the deploy of this feature replaced (byte-identical to the pre-feature build).
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   function LastBak($pattern) { Get-BakItem $pattern | Select-Object -Last 1 }
   $bm = LastBak "$js\main.js.bak-*-splitlayout"; $bc = LastBak "$app\css\main.css.bak-*-splitlayout"; $bi = LastBak "$app\index.php.bak-*-splitlayout"
   if (-not $MainJs)   { if (-not $bm) { throw '-Control needs js\main.js.bak-*-splitlayout (made by the deploy), or pass -MainJs' }; $MainJs = $bm.FullName }

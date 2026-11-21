@@ -3,7 +3,7 @@
 # from the index.php under test (so a rebuild runs the real Generate), a visible Pivot
 # toolbar button, the tile engine (the search strip's grammar) and the menu module.
 import os, re
-PVSHADE = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pvshade\harness.html'
+PVSHADE = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pvshade\harness.html'
 
 
 def lift_builder(index_src):

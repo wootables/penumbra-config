@@ -2,7 +2,7 @@
 # Email-only scheduler options stay off non-EMAIL tasks (added 2026-09-18).
 #
 # Run the BODY as a scriptblock (UNC scripts are GPO-blocked):
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\schedprune\run.ps1'))
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\schedprune\run.ps1'))
 #   & $sb                     # EXPECTED TAIL: "PASS 219   FAIL 0" (link_text + 3 more link keys, 2026-10-07)
 #   & $sb -Control            # must report FAIL 1 - proves the harness can fail
 #   & $sb -Manage <file>      # test a staged manage_schedule.php (runner + main.js stay live)
@@ -21,9 +21,9 @@ param([switch]$Control, [switch]$Dump, [string]$Manage = '', [string]$Template =
 
 $ErrorActionPreference = 'Stop'
 # Hard-coded, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\schedprune'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\schedprune'
 $app  = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 
 # NOT $args - that is an automatic variable in PowerShell.
 $phpArgs = @('-n', '-d', 'memory_limit=1024M', '-d', 'date.timezone=America/New_York',

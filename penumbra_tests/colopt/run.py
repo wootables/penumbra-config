@@ -46,7 +46,7 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
@@ -929,7 +929,7 @@ def run_php(texts):
         open(fx, 'w', encoding='utf-8').write(json.dumps({'parity': INFO.get('fparity'), 'pvfmt': INFO.get('pvfmt'), 'pvfmt2': INFO.get('pvfmt2'), 'pvtie': INFO.get('pvtie'),
                                                           'hrep': INFO.get('hrep'), 'pvhlseed': INFO.get('pvhlseed')}))
         if os.environ.get('PNB_FX'): shutil.copyfile(fx, os.environ['PNB_FX'])   # PNB_FX=path: keep the page's answers
-        res = subprocess.run([PHP, '-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring',
+        res = subprocess.run([PHP, '-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext', '-d', 'extension=mbstring',
                               '-d', 'date.timezone=America/New_York', os.path.join(HERE, 'test_colopt.php'), 'calc', cp, fx], capture_output=True, text=True)
         out += php_lines(res, 'P-')
         subprocess.run([PHP, '-n', os.path.join(HERE, '..', 'pivotparity', 'extract_mirror.php'), srp, mir], capture_output=True, text=True)
@@ -938,13 +938,13 @@ def run_php(texts):
                              capture_output=True, text=True)
         out += php_lines(res, 'P-')
         # (2026-10-20 b) the email: the report's formats and highlight rules (hrep's answers)
-        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring',
+        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext', '-d', 'extension=mbstring',
                               '-d', 'date.timezone=America/New_York', os.path.join(HERE, 'test_colopt.php'), 'hl', mir, cp, os.path.join(APP, 'themes_config.php'), fx,
                               os.path.join(APP, 'penumbra_search.php')],
                              capture_output=True, text=True)
         out += php_lines(res, 'P-hl-')
         # (2026-10-24, hlhead) the email's header rules
-        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring',
+        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext', '-d', 'extension=mbstring',
                               '-d', 'date.timezone=America/New_York', os.path.join(HERE, 'test_colopt.php'), 'hlhd', mir, cp, os.path.join(APP, 'themes_config.php'),
                               os.path.join(APP, 'penumbra_search.php')],
                              capture_output=True, text=True)

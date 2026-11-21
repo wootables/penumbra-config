@@ -353,7 +353,7 @@ removes exactly the inserted lines (`patch_colwidths.py reverse`), so anything d
 of it stays - after the same hash-guarded, atomic swap the deploy used.
 """, BLOCK),
 ('suite entry',
-"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\savelayout\\run.ps1'))) -Mutants
+"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\savelayout\\run.ps1'))) -Mutants
 """,
 """# Flat-table column widths (2026-09-24): js/penumbra_colwidths.js + the state layer in main.js.
 # The REAL main.js (closure unwrapped), the module, main.css and the module's CSS in headless Edge,
@@ -370,8 +370,8 @@ of it stays - after the same hash-guarded, atomic swap the deploy used.
 ('suite entry run lines',
 """# 135 browser asserts, 94 mutants (7 for breakdowns).
 """,
-"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\colwidths\\run.ps1')))
-& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\colwidths\\run.ps1'))) -Mutants
+"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\colwidths\\run.ps1')))
+& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\colwidths\\run.ps1'))) -Mutants
 """, BLOCK),
 ]
 

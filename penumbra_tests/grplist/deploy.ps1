@@ -28,13 +28,13 @@
 # rollback.ps1 -Restore instead (it reverses exactly these lines).
 # Writes deploy\<stamp>[-rollback]\manifest.json under -Here.
 # UNC: run the body as a scriptblock (the share is RemoteSigned):
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grplist'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\grplist'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\deploy.ps1"))) -Stage ... -Expect ... -DryRun
 # =============================================================================
 param([Parameter(Mandatory = $true)][string]$Stage, [Parameter(Mandatory = $true)][string]$Expect,
       [string]$Stamp = '', [switch]$DryRun, [switch]$Rollback, [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grplist' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\grplist' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 if (-not $Stamp) {
   if ($Rollback) { throw '-Rollback needs the -Stamp of the deploy to undo' }

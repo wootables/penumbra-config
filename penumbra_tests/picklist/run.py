@@ -22,7 +22,7 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-JRF = r'\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\jrowfeat'
+JRF = r'\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\jrowfeat'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',

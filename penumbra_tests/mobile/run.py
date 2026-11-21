@@ -58,7 +58,7 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
+sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 PAGES = ['home.html', 'report.html', 'admin.html', 'dash.html']
 CR = '\r\n'

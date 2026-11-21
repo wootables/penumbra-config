@@ -24,7 +24,7 @@ Oracle's regex - hence the Oracle half.
 
 ## Oracle half (the DUAL probe)
 
-    php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=pdo_sqlite
+    php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=pdo_sqlite
         oracle_probe.php --file <get_server_reports.php>  >  probe.json
 
 prints `{sql, terms, expected}`: ONE read-only statement, FROM DUAL only, running the endpoint's own CASE (binds as

@@ -17,7 +17,7 @@
 # =============================================================================
 param([switch]$Disable, [switch]$Enable, [switch]$Restore, [switch]$DryRun, [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\hiddencols' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\hiddencols' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 $marker = Join-Path $app 'js\penumbra_lazycells.off'
 

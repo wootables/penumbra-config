@@ -38,7 +38,7 @@
 #
 # If the UNC execution policy refuses the script ("not digitally signed"), run
 # its body as a scriptblock from the workstation:
-#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivot_trigger'
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivot_trigger'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
 # and do NOT pipe the invocation (a lingering Edge child keeps stdout open and
 # the pipeline never sees EOF); the script prints its own summary.
@@ -48,7 +48,7 @@
 # =============================================================================
 param([string]$MainJs = '', [switch]$PerfMode, [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivot_trigger' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivot_trigger' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }

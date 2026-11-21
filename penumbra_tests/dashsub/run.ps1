@@ -22,7 +22,7 @@
 # The pre-feature app (live before this change) fails the beside checks.
 #
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dashsub\run.ps1'))
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dashsub\run.ps1'))
 #   & $sb -App <stage>
 # Never add a bare `exit` (it would kill the caller), and do not pipe the invocation.
 # =============================================================================
@@ -34,9 +34,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 # Hard-coded, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dashsub'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dashsub'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
-$jq   = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes\jquery-3.7.1.min.js'
+$jq   = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\auditfixes\jquery-3.7.1.min.js'
 
 function Get-Lift([string]$src, [string]$start, [string]$end, [string]$what) {
     $s = $src.IndexOf($start)

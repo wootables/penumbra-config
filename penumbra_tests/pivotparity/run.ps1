@@ -12,21 +12,21 @@
 #             it is never required here.
 #
 # Run it (UNC execution policy blocks -File, so pass the body as a scriptblock):
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotparity'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotparity'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 #
 # Writes nothing to the webroot. Exit 1 when any divergence is found.
 # =============================================================================
 param([string]$MainJs = '', [switch]$KeepArtifacts, [switch]$TraceInit, [string]$AppDir = '')
 $ErrorActionPreference = 'Stop'
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotparity'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotparity'
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 # -AppDir <stage> (2026-09-23): test a staged tree - its schedule_runner.php (the mirror),
 # penumbra_search.php (the PHP driver loads it) and js\main.js. ($App would BE $app:
 # PowerShell variable names are case-insensitive.)
 if ($AppDir) { $app = $AppDir.TrimEnd('\') }
 $js   = "$app\js"
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 if (-not $MainJs) { $MainJs = "$js\main.js" }
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }

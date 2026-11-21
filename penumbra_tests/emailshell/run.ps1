@@ -33,9 +33,9 @@
 param([switch]$Rebaseline, [string]$App = '', [string]$Mutant = '')
 
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\emailshell' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\emailshell' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 
 # Each mutant reverts ONE lang site (file, new text, old text); the anchor must match exactly once.
 $mutants = @{

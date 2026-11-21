@@ -2,7 +2,7 @@
 // =============================================================================
 // oldver.php - old versions of webroot files for --control runs, read from GIT.
 // PHP twin of oldver.py (read its header).
-//   require '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\_oldver\\oldver.php';
+//   require '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\_oldver\\oldver.php';
 //   oldver_glob("$APP/x.php.bak-*-tag")   drop-in for glob() + sort()
 //   oldver_path("$APP/x.php.bak-<stamp>") drop-in for "is_file($p) ? $p : null"
 //   oldver_git_show('abc1234^', 'x.php')  the file at a commit (git show <rev>:<rel>), a path

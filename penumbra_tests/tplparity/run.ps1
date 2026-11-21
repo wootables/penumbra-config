@@ -16,7 +16,7 @@
 # _snippet_string - the twin scheduled EMAILS use too.
 #
 # Run it (UNC execution policy blocks -File, so pass the body as a scriptblock):
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tplparity'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tplparity'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 #   ... -App <dir>   files under test (a stage dir is fine; anything it lacks comes from -Live)
 #   ... -Control     plant one wrong byte on the PHP side: the run MUST report FAIL 1
@@ -36,14 +36,14 @@
 # =============================================================================
 param([string]$App = '', [string]$Live = '', [string]$Here = '', [switch]$Control, [switch]$Mutants, [switch]$KeepArtifacts, [switch]$Quiet)
 $ErrorActionPreference = 'Stop'
-if (-not $Here) { $Here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tplparity' }
+if (-not $Here) { $Here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tplparity' }
 if (-not $Live) { $Live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 if (-not $App)  { $App = $Live }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 # Production loads mbstring; off-box the ini's D:\ extension_dir does not resolve,
 # so load it by UNC. FORWARD slashes: a backslash UNC loses its first slash on the
 # way through the ini scanner.
-$phpArgs = @('-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring')
+$phpArgs = @('-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext', '-d', 'extension=mbstring')
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $utf8 = New-Object System.Text.UTF8Encoding($false)

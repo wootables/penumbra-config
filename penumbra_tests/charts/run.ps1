@@ -67,9 +67,9 @@
 #
 # If the UNC execution policy refuses the script ("not digitally signed"), run
 # its body as a scriptblock from the workstation:
-#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\charts'
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\charts'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('# $PSScriptRoot is empty when the BODY is run as a scriptblock (UNC .ps1 files are GPO-blocked).
-#   $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\charts' }',"`$here = '$dir'")))
+#   $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\charts' }',"`$here = '$dir'")))
 # and do NOT pipe the invocation (a lingering headless child keeps stdout open
 # and the pipeline never sees EOF); the script prints its own summary.
 #
@@ -80,7 +80,7 @@ param([string]$MainJs = '', [string]$ChartsJs = '', [string]$A11yJs = '',
       [ValidateSet('', 'xdecl', 'xread', 'tmdecl', 'tmread')][string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (UNC .ps1 files are GPO-blocked).
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\charts' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\charts' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }

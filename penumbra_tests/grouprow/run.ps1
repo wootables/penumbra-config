@@ -25,16 +25,16 @@
 #   powershell -File run.ps1 -Mutant <name>   one behaviour reverted
 # Writes nothing to the webroot. Exit 1 when any assertion fails - which, run as a
 # scriptblock, ends the calling session too: run it on its own.
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grouprow'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\grouprow'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 # =============================================================================
 param([string]$App = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grouprow' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\grouprow' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $App) { $App = $live }
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
-$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotparity\extract_mirror.php'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotparity\extract_mirror.php'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $u8 = New-Object System.Text.UTF8Encoding($false)
@@ -91,7 +91,7 @@ Write-Host "[3/4] the email (runner grouped-summary filter) ..."
 $mirror = Join-Path $here 'mirror.php'
 & $php -n -d memory_limit=512M $extract "$App\schedule_runner.php" $mirror | Out-Null
 if (-not (Test-Path $mirror)) { throw "mirror extraction failed" }
-$phpOut = & $php -n -d memory_limit=512M -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=mbstring "$here\email.php" $mirror "$App\penumbra_search.php" "$here\fixture.json"
+$phpOut = & $php -n -d memory_limit=512M -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring "$here\email.php" $mirror "$App\penumbra_search.php" "$here\fixture.json"
 try { [IO.File]::Delete($mirror) } catch {}
 $phpLine = ($phpOut | Where-Object { "$_".StartsWith('RESULTS_JSON:') } | Select-Object -First 1)
 if (-not $phpLine) { throw "email.php did not finish: $(($phpOut | Select-Object -First 6) -join ' | ')" }

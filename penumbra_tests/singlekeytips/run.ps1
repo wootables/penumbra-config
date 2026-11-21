@@ -36,7 +36,7 @@
 #   -Keep keeps the staging dirs;  -Here <dir> runs a copy of this suite from elsewhere.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\singlekeytips'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\singlekeytips'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Stages into %TEMP%; writes nothing to the webroot.
@@ -46,14 +46,14 @@ param([string]$MainJs = '', [string]$MainCss = '', [string]$A11yJs = '', [string
       [string]$BaseMainJs = '', [string]$BaseA11yJs = '',
       [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Real, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\singlekeytips' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\singlekeytips' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
-. ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+. ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
 function LastBak([string]$live) {
   $b = Get-BakItem "$live.bak-*-singlekeytips" | Select-Object -Last 1
   if ($b) { return $b.FullName } else { return '' }

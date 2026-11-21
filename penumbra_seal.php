@@ -11,9 +11,9 @@
 //
 // From a workstation over the admin shares (extension_dir MUST use forward slashes -
 // the backslash UNC form fails to load the DLLs):
-//   & "\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe" -n `
-//     -d 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext' -d extension=openssl `
-//     "\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_seal.php" `
+//   & "\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe" -n `
+//     -d 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext' -d extension=openssl `
+//     "\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_seal.php" `
 //     -k "//oitras.oit.ncsu.edu/c$/inetpub/penumbra_config.key"
 //
 // After sealing, paste the printed enc:v1:... string into penumbra_config.php as

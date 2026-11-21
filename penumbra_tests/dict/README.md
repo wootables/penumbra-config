@@ -9,7 +9,7 @@ the palette rows `dictionary` / `gendict` (static), the Custom Code sidebar's Ge
 `js/penumbra_dict.off`, the help (`optionsHelpLightbox` `#dict-mode`) and `ai_system_prompt.php`.
 
     $env:PYTHONIOENCODING='utf-8'
-    py -3 \\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dict\run.py [--stage DIR] [--control] [--mutants | --mutant NAME] [--scn S]
+    py -3 \\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dict\run.py [--stage DIR] [--control] [--mutants | --mutant NAME] [--scn S]
 
 Headless Edge over CDP on the colmenu harness (the REAL main.js, saveconf fixture: shown V_ID V_NAME
 V_AMOUNT V_DATE V_LINK V_STATUS, hidden H_*); `mk_harness.py` adds the module before main.js and puts a

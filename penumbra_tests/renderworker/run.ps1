@@ -10,16 +10,17 @@
 #                                "no leftover Edge after a timeout" assertion
 #                                must go red (and only what follows from it)
 # Run the body as a scriptblock from the workstation (UNC .ps1 policy):
-#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\renderworker'
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\renderworker'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
 # Writes summary.txt. Exit code 1 when any assertion fails.
 # =============================================================================
 param([string]$Worker = '', [string]$Client = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Continue'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\renderworker' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$phpDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\renderworker' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$phpDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p'
+$homeDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra'
 $app = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-if (-not $Worker) { $Worker = "$phpDir\penumbra_render_worker.ps1" }
+if (-not $Worker) { $Worker = "$homeDir\penumbra_render_worker.ps1" }
 if (-not $Client) { $Client = "$app\penumbra_render_client.php" }
 $php = "$phpDir\php.exe"
 # The queue lives on the WORKSTATION (local disk): the worker and Edge run here,

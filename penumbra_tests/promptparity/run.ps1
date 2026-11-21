@@ -80,7 +80,7 @@
 #
 # UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
 # a scriptblock rather than with -File:
-#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\promptparity'
+#   $dir = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\promptparity'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
 # Never add a bare `exit` for the same reason: it would kill the caller. And do
 # not pipe the invocation: a lingering headless-Edge child can hold stdout open.
@@ -93,9 +93,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\promptparity' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\promptparity' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $live = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $work = Join-Path $env:TEMP ('pnb_promptparity_' + $PID)

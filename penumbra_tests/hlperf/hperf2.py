@@ -13,7 +13,7 @@ import base64, json, os, re, shutil, socket, statistics, subprocess, sys, tempfi
 import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-KIT = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/penumbra_tests/bigperf'
+KIT = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/penumbra_tests/bigperf'
 LIVE = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra'
 EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',

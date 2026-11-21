@@ -40,7 +40,7 @@
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked. Run the body as a scriptblock,
 # ONE run per PowerShell call, output to a file:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\ownerview'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\ownerview'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -App <stage> *> <log>
 # Prints RESULT: GREEN/RED (never exits). Writes summary.txt / summary_mutant_<name>.txt /
 # summary_mutants.txt here; works in %TEMP%\pnb_ov_<8 hex> (removed afterwards unless
@@ -50,9 +50,9 @@ param([string]$App = '', [string]$IndexPhp = '', [string]$MainJs = '', [string]$
       [string]$QueryPhp = '', [string]$DashPhp = '', [string]$HelpPhp = '', [string]$Here = '',
       [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Keep, [string]$Summary = 'summary.txt')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\ownerview' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\ownerview' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 function Pick([string]$explicit, [string]$name, [string]$sub) {

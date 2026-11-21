@@ -17,15 +17,15 @@
 #     brand  -> wolfpack's red becomes its #990000 primary:    1 fail  (1:1 against the brand)
 #   A mutant prints MUTANT CAUGHT (the expected fail count) or MUTANT SURVIVED (exit 1).
 # UNC .ps1 files are GPO-blocked: run the BODY as a scriptblock:
-#   $d = '\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dangertheme'
+#   $d = '\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dangertheme'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -App <dir>
 # Exit 1 when RED (or a mutant survives). Writes nothing to the webroot.
 # =============================================================================
 param([string]$App = '', [string]$Cfg = '', [string]$Css = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\' + '\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dangertheme' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\' + '\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dangertheme' }
 $live = '\' + '\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\' + '\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\' + '\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 if ($App) { if (-not $Cfg) { $Cfg = Join-Path $App 'themes_config.php' }; if (-not $Css) { $Css = Join-Path $App 'css\main.css' } }
 if (-not $Cfg) { $Cfg = Join-Path $live 'themes_config.php' }
 if (-not $Css) { $Css = Join-Path $live 'css\main.css' }

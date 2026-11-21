@@ -16,7 +16,7 @@ import os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 ABSENT = {'P-lint-runner'}   # holds on live too
 # (cmsize, 2026-11-01) the include is live (csched 4bb5714): the control now expects THIS round's checks red on live and
 # every other green; P-budget measures a card by the new layout (either way on live)
@@ -193,7 +193,7 @@ def run_test(paths):
 # (pvsched) test_pvtiles.php over a MIRROR of the candidate runner (its functions alone: pivotparity's extractor, never the
 # runner itself - Oracle, mail), in its own PHP (its stand-ins are not test_csched.php's)
 EXTRACT = os.path.join(os.path.dirname(HERE), 'pivotparity', 'extract_mirror.php')
-if not os.path.exists(EXTRACT): EXTRACT = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotparity\extract_mirror.php'   # (a kit's copy of the suite)
+if not os.path.exists(EXTRACT): EXTRACT = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotparity\extract_mirror.php'   # (a kit's copy of the suite)
 def run_pvtiles(paths):
     d = tempfile.mkdtemp(prefix='pnb_pvt_')
     try:

@@ -16,8 +16,8 @@ S3_ADD = r"""
 # js\main.js.bak-*-cmpfoot) 14/11, exactly B1 B2 B4 B5 R1 T1 T2 H4 H5 A4 A6; --mutants 4/4 bite
 # (`oneliner` = the fix with the name read from the header at the cell's index, as before).
 # Python + websocket-client over CDP, ~@@SECS@@ s.
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\cmpfoot\run.py
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\cmpfoot\run.py --mutants
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cmpfoot\run.py
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cmpfoot\run.py --mutants
 """
 
 S5_ANCHOR = "- **A local snapshot is filed under the report it was CAPTURED from, never the one that happens\n"

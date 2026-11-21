@@ -15,21 +15,21 @@
 #   run.ps1 -Mutant <name> / -Mutants    anchors checked first (-CheckAnchors)
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\qfail'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\qfail'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting. Writes nothing to the webroot.
 # =============================================================================
 param([string]$From = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\qfail' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\qfail' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 $files = [ordered]@{ db = 'db_connection.php'; q = 'query.php'; sh = 'analytics_shared.php'; all = 'analytics_all.php'; hlp = 'help\topics\auditorHelpLightbox.php' }
 $paths = @{}
 if ($Control) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))
   foreach ($k in $files.Keys) { $paths[$k] = Get-GitVersion '10d2ee6' ($files[$k] -replace '\\', '/') }
 } else {
   $root = if ($From) { $From } else { $app }

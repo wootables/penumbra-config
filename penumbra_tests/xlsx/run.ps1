@@ -44,7 +44,7 @@
 #
 # If the UNC execution policy refuses the script ("not digitally signed"), run
 # its body as a scriptblock from the workstation:
-#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\xlsx'
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\xlsx'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
 # Do NOT pipe the invocation (a lingering headless child keeps stdout open).
 #
@@ -60,10 +60,10 @@ $ErrorActionPreference = 'Stop'
 # back to the literal keeps both forms working: -File still gets the real value,
 # and the scriptblock form no longer resolves "$here\harness.html" to a bare
 # relative "harness.html" and dies in staging.
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\xlsx' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\xlsx' }
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\xlsx' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\xlsx' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 if (-not $MainJs) { $MainJs = "$app\js\main.js" }
 
 $browser = 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'

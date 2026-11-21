@@ -12,7 +12,7 @@
 #   dash orig      the pre-change penumbra_dashboard.js (-OrigDashJs, default LIVE): D1 D5 D6 D7 FAIL
 # Prints a verdict per run and SUITE: GREEN only when every run is as expected.
 # Run from PowerShell (not Git Bash: UNC paths); the execution policy refuses .ps1 files on the share:
-#   & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpanchor\run.ps1'))) -MainJs <f> -DashJs <f>
+#   & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpanchor\run.ps1'))) -MainJs <f> -DashJs <f>
 param([string]$MainJs = '', [string]$DashJs = '', [string]$OrigMainJs = '', [string]$OrigDashJs = '', [string]$Out = '')
 $ErrorActionPreference = 'Stop'
 $webroot = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
@@ -21,7 +21,7 @@ if (-not $OrigMainJs) { $OrigMainJs = "$webroot\js\main.js" }
 if (-not $OrigDashJs) { $OrigDashJs = "$webroot\js\penumbra_dashboard.js" }
 if (-not $Out) { $Out = Join-Path $env:TEMP ('helpanchor_' + (Get-Date -Format 'yyyyMMdd_HHmmss')) }
 New-Item -ItemType Directory -Force $Out | Out-Null
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpanchor' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpanchor' }
 $hashEngine = [scriptblock]::Create([IO.File]::ReadAllText((Join-Path $here 'helphash_harness.ps1')))
 $dashEngine = [scriptblock]::Create([IO.File]::ReadAllText((Join-Path $here 'dashanchor_harness.ps1')))
 $all = $true

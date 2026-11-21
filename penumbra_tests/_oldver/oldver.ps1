@@ -2,13 +2,13 @@
 # oldver.ps1 - old versions of webroot files for -Control runs, read from GIT.
 # PowerShell twin of oldver.py (read its header). The share is MachinePolicy RemoteSigned, so a
 # plain dot-source is refused ("not digitally signed") - load it as a scriptblock, like the suites:
-#   . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))
+#   . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))
 #   Get-BakItem "$js\main.js.bak-*-tag"   drop-in for Get-ChildItem <pattern> | Sort-Object Name
 #                                         (FileInfo objects; .FullName / .Name as before)
 #   Resolve-Bak "$app\x.php.bak-<stamp>"  drop-in for "path if Test-Path, else nothing"
 #   Get-GitVersion 'abc1234^' 'js\main.js' the file at a commit (git show <rev>:<rel>), a path
 # =============================================================================
-$script:OldVerHere    = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'   # fixed: a scriptblock has no file path
+$script:OldVerHere    = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver'   # fixed: a scriptblock has no file path
 $script:OldVerWebroot = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $script:OldVerGitDir  = '\\oitras.oit.ncsu.edu\d$\Utilities\penumbra_git'
 $script:OldVerIndex   = $null

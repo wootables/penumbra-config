@@ -13,7 +13,7 @@
  * EXPECTED: "PASS 25   FAIL 0"; every mutant RED on only its listed asserts.
  */
 error_reporting(E_ALL);
-$FILE = '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_monitor.php';
+$FILE = '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra\\penumbra_monitor.php';
 $MUTANT = ''; $ALL = false; $CONTROL = false;
 foreach (array_slice($argv, 1) as $a) {
     if (strpos($a, '--file=') === 0) $FILE = substr($a, 7);

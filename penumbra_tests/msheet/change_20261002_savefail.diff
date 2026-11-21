@@ -53,8 +53,8 @@
 +# (the newest js\main.js.bak-*-savefail) RED on exactly the 4 S-* the fix turned green;
 +# --mutants 16/16; --php-mutants 9/9 (with --scn parity, so the B-* rows are judged too).
 +# ~30 s; mutants ~7 min.
- py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\msheet\run.py
- py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\msheet\run.py --mutants
+ py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\msheet\run.py
+ py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\msheet\run.py --mutants
  
 @@ -5538,6 +5543,12 @@
    view stash and before its first `await`: anything that arms a view for the next query has to land

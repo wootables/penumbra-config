@@ -31,11 +31,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\maintenance' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\maintenance' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
 # Invoked as a scriptblock (the UNC workaround) neither of the above exists.
-if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\maintenance' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\maintenance' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $test = Join-Path $here 'test_maintenance.php'
 $src  = Join-Path $App 'penumbra_maintenance.php'
 

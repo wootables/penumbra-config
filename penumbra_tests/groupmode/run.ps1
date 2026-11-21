@@ -49,7 +49,7 @@
 #
 # If the UNC execution policy refuses the script ("not digitally signed"), run
 # its body as a scriptblock from the workstation:
-#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\groupmode'
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\groupmode'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
 # and do NOT pipe the invocation (a lingering Edge child keeps stdout open and
 # the pipeline never sees EOF); the script prints its own summary.
@@ -61,7 +61,7 @@ param([string]$MainJs = '',
       [ValidateSet('', 'groups', 'shared', 'distinct', 'groupset', 'allgroupset', 'seen', 'hop')]
       [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\groupmode' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\groupmode' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }
@@ -293,8 +293,8 @@ $parsed.results = @($parsed.results) + @($parsed2.results | ForEach-Object {
 # harness uses - a report that groups differently in email than on screen is
 # exactly the failure this catches, and neither of the passes above can see it.
 Write-Host "      + PHP pass (runner nesting) ..."
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
-$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotparity\extract_mirror.php'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotparity\extract_mirror.php'
 # NEVER require schedule_runner.php: its top level opens Oracle, claims tasks and
 # SENDS EMAIL. extract_mirror.php lifts its function declarations via PHP's own
 # tokenizer into a side-effect-free mirror, regenerated here from the LIVE file.

@@ -2,7 +2,7 @@
 # (the only execution channel to the box). Registers the "Penumbra Render
 # Worker" scheduled task under NETWORK SERVICE, grants that account what the
 # worker needs, starts it, and proves it is alive by its heartbeat.
-$P = 'D:\Utilities\PHP_8.2-p'
+$P = $PSScriptRoot   # this script's own folder: Penumbra's, D:\Utilities\PHP_penumbra
 $Q = "$P\render_queue"
 $tn = 'Penumbra Render Worker'
 "register as $([Environment]::UserName) session $([Diagnostics.Process]::GetCurrentProcess().SessionId)"

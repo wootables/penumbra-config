@@ -16,7 +16,7 @@
 # window.__PL holds the strings; window.__INJ lists every element added to the document with an
 # on* attribute that names __pwn (a MutationObserver from before main.js loads). pivmenu's files are read, never written.
 import importlib.util, os
-PIVMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivmenu'
+PIVMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivmenu'
 _spec = importlib.util.spec_from_file_location('pivmenu_mk_harness', os.path.join(PIVMENU, 'mk_harness.py'))
 _pm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_pm)

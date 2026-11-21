@@ -49,16 +49,16 @@
 #   word and said ROLLED BACK).
 #
 # UNC NOTE: run the body as a scriptblock (-File on a UNC path is GPO-blocked here):
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colwidths'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\rollback.ps1"))) -Disable
 # =============================================================================
 param([switch]$Status, [switch]$Disable, [switch]$Enable, [switch]$DisableViews, [switch]$EnableViews,
       [switch]$Restore, [int]$Round = 0, [switch]$DryRun, [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colwidths' }
 # -App: rehearse against a scratch copy of the app folder.
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $off  = Join-Path $app 'js\penumbra_colwidths.off'
 $voff = Join-Path $app 'js\penumbra_colwidths_views.off'
 $mods = @('js\penumbra_colwidths.js', 'css\penumbra_colwidths.css')

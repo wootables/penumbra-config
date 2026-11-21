@@ -8,7 +8,7 @@
 # their OWN mode()/distinct()/count_filled()/... - a fourth hand-copied set.
 #
 # The share blocks .ps1 files, so run the BODY as a scriptblock (never pipe it):
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\cfagg\run_cfagg.ps1')); & $sb
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\cfagg\run_cfagg.ps1')); & $sb
 #   & $sb -MainSrc <stage js\main.js> -RunnerSrc <stage schedule_runner.php>   # a stage or mutant copy
 # (a local copy of the folder also runs with powershell -File run_cfagg.ps1).
 #
@@ -33,14 +33,14 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot   # empty when run as a scriptblock
-if (-not $src) { $src = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\cfagg' }
+if (-not $src) { $src = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\cfagg' }
 $kit = Join-Path $env:TEMP 'penumbra_cfagg'
 if (-not (Test-Path -LiteralPath $kit)) { New-Item -ItemType Directory -Path $kit | Out-Null }
 foreach ($f in @('corpus.json', 'cfagg_c.php', 'cfagg_a.html')) {
     Copy-Item -LiteralPath (Join-Path $src $f) -Destination (Join-Path $kit $f) -Force
 }
-$parity = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity'
-$php = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$parity = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\parity'
+$php = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $work = Join-Path $kit 'work'

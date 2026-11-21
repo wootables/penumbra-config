@@ -78,7 +78,7 @@
 #   -Keep keeps the staging dir.  -Here <dir> runs a copy.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditortab'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\auditortab'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Needs py -3 with websocket-client and the PHP 8.2 CLI. Writes nothing to the webroot.
@@ -87,14 +87,14 @@ param([string]$MainCss = '', [string]$MainJs = '', [string]$IndexPhp = '', [stri
       [string]$App = '', [string]$Here = '',
       [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$ControlBn, [switch]$ControlMix, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditortab' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\auditortab' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if ($Control) {
   # The build before ANY of the Auditor tab work: the oldest of the day's two stamps per file.
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   function Get-ControlFile([string]$rel) {
     foreach ($st in @('auditortab', 'auditerrors', 'auditbenign')) { $p = Resolve-Bak "$app\$rel.bak-20260925-$st"; if ($p) { return $p } }
     throw "-Control: no .bak-20260925-auditortab / -auditerrors for $rel"
@@ -104,12 +104,12 @@ if ($Control) {
 }
 if ($ControlBn) {
   # The build before the neutral badge for the browser's harmless notices (2026-10-21).
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))
   $MainJs = Get-GitVersion '705b22d' 'js/main.js'; $AuditPhp = Get-GitVersion '705b22d' 'get_audit_log.php'
 }
 if ($ControlMix) {
   # The build before Pulse's action mix left the harmless notices out (2026-10-21).
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))
   $AuditPhp = Get-GitVersion '528f6d0' 'get_audit_log.php'
 }
 $cssPath = if ($MainCss) { $MainCss } else { "$app\css\main.css" }

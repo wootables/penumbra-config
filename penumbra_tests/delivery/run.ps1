@@ -28,13 +28,13 @@
 #
 # EXPECTED TAIL: "SUMMARY  pass=NN  fail=0". Any other tail is a failure.
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\delivery\run.ps1')); & $sb
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\delivery\run.ps1')); & $sb
 # =============================================================================
 param([switch]$Control, [switch]$Mutant)
 
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\delivery' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\delivery' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $app  = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $iis  = '\\oitras\c$\inetpub\logs\LogFiles\W3SVC1'
 

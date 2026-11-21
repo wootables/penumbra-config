@@ -30,7 +30,7 @@ except Exception: pass
 HERE = os.path.dirname(os.path.abspath(__file__))
 LIVE = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 
 # name -> ([(old, new), ...] applied to penumbra_bulkset.js, [asserts that must go red])
 MUTANTS = {

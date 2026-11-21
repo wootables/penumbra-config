@@ -17,7 +17,7 @@
 # EXPECTED TAIL: "PASS: 19   FAIL: 0"  (count as of 2026-09-23 night)
 #
 # UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as a scriptblock:
-#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\recipalerts'
+#   $dir = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\recipalerts'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
 # Never add a bare `exit` (it would kill the caller), and do not pipe the invocation.
 # =============================================================================
@@ -28,10 +28,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\recipalerts' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\recipalerts' }
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\recipalerts' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\recipalerts' }
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
-$jq   = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes\jquery-3.7.1.min.js'
+$jq   = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\auditfixes\jquery-3.7.1.min.js'
 
 function Get-Lift([string]$src, [string]$start, [string]$end, [string]$what) {
     $s = $src.IndexOf($start)

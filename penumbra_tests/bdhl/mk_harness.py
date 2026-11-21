@@ -9,7 +9,7 @@
 #   pbhfmt   (bdhl 3) pbhui's formats + a rule on V_AMOUNT; the formats changed from the breakdown's Format...
 # pivmenu's files are read, never written.
 import importlib.util, os
-PIVMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivmenu'
+PIVMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivmenu'
 _spec = importlib.util.spec_from_file_location('pivmenu_mk_harness', os.path.join(PIVMENU, 'mk_harness.py'))
 _pm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_pm)

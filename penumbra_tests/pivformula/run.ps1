@@ -19,12 +19,12 @@
 # name. Control: the build before it fails F2-F4, V2-V4, F9, V9, F10, V10. Mutant names (the
 # mask call undone) = exactly those.
 #
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivformula'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivformula'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -MainJs <path> [-Mutant name]
 # Default main.js = the live one. Writes nothing to the webroot.
 # =============================================================================
 param([string]$MainJs = '', [string]$Mutant = '')
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivformula'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivformula'
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $MainJs) { $MainJs = "$live\js\main.js" }
 $browser = 'C:\Program Files\Google\Chrome\Application\chrome.exe'

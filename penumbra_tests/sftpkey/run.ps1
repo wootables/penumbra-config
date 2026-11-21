@@ -25,19 +25,19 @@
 #
 # UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as a
 # scriptblock, never with -File, and never add a bare `exit` (it would kill the caller):
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\sftpkey'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sftpkey'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -App <stage> -Mutants
 # =============================================================================
 param([string]$App = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra', [switch]$Control, [switch]$Mutants)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
-if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\sftpkey' }   # a scriptblock has neither
-$phpHome = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p'
+if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sftpkey' }   # a scriptblock has neither
+$phpHome = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p'
 $php  = Join-Path $phpHome 'php.exe'
 # FORWARD slashes on purpose: php's -d parser reads a leading "\\" as an escape and
 # then looks for \oitras...\ext (verified 2026-10-16: the backslash form loads nothing).
-$ext  = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext'
+$ext  = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext'
 $test = Join-Path $here 'test_sftpkey.php'
 $phpArgs = @('-n', '-d', "extension_dir=$ext", '-d', 'extension=openssl')
 Write-Host "app: $App"

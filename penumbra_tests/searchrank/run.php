@@ -16,7 +16,7 @@
 // =============================================================================
 $HERE = __DIR__;
 $APP = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra';
-$EXT = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext';
+$EXT = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext';
 $EXPECT = array('P-lift', 'P-fixture', 'Q-epa8', 'S-epa50', 'S-tiers', 'Q-tiers', 'Q-ownername', 'S-ownername', 'S-escape-dot',
                 'Q-escape-paren', 'S-literal', 'S-nonadmin', 'S-tag', 'Q-tag', 'R-helper', 'R-escape', 'R-fold', 'R-gate', 'R-long',
                 'B-list', 'B-count');
@@ -33,7 +33,7 @@ if ($control) {
     if (isset($opts['baseline'])) { $file = rtrim($opts['baseline'], '/\\') . '/get_server_reports.php'; }
     else if (strpos((string)@file_get_contents("$APP/get_server_reports.php"), 'function penumbraReportSearchRankSql(') === false) { $file = "$APP/get_server_reports.php"; }
     else {
-        require '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/penumbra_tests/_oldver/oldver.php';
+        require '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/penumbra_tests/_oldver/oldver.php';
         $shas = preg_split('/\s+/', trim(oldver_git(array('log', '--format=%H', '-S', 'function penumbraReportSearchRankSql(', '--', 'get_server_reports.php'))));
         $file = oldver_git_show(end($shas) . '^', 'get_server_reports.php');
     }

@@ -12,7 +12,7 @@
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the BODY
 # as a scriptblock instead:
-#   $d = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\rankfilter'
+#   $d = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\rankfilter'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 # A control/mutant run exits non-zero, so under $ErrorActionPreference='Stop' it
 # kills a parent scriptblock - invoke each in its own call.
@@ -39,9 +39,9 @@
 param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3)
 
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\rankfilter' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\rankfilter' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\rankfilter' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\rankfilter' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 
 # NOT $args - that is an automatic variable in PowerShell.
 $phpArgs = @('-n', (Join-Path $here 'test_rankfilter.php'))

@@ -23,7 +23,7 @@
 # =============================================================================
 param([string]$App = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\snipmenu' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\snipmenu' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $App) { $App = $live }
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'

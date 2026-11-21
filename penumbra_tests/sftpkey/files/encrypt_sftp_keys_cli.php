@@ -12,7 +12,7 @@
  * Notice on every run until it is encrypted.
  *
  * Run (on the server; a workstation php has no oci8 and no config):
- *   \\oitras\d$\Utilities\PHP_8.2-p\php.exe encrypt_sftp_keys_cli.php             dry run: each task's key state
+ *   \\oitras\d$\Utilities\PHP_8.6-p\php.exe encrypt_sftp_keys_cli.php             dry run: each task's key state
  *   ... --commit                                                               encrypt the plaintext ones
  *   ... --task=<id>                                                            one task only (with or without --commit)
  *   ... --help

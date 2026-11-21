@@ -24,17 +24,18 @@
 #
 # EXPECTED TAIL: "PASS 82   FAIL 0". Any other tail is a failure.
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\monfix\run.ps1')); & $sb
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\monfix\run.ps1')); & $sb
 # =============================================================================
 param([switch]$Control)
 
 $ErrorActionPreference = 'Stop'
-$here   = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\monfix' }   # empty as a scriptblock
-$php    = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here   = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\monfix' }   # empty as a scriptblock
+$php    = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $app    = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$phpdir = '\\oitras\d$\Utilities\PHP_8.2-p'
+$phpdir = '\\oitras\d$\Utilities\PHP_8.6-p'
+$homedir = '\\oitras\d$\Utilities\PHP_penumbra'
 
-$args = @('-n', (Join-Path $here 'test_monfix.php'), "--app=$app", "--phpdir=$phpdir")
+$args = @('-n', (Join-Path $here 'test_monfix.php'), "--app=$app", "--phpdir=$phpdir", "--homedir=$homedir")
 if ($Control) { $args += '--control' }
 
 & $php @args

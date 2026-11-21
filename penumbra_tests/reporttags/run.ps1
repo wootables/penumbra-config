@@ -36,9 +36,9 @@ param(
     [switch]$Mutant
 )
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\reporttags' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\reporttags' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 $live = '\' + '\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\' + '\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\' + '\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $test = Join-Path $here 'test_reporttags.php'
 # A staged file by its app-relative name: flat (main.js beside) or app-shaped (js\main.js); live otherwise.
 function Pick($name) {

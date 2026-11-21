@@ -21,7 +21,7 @@
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the BODY
 # as a scriptblock instead:
-#   $d = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hideempty'
+#   $d = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\hideempty'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 #
 # WHAT IS UNDER TEST. The engine-C half of the hide-empty pivot option:
@@ -41,9 +41,9 @@
 param([switch]$Control, [switch]$Mutant, [switch]$Mutant2)
 
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\hideempty' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hideempty' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\hideempty' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\hideempty' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 
 # NOT $args - that is an automatic variable in PowerShell.
 $phpArgs = @('-n', (Join-Path $here 'test_hideempty.php'))

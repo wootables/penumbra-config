@@ -25,7 +25,7 @@
 # before 2026-10-07) scores PHP FAIL 48 and throws on the first browser anchor.
 #
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\subtip\run.ps1'))
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\subtip\run.ps1'))
 #   & $sb -App <stage>
 # Never add a bare `exit` (it would kill the caller), and do not pipe the invocation.
 # =============================================================================
@@ -37,10 +37,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 # Hard-coded, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\subtip'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\subtip'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
-$jq   = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes\jquery-3.7.1.min.js'
+$jq   = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\auditfixes\jquery-3.7.1.min.js'
 $appFwd = $App -replace '\\', '/'
 
 function Get-Lift([string]$src, [string]$start, [string]$end, [string]$what) {

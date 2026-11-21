@@ -52,7 +52,7 @@ $HERE = str_replace('\\', '/', dirname(__FILE__));
 // The tokenizer-based extractor lives with the pivot parity suite; fall back to
 // its absolute home so a copy of this test run from anywhere else still finds it.
 $EXTRACTOR = dirname($HERE) . '/pivotparity/extract_mirror.php';
-if (!is_file($EXTRACTOR)) $EXTRACTOR = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/penumbra_tests/pivotparity/extract_mirror.php';
+if (!is_file($EXTRACTOR)) $EXTRACTOR = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/penumbra_tests/pivotparity/extract_mirror.php';
 
 // ---------------------------------------------------------------------------
 // The shared case table. [frozenCols, visibleColumns (null = key absent),
@@ -222,7 +222,7 @@ if ($opt['child']) {
 // ---------------------------------------------------------------------------
 $runner = $opt['runner'] !== '' ? str_replace('\\', '/', $opt['runner']) : $APP . '/schedule_runner.php';
 if ($opt['control'] && $opt['runner'] === '') {
-    require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
+    require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
     $baks = oldver_glob($APP . '/schedule_runner.php.bak-*-flatfreeze');
     if (!$baks) { fwrite(STDERR, "--control needs schedule_runner.php.bak-*-flatfreeze (made by the deploy) or --runner=<pre-feature file>\n"); exit(2); }
     sort($baks); $runner = end($baks);

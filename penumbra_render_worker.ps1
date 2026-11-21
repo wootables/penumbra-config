@@ -34,7 +34,7 @@
 #   -Once   process what is queued and exit (used by the test suite)
 # =============================================================================
 param(
-  [string]$Queue = 'D:\Utilities\PHP_8.2-p\render_queue',
+  [string]$Queue = '',   # default: render_queue\ beside this script = Penumbra's own folder (the client's penumbra_home())
   [string]$Edge = '',
   [double]$MaxHours = 23,
   [int]$RenderTimeoutSec = 60,
@@ -44,6 +44,7 @@ param(
   [switch]$Once
 )
 $ErrorActionPreference = 'Continue'
+if (-not $Queue) { $Queue = Join-Path $PSScriptRoot 'render_queue' }
 if (-not $Edge) {
   $Edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
   if (-not (Test-Path $Edge)) { $Edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }

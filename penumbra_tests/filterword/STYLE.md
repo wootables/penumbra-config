@@ -68,7 +68,7 @@ In searchHelpLightbox's opening paragraph keep ONE sentence saying the box used 
 - Edit with the Edit tool only (it keeps each file's line endings: topics LF, tips CRLF). No sed,
   no PowerShell Set-Content, no Python rewrites.
 - Edit ONLY the files you were given, in the STAGE folder
-  `\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\filterword\stage\...`.
+  `\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\filterword\stage\...`.
   Never touch the live webroot (`\\oitras.oit.ncsu.edu\c$\inetpub\...`) or `orig\`.
 - When unsure whether a "search" means the filter box, read the surrounding paragraph: if it is
   about narrowing the report's rows, it is the filter; if it is about finding a thing to open, keep.

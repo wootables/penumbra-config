@@ -27,8 +27,8 @@
 # =============================================================================
 param([string]$App = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\secfixes' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\secfixes' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 function Src($name) { if ($App -and (Test-Path -LiteralPath (Join-Path $App $name))) { return (Join-Path $App $name) }; return (Join-Path $live $name) }
 $files = @{ db = Src 'db_connection.php'; ai = Src 'ai_assist.php'; ack = Src 'audit_ack.php' }

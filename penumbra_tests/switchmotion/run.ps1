@@ -39,7 +39,7 @@
 #   -Keep keeps the staging dir.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\switchmotion'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\switchmotion'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # ONE suite run per PowerShell call, output to a FILE (the console truncates).
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
@@ -47,14 +47,14 @@
 # =============================================================================
 param([string]$MainJs = '', [string]$MainCss = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\switchmotion' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\switchmotion' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if ($Control -and -not $MainJs) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   $bm = Get-BakItem "$js\main.js.bak-*-switchmotion" | Select-Object -Last 1
   $bc = Get-BakItem "$app\css\main.css.bak-*-switchmotion" | Select-Object -Last 1
   if (-not $bm -or -not $bc) { throw '-Control needs js\main.js.bak-*-switchmotion + css\main.css.bak-*-switchmotion (made by the deploy), or pass -MainJs/-MainCss <pre-fix copies>' }

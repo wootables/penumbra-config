@@ -346,9 +346,9 @@ HUNKS['README.md'] = [
 """(`penumbraToggleShortcutSheet`, a `.help-lightbox` in `PNB_LIGHTBOXES`, opened by ? or the Settings row's ? button; the admin section renders only for editors).""",
 r"""(`penumbraToggleShortcutSheet`, a `.help-lightbox` in `PNB_LIGHTBOXES`, opened by ? or the Settings row's ? button; the admin section renders only for editors). The same map feeds the toolbar tooltips (2026-09-25): an entry's `tip` names its control by `#id` (its `run` fires that same selector), and the global `$(document).tooltip`'s `content` callback puts the key into the title's `(HOTKEY)` prefix - `(P or CTRL+SHIFT+P) Create a Pivot Table`, or `(X) Clear search` - while the switch is on (`_pnbSingleKeyTip`). It is decided as the tooltip opens: nothing runs at load, no listener is added, the title attribute is never written (so `journalBtnTitle()` and the admin-hidden marker, which rebuild titles, keep the hint), and a throw falls back to the stock escaped title. Letters match either case (Caps Lock sends "P"), as on dashboards and the Health page. The dashboard header names its keys (the tooltip's "(R)" and `aria-keyshortcuts`) only while the switch is on and a dashboard is open (`keyHints()` in penumbra_dashboard.js); its help panel's checkbox re-renders the header. With the switch off the "/" badges go too: `window.penumbraSingleKeysSync()` (penumbra_a11y.js, run at load on every page and by the report page's two switches - no listener, so another tab's flip shows on the next load) sets `html.pnb-keys-off`, and main.css hides `#tableSearchKey`, `#pnlFilterKey` (not while it is the `.is-clear` button) and the repository's `.repo-search-key` (`!important` against repository.js's inline `.toggle()`). Suite `penumbra_tests\singlekeytips`."""),
 ('suite entry',
-r"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths\run.ps1'))) -Mutants
+r"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\colwidths\run.ps1'))) -Mutants
 """,
-r"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths\run.ps1'))) -Mutants
+r"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\colwidths\run.ps1'))) -Mutants
 # Single-key hints (2026-09-25): the report toolbar's tooltips name a control's single key while
 # the switch is on - "(P or CTRL+SHIFT+P) Create a Pivot Table" - through the global jQuery UI
 # tooltip's content callback (_pnbSingleKeyTip); letters work with Caps Lock on; the dashboard
@@ -359,8 +359,8 @@ r"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8
 # content callback per tooltip against jQuery UI's stock one; the page's listeners against the
 # build before the feature). `-Control` runs the pre-feature .baks (RED); `-Mutants` runs every
 # mutant against the asserts it must turn red.
-& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\singlekeytips\run.ps1')))
-& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\singlekeytips\run.ps1'))) -Mutants
+& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\singlekeytips\run.ps1')))
+& ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\singlekeytips\run.ps1'))) -Mutants
 """),
 ]
 

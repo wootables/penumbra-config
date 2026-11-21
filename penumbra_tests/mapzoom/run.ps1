@@ -20,7 +20,7 @@
 #   on the staged penumbra_charts.js. Live (control) 2 FAIL (Z9, Z10); stage minus the focusAfterZoomOut call 2 FAIL.
 # Installed copy lives in penumbra_tests\mapzoom. The UNC share blocks .ps1 files,
 # so run it as a scriptblock with -Here:
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\mapzoom'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\mapzoom'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Here $d
 #
 # SRC.js = penumbra_charts.js + main.js, module first (grab() takes the first

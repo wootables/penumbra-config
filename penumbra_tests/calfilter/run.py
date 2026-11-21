@@ -42,7 +42,7 @@
 #   py -3 run.py --stage <file>     a staged analytics_all.php
 #   py -3 run.py --mutant <name> / --mutants   (anchors are checked first)
 # Run it from its own folder (Git Bash mangles a \\server\d$ path argument):
-#   cd '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\calfilter' ; py -3 run.py
+#   cd '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\calfilter' ; py -3 run.py
 # Needs py -3 + websocket-client and the PHP 8.2 CLI. Stages into %TEMP%;
 # writes nothing to the webroot.
 # =============================================================================
@@ -51,8 +51,8 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 STAMP = '20261008-calfilter'
 

@@ -32,7 +32,7 @@
 param([string]$StageDir = '', [string]$MainJs = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control,
       [switch]$Real, [string]$Shots = '', [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiphost' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tiphost' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 $css  = "$app\css"
@@ -40,7 +40,7 @@ $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if ($Control -and -not $MainJs) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   $b = Get-BakItem "$js\main.js.bak-*-tiphost" | Select-Object -Last 1
   if (-not $b) { throw '-Control needs js\main.js.bak-*-tiphost (made by the deploy), or pass -MainJs <pre-fix build>' }
   $MainJs = $b.FullName

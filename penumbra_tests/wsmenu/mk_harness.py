@@ -7,7 +7,7 @@
 # penumbra_vars before main.js boots (owner = an admin who owns the report: isReportOwner); an admin also gets
 # PENUMBRA_ADMIN_TOOLS, the chrome's registry (TOOLS_JSON).
 import importlib.util, os, re
-CM = os.environ.get('PNB_COLMENU_DIR', r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colmenu')
+CM = os.environ.get('PNB_COLMENU_DIR', r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colmenu')
 _spec = importlib.util.spec_from_file_location('colmenu_mk_harness', os.path.join(CM, 'mk_harness.py'))
 colmenu_harness = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(colmenu_harness)

@@ -42,7 +42,7 @@ handed to the browser (target="_blank") is skipped; in-panel jumps and the local
 
 From PowerShell (the execution policy refuses `.ps1` files on the share; invoke the text):
 
-    & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dashhelplinks\run.ps1'))) -Patched <stage>\js\penumbra_dashboard.js -Unpatched <orig>\js\penumbra_dashboard.js -Out <scratch dir>
+    & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dashhelplinks\run.ps1'))) -Patched <stage>\js\penumbra_dashboard.js -Unpatched <orig>\js\penumbra_dashboard.js -Out <scratch dir>
 
 Deployed 2026-10-16 10:43 as commit 8d8fa03, so the mutant is the pre-fix version:
 `git show 618a0e5:js/penumbra_dashboard.js > <file>` (GIT_DIR //oitras.oit.ncsu.edu/d$/Utilities/penumbra_git).

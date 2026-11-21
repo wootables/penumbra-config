@@ -64,7 +64,7 @@ $CONTROL = opt_flag('--control');
 if (!empty($PHP_ARGS)) { fwrite(STDERR, "unknown arguments: " . implode(' ', $PHP_ARGS) . "\n"); exit(2); }
 if (!class_exists('ZipArchive')) { fwrite(STDERR, "FATAL: ZipArchive missing - run with -d extension_dir=<php>\\ext -d extension=zip\n"); exit(2); }
 if ($BASE === null) {
-    require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
+    require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
     $baks = oldver_glob($APP . '\\shared_logic.php.bak-*-msheet');
     if (!$baks) { fwrite(STDERR, "FATAL: no baseline - pass --baseline <shared_logic.php before the change>\n"); exit(2); }
     sort($baks);

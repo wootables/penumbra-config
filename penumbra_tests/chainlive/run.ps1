@@ -13,7 +13,7 @@
 #   run.ps1 -Mutants -App <dir> every mutant, each against the checks it MUST turn red
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\chainlive'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\chainlive'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -App <dir>
 # ONE suite run per PowerShell call, output to a FILE. Prints RESULT: GREEN/RED. Stages into %TEMP%.
 # =============================================================================
@@ -25,7 +25,7 @@
 # the editlive mutant was re-anchored on the cost gate, and the rowline mutant (the old row line back) guards E0.
 param([string]$App = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep, [string]$Here = '', [int]$Rows = 1500, [int]$Cols = 115)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\chainlive' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\chainlive' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $App) { $App = $live }
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'

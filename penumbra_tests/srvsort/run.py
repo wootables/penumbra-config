@@ -34,10 +34,10 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 PHP74 = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP7.4.3\php.exe'   # a stub runs on its reader's PHP (7.1+)
 PHP56 = r'\\oitras.oit.ncsu.edu\c$\PHP\php.exe'                   # 5.6.20: only for "the twin still runs on an old PHP"
-MB82 = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext/php_mbstring.dll'   # forward slashes: -d eats a leading \\
+MB82 = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext/php_mbstring.dll'   # forward slashes: -d eats a leading \\
 MB74 = '//oitras.oit.ncsu.edu/d$/Utilities/PHP7.4.3/ext/php_mbstring.dll'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 KIT = os.path.join(HERE, 'stage_20261024')

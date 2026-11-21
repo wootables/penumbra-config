@@ -112,7 +112,7 @@
 #   null-prototype drill set (else "anchor not found").
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotperf'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotperf'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Control
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Writes nothing to the webroot.
@@ -120,7 +120,7 @@
 param([string]$MainJs = '', [switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [switch]$Mutant5, [switch]$Mutant6, [switch]$Mutant7, [switch]$Mutant8, [switch]$Mutant9, [switch]$Mutant10, [switch]$Mutant11, [switch]$Mutant12, [switch]$Mutant13,
       [ValidateSet('', 'click', 'reapply', 'restoreexp', 'restorecol', 'colsort', 'sortrows')][string]$KeyMutant = '', [string]$Matrix = '')
 $ErrorActionPreference = 'Stop'
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotperf'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotperf'
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 $controlBak = "$js\main.js.bak-20260916-pivotgroups"
@@ -128,7 +128,7 @@ $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if ($Control) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   $MainJs = Resolve-Bak $controlBak; if (-not $MainJs) { throw "-Control: no $controlBak" }
 }
 if (-not $MainJs) { $MainJs = "$js\main.js" }

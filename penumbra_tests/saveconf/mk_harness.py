@@ -1,5 +1,5 @@
 import os
-T = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests'
+T = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests'
 src = open(os.path.join(T, 'cellsel', 'harness.html'), encoding='utf-8').read()
 
 def rep(old, new):

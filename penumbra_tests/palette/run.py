@@ -1109,7 +1109,7 @@ def write_stage(texts):
     w(os.path.join('help', 'functions_index.php'), texts['fni'])
     w('help_functions.json', fn_index_json() if texts['fni'] else '{}')
 
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 def fn_index_run(check):
     """(round 7) fn_index_build.php over the staged builder: the JSON, or (ok, the last line) with --check."""
     argv = [PHP, '-n', os.path.join(HERE, 'fn_index_build.php'), '--index', os.path.join(stage, 'help', 'functions_index.php'), '--help', os.path.join(APP, 'help'),

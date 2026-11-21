@@ -27,9 +27,9 @@ param([Parameter(Mandatory = $true)][string]$Stage, [Parameter(Mandatory = $true
       [ValidateSet('fsexit', 'fsfit')][string]$Change = 'fsexit',
       [string]$Stamp = '', [switch]$DryRun, [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\fsexit' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\fsexit' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 if (-not $Stamp) { $Stamp = (Get-Date).ToString('yyyyMMdd-HHmmss') + '-' + $Change }
 
 if (-not ('PnbMove' -as [type])) {

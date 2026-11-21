@@ -10,7 +10,7 @@
 #   & ([scriptblock]::Create([IO.File]::ReadAllText('<kit>\deploy.ps1'))) -DryRun
 param([switch]$DryRun)
 $ErrorActionPreference = 'Stop'
-$KitDir  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\find'
+$KitDir  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\find'
 $SetDir  = Join-Path $KitDir 'stage3'   # cut 3 (13:37): live moved twice (colscard 249f81d, calcadj 176e29c)
 $FromDir = Join-Path $KitDir 'orig3'
 $LiveDir = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'

@@ -6,7 +6,7 @@ main.js's "?" sheet Ctrl+K row and its Clear all custom preferences hook, `penum
 `colMenu.items(th, cell)`, the help topic `commandPaletteHelpLightbox` + tip `us-tip-palette`.
 
     $env:PYTHONIOENCODING='utf-8'
-    py -3 \\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\palette\run.py [--stage DIR] [--control] [--mutants | --mutant NAME] [--scn S]
+    py -3 \\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\palette\run.py [--stage DIR] [--control] [--mutants | --mutant NAME] [--scn S]
 
 Headless Edge over CDP (one headless-Edge suite at a time), on the colmenu harness (the REAL
 main.js, the saveconf fixture: shown V_ID V_NAME V_AMOUNT V_DATE V_LINK V_STATUS, hidden H_*)

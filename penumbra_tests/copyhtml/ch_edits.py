@@ -236,9 +236,9 @@ edit('help_content.php', 'help-copy-html-pages', crlf(r'''group headers, subtota
 
 # --- README.md -------------------------------------------------------------------
 
-edit('README.md', 'readme-copyhtml-suite', r'''py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\jsongroup\run.py --mutants
+edit('README.md', 'readme-copyhtml-suite', r'''py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\jsongroup\run.py --mutants
 ```
-''', r'''py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\jsongroup\run.py --mutants
+''', r'''py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\jsongroup\run.py --mutants
 
 # Copy as HTML copies every page (2026-09-30): it used to carry only the page on screen, while
 # CSV / TSV / JSON copy every search-visible row. Browser only: the REAL main.js on the hiddencols
@@ -257,8 +257,8 @@ edit('README.md', 'readme-copyhtml-suite', r'''py -3 \\oitras\d$\Utilities\PHP_8
 # C-note, C-prefix and C-toast (it pasted one page, and from any page but the last a dead "View
 # Last Page" link row in place of the totals); --mutants: every step of the layout bites, and
 # eq-forward (restore order) is redundant by design.
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\copyhtml\run.py
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\copyhtml\run.py --mutants
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\copyhtml\run.py
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\copyhtml\run.py --mutants
 ```
 ''')
 

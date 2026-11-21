@@ -13,14 +13,14 @@
 #                   and the same-origin refusal on jsontable URLs
 #
 # Run the BODY as a scriptblock (UNC scripts are GPO-blocked):
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiles\run.ps1')); & $sb
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tiles\run.ps1')); & $sb
 # Never pipe the invocation (a lingering Edge child keeps stdout open).
 #
 # Mutation control: set $env:PNB_DASH_SRC / $env:PNB_TILES_SRC / $env:PNB_MAIN_SRC
 # to a .bak before running and the suite MUST go red.
 # =============================================================================
 $ErrorActionPreference = 'Stop'
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiles'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tiles'
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }

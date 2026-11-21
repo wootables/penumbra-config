@@ -6,7 +6,7 @@
 #
 # UNC .ps1 files are blocked by policy: run the BODY as a scriptblock, one run
 # per PowerShell call, output to a file:
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\acrow'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\acrow'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Js <stage>\search_builder.js -Css <stage>\search_builder.css -Help <stage>\help_content.php *>&1 | Out-File "$d\run.log"
 #   ... -Control          the build before the change (live, or the .bak-*-acrow files after the deploy)
 #   ... -Control5         the build before round 5 (-Js/-Css/-Help if given, else live, else the .bak-*-acrow5 files)
@@ -17,8 +17,8 @@
 # =============================================================================
 param([string]$Js = '', [string]$Css = '', [string]$Help = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Explore,
       [switch]$Control5, [string]$Only = '')
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\acrow' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\acrow' }
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\acrow' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\acrow' }
 $pyArgs = @('-3', "$here\run.py")
 if ($Js)      { $pyArgs += @('--js', $Js) }
 if ($Css)     { $pyArgs += @('--css', $Css) }

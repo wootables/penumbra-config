@@ -2,7 +2,7 @@
 # Penumbra snippet parity harness - LOCAL LAUNCHER
 #
 #   $p = "$env:TEMP\run_parity_local.ps1"
-#   Copy-Item '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity\run_parity_local.ps1' $p -Force
+#   Copy-Item '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\parity\run_parity_local.ps1' $p -Force
 #   & $p                    # add -CompareOnly to skip to the comparison
 #   & $p -MainSrc <path\to\main.js>   # a stage or mutant main.js in place of live's (how the
 #                                     # page-error check is proved: tBodies -> tBodiez must go RED)
@@ -45,7 +45,7 @@
 param([switch]$CompareOnly, [string]$MainSrc, [string]$RunnerSrc)
 
 $ErrorActionPreference = 'Stop'
-$root = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity'
+$root = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\parity'
 
 if (-not (Test-Path $root)) { throw "parity share not reachable: $root" }
 

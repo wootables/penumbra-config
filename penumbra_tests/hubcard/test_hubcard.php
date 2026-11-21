@@ -359,9 +359,9 @@ $plog = array('count' => 3, 'last_at' => date('H:i:s', $T - 1400));
 $dbOk = 0; $dbBad = 0;
 foreach ($dbs as $d) { if ($d['status'] === 'ok') $dbOk++; elseif ($d['status'] === 'down') $dbBad++; }
 $logSources = array(
-    'php'       => array('label' => 'PHP errors', 'path' => 'D:\\Utilities\\PHP_8.2-p\\logs\\php82_errors.log', 'kind' => 'php', 'hint' => 'Fatals, warnings and every PENUMBRA-prefixed line.'),
+    'php'       => array('label' => 'PHP errors', 'path' => 'D:\\Utilities\\PHP_penumbra\\logs\\php82_errors.log', 'kind' => 'php', 'hint' => 'Fatals, warnings and every PENUMBRA-prefixed line.'),
     'scheduler' => array('label' => 'Scheduler',  'path' => 'C:\\inetpub\\wwwroot\\sponsor_migration\\penumbra\\log\\scheduler_' . date('Y-m-d') . '.log', 'kind' => 'scheduler', 'hint' => 'One line per task start and finish.'),
-    'monitor'   => array('label' => 'Watchdog',   'path' => 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor.log', 'kind' => 'monitor', 'hint' => 'One line per 5-minute check.'),
+    'monitor'   => array('label' => 'Watchdog',   'path' => 'D:\\Utilities\\PHP_penumbra\\logs\\penumbra_monitor.log', 'kind' => 'monitor', 'hint' => 'One line per 5-minute check.'),
     'iis'       => array('label' => 'IIS access', 'path' => 'C:\\inetpub\\logs\\LogFiles\\W3SVC1\\u_ex' . gmdate('ymd') . '.log', 'kind' => 'w3c', 'hint' => 'Every request, UTC.'),
     'httperr'   => array('label' => 'HTTP errors', 'path' => '', 'kind' => 'w3c', 'hint' => 'HTTP.sys rejects.', 'why' => 'C:\\Windows\\System32\\LogFiles\\HTTPERR is not readable by the pool identity'),
 );
@@ -601,9 +601,9 @@ $h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
 ok(preg_match('#<a class="pnb-chip" href="\#pnbCardMaint" data-card="pnbCardMaint" title="PENUMBRA_PEOPLE has not been probed yet - shown on the Maintenance card"><span class="pnb-chip-v">&mdash;</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'the chip is toneless with a dash');
 $snap = $keep;
 // the backup set, when the snapshot carries one, is the second line
-$snap['components']['backup'] = array('status' => 'ok', 'age_secs' => 61200, 'detail' => 'last complete 17h ago - 14 tables, 106,800 rows, 40.6 MB', 'latest' => array('dir' => 'D:\\Utilities\\PHP_8.2-p\\penumbra_backups\\2026-10-14_0132'));
+$snap['components']['backup'] = array('status' => 'ok', 'age_secs' => 61200, 'detail' => 'last complete 17h ago - 14 tables, 106,800 rows, 40.6 MB', 'latest' => array('dir' => 'D:\\Utilities\\PHP_penumbra\\penumbra_backups\\2026-10-14_0132'));
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(preg_match('#<span class="k">Table backups</span>\s*<span class="v"><span class="pnb-adm-dot ok"></span>last complete 17h ago - 14 tables, 106,800 rows, 40.6 MB &middot; <span title="[^"]*">D:\\\\Utilities\\\\PHP_8.2-p\\\\penumbra_backups\\\\2026-10-14_0132</span></span>#', $h) === 1 && strpos($h, '<strong>Backups:</strong>') === false, 'the backup set is the second line, not a note under the job', $h);
+ok(preg_match('#<span class="k">Table backups</span>\s*<span class="v"><span class="pnb-adm-dot ok"></span>last complete 17h ago - 14 tables, 106,800 rows, 40.6 MB &middot; <span title="[^"]*">D:\\\\Utilities\\\\PHP_penumbra\\\\penumbra_backups\\\\2026-10-14_0132</span></span>#', $h) === 1 && strpos($h, '<strong>Backups:</strong>') === false, 'the backup set is the second line, not a note under the job', $h);
 ok(strpos($h, '&middot; backups 17h ago</span>') !== false, 'and the summary carries its age');
 $snap['components']['backup']['status'] = 'stale';
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');

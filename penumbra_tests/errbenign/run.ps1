@@ -31,7 +31,7 @@
 #   run.ps1 -Mutant <name> / -Mutants    anchors checked first (-CheckAnchors)
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\errbenign'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\errbenign'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting. Writes nothing to the webroot.
 # =============================================================================
@@ -39,15 +39,15 @@ param([string]$DbPhp = '', [string]$AuditPhp = '', [string]$AnPhp = '', [string]
       [string]$App = '', [string]$Here = '',
       [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$ControlRo)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\errbenign' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\errbenign' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 $map = [ordered]@{ db = 'db_connection.php'; aud = 'get_audit_log.php'; an = 'analytics.php'; all = 'analytics_all.php'; hl = 'penumbra_health.php'; log = 'log_client_error.php'; sh = 'analytics_shared.php'; lg = 'penumbra_logs.php' }
 $over = @{ db = $DbPhp; aud = $AuditPhp; an = $AnPhp; all = $AllPhp; hl = $HealthPhp; log = $LogPhp; sh = $ShPhp; lg = $LogsPhp }
 if ($Control -or $ControlRo) {
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
 }
 if ($Control) {
   foreach ($k in @($map.Keys)) {

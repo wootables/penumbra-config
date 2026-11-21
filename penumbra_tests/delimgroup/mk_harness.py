@@ -4,7 +4,7 @@
 #   py -3 mk_harness.py      (writes harness.html beside this file)
 import os, re
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\digitcol\harness.html'
+SRC = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\digitcol\harness.html'
 src = open(SRC, 'rb').read().decode('utf-8')
 
 def cut(s, start, end):

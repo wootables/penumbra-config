@@ -10,7 +10,7 @@
 #   mutants one single-point revert per part of the fix, each must turn exactly its checks red.
 param([string]$App = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra', [string]$Here = '')
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$here = if ($Here) { $Here } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\idcard' }
+$here = if ($Here) { $Here } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\idcard' }
 function Src([string]$rel) { $p = Join-Path $App $rel; if (Test-Path -LiteralPath $p) { return $p } return (Join-Path $live $rel) }
 $work = Join-Path $env:TEMP ('idcard_' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force $work | Out-Null

@@ -6,12 +6,12 @@
 # or `git show <rev>:js/penumbra_dashboard.js` after it): T2 FAILS, the rest PASS. Prints a verdict
 # per run and SUITE: GREEN only when both are as expected. Run from PowerShell (not Git Bash: UNC paths).
 # The execution policy refuses .ps1 files on the share, so invoke the text as a scriptblock:
-#   & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dashhelplinks\run.ps1'))) -Patched <f> -Unpatched <f> -Out <dir>
+#   & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dashhelplinks\run.ps1'))) -Patched <f> -Unpatched <f> -Out <dir>
 param([string]$Patched = '', [string]$Unpatched = '', [string]$Out = '')
 $ErrorActionPreference = 'Stop'
 if (-not $Patched -or -not $Unpatched) { throw 'usage: -Patched <file> -Unpatched <file> [-Out <dir>]' }
 if (-not $Out) { $Out = Join-Path $env:TEMP ('dashhelplinks_' + (Get-Date -Format 'yyyyMMdd_HHmmss')) }
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dashhelplinks' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dashhelplinks' }
 $engine = [scriptblock]::Create([IO.File]::ReadAllText((Join-Path $here 'dashhelp_harness.ps1')))
 Write-Host "control: $Patched"
 $c = & $engine -DashJs $Patched -Here $here -Out (Join-Path $Out 'control') | Out-String

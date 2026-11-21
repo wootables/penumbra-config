@@ -6,8 +6,8 @@
 #   (a .ps1 on the share does not run with -File on this machine; a scriptblock does)
 param([switch]$Live, [string]$Only = '', [string]$Stage = 'stage')
 $ErrorActionPreference = 'Continue'
-$Kit   = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\filterword'
-$Tests = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests'
+$Kit   = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\filterword'
+$Tests = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests'
 $LiveDir = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $S = if ($Live) { $LiveDir } else { Join-Path $Kit $Stage }
 $tag = if ($Live) { '_live' } elseif ($Stage -ne 'stage') { '_' + $Stage } else { '' }

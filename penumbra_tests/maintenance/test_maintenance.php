@@ -156,7 +156,7 @@ eq(penumbra_maintenance_control_path('rm -rf', 'request', 'D:\\state'), null, 'a
 $GLOBALS['config'] = array('maintenance_state_dir' => 'X:\\override\\');
 eq(penumbra_maintenance_state_dir(), 'X:\\override', "config 'maintenance_state_dir' overrides the default");
 unset($GLOBALS['config']);
-ok(strpos(penumbra_maintenance_state_dir(), 'PHP_8.2-p') !== false && stripos(penumbra_maintenance_state_dir(), 'logs') !== false, 'the default is the web-writable PHP logs folder (the notice/health state folder), not the webroot log/');
+eq(penumbra_maintenance_state_dir(), penumbra_home() . '\\logs', 'the default is logs\ in penumbra_home() (the web-writable notice/health state folder), not the webroot log/');
 eq(penumbra_maintenance_flag_from_content(null), false, 'no file = flag off');
 eq(penumbra_maintenance_flag_from_content(''), true, 'an EMPTY file = flag on (touch keeps working)');
 eq(penumbra_maintenance_flag_from_content("on\n"), true, '"on" = on');

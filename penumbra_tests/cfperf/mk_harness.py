@@ -11,7 +11,7 @@
 #   pcftxt pivot: format() on Amt + text the snippet shows (Generate then renders no snippet)
 # and the page buttons (the pvshade harness has none). pvfix's files are read, never written.
 import importlib.util, json, os
-PVFIX = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pvfix'
+PVFIX = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pvfix'
 # by its path: a plain "import mk_harness" would find THIS module (same name, already loaded)
 _spec = importlib.util.spec_from_file_location('pvfix_mk_harness', os.path.join(PVFIX, 'mk_harness.py'))
 _pf = importlib.util.module_from_spec(_spec)

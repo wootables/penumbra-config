@@ -12,17 +12,17 @@
 #   run.ps1 -Mutants -App <dir> every mutant, each against the checks it MUST turn red
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\cardsnip'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\cardsnip'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -App <dir>
 # ONE suite run per PowerShell call, output to a FILE. Prints RESULT: GREEN/RED. Stages into %TEMP%.
 # =============================================================================
 param([string]$App = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep, [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\cardsnip' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\cardsnip' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $App) { $App = $live }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
-$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity\extract_engine_c.php'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\parity\extract_engine_c.php'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $NL = "`r`n"

@@ -39,7 +39,7 @@
 #   run.ps1 -Mutant <name> / -Mutants    anchors checked first (-CheckAnchors)
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\searchbar'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\searchbar'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting. Needs py -3 + websocket-client and
 # the PHP 8.2 CLI. Writes nothing to the webroot.
@@ -48,13 +48,13 @@ param([string]$MainCss = '', [string]$MainJs = '', [string]$IndexPhp = '', [stri
       [string]$App = '', [string]$Here = '',
       [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\searchbar' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\searchbar' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 if ($Control) {
   # De-bloats moved the webroot's .bak files out; Resolve-Bak finds them in git / the de-bloat folders.
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   $MainCss = Resolve-Bak "$app\css\main.css.bak-20260925-searchbar"; $MainJs = Resolve-Bak "$app\js\main.js.bak-20260925-searchbar"
   $IndexPhp = Resolve-Bak "$app\index.php.bak-20260925-searchbar"; $HelpPhp = Resolve-Bak "$app\help_content.php.bak-20260925-searchbar"
   foreach ($p in @($MainCss, $MainJs, $IndexPhp, $HelpPhp)) { if (-not $p) { throw "-Control: a .bak-20260925-searchbar file is missing" } }

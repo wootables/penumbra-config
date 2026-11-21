@@ -10,7 +10,7 @@
 // names and an option's old labels (= / != only, a current label wins) still find it; the list's order is the
 // sort and group order; a report whose only journal column is a pick list gets all of this too.
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=mbstring output.php
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring output.php
 //        [--app DIR]        the build under test: journal_export.php, penumbra_search.php, schedule_runner.php
 //                           (default: the live webroot; a file DIR lacks is read from the live webroot)
 //        [--mutant NAME]    a single-point revert of that build: exactly its asserts must go red
@@ -144,7 +144,7 @@ function plo_run_child($files) {
     if (!preg_match('/pnb_picklist_out_\d+_\d{4}$/', $dir)) { fwrite(STDERR, "bad temp dir\n"); exit(2); }
     mkdir($dir);
     foreach ($files as $f => $src) file_put_contents($dir . '/' . $f, $src);
-    $cmd = '"' . PHP_BINARY . '" -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=mbstring "' . __FILE__ . '"';
+    $cmd = '"' . PHP_BINARY . '" -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring "' . __FILE__ . '"';
     $env = array('PNB_PLO_CHILD' => $dir, 'SystemRoot' => getenv('SystemRoot'), 'TEMP' => getenv('TEMP'), 'TMP' => getenv('TMP'));
     $p = proc_open($cmd, array(1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, $env);
     $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]);

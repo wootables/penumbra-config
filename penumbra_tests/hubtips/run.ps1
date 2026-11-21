@@ -5,7 +5,7 @@
 # CONTROL: health.php from 4780452..4e42166 -> exactly T2 and T8 red.
 param([string]$App = '')
 if (-not $App) { $App = [IO.Path]::Combine('\\oitras.oit.ncsu.edu\c$', 'inetpub\wwwroot\sponsor_migration\penumbra') }
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { [IO.Path]::Combine('\\oitras.oit.ncsu.edu\d$', 'Utilities\PHP_8.2-p\penumbra_tests\hubtips') }   # run as a scriptblock (unsigned scripts are blocked)
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { [IO.Path]::Combine('\\oitras.oit.ncsu.edu\d$', 'Utilities\PHP_penumbra\penumbra_tests\hubtips') }   # run as a scriptblock (unsigned scripts are blocked)
 $tmp = Join-Path $env:TEMP ('hubtips_' + [guid]::NewGuid().ToString('N').Substring(0, 6)); [void][IO.Directory]::CreateDirectory($tmp)
 $src = [IO.File]::ReadAllText((Join-Path $App 'health.php'))
 $a = $src.IndexOf('    function tipOf(i)'); $b = $src.IndexOf('    function stickH()')

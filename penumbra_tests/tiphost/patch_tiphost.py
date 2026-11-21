@@ -157,8 +157,8 @@ R1_NEW = lf_lines(
     "forty; a few suites, `presets` among them, have more than one entry point; `tiphost` joined that",
     "day). Run them from a workstation.",
 )
-SKT = "& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\singlekeytips\\run.ps1'))) -Mutants"
-TTH = "& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\tiphost\\run.ps1')))"
+SKT = "& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\singlekeytips\\run.ps1'))) -Mutants"
+TTH = "& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\tiphost\\run.ps1')))"
 R2_OLD = lf_lines(SKT, "", "# Switch motion (2026-09-24, follow-up 2026-09-25): a layout_switch / toggle_switch click moves the")
 R2_NEW = lf_lines(
     SKT,

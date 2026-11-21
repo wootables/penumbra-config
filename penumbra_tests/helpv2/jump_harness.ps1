@@ -8,7 +8,7 @@
 # must FAIL (the control proves the harness sees the old behaviour). Prints RESULT: GREEN/RED.
 param([string]$MainJs = '', [string]$Here = '', [string]$Out = '', [switch]$ExpectControl)
 $ErrorActionPreference = 'Stop'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 if (-not $Here) { $Here = $PSScriptRoot }

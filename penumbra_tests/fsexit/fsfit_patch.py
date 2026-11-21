@@ -191,8 +191,8 @@ README = [
 # viewport and a report chart mounted at the old size covers the x (not a real-monitor case).
 # Measured 2026-10-01 on the stage: 23/0; --control (the build before the change) red on exactly
 # T-x T-name T-exit T-stay T-again K-x K-exit; --mutants 4/4 (nocss, noexit, closeall, noname).
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\fsexit\run.py
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\fsexit\run.py --mutants
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\fsexit\run.py
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\fsexit\run.py --mutants
 ''', r'''# the tile stays and the fullscreen button is offered again. A report's own x still closes.
 # Same day, report charts RE-FIT (fsfit): both carousel mounts size the page from the viewport at
 # that moment, and only tiles and slides followed later changes, so a click-launched chart - mounted
@@ -216,8 +216,8 @@ py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\fsexit\run.py --mutants
 # W-shrink W-grow W-fs; --control-fsexit (before the x) red on those plus T-x T-name T-exit T-stay
 # T-again K-x K-exit; --mutants 9/9 (nocss, noexit, closeall, noname, nodefer, norefit, resetprog,
 # nounbind, nobaseline). ~25 s.
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\fsexit\run.py
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\fsexit\run.py --mutants
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\fsexit\run.py
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\fsexit\run.py --mutants
 '''),
 ]
 

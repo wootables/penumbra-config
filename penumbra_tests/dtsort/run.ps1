@@ -25,8 +25,8 @@
 # =============================================================================
 param([string]$App = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra', [switch]$Control)
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\dtsort' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\dtsort' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $work = Join-Path $env:TEMP ('pnb_dtsort_' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force (Join-Path $work 'css') | Out-Null
 try {

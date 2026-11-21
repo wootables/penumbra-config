@@ -15,15 +15,15 @@
 # behaves exactly as before this change, minus the Caps Lock fix.
 #
 # UNC NOTE: run the body as a scriptblock (-File on a UNC path is GPO-blocked here):
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\singlekeytips'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\singlekeytips'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\rollback.ps1"))) -Restore -DryRun
 # =============================================================================
 param([switch]$Status, [switch]$Restore, [switch]$DryRun, [string]$App = '', [string]$Here = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\singlekeytips' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\singlekeytips' }
 # -App: rehearse against a scratch copy of the app folder.
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $code = @('js/main.js', 'js/penumbra_dashboard.js', 'js/penumbra_a11y.js', 'css/main.css', 'health.php', 'help_content.php', 'README.md')
 
 if (-not ('PnbMove' -as [type])) {

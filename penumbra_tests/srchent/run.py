@@ -45,7 +45,7 @@ import argparse, html, json, os, re, shutil, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 GIT_DIR = '//oitras.oit.ncsu.edu/d$/Utilities/penumbra_git'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if not os.path.exists(EDGE):

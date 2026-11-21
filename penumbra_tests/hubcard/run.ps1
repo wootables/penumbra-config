@@ -62,13 +62,13 @@
 #
 # EXPECTED TAIL: "SUMMARY  pass=NN  fail=0". Any other tail is a failure.
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hubcard\run.ps1')); & $sb
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\hubcard\run.ps1')); & $sb
 # =============================================================================
 param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [switch]$Mutant5, [switch]$Mutant6, [switch]$Mutant7, [switch]$Mutant8, [switch]$Mutant9, [string]$Html, [string]$App)
 
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hubcard' }
-$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\hubcard' }
+$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
 $app  = if ($App) { $App } else { '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 
 $args = @('-n', '-d', 'date.timezone=America/New_York', (Join-Path $here 'test_hubcard.php'),

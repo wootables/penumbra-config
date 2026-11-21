@@ -14,7 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 COLMENU = os.path.join(HERE, '..', 'colmenu')
-if not os.path.exists(os.path.join(COLMENU, 'mk_harness.py')): COLMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colmenu'
+if not os.path.exists(os.path.join(COLMENU, 'mk_harness.py')): COLMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colmenu'
 _spec = importlib.util.spec_from_file_location('colmenu_mk_harness', os.path.join(COLMENU, 'mk_harness.py'))
 mk_harness = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mk_harness)

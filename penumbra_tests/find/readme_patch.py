@@ -2,7 +2,7 @@
 #   py -3 readme_patch.py SRC_README OUT_README      (anchors must hit once; nothing written otherwise)
 import sys
 
-SUITE_ANCHOR = r"""$d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colscard'; & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
+SUITE_ANCHOR = r"""$d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colscard'; & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 """
 SUITE_ADD = r"""
 # Find in results (2026-10-19, "find" round 1): Ctrl+F on the FLAT table finds text without
@@ -18,7 +18,7 @@ SUITE_ADD = r"""
 # and cell selection with no module = every behaviour check RED. `--mutants` runs all 28. About 3
 # minutes; the mutants about 5. Run it from a LOCAL folder (headless Edge); --stage DIR = a stage
 # in the app layout (the webroot for live). patch.py re-applies the four patches to new copies.
-py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\find\run.py [--stage DIR] [--control] [--mutants]
+py -3 \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\find\run.py [--stage DIR] [--control] [--mutants]
 """
 
 LANDMINE_ANCHOR = """- **The Cols count opens the Columns card (2026-10-19, "colscard"; suite `colscard`).**"""

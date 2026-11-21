@@ -1,7 +1,7 @@
 # spike_v3.ps1 - runs as SYSTEM from the watchdog tick. Edge refuses to run as
 # SYSTEM (v2: exit in <300ms, no output), so try the two passwordless service
 # accounts through TEMPORARY local tasks, created and deleted in this run.
-$D = 'D:\Utilities\PHP_8.2-p\chart_spike'
+$D = 'D:\Utilities\PHP_penumbra\chart_spike'
 "v3 as $([Environment]::UserName) session $([Diagnostics.Process]::GetCurrentProcess().SessionId)"
 & icacls $D /grant "NT AUTHORITY\NETWORK SERVICE:(OI)(CI)M" /grant "NT AUTHORITY\LOCAL SERVICE:(OI)(CI)M" /T /Q 2>&1 | Out-String | ForEach-Object { "icacls: " + $_.Trim() }
 foreach ($t in @(@{ x = 'NS'; ru = 'NT AUTHORITY\NETWORK SERVICE' }, @{ x = 'LS'; ru = 'NT AUTHORITY\LOCAL SERVICE' })) {

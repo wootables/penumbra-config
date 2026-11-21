@@ -26,13 +26,13 @@
 # is normalised, the header side then is not), arrowsaved 2 (H5 H6), additive 2 (C2 C3).
 #
 # UNC .ps1 files are GPO-blocked: run the BODY as a scriptblock, never piped:
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotsortkeep'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotsortkeep'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 # Writes nothing to the webroot. Exit 1 when any assertion fails.
 # =============================================================================
 param([string]$MainJs = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotsortkeep' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotsortkeep' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }

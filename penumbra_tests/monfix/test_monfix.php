@@ -31,10 +31,12 @@
 date_default_timezone_set('America/New_York');
 
 $APP = 'C:\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
-$PHPDIR = 'D:\\Utilities\\PHP_8.2-p';
+$PHPDIR = 'D:\\Utilities\\PHP_8.6-p';
+$HOMEDIR = 'D:\\Utilities\\PHP_penumbra';
 foreach ($argv as $a) {
     if (strpos($a, '--app=') === 0)    $APP    = substr($a, 6);
     if (strpos($a, '--phpdir=') === 0) $PHPDIR = substr($a, 9);
+    if (strpos($a, '--homedir=') === 0) $HOMEDIR = substr($a, 10);
 }
 $CONTROL = in_array('--control', $argv, true);
 
@@ -89,7 +91,7 @@ function lift($file, $names) {
     return $out;
 }
 
-$lifted  = lift($PHPDIR . '\\penumbra_monitor.php', array('mon_flap_update', 'mon_correlated_update', 'mon_apply_mutes'));
+$lifted  = lift($HOMEDIR . '\\penumbra_monitor.php', array('mon_flap_update', 'mon_correlated_update', 'mon_apply_mutes'));
 $lifted .= lift($APP . '\\penumbra_health.php',     array('penumbra_outage_classify', 'penumbra_mute_lookup'));
 $lifted .= lift($APP . '\\db_connection.php',       array('penumbraNoteConnectFallback',
                                                           'penumbraConnectFallbackFor',
@@ -150,7 +152,7 @@ function replay($ticks, $thr = null, $win = null, $record = true) {
 }
 
 echo "Penumbra monitoring fixes - 2026-08-28\n";
-echo "app=$APP\nphp=$PHPDIR\n";
+echo "app=$APP\nphp=$PHPDIR\nhome=$HOMEDIR\n";
 
 // ===========================================================================
 group('1. The real 2026-08-28 InfoEd day');
@@ -385,7 +387,7 @@ group('9. CSRF guard: reads exempt, writes still blocked');
 $self  = escapeshellarg(__FILE__);
 $php   = escapeshellarg($PHPDIR . '\\php.exe');
 $cmd   = "$php -n $self --csrf-child --app=" . escapeshellarg($APP)
-       . " --phpdir=" . escapeshellarg($PHPDIR) . " 2>&1";
+       . " --phpdir=" . escapeshellarg($PHPDIR) . " --homedir=" . escapeshellarg($HOMEDIR) . " 2>&1";
 $out   = shell_exec($cmd);
 ok(strpos((string)$out, 'EXEMPT-RETURNED') !== false,
    "action=list returns instead of 403ing (this is the 12:00:16 request)", trim((string)$out));

@@ -5,7 +5,7 @@
 param([string]$N, [string]$Patch, [switch]$DryRun)
 $ErrorActionPreference = 'Stop'
 if (-not $N -or -not $Patch) { throw 'usage: -N <cut number> -Patch <readme_patch*.py>' }
-$KitDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\find'
+$KitDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\find'
 $Live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra\README.md'
 $Cut = Join-Path $KitDir "readme\README.orig$N.md"
 $New = Join-Path $KitDir "readme\README$N.md"

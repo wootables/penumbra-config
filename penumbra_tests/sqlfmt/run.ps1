@@ -11,11 +11,11 @@
 #             layout; the suite MUST then fail. Proves the assertions bite.
 #
 # UNC .ps1 files are GPO-blocked from -File: run the BODY as a scriptblock:
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\sqlfmt\run.ps1'))
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sqlfmt\run.ps1'))
 #   & $sb ; & $sb -Control
 param(
     [string]$app   = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra',
-    [string]$suite = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\sqlfmt',
+    [string]$suite = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sqlfmt',
     [switch]$Control
 )
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'

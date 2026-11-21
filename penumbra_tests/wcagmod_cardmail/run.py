@@ -12,7 +12,7 @@ import os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 NEW = {'P-barWords', 'P-tileWords'}   # P-barHidden, P-barListed, P-barIsBig, P-tileSameSkip, P-noWarnings hold on live (no words there)
 MUTANTS = {
     'm-flat': ([("if ($bv !== '' && !_pnb_cm_hid($rc['css'])", "if (false && $bv !== '' && !_pnb_cm_hid($rc['css'])")], ['P-barWords']),

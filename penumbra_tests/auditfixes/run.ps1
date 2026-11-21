@@ -2,7 +2,7 @@
 # Audit-fix test suite (2026-08-22)  -  PHP unit tests + JS harness
 #
 # Run the BODY as a scriptblock (UNC scripts are GPO-blocked):
-#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes\run.ps1')); & $sb
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\auditfixes\run.ps1')); & $sb
 # Never pipe the invocation (a lingering Edge child keeps stdout open).
 #
 # Must end:  SUMMARY php_exit=0 php_pass=37 php_fail=0 js_pass=34 js_fail=0 -> GREEN
@@ -18,10 +18,10 @@
 # un-lifted, and the PHP half MUST stop on a NAMED "dependency not lifted" FATAL (RED).
 # =============================================================================
 $ErrorActionPreference = 'Stop'
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\auditfixes'
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
-$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity\extract_engine_c.php'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\parity\extract_engine_c.php'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 

@@ -16,7 +16,7 @@
 # Before the change (live 2026-09-24 17:25) the lift fails: "PASS: 0   FAIL: 1".
 #
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
-#   $sb = [scriptblock]::Create((Get-Content -Raw '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\autofillterm\run.ps1'))
+#   $sb = [scriptblock]::Create((Get-Content -Raw '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\autofillterm\run.ps1'))
 # Never add a bare `exit` (it would kill the caller).
 # =============================================================================
 param(
@@ -25,8 +25,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 # Hard-coded, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
-$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\autofillterm'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\autofillterm'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $target = Join-Path $App 'get_autofill_values.php'
 
 function Invoke-Term([string]$mut) {

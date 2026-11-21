@@ -4,7 +4,9 @@ REM replaced by the script now on disk (used once, 2026-09-29, when the 12:53
 REM copy - which has no self-reload - had to pick up DOM mode). Started by the
 REM watchdog wrapper when render_queue\restart.once exists; runs as SYSTEM.
 setlocal
-set P=D:\Utilities\PHP_8.2-p
+REM P = this script's own folder (Penumbra's, D:\Utilities\PHP_penumbra), without the trailing backslash
+set P=%~dp0
+set P=%P:~0,-1%
 set L=%P%\render_queue\restart.log
 echo [%date% %time%] restart start >> "%L%"
 schtasks /Query /TN "Penumbra Render Worker" /FO LIST >> "%L%" 2>&1

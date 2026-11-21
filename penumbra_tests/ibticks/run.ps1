@@ -24,13 +24,13 @@
 # every A/B/Z check but the guards (A5, Z2, "no page errors") must FAIL there.
 #
 # UNC .ps1 files are GPO-blocked: run the BODY as a scriptblock, never piped:
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\ibticks'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\ibticks'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
 # Writes nothing to the webroot. Exit 1 when any assertion fails.
 # =============================================================================
 param([string]$MainJs = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\ibticks' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\ibticks' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }

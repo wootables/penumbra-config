@@ -199,7 +199,7 @@ if rev and not live_control: raise SystemExit('--rev is for --live-control')
 main_path = os.path.join(stage_dir or APP, 'js', 'main.js')
 # (2026-10-25, urlnum) --live-control --rev REV: the build at a git revision in the live one's place
 if rev:
-    sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'); from oldver import git_show
+    sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver'); from oldver import git_show
     main_path = git_show(rev, 'js/main.js')
 
 def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')

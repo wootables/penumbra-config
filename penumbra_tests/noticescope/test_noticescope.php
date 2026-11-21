@@ -220,8 +220,8 @@ ok(raw_state() === array('notice' => null, 'maintenance' => null), 'clearing bot
 
 // ---------------------------------------------------------------------------
 section('G. the real watchdog keeps a scoped window scoped');
-$MONITOR = 'D:\\Utilities\\PHP_8.2-p\\penumbra_monitor.php';
-if (!is_file($MONITOR)) { $MONITOR = '\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_monitor.php'; }
+$MONITOR = 'D:\\Utilities\\PHP_penumbra\\penumbra_monitor.php';
+if (!is_file($MONITOR)) { $MONITOR = '\\\\oitras\\d$\\Utilities\\PHP_penumbra\\penumbra_monitor.php'; }
 eval(lift(file_get_contents($MONITOR), array('mon_sync_notice')));
 penumbra_monitor_ack_clear();
 put_state(null, array('enabled' => true, 'message' => 'm', 'until' => $future, 'set_by' => 'bplimon', 'scope' => $S('report', array('hrlist'))));

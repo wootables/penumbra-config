@@ -14,7 +14,7 @@
  *   and produce identical results - the DB-down path included.
  *
  *   php.exe -n -d date.timezone=America/New_York -d memory_limit=1G run.php
- *       (with increment 6 also -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext
+ *       (with increment 6 also -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext
  *        -d extension=mbstring - forward slashes; the feed clips with mb_*)
  *       [--app=<dir>]                       the pages AFTER (default: live webroot)
  *       [--orig1=<dir> | --bak1=<stamp>]    the pages before increment 1
@@ -162,7 +162,7 @@ function section($t) { echo "== $t\n"; }
 function readf($p) { $s = @file_get_contents($p); if ($s === false) { fwrite(STDERR, "cannot read $p\n"); exit(2); } return $s; }
 
 $src = array('s_an' => readf("$APP/analytics.php"), 's_all' => readf("$APP/analytics_all.php"), 's_sh' => readf("$APP/analytics_shared.php"), 'db' => readf($DB));
-require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
+require_once '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra\\penumbra_tests\\_oldver\\oldver.php';   // .bak copies come from git since 2026-10-14
 foreach (array(1, 2, 3, 4, 5, 6, 7, 8) as $n) {
     if ($BEFORE[$n] === null && $BAK[$n] === null) continue;
     foreach (array('an' => 'analytics.php', 'all' => 'analytics_all.php', 'sh' => 'analytics_shared.php') as $k => $f) {
@@ -312,7 +312,7 @@ if (isset($src['b5_an'])) {
 }
 if (isset($src['b6_an']) && !function_exists('mb_strlen')) {
     // The feed clips its detail with mb_strlen()/mb_substr(); php.exe -n loads no extension.
-    fwrite(STDERR, "increment 6 needs mbstring: add -d extension_dir=//oitras.oit.ncsu.edu/d\$/Utilities/PHP_8.2-p/ext -d extension=mbstring (forward slashes)\n"); exit(2);
+    fwrite(STDERR, "increment 6 needs mbstring: add -d extension_dir=//oitras.oit.ncsu.edu/d\$/Utilities/PHP_8.6-p/ext -d extension=mbstring (forward slashes)\n"); exit(2);
 }
 if (isset($src['b6_an'])) {
     // Increment 6 (the one engine, E3a): the person-level builders - Top

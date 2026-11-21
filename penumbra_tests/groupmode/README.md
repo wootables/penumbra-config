@@ -11,7 +11,7 @@ UNC `.ps1` files are GPO-blocked ("not digitally signed"), so run the body as a
 scriptblock from the workstation and do NOT pipe the invocation:
 
 ```powershell
-$dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\groupmode'
+$dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\groupmode'
 $body = [IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")
 & ([scriptblock]::Create($body))
 ```

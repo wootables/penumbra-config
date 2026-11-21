@@ -10,13 +10,13 @@
 # in <Out>\edge_stderr.txt; its profile is a SHORT %TEMP% path (a long one makes Edge log cache errors).
 param([string]$DashJs = '', [string]$Here = '', [string]$Out = '', [string]$MustFail = '')
 $ErrorActionPreference = 'Stop'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 if (-not $DashJs) { throw 'usage: -DashJs <penumbra_dashboard.js> [-Out <dir>] [-MustFail D1,D5]' }
 if (-not (Test-Path -LiteralPath $DashJs)) { throw "no such file: $DashJs" }
 # Empty when run as a scriptblock (the execution policy refuses .ps1 files on the share): never the caller's cwd.
-if (-not $Here) { $Here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpanchor' } }
+if (-not $Here) { $Here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpanchor' } }
 if (-not $Out)  { $Out = Join-Path $env:TEMP ('dashanchor_' + (Get-Date -Format 'yyyyMMdd_HHmmss_fff')) }
 New-Item -ItemType Directory -Force $Out | Out-Null
 Copy-Item (Join-Path $Here 'dashanchor_harness.html') (Join-Path $Out 'dashanchor_harness.html') -Force

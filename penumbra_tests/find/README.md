@@ -21,7 +21,7 @@ grouped view, a pivot, a dialog, a text field or Rows = None (round 1).
 
 ## The suite
 
-Run from a LOCAL cwd (headless Edge): `cd $env:TEMP; py -3 \\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\find\run.py`
+Run from a LOCAL cwd (headless Edge): `cd $env:TEMP; py -3 \\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\find\run.py`
 
 * default: candidate = `stage\` (or `--stage DIR`): I-* (no browser: the include block run by PHP on / .off / missing, order, help, lint, the patch markers, CRLF, ASCII) + 21 scenarios.
 * `--control`: LIVE main.js + LIVE cell selection, NO module: every behaviour check red; sane* and the absences in CONTROL_OK green.

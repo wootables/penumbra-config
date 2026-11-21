@@ -7,7 +7,7 @@
 #           values), Amt shaded with a Color scale
 # pivmenu's own files are read, never written.
 import importlib.util, os
-PIVMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivmenu'
+PIVMENU = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivmenu'
 # by its path: a plain "import mk_harness" would find THIS module (same name, already loaded)
 _spec = importlib.util.spec_from_file_location('pivmenu_mk_harness', os.path.join(PIVMENU, 'mk_harness.py'))
 _pm = importlib.util.module_from_spec(_spec)

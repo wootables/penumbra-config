@@ -34,7 +34,7 @@ function eq($got, $want, $label) {
 // ---------------------------------------------------------------- 1. pure
 echo "1. settings\n";
 $s = db_backup_settings(null);
-eq($s['dir'], 'D:\\Utilities\\PHP_8.2-p\\penumbra_backups', 'default folder is in the PHP folder, outside the webroot');
+eq($s['dir'], penumbra_home() . '\\penumbra_backups', 'default folder is penumbra_backups\ in penumbra_home(), outside the webroot');
 eq(array($s['keep_days'], $s['budget_secs'], $s['exclude']), array(14, 150, array('PENUMBRA_PEOPLE_STG')), 'defaults: 14 sets, 150 s a cycle, staging excluded');
 $s = db_backup_settings(array('keep_days' => 500, 'budget_secs' => 9999, 'exclude' => array(' penumbra_x ', ''), 'dir' => 'E:\\bk\\'));
 eq(array($s['keep_days'], $s['budget_secs'], $s['exclude'], $s['dir']), array(90, 240, array('PENUMBRA_X'), 'E:\\bk'), 'clamped to 90 / 240, exclude upper-cased, trailing slash dropped');

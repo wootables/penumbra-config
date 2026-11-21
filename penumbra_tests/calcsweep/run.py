@@ -26,7 +26,7 @@ try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 except Exception: pass
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
+sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
 
 # What the build before the sweep gets wrong (frozen from the first control run, live 0570df0e).
 CONTROL_RED = ['round-big2', 'round-big2b', 'round-6pl', 'fmt-num-noise', 'if-FALSE-text', 'if-false-lc', 'chain-bool',

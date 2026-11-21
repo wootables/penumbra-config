@@ -10,13 +10,13 @@
 #   Control = -Css <the pre-change main.css>: fails C1 C2 C3 (C4 held there too).
 #   Mutants: nowrap -> C2 C3, emnone -> C1 C4, stbasis -> C6 (a "PI:" chip wraps).
 # UNC .ps1 files are GPO-blocked: run the BODY as a scriptblock:
-#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\promptchip'
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\promptchip'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Css <p>
 # Writes nothing to the webroot. Exit 1 when any assertion fails.
 # =============================================================================
 param([string]$Css = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
-$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\promptchip' }
+$here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\promptchip' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $Css) { $Css = "$app\css\main.css" }
 $browser = 'C:\Program Files\Google\Chrome\Application\chrome.exe'

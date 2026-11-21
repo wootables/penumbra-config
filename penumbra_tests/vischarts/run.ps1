@@ -33,19 +33,20 @@
 #   run.ps1 -Mutant noaltpage      the render page sends no description (render alt asserts, A real chart red)
 # Control: the pre-fix module (alt = the title only) fails section A and the render alt asserts.
 # Run the body as a scriptblock from the workstation (UNC .ps1 policy):
-#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\vischarts'
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\vischarts'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
 # Output: summary.txt, php.out, out\chart1..3.png/.jpg, out\charts.pdf,
 # out\email_body.txt. Exit code 1 when any assertion fails.
 # =============================================================================
 param([string]$Module = '', [string]$Client = '', [string]$Worker = '', [string]$Pdf = '', [string]$Runner = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Continue'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\vischarts' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$phpDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\vischarts' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$phpDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p'
+$homeDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra'
 $app = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $Module) { $Module = "$app\penumbra_render_charts.php" }
 if (-not $Client) { $Client = "$app\penumbra_render_client.php" }
-if (-not $Worker) { $Worker = "$phpDir\penumbra_render_worker.ps1" }
+if (-not $Worker) { $Worker = "$homeDir\penumbra_render_worker.ps1" }
 if (-not $Pdf)    { $Pdf = "$app\plugins\pdf_generator.php" }
 $php = "$phpDir\php.exe"
 # Everything under test runs LOCALLY: PHP's is_writable() refuses a UNC queue,
@@ -120,7 +121,7 @@ if ($Mutant -eq 'planweb') {
   [IO.File]::WriteAllText($Runner, $rsrc)
   Write-Host "      + RUNNER MUTANT planweb"
 }
-& $php -n "$phpDir\penumbra_tests\parity\extract_engine_c.php" $Runner "$here\runner_mirror.php" | Out-Host
+& $php -n "$homeDir\penumbra_tests\parity\extract_engine_c.php" $Runner "$here\runner_mirror.php" | Out-Host
 Write-Host "      module: $Module"; Write-Host "      client: $Client"; Write-Host "      worker: $Worker"; Write-Host "      pdf:    $Pdf"; Write-Host "      runner: $Runner"
 
 Write-Host "[2/4] worker up"

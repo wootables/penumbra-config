@@ -85,7 +85,7 @@
 #   -Keep keeps the staging dir;  -Here <dir> runs a copy of this suite from elsewhere.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
-#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths'
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colwidths'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Stages into %TEMP%; writes nothing to the webroot.
@@ -94,10 +94,10 @@ param([string]$MainJs = '', [string]$MainCss = '', [string]$IndexPhp = '', [stri
       [string]$ModuleJs = '', [string]$ModuleCss = '', [string]$Here = '',
       [string]$Mutant = '', [switch]$Mutants, [switch]$CheckMutants, [string]$Only = '', [switch]$Control, [switch]$NoModule, [switch]$Real, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
-$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths' }
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\colwidths' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
@@ -105,7 +105,7 @@ if ($Control) {
   # The files the deploy of this feature replaced (byte-identical to the pre-feature build).
   # De-bloats MOVED the old .baks out of the webroot; Get-BakItem finds them in git / the
   # de-bloat folders (_oldver\bak_index.tsv).
-  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
   function LastBak($rel) { Get-BakItem "$app\$rel" | Select-Object -Last 1 }
   $bm = LastBak 'js\main.js.bak-*-colwidths'; $bi = LastBak 'index.php.bak-*-colwidths'; $bh = LastBak 'help_content.php.bak-*-colwidths'
   if (-not $MainJs)   { if (-not $bm) { throw '-Control needs js\main.js.bak-*-colwidths (made by the deploy), or pass -MainJs' }; $MainJs = $bm.FullName }

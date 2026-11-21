@@ -41,7 +41,7 @@ param([string]$Js = '')
 # $MyInvocation.MyCommand.Path is null when this body is run as a scriptblock
 # (the GPO workaround above), so check before calling Split-Path on it.
 $dir = if ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path }
-       else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\listpaste' }
+       else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\listpaste' }
 $jsPath = if ($Js) { $Js } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra\js\search_builder.js' }
 Write-Output "search_builder.js under test: $jsPath"
 
