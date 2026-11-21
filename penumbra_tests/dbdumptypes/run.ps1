@@ -26,7 +26,7 @@
 # =============================================================================
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dbdumptypes' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $app  = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 
 & $php -n (Join-Path $here 'test_dbdumptypes.php') $app

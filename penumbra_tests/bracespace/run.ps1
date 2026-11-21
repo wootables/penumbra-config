@@ -37,7 +37,7 @@ $ErrorActionPreference = 'Stop'
 # Hard-coded, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
 $here   = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\bracespace'
 $parity = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\parity'
-$php    = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php    = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $edge   = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $libs = @('jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',

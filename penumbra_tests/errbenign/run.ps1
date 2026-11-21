@@ -41,7 +41,7 @@ param([string]$DbPhp = '', [string]$AuditPhp = '', [string]$AnPhp = '', [string]
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\errbenign' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 $map = [ordered]@{ db = 'db_connection.php'; aud = 'get_audit_log.php'; an = 'analytics.php'; all = 'analytics_all.php'; hl = 'penumbra_health.php'; log = 'log_client_error.php'; sh = 'analytics_shared.php'; lg = 'penumbra_logs.php' }

@@ -304,7 +304,7 @@ if ($Mutant) {
 # The server half of the range parity (section J): the corpus through the REAL
 # php_apply_search_filter, written as window.RANGE for the page.
 Write-Host "      penumbra_search.php (range parity): $SearchPhp"
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $rangeJs = & $php -n "$here\range_php.php" $SearchPhp "$here\range_corpus.json" 2>&1 | Out-String
 if ($rangeJs -notmatch '^window\.RANGE = ') { throw "range_php.php failed: $rangeJs" }
 [IO.File]::WriteAllText("$here\range_php.js", $rangeJs, $utf8)

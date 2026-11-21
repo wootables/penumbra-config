@@ -12,7 +12,7 @@
 //   X-*  journal_export.php: the NOTES column carries the note's own text (journalSharedNoteText)
 //   C-*  the Discussion type exactly as before (the control's green rows)
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring server.php
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=mbstring server.php
 //        [--app DIR]        the build under test (default: the live webroot)
 //        [--control]        the build BEFORE the change: exactly CONTROL_RED fails
 //        [--mutant NAME | --mutants]   single-point reverts: exactly the named asserts go red
@@ -22,7 +22,7 @@
 // =============================================================================
 error_reporting(E_ALL);
 $APP = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra';
-$PHP = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/php.exe';
+$PHP = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/php.exe';
 $args = $argv; array_shift($args);
 $opt = function ($n, $d = null) use (&$args) { $i = array_search($n, $args, true); if ($i === false) return $d; $v = $args[$i + 1]; array_splice($args, $i, 2); return $v; };
 $flag = function ($n) use (&$args) { $i = array_search($n, $args, true); if ($i === false) return false; array_splice($args, $i, 1); return true; };
@@ -92,7 +92,7 @@ if ($child === null) {
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_sn_' . getmypid() . '_' . mt_rand();
         mkdir($dir);
         foreach ($files as $f => $txt) file_put_contents($dir . '/' . $f, $txt);
-        $cmd = escapeshellarg($PHP) . ' -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring '
+        $cmd = escapeshellarg($PHP) . ' -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=mbstring '
              . escapeshellarg(__FILE__) . ' --child ' . escapeshellarg($dir) . ($textOut ? ' --text-out ' . escapeshellarg($textOut) : '');
         $out = shell_exec($cmd . ' 2>&1');
         foreach (glob($dir . '/*') as $f) unlink($f);

@@ -34,7 +34,7 @@ param([switch]$Control, [switch]$Mutant)
 
 $ErrorActionPreference = 'Stop'
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\delivery' }
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $app  = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $iis  = '\\oitras\c$\inetpub\logs\LogFiles\W3SVC1'
 

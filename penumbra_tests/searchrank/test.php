@@ -20,7 +20,7 @@
 // SQLite folds ASCII only and is not Oracle: the ranking text also runs on Oracle itself in
 // the live DUAL probe (README.md), and on the endpoint after the deploy.
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=pdo_sqlite
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=pdo_sqlite
 //       -d date.timezone=America/New_York test.php --file <get_server_reports.php>
 // Prints one JSON object: {"asserts": [{"id", "ok", "detail"}, ...]}. run.php drives it.
 // =============================================================================

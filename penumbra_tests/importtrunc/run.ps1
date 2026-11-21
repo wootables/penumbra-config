@@ -46,7 +46,7 @@ param([switch]$Control)
 
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\importtrunc' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 
 # NOT $args - that is an automatic variable in PowerShell.
 $phpArgs = @('-n', (Join-Path $here 'test_importtrunc.php'))

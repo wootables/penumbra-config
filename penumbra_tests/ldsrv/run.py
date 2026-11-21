@@ -32,9 +32,9 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 PHP56 = r'\\oitras.oit.ncsu.edu\c$\PHP\php.exe'          # 5.6.20: only for "the twin still runs on an old PHP"
-MBSTRING = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext/php_mbstring.dll'   # forward slashes: -d eats a leading \\
+MBSTRING = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext/php_mbstring.dll'   # forward slashes: -d eats a leading \\
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 KIT = os.path.join(HERE, 'stage_20261024')
 FILES = {'ix': 'index.php', 'sr': 'schedule_runner.php', 'gs': 'generate_stub.php', 'lib': 'penumbra_layout.php'}

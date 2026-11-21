@@ -293,7 +293,7 @@ $parsed.results = @($parsed.results) + @($parsed2.results | ForEach-Object {
 # harness uses - a report that groups differently in email than on screen is
 # exactly the failure this catches, and neither of the passes above can see it.
 Write-Host "      + PHP pass (runner nesting) ..."
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotparity\extract_mirror.php'
 # NEVER require schedule_runner.php: its top level opens Oracle, claims tasks and
 # SENDS EMAIL. extract_mirror.php lifts its function declarations via PHP's own

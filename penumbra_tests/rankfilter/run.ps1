@@ -41,7 +41,7 @@ param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\rankfilter' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\rankfilter' }
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 
 # NOT $args - that is an automatic variable in PowerShell.
 $phpArgs = @('-n', (Join-Path $here 'test_rankfilter.php'))

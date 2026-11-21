@@ -79,7 +79,7 @@ Mutants and their exact counts (2026-10-16): `plainsave` 5, `rawkey` 3, `nostrip
    prompt (the config's secrets are sealed with `C:\inetpub\penumbra_config.key`, readable by
    Administrators / SYSTEM / IUSR only, and that key is server-local by design, so the CLI cannot run from
    a workstation even with oci8 loaded from the share - proven 2026-10-17):
-   `D:\Utilities\PHP_8.6-p\php.exe C:\inetpub\wwwroot\sponsor_migration\penumbra\encrypt_sftp_keys_cli.php`
+   `D:\Utilities\PHP_penumbra\php.exe C:\inetpub\wwwroot\sponsor_migration\penumbra\encrypt_sftp_keys_cli.php`
    (dry run: every task's key state, never a value), then the same command with `--commit`. Until it runs,
    each Drop-a-File run with a key stored as pasted logs a Notice in `log/scheduler_<date>.log`.
    `work/probe_sftpkey_dryrun.php` is the fallback for a dry run without a server shell: copied into the

@@ -68,7 +68,7 @@ param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [sw
 
 $ErrorActionPreference = 'Stop'
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\hubcard' }
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $app  = if ($App) { $App } else { '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 
 $args = @('-n', '-d', 'date.timezone=America/New_York', (Join-Path $here 'test_hubcard.php'),

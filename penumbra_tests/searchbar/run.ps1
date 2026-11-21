@@ -50,7 +50,7 @@ param([string]$MainCss = '', [string]$MainJs = '', [string]$IndexPhp = '', [stri
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\searchbar' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 if ($Control) {
   # De-bloats moved the webroot's .bak files out; Resolve-Bak finds them in git / the de-bloat folders.

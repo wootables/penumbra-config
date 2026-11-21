@@ -34,7 +34,7 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 EXTRACT = os.path.join(os.path.dirname(HERE), 'pivotparity', 'extract_mirror.php')
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
@@ -294,7 +294,7 @@ def run_php(appdir, work):
                         cwd=work, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
     if r1.returncode != 0 or not os.path.exists(mirror):
         return [('F-php', False, 'extract_mirror failed: %s' % (r1.stdout + r1.stderr)[-300:])], None
-    r2 = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext', '-d', 'extension=mbstring',
+    r2 = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext', '-d', 'extension=mbstring',
                          os.path.join(HERE, 'test_nestsort.php'), fs(appdir), fs(work)],
                         cwd=work, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=900)
     line = [l for l in r2.stdout.splitlines() if l.startswith('RESULTS_JSON:')]

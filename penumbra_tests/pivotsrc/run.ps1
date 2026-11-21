@@ -53,7 +53,7 @@ $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotsrc' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $App) { $App = $live }
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\pivotparity\extract_mirror.php'
 $browser = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 if (-not (Test-Path $browser)) { $browser = 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe' }
@@ -196,7 +196,7 @@ $runner = Apply-Mutant 'runner' (Read-U8 "$App\schedule_runner.php")
 [IO.File]::WriteAllText("$here\runner_under_test.php", $runner, $u8)
 $ex = & $php -n -d memory_limit=512M $extract "$here\runner_under_test.php" "$here\mirror.php" 2>&1
 if (-not (Test-Path "$here\mirror.php")) { throw "mirror extraction failed: $ex" }
-$phpOut = & $php -n -d memory_limit=512M -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring "$here\php_driver.php" "$here\search_under_test.php" "$here\mirror.php" "$here\fixture.json" 2>&1
+$phpOut = & $php -n -d memory_limit=512M -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=mbstring "$here\php_driver.php" "$here\search_under_test.php" "$here\mirror.php" "$here\fixture.json" 2>&1
 $phpLine = ($phpOut | Where-Object { "$_".StartsWith('RESULTS_JSON:') } | Select-Object -First 1)
 if (-not $phpLine) { throw "php_driver did not finish: $(($phpOut | Select-Object -First 8) -join ' | ')" }
 $ph = $ser.DeserializeObject("$phpLine".Substring(13))

@@ -16,7 +16,7 @@ import os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 ABSENT = {'P-lint-runner'}   # holds on live too
 # (cmsize, 2026-11-01) the include is live (csched 4bb5714): the control now expects THIS round's checks red on live and
 # every other green; P-budget measures a card by the new layout (either way on live)

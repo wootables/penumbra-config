@@ -43,7 +43,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\schedliveness' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $test = Join-Path $here 'test_schedliveness.php'
 $src  = Join-Path $App 'penumbra_health.php'
 

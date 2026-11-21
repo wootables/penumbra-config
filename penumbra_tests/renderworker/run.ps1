@@ -17,7 +17,7 @@
 param([string]$Worker = '', [string]$Client = '', [string]$Mutant = '')
 $ErrorActionPreference = 'Continue'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\renderworker' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$phpDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p'
+$phpDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra'
 $homeDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra'
 $app = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 if (-not $Worker) { $Worker = "$homeDir\penumbra_render_worker.ps1" }

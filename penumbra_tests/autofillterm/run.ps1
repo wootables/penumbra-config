@@ -26,7 +26,7 @@ param(
 $ErrorActionPreference = 'Stop'
 # Hard-coded, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
 $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\autofillterm'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $target = Join-Path $App 'get_autofill_values.php'
 
 function Invoke-Term([string]$mut) {

@@ -619,10 +619,10 @@ REPL
 // README.md - a tests entry (section 3), a landmine (section 5), an open item (6)
 // =============================================================================
 edit('README.md', <<<'ANCHOR'
-& \\oitras\d$\Utilities\PHP_8.6-p\php.exe -n \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
+& \\oitras\d$\Utilities\PHP_penumbra\php.exe -n \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
 ANCHOR
 , <<<'REPL'
-& \\oitras\d$\Utilities\PHP_8.6-p\php.exe -n \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
+& \\oitras\d$\Utilities\PHP_penumbra\php.exe -n \\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\cronnever\test.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\manage_schedule.php \\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra\schedule_runner.php
 # SFTP/SCP private key at rest (2026-10-16, "sftpkey") - see section 5. A Drop-a-File task's SSH
 # private key is encrypted like the password (manage_schedule.php, its own POST field; blank keeps
 # the stored key, "Remove the saved key" drops it), stripped from the task list (has_drop_sftp_key),

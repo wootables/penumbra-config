@@ -34,7 +34,7 @@
 param([string]$App = '', [string]$Mutant = '', [switch]$Mutants)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\noadm5' }   # empty when run as a scriptblock: never fall back to the caller's cwd
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 function Src($rel) { if ($App -and (Test-Path -LiteralPath (Join-Path $App $rel))) { return (Join-Path $App $rel) }; return (Join-Path $live $rel) }
 $names = @{ dash = 'dashboard.php'; journal = 'manage_journal.php'; index = 'index.php'; help = 'help\topics\viewoptionsHelpLightbox.php'; an = 'analytics_shared.php'; dashjs = 'js\penumbra_dashboard.js'; jrnjs = 'js\penumbra_journal.js' }

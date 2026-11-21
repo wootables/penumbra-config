@@ -29,7 +29,7 @@ param([Parameter(Mandatory = $true)][string]$Stage, [Parameter(Mandatory = $true
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\fsexit' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 if (-not $Stamp) { $Stamp = (Get-Date).ToString('yyyyMMdd-HHmmss') + '-' + $Change }
 
 if (-not ('PnbMove' -as [type])) {

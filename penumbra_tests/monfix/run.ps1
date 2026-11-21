@@ -30,9 +30,9 @@ param([switch]$Control)
 
 $ErrorActionPreference = 'Stop'
 $here   = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\monfix' }   # empty as a scriptblock
-$php    = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php    = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $app    = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$phpdir = '\\oitras\d$\Utilities\PHP_8.6-p'
+$phpdir = '\\oitras\d$\Utilities\PHP_penumbra'
 $homedir = '\\oitras\d$\Utilities\PHP_penumbra'
 
 $args = @('-n', (Join-Path $here 'test_monfix.php'), "--app=$app", "--phpdir=$phpdir", "--homedir=$homedir")

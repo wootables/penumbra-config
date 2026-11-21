@@ -36,7 +36,7 @@
 param([string]$App = '', [string]$Mutant = '', [switch]$Mutants, [string]$Here = '')
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\schedkey' }
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 function Src($rel) { if ($App -and (Test-Path -LiteralPath (Join-Path $App $rel))) { return (Join-Path $App $rel) }; return (Join-Path $live $rel) }
 $names = @{ query = 'query.php'; db = 'db_connection.php'; runner = 'schedule_runner.php'; sched = 'manage_schedule.php' }
@@ -77,7 +77,7 @@ function Run-Once([string]$mut) {
   # loaded by UNC with forward slashes, as tplparity does for mbstring.
   $testPhp = Join-Path $here 'test.php'
   Push-Location $env:TEMP
-  try { $out = cmd /c "`"$php`" -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=openssl `"$testPhp`" `"$appDir`" 2>nul" } finally { Pop-Location }
+  try { $out = cmd /c "`"$php`" -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=openssl `"$testPhp`" `"$appDir`" 2>nul" } finally { Pop-Location }
   $lines = @($out | Where-Object { $_ -notmatch '^PHP (Warning|Notice|Deprecated)' })
   $last = @($lines | Where-Object { $_ -match 'assertions, \d+ failed|^FATAL' }) | Select-Object -Last 1
   if (-not $last) { $last = 'FATAL: test.php produced no summary' }

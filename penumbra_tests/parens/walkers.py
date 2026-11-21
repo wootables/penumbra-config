@@ -11,7 +11,7 @@ import argparse, html, json, os, shutil, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 TESTS = os.path.dirname(HERE)
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 EXTRACT = os.path.join(TESTS, 'pivotparity', 'extract_mirror.php')
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if not os.path.exists(EDGE):

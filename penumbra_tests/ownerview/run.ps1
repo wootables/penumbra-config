@@ -52,7 +52,7 @@ param([string]$App = '', [string]$IndexPhp = '', [string]$MainJs = '', [string]$
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\ownerview' }
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 function Pick([string]$explicit, [string]$name, [string]$sub) {

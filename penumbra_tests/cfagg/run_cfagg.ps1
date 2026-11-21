@@ -40,7 +40,7 @@ foreach ($f in @('corpus.json', 'cfagg_c.php', 'cfagg_a.html')) {
     Copy-Item -LiteralPath (Join-Path $src $f) -Destination (Join-Path $kit $f) -Force
 }
 $parity = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\parity'
-$php = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $work = Join-Path $kit 'work'

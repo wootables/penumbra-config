@@ -16,7 +16,7 @@
 param([string]$App = '', [switch]$Control, [switch]$Mutants)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\subq' }
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $phpArgs = @('-n', (Join-Path $here 'test_subq.php'))
 if ($App -ne '') { $phpArgs += "--app=$App" }
 if ($Control) { $phpArgs += '--control' }

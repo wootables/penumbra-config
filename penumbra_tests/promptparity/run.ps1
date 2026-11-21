@@ -95,7 +95,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\promptparity' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $live = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $work = Join-Path $env:TEMP ('pnb_promptparity_' + $PID)

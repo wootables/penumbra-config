@@ -33,11 +33,11 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
 if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\sftpkey' }   # a scriptblock has neither
-$phpHome = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p'
+$phpHome = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra'
 $php  = Join-Path $phpHome 'php.exe'
 # FORWARD slashes on purpose: php's -d parser reads a leading "\\" as an escape and
 # then looks for \oitras...\ext (verified 2026-10-16: the backslash form loads nothing).
-$ext  = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext'
+$ext  = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext'
 $test = Join-Path $here 'test_sftpkey.php'
 $phpArgs = @('-n', '-d', "extension_dir=$ext", '-d', 'extension=openssl')
 Write-Host "app: $App"

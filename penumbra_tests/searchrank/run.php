@@ -16,7 +16,7 @@
 // =============================================================================
 $HERE = __DIR__;
 $APP = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra';
-$EXT = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext';
+$EXT = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext';
 $EXPECT = array('P-lift', 'P-fixture', 'Q-epa8', 'S-epa50', 'S-tiers', 'Q-tiers', 'Q-ownername', 'S-ownername', 'S-escape-dot',
                 'Q-escape-paren', 'S-literal', 'S-nonadmin', 'S-tag', 'Q-tag', 'R-helper', 'R-escape', 'R-fold', 'R-gate', 'R-long',
                 'B-list', 'B-count');

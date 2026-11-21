@@ -23,7 +23,7 @@ param([string]$From = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mut
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\qfail' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 $files = [ordered]@{ db = 'db_connection.php'; q = 'query.php'; sh = 'analytics_shared.php'; all = 'analytics_all.php'; hlp = 'help\topics\auditorHelpLightbox.php' }

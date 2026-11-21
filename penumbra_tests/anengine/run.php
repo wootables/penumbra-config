@@ -14,7 +14,7 @@
  *   and produce identical results - the DB-down path included.
  *
  *   php.exe -n -d date.timezone=America/New_York -d memory_limit=1G run.php
- *       (with increment 6 also -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext
+ *       (with increment 6 also -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext
  *        -d extension=mbstring - forward slashes; the feed clips with mb_*)
  *       [--app=<dir>]                       the pages AFTER (default: live webroot)
  *       [--orig1=<dir> | --bak1=<stamp>]    the pages before increment 1
@@ -312,7 +312,7 @@ if (isset($src['b5_an'])) {
 }
 if (isset($src['b6_an']) && !function_exists('mb_strlen')) {
     // The feed clips its detail with mb_strlen()/mb_substr(); php.exe -n loads no extension.
-    fwrite(STDERR, "increment 6 needs mbstring: add -d extension_dir=//oitras.oit.ncsu.edu/d\$/Utilities/PHP_8.6-p/ext -d extension=mbstring (forward slashes)\n"); exit(2);
+    fwrite(STDERR, "increment 6 needs mbstring: add -d extension_dir=//oitras.oit.ncsu.edu/d\$/Utilities/PHP_penumbra/ext -d extension=mbstring (forward slashes)\n"); exit(2);
 }
 if (isset($src['b6_an'])) {
     // Increment 6 (the one engine, E3a): the person-level builders - Top

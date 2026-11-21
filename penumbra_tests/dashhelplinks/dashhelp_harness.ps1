@@ -11,7 +11,7 @@
 # <Out>\edge_stderr.txt; its profile is a SHORT %TEMP% path (a long one makes Edge log cache errors).
 param([string]$DashJs = '', [string]$Here = '', [string]$Out = '', [switch]$ExpectMutant)
 $ErrorActionPreference = 'Stop'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 if (-not $DashJs) { throw 'usage: -DashJs <penumbra_dashboard.js> [-Out <dir>] [-ExpectMutant]' }

@@ -13,7 +13,7 @@
 //   E-*  edit / D-* delete: a hidden note is a missing one; a private note is never a Shared note; D7 audit
 //   H-*  journalSharedNoteOf skips private notes; X-* the export resolver leaves them out; I-* install; M-* messages
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring server.php
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=mbstring server.php
 //        [--app DIR]        the build under test (default: the live webroot)
 //        [--control]        DIR is the build BEFORE the change: exactly CONTROL_GREEN pass
 //        [--mutant NAME | --mutants]   single-point reverts: exactly the named asserts go red
@@ -22,7 +22,7 @@
 // =============================================================================
 error_reporting(E_ALL);
 $APP = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra';
-$PHP = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/php.exe';
+$PHP = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/php.exe';
 $args = $argv; array_shift($args);
 $opt = function ($n, $d = null) use (&$args) { $i = array_search($n, $args, true); if ($i === false) return $d; $v = $args[$i + 1]; array_splice($args, $i, 2); return $v; };
 $flag = function ($n) use (&$args) { $i = array_search($n, $args, true); if ($i === false) return false; array_splice($args, $i, 1); return true; };
@@ -90,7 +90,7 @@ if ($child === null) {
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_pv_' . getmypid() . '_' . mt_rand();
         mkdir($dir);
         foreach ($files as $f => $txt) file_put_contents($dir . '/' . $f, $txt);
-        $cmd = escapeshellarg($PHP) . ' -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring '
+        $cmd = escapeshellarg($PHP) . ' -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=mbstring '
              . escapeshellarg(__FILE__) . ' --child ' . escapeshellarg($dir);
         $out = shell_exec($cmd . ' 2>&1');
         foreach (glob($dir . '/*') as $f) unlink($f);

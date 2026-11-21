@@ -31,7 +31,7 @@
 date_default_timezone_set('America/New_York');
 
 $APP = 'C:\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
-$PHPDIR = 'D:\\Utilities\\PHP_8.6-p';
+$PHPDIR = 'D:\\Utilities\\PHP_penumbra';
 $HOMEDIR = 'D:\\Utilities\\PHP_penumbra';
 foreach ($argv as $a) {
     if (strpos($a, '--app=') === 0)    $APP    = substr($a, 6);

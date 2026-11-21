@@ -56,7 +56,7 @@ $ErrorActionPreference = 'Stop'
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\flatfreeze' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
@@ -271,7 +271,7 @@ if (-not $SkipBrowser) {
 
 if (-not $SkipPhp -and -not $Mutant) {
   Write-Host "[2/2] runner half    schedule_runner.php: $Runner"
-  $ext = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext'
+  $ext = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext'
   # NOT $args - that is an automatic variable in PowerShell.
   $phpArgs = @('-n', '-d', 'memory_limit=1024M', '-d', 'date.timezone=America/New_York', '-d', "extension_dir=$ext",
                '-d', 'extension=zip', '-d', 'extension=mbstring', (Join-Path $here 'test_flatfreeze.php'),

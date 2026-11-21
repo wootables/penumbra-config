@@ -39,11 +39,11 @@ $ErrorActionPreference = 'Stop'
 if (-not $Here) { $Here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\tplparity' }
 if (-not $Live) { $Live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 if (-not $App)  { $App = $Live }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 # Production loads mbstring; off-box the ini's D:\ extension_dir does not resolve,
 # so load it by UNC. FORWARD slashes: a backslash UNC loses its first slash on the
 # way through the ini scanner.
-$phpArgs = @('-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext', '-d', 'extension=mbstring')
+$phpArgs = @('-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext', '-d', 'extension=mbstring')
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $utf8 = New-Object System.Text.UTF8Encoding($false)

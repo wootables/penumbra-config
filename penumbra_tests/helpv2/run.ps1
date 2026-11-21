@@ -27,7 +27,7 @@ param([string]$App = '', [string]$Orig = '', [string]$Live = '', [string]$Out = 
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\helpv2' }
 $webroot = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 if (-not $App)  { $App = $webroot }
 if (-not $Orig) { $Orig = $App }
 if (-not $Live) { $Live = $webroot }

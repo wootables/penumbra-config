@@ -25,7 +25,7 @@ param([string]$App = '', [string]$Cfg = '', [string]$Css = '', [string]$Mutant =
 $ErrorActionPreference = 'Stop'
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\' + '\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\dangertheme' }
 $live = '\' + '\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\' + '\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\' + '\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 if ($App) { if (-not $Cfg) { $Cfg = Join-Path $App 'themes_config.php' }; if (-not $Css) { $Css = Join-Path $App 'css\main.css' } }
 if (-not $Cfg) { $Cfg = Join-Path $live 'themes_config.php' }
 if (-not $Css) { $Css = Join-Path $live 'css\main.css' }

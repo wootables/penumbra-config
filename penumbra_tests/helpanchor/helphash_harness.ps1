@@ -10,7 +10,7 @@
 # <Out>\edge_stderr.txt; its profile is a SHORT %TEMP% path (a long one makes Edge log cache errors).
 param([string]$MainJs = '', [string]$Here = '', [string]$Out = '', [string]$MustFail = '')
 $ErrorActionPreference = 'Stop'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 if (-not $MainJs) { throw 'usage: -MainJs <main.js> [-Out <dir>] [-MustFail H2,H3]' }

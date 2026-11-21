@@ -11,7 +11,7 @@
 // it (tplparity's extract_mirror.php), with the build's journal_export.php and
 // penumbra_search.php. Only the database is faked (queryViaOci8).
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=mbstring snip.php [--app DIR] [--control]
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=mbstring snip.php [--app DIR] [--control]
 //   --control: the build before (expects RED on exactly CONTROL_RED)
 // =============================================================================
 error_reporting(E_ALL);

@@ -16,7 +16,7 @@
  */
 
 $app = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
-define('PNB_PHPDIR', '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.6-p');   // (PHP_BINARY loses the UNC lead here)
+define('PNB_PHPDIR', '\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_penumbra');   // (PHP_BINARY loses the UNC lead here)
 $control = false; $mutant = ''; $allMut = false;
 foreach (array_slice($argv, 1) as $a) {
     if (strpos($a, '--app=') === 0) $app = substr($a, 6);
@@ -60,7 +60,7 @@ function runOnce($app, $control, $mut, $MUTANTS) {
     file_put_contents("$tmp/lib.php", $files['lib']);
     file_put_contents("$tmp/probe.php", file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'probe.php'));
     // proc_open with an ARRAY: no shell, so the UNC php path survives (cmd.exe drops a leading \\)
-    $pp = proc_open(array(PNB_PHPDIR . '\php.exe', '-n', '-d', 'extension=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext/php_mbstring.dll',   /* forward slashes: -d's ini parse eats a leading \\ */ "$tmp/probe.php", "$tmp/lib.php", $tmp),
+    $pp = proc_open(array(PNB_PHPDIR . '\php.exe', '-n', '-d', 'extension=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext/php_mbstring.dll',   /* forward slashes: -d's ini parse eats a leading \\ */ "$tmp/probe.php", "$tmp/lib.php", $tmp),
                     array(1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, sys_get_temp_dir());
     $raw = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]); proc_close($pp);
     $probe = json_decode($raw, true);

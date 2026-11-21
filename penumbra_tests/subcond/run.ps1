@@ -39,7 +39,7 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\subcond' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
 if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\subcond' }
-$php  = '\\oitras\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras\d$\Utilities\PHP_penumbra\php.exe'
 $test = Join-Path $here 'test_subcond.php'
 $lib  = Join-Path $App 'penumbra_subscribe_condition.php'
 

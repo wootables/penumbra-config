@@ -351,7 +351,7 @@ def evaluate(res, scns):
 # The include block LIFTED from the index.php under test, run by PHP in a temp folder:
 # both files present -> the link + the deferred script (cache-busted); an empty
 # js/penumbra_cellsel.off -> nothing (the rollback switch); a missing file -> nothing.
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 def index_half():
     import re
     out = []

@@ -11,7 +11,7 @@
 // value, so the semantics are the same. No tags table (the console's allow-list has only
 // DUAL here); a term too long for the word tier gets its own SELECT with that CASE.
 //
-//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext -d extension=pdo_sqlite
+//   php -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext -d extension=pdo_sqlite
 //       oracle_probe.php --file <get_server_reports.php>   -> {"sql": ..., "expected": [[T, SID, RK], ...]}
 // Run the sql through query.php (an admin's console, no short_id) from a signed-in www3 tab
 // and compare; README.md has the browser snippet.

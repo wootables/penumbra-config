@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\singlekeytips' }
 # -App: rehearse against a scratch copy of the app folder.
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $code = @('js/main.js', 'js/penumbra_dashboard.js', 'js/penumbra_a11y.js', 'css/main.css', 'health.php', 'help_content.php', 'README.md')
 
 if (-not ('PnbMove' -as [type])) {

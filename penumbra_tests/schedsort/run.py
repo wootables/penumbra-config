@@ -39,8 +39,8 @@ import websocket
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
-EXT82 = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext'     # forward slashes: -d eats a leading \\
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
+EXT82 = '//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext'     # forward slashes: -d eats a leading \\
 EXTRACT = os.path.join(os.path.dirname(HERE), 'pivotparity', 'extract_mirror.php')
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 KIT = os.path.join(HERE, 'stage_20261024')

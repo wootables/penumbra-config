@@ -27,7 +27,7 @@
 param([string]$App = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra',
       [switch]$Control, [int]$Mutant = 0)
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\noticescope' }
-$phpDir = '\\oitras\d$\Utilities\PHP_8.6-p'
+$phpDir = '\\oitras\d$\Utilities\PHP_penumbra'
 $php  = Join-Path $phpDir 'php.exe'
 $a = @('-n', '-d', 'extension_dir=ext', '-d', 'extension=php_mbstring.dll', '-d', 'date.timezone=America/New_York',
        (Join-Path $here 'test_noticescope.php'), "--app=$($App -replace '\\','/')")

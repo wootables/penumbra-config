@@ -23,7 +23,7 @@ except Exception: pass
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
@@ -161,7 +161,7 @@ shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'
 harness = open(os.path.join(HERE, 'harness.html'), encoding='utf-8').read()
 if harness.count('<!--JR_VIEW_OPTIONS-->') != 1: raise SystemExit('harness: splice marker missing')
 # the server's flattening of the parity fixture (from the build's journal_export.php)
-srv_out = subprocess.run([PHP, '-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext', '-d', 'extension=mbstring',
+srv_out = subprocess.run([PHP, '-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext', '-d', 'extension=mbstring',
                           os.path.join(HERE, 'server.php'), '--app', app_dir.replace('\\', '/'), '--text-out', os.path.join(stage, 'parity.json')],
                          capture_output=True, text=True, encoding='utf-8', errors='replace')
 if not os.path.exists(os.path.join(stage, 'parity.json')):

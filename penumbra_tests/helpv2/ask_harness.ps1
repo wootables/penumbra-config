@@ -7,7 +7,7 @@
 # -App, runs Edge headless with --dump-dom and prints the harness results (T1..T6). Prints RESULT: GREEN/RED.
 param([string]$App = '', [string]$Here = '', [string]$Out = '')
 $ErrorActionPreference = 'Stop'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 if (-not $Here) { $Here = $PSScriptRoot }

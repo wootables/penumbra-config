@@ -35,7 +35,7 @@ $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utili
 if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
 # Invoked as a scriptblock (the UNC workaround) neither of the above exists.
 if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\peoplesync' }
-$phpDir = '\\oitras\d$\Utilities\PHP_8.6-p'
+$phpDir = '\\oitras\d$\Utilities\PHP_penumbra'
 $php  = Join-Path $phpDir 'php.exe'
 $test = Join-Path $here 'test_peoplesync.php'
 $src  = Join-Path $App 'people_sync_lib.php'

@@ -10,8 +10,8 @@
 //   php.exe penumbra_unseal.php            (paste enc:v1:..., Enter, Ctrl+Z, Enter)
 //
 // From a workstation over the admin shares (extension_dir MUST use forward slashes):
-//   & "\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe" -n `
-//     -d 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.6-p/ext' -d extension=openssl `
+//   & "\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe" -n `
+//     -d 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_penumbra/ext' -d extension=openssl `
 //     "\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_unseal.php" `
 //     -k "//oitras.oit.ncsu.edu/c$/inetpub/penumbra_config.key"
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }

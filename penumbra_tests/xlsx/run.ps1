@@ -63,7 +63,7 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\xlsx' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\xlsx' }
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
-$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.6-p\php.exe'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\php.exe'
 if (-not $MainJs) { $MainJs = "$app\js\main.js" }
 
 $browser = 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'
