@@ -456,7 +456,7 @@
                     {
                         "name":  "J2 every writer re-applies format(header) rules",
                         "pass":  true,
-                        "detail":  "[{\"line\":49699,\"reapplies\":true},{\"line\":57294,\"reapplies\":true},{\"line\":85633,\"reapplies\":true}]"
+                        "detail":  "[{\"line\":50719,\"reapplies\":true},{\"line\":58415,\"reapplies\":true},{\"line\":86898,\"reapplies\":true}]"
                     },
                     {
                         "name":  "Q1 while a pivot is on screen the bridge lists its columns",

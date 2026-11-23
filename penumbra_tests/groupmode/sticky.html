@@ -327,7 +327,15 @@
         eq('ggt: its bottom border is gone', cBarH.borderBottomWidth, '0px');
         assert('ggt: a band still has one (so that claim discriminates)',
           cBandH.borderBottomWidth !== '0px', cBandH.borderBottomWidth);
-        eq('ggt: it keeps the brand rule above it', cBarH.borderTopWidth, '2px');
+        // (2026-11-21, ggtnoborder) No brand rule and no outline: a readout, not a band to click.
+        eq('ggt: no rule above it either', cBarH.borderTopWidth, '0px');
+        var cOut = getComputedStyle(g.barBox);
+        eq('ggt: the bar has no outline', [cOut.borderTopWidth, cOut.borderRightWidth,
+          cOut.borderBottomWidth, cOut.borderLeftWidth].join(' '), '0px 0px 0px 0px');
+        // (ggtflat) ...and no card treatment: flush under the bands, square, no shadow.
+        eq('ggt: no gap above the bar', cOut.marginTop, '0px');
+        eq('ggt: square corners', cOut.borderTopLeftRadius, '0px');
+        eq('ggt: no shadow', cOut.boxShadow, 'none');
 
         // --- the geometry the containerization bug broke ---------------------
         var cBox = getComputedStyle(g.barBox);

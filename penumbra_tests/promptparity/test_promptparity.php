@@ -118,6 +118,9 @@ lift_present($F_SHARED, array('penumbraSqlQQuoteClose', 'penumbraPromptTagsInCom
 lift_present($F_SHARED, array('penumbraResultIfSkipSpan', 'penumbraPromptEmptyExclude'));
 // (2026-11-19, promptfix3 S1) ?json=1 never reads a reserved URL name as a prompt answer: one PHP list. Lifted when present.
 lift_present($F_SHARED, array('penumbraUrlReservedNames', 'penumbraUrlNameReserved'));
+// (apifix, 2026-11-22) index.php's ?json=1 passes read answers (penumbraApiPromptAnswer: the raw query string,
+// then $_GET) and turn a date prompt's YYYY-MM-DD into DD-MON-YY through penumbra_api.php: lifted when present.
+if (is_file($APP . '/penumbra_api.php')) lift_present($APP . '/penumbra_api.php', array('penumbraApiRawParams', 'penumbraApiPromptAnswer', 'penumbraApiIsoDate', 'penumbraApiLooksLikeDate'));
 // (2026-11-20, promptfix4 Z1) every Oracle date literal goes through these (four digits only when RR would misread two).
 lift_present($F_SHARED, array('penumbraOracleDateLiteral', 'penumbraOracleRRYear'));
 // (2026-11-19) subqsweep (41364e4 / 26e5cba): both PHP engines ask penumbraOffsetInMssqlTag whether a tag sits inside an

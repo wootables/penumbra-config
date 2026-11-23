@@ -11,6 +11,7 @@ SCN = [('boot', ''), ('open', ''), ('lazy', ''), ('order', ''), ('search', ''), 
        ('dlg_find', ''), ('dlg_notable', ''), ('dlg_switch', ''), ('dlg_ontop', ''), ('cmp_names', ''),
        ('narrow', '&vw=420&vh=800'), ('narrow_mid', '&vw=700&vh=800'), ('wide_edge', '&vw=760&vh=800'),
        ('mk_flat', ''), ('mk_col', ''), ('mk_forms', ''), ('grp_marks_closed', ''), ('piv_marks', ''), ('mk_find', ''),
+       ('fs_flat', ''),   # (findsweep, 2026-11-21)
        # the sweep (never in a default run: --scn sweep_a,...): a seeded random walk, invariants after each step
        ('sweep_a', '&seed=11&steps=70'), ('sweep_b', '&seed=23&steps=70'), ('sweep_c', '&seed=37&steps=70'),
        ('grp_sweep_list', '&seed=41&steps=70'), ('piv_sweep', '&seed=53&steps=70'),
@@ -22,9 +23,9 @@ PROBES = {'probe', 'shot', 'shotdark', 'shot_open', 'shot_kilo', 'shot_dlg', 'sh
 CHK = {
     'boot': ['sane300', 'saneLazy', 'sanePage', 'api', 'host', 'noBarYet', 'activateApi'],
     'open': ['ctrlF', 'barShown', 'inputFocused', 'a11y', 'placed', 'secondPasses', 'escCloses', 'escConsumed', 'metaF',
-             'typingFree', 'busyFree', 'sheet'],
+             'filterBoxOpens', 'textareaFree', 'modalFree', 'busyFree', 'sheet'],   # (findsweep 6: typingFree became these three)
     'lazy': ['saneLazy', 'count1', 'onPage', 'filled', 'curMarked', 'inView', 'highlighted', 'live', 'caseless', 'noMatches'],
-    'order': ['saneSorted', 'domOrder', 'firstOnTop', 'nextDown', 'wraps', 'f3', 'ctrlG', 'ctrlShiftG'],
+    'order': ['saneSorted', 'domOrder', 'firstOnTop', 'nextDown', 'wraps', 'f3', 'ctrlG', 'ctrlShiftGFree', 'ctrlShiftG'],
     'search': ['saneSearched', 'scoped', 'countKept', 'moreLine', 'liveRescope'],
     'hidcol': ['saneHidden', 'noHiddenCol', 'noHiddenOnly', 'shownCol'],
     'fmt': ['saneFmt', 'saneLazy', 'shownLazy', 'rawLazy', 'shownFilled', 'rawFilled', 'rawTint'],
@@ -36,15 +37,16 @@ CHK = {
     'paint': ['sanePage2', 'startHere', 'paintsPage', 'afterFlip', 'noReread', 'closesOnNone'],
     'export': ['openOk', 'csvSame', 'htmlSame'],
     'gview': ['saneGrouped', 'taken'],
-    'grp_stack': ['saneGrouped', 'taken', 'oneCell', 'inView', 'highlighted', 'allGroups', 'pageOrder', 'stepped', 'band', 'bandOutline', 'bandEsc'],
-    'grp_closed': ['saneClosed', 'opened', 'othersClosed', 'inView', 'stepOpens'],
-    'grp_nest_closed': ['saneNested', 'twoLevels', 'bothOpen', 'inView'],
-    'grp_list': ['saneList', 'otherGroup', 'picked', 'inView', 'listFollows', 'barFollows'],
+    'grp_stack': ['saneGrouped', 'taken', 'oneCell', 'inView', 'highlighted', 'allGroups', 'pageOrder', 'stepped', 'band', 'bandOutline', 'bandEsc', 'sortRereads'],
+    'grp_closed': ['saneClosed', 'named', 'opened', 'othersClosed', 'inView', 'stepOpens'],
+    'grp_nest_closed': ['saneNested', 'named', 'twoLevels', 'bothOpen', 'inView'],
+    'grp_list': ['saneList', 'named', 'otherGroup', 'picked', 'inView', 'listFollows', 'barFollows'],
+    'fs_flat': ['whereLine', 'strip', 'selectOnScreen', 'colScope', 'copyLines', 'startOnScreen', 'accentFold'],   # (findsweep)
     'grp_search': ['saneSearched', 'allBefore', 'liveRescope', 'moreLine', 'scoped'],
     'grp_filter': ['offered', 'filtered', 'noReoffer'],
     'grp_esc': ['closed', 'activeCell', 'arrowsOn'],
     'piv_open': ['sanePivot', 'taken', 'labels', 'cur', 'stepped', 'noFilter', 'grandTotal'],
-    'piv_closed': ['saneClosed', 'expanded', 'inView', 'othersClosed', 'stepExpands'],
+    'piv_closed': ['saneClosed', 'named', 'expanded', 'inView', 'othersClosed', 'stepExpands'],
     'piv_esc': ['closed', 'activeCell'],
     'none': ['saneNone', 'notTaken'],
     'json': ['saneJson', 'nestedLazy', 'nestedMarked', 'nestedOnce', 'noKeys'],
@@ -88,7 +90,7 @@ CHK = {
     'grp_probe': [], 'grp_probe_closed': [], 'grp_probe_list': [], 'grp_probe_nest_closed': [], 'piv_probe': [], 'piv_probe_closed': [],
 }
 # Hold with or without the module (they assert an ABSENCE): green in --control too.
-CONTROL_OK = {'L-boot-noBarYet', 'L-open-typingFree', 'L-open-busyFree', 'L-esc-closed', 'L-esc-unpainted',
+CONTROL_OK = {'L-boot-noBarYet', 'L-open-textareaFree', 'L-open-modalFree', 'L-open-busyFree', 'L-esc-closed', 'L-esc-unpainted',
               'L-export-csvSame', 'L-export-htmlSame', 'L-none-notTaken',
               'L-grp_esc-closed', 'L-piv_esc-closed',
               # round 1 is LIVE (2026-10-19 13:38): the control's live main.js and cell selection
@@ -120,8 +122,7 @@ MUTANTS = {
     'scopeall': ([('mod', "                    var tr = trs[r], kept = !tr.classList.contains('search-hidden');\n", "                    var tr = trs[r], kept = true;\n")],
                  ['L-search-scoped', 'L-search-countKept'], ['search']),
     # hidden columns are searched
-    'hiddencols': ([('mod', "            if (id === null || id === '#' || th.style.display === 'none' || th.classList.contains('journal-toggle-col')) { continue; }\n",
-                     "            if (id === null || id === '#' || th.classList.contains('journal-toggle-col')) { continue; }\n")],
+    'hiddencols': ([('mod', "            if (th.style.display === 'none' && cardCols.indexOf(nm) < 0) { continue; }\n", "")],   # (findsweep 7 re-anchor)
                    ['L-hidcol-noHiddenCol', 'L-hidcol-noHiddenOnly'], ['hidcol']),
     # only the stored value is matched (never what the cell shows)
     'rawonly': ([('mod', "        if (spec.test(shown)) { return 1; }\n", "        if (false) { return 1; }\n")],
@@ -130,14 +131,47 @@ MUTANTS = {
     'shownonly': ([('mod', "        return (alt !== null && alt !== shown && spec.test(alt)) ? 2 : 0;\n", "        return 0;\n")],
                   ['L-fmt-rawLazy', 'L-fmt-rawFilled'], ['fmt']),
     # the current match painted with a background: Copy as HTML / email carry it
-    'markbg': ([('mod', "            if (k === cur) { td.classList.add('pnb-find-cur');", "            if (k === cur) { td.style.backgroundColor = 'rgb(255, 230, 0)'; td.classList.add('pnb-find-cur');")],
+    'markbg': ([('mod', "            if (k === cur) { curDone = true; td.classList.add('pnb-find-cur');", "            if (k === cur) { curDone = true; td.style.backgroundColor = 'rgb(255, 230, 0)'; td.classList.add('pnb-find-cur');")],   # (findsweep 2 re-anchor)
                ['L-export-htmlSame'], ['export']),
     # Ctrl+F taken from a text field - Find's own box too (Ctrl+F again = the browser's own find)
     # (round 5 split the guard: the text field first, then a dialog with a table or the view)
-    'grabtyping': ([('mod', "            if (!h || h.typing(e.target)) { return; }\n            var d = topDialog();\n", "            if (!h) { return; }\n            var d = topDialog();\n")],
-                   ['L-open-typingFree', 'L-open-secondPasses'], ['open']),
+    'grabtyping': ([('mod', "            if (!h || editing(e.target) || editing(document.activeElement)) { return; }\n            var d = topDialog();\n", "            if (!h) { return; }\n            var d = topDialog();\n")],
+                   ['L-open-textareaFree', 'L-open-modalFree', 'L-open-secondPasses'], ['open']),   # (findsweep 6 re-anchor)
+    # (findsweep 6) a one-line field keeps Ctrl+F again (the browser's find saw one page)
+    'editinginput': ([('mod', "        if (el === input || el.tagName === 'TEXTAREA' || el.isContentEditable) { return true; }\n", "        if (el === input || el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || el.isContentEditable) { return true; }\n")],
+                     ['L-open-filterBoxOpens'], ['open']),
+    # (findsweep hotfix) Ctrl+F taken inside a modal of its own (Find opened under Quick actions)
+    'nomodal': ([('mod', "        return !!(m && !m.closest('.infobox-overlay, #pnbCardDetails'));   // (findsweep 50) the card details window is Find's\n", "        return false;\n")],   # (findsweep 50 re-anchor)
+                ['L-open-modalFree'], ['open']),
+    # (findsweep 15) Ctrl+Shift+G taken everywhere again (main.js's Group Controls never fired while the bar was up)
+    'shiftganywhere': ([('mod', " && (!e.shiftKey || e.target === input));\n", ");\n")],
+                       ['L-order-ctrlShiftGFree'], ['order']),
+    # (findsweep F5) the first match in a closed group opened while typing again (no notice)
+    'nonamed': ([('mod', "if (at < 0 && h0 && h0.dom && (h0.view === 'grouped' || h0.view === 'pivot') && ", "if (false && at < 0 && h0 && h0.dom && (h0.view === 'grouped' || h0.view === 'pivot') && ")],
+                ['L-grp_closed-named', 'L-grp_nest_closed-named', 'L-grp_list-named', 'L-piv_closed-named'], ['grp_closed', 'grp_nest_closed', 'grp_list', 'piv_closed']),
+    # (findsweep 32) the grouped signature without row order: a sort is not read again
+    'nogrpsortread': ([('mod', " ord = (Math.imul(ord, 31) + rowId(rows[i])) | 0; }", " }")],
+                   ['L-grp_stack-sortRereads'], ['grp_stack']),
+    # (findsweep 33) the copy of selected matches left to cell selection (the bounding box)
+    'nocopylines': ([('mod', "        if (!selCopy) { return; }\n", "        return;\n")],
+                    ['L-fs_flat-copyLines'], ['fs_flat']),
+    # (findsweep 31) the flat start from the page's first row again
+    'nostartscreen': ([('mod', "                ref = shownRows[lo].sectionRowIndex;\n", "                ref = shownRows[0].sectionRowIndex;\n")],
+                      ['L-fs_flat-startOnScreen'], ['fs_flat']),
+    # (findsweep 13) no accent folding
+    'nofold': ([('mod', "        return NON_ASCII.test(s) ? s.normalize('NFD').replace(MARKS, '') : s;\n", "        return s;\n")],
+               ['L-fs_flat-accentFold'], ['fs_flat']),
+    # (findsweep F4) Find in this column reads every column
+    'noscope': ([('mod', "            if (onlyCol && nm !== onlyCol) { continue; }   // (findsweep F4) Find in this column\n", "")],
+                ['L-fs_flat-colScope'], ['fs_flat']),
+    # (findsweep F3) Select matches selects nothing
+    'noselect': ([('mod', "        var n = blocks.length ? cs.select(blocks) : 0;\n", "        var n = 0;\n")],
+                 ['L-fs_flat-selectOnScreen'], ['fs_flat']),
+    # (findsweep F1) no location line
+    'nowhere': ([('mod', "        if (atEl && !(scanning && rereading)) { setText(atEl, where); atEl.title = where; }\n", "")],
+                ['L-fs_flat-whereLine'], ['fs_flat']),
     # Ctrl+F taken under a dialog (one with no table: main.js's busy())
-    'noguard': ([('mod', "            if (!d && (!activeView() || h.busy())) { return; }\n", "            if (!d && !activeView()) { return; }\n")],
+    'noguard': ([('mod', "            if (!d && (!activeView() || (h.busy() && !inCardDetails()))) { return; }\n", "            if (!d && !activeView()) { return; }\n")],   # (findsweep 50 re-anchor)
                 ['L-open-busyFree'], ['open']),
     # Esc reaches main.js's own Escape handler (the admin console toggle)
     'escleak': ([('mod', "            e.preventDefault();\n            e.stopPropagation();\n            close(true);\n", "            e.preventDefault();\n            close(true);\n")],
@@ -163,10 +197,11 @@ MUTANTS = {
     'filterlie': ([('mod', "            p.n = (rows && rows.length <= COUNT_MAX_ROWS) ? h.searchCount(p.q) : null;\n", "            p.n = hits.length;\n")],
                   ['L-filter-honest'], ['filter']),
     # ...and the bar's own (sliced) count does too
-    'filterlieasync': ([('mod', "            p.n = n; promo = p;\n", "            p.n = hits.length; promo = p;\n")],
+    'filterlieasync': ([('mod', "            counting = false;\n            counted = { q: p.q, rows: rows, len: rows.length, n: n };\n            p.n = n; promo = p;\n            filterUi(); busyUi();\n        }, stop);\n        return null;\n",
+                                 "            counting = false;\n            counted = { q: p.q, rows: rows, len: rows.length, n: n };\n            p.n = hits.length; promo = p;\n            filterUi(); busyUi();\n        }, stop);\n        return null;\n")],   # (findsweep 10 re-anchor: the plain count's path)
                        ['L-filter-labelAsync'], ['filter']),
     # an applied search is replaced, not added to
-    'noand': ([('mod', "        return { q: applied + ' AND ' + q, add: true, n: null };\n", "        return { q: q, add: false, n: null };\n")],
+    'noand': ([('mod', "        return { q: applied + ' AND ' + q, alt: alt ? applied + ' AND ' + alt : null, add: true, n: null };\n", "        return { q: q, alt: null, add: false, n: null };\n")],   # (findsweep 10 re-anchor)
               ['L-filter-andAdds'], ['filter']),
     # two words handed over unquoted (the search reads them as two terms)
     'noquote': ([('mod', "            else if (t.indexOf('\"') < 0) { q = '\"' + t + '\"'; }\n", "            else if (t.indexOf('\"') < 0) { q = t; }\n")],
@@ -182,13 +217,13 @@ MUTANTS = {
     'nomore': ([('mod', "        if (hidden > 0 && spec && !spec.bad && !scanning) {\n", "        if (false) {\n")],
                ['L-search-moreLine'], ['search']),
     # the cheat sheet does not list Ctrl+F
-    'nosheet': ([('main', "            (window.Penumbra && window.Penumbra.find) ? row(['Ctrl+F'], 'Find in the table without filtering it (press it again for the browser find)') : ''\r\n", "            ''\r\n")],
+    'nosheet': ([('main', "            (window.Penumbra && window.Penumbra.find) ? row(['Ctrl+F'], 'Find in the table without filtering it (press it again for the browser find)') : '',\r\n", "            '',\r\n")],   # (re-anchor: the sheet's list gained a row after it)
                 ['L-open-sheet'], ['open']),
     # stepping always starts at the first match (not where you are)
     'nostart': ([('mod', "        for (var k = 0; k < hits.length; k++) { if (hits[k].pos >= ref) { return k; } }\n        return 0;\n", "        return 0;\n")],
                 ['L-paint-startHere'], ['paint']),
     # the match is never scrolled into view
-    'noreveal': ([('mod', "        if (td && hit.tr.style.display !== 'none') { reveal(td); }\n", "")],
+    'noreveal': ([('mod', " else if (td && hit.tr.style.display !== 'none') { reveal(td); }   // (cardfind; findsweep 17)\n", "\n")],   # (findsweep re-anchor)
                  ['L-lazy-inView'], ['lazy']),
     # the bar stays open when the table is hidden (Rows = None): nothing watches the page's classes
     'nowatch': ([('mod', "                watcher.observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });\n", "")],
@@ -212,7 +247,7 @@ MUTANTS = {
     'nolistpick': ([('mod', "                try { gl.selectGroup(chain[chain.length - 1]); } catch (e) { }\n", "")],
                    ['L-grp_list-picked'], ['grp_list']),
     # group names are not looked for in the headings
-    'nobands': ([('mod', "                    if (lab) { out.push({ kind: 'band', el: lab, tr: null, kept: !searchHidden(el) }); }\n", "")],
+    'nobands': ([('mod', "                    if (lab && !onlyCol) { out.push({ kind: 'band', el: lab, tr: null, kept: !searchHidden(el) }); }", "                    if (false) { }")],   # (findsweep F4 re-anchor)
                 ['L-grp_stack-band'], ['grp_stack']),
     'nobandoutline': ([('css', '#groupedResultsContainer .group-name.pnb-find-cur {', '#groupedResultsContainer .group-name.pnb-find-nope {')],
                 ['L-grp_stack-bandOutline'], ['grp_stack']),
@@ -236,10 +271,10 @@ MUTANTS = {
                     "        if (scanned && scanned.view === 'dialog') { return null; }\n")],
                   ['L-piv_open-noFilter'], ['piv_open']),
     # the bar stays put over a match in the top row of a right-hand column
-    'nocoverflip': ([('mod', "                top = (c.bottom + 6 + b.height <= window.innerHeight) ? Math.round(c.bottom + 6) : Math.max(0, Math.round(c.top - b.height - 6));\n", "")],
+    'nocoverflip': ([('mod', "                top = (c.bottom + 6 + b.height <= vb) ? Math.round(c.bottom + 6) : Math.max(fv ? fv.top : 0, Math.round(c.top - b.height - 6));\n", "")],   # (findsweep 36 re-anchor)
                     ['L-cover-notCovered', 'L-cover-justBelow'], ['cover']),
     # after Filter the button offers the applied term again (term AND term)
-    'reoffer': ([('mod', "        if (applied.split(/\\s+and\\s+/i).some(function (part) { return norm(part).toLowerCase() === lowQ; })) { return null; }\n", "")],
+    'reoffer': ([('mod', "        if (applied.split(/\\s+and\\s+/i).some(function (part) { var lp = norm(part).toLowerCase(); return lp === lowQ || (lowAlt !== null && lp === lowAlt); })) { return null; }\n", "")],   # (findsweep 25 re-anchor)
                 ['L-filter-noReoffer'], ['filter']),
     # Ctrl+F taken with the table hidden (Rows = None)
     'nonecheck': ([('main', "            if (document.body.classList.contains('pnb-data-hidden')) return false;\r\n", "")],
@@ -270,7 +305,7 @@ MUTANTS = {
                   "            if (scanning) { reread(null); return; }\n")],
                 ['L-big_dirty-noRestart'], ['big_dirty']),
     # Filter offered for 'empty' and number ranges (the search reads them by value)
-    'noguard3': ([('mod', "            if (/^empty$/i.test(t) || (!plainNum && /[,\\-]/.test(t) && /^[\\d,\\-.$%\\s]+$/.test(t))) { return null; }\n", "")],
+    'noguard3': ([('mod', "            if (/^empty$/i.test(t) || rangeLike || listLike) { return null; }\n", "")],   # (findsweep 18 re-anchor)
                  ['L-guards3-noKeyword'], ['guards3']),
     # the grouped view's Filter adds to whatever the box holds (typed, never run)
     'boxapplied': ([('mod', "        var applied = (scanned && scanned.dom) ? markQuery('grouped') : norm(h.searchApplied());\n",
@@ -314,7 +349,7 @@ MUTANTS = {
                      ['L-mk_find-printClean'], ['mk_find']),
     'marksnowatch': ([('mod', "            if (el) { markWatch.observe(el, { attributes: true, attributeFilter: ['style', 'class'], attributeOldValue: true, childList: true, subtree: true }); }\n", "")],
                      ['L-grp_marks_closed-opensMarked', 'L-piv_marks-pivLabels'], ['grp_marks_closed', 'piv_marks']),
-    'marksclass': ([('mod', "        var nodes = textNodes(td), n = 0, i, r, k, low;\n", "        td.classList.add('pnb-mark-x');\n        var nodes = textNodes(td), n = 0, i, r, k, low;\n")],
+    'marksclass': ([('mod', "        var nodes = textNodes(td).map(function (o) { return o.node; }), n = 0, i, r, k, low;\n", "        td.classList.add('pnb-mark-x');\n        var nodes = textNodes(td).map(function (o) { return o.node; }), n = 0, i, r, k, low;\n")],   # (findsweep 9 re-anchor)
                    ['L-mk_find-marksNoDom'], ['mk_find']),
     'markspriority': ([('mod', "        hl.priority = -1;   // under Find's own\n", "        hl.priority = 5;\n")],
                       ['L-mk_find-underFind'], ['mk_find']),
@@ -347,8 +382,7 @@ MUTANTS = {
                   ['L-steady-roomCleared'], ['steady']),
     # ---- round 5: dialogs, a comparison's group names, narrow windows ----
     # Ctrl+F never takes a dialog (the old "under a dialog: the browser's")
-    'nodialog': ([('mod', "            var d = topDialog();\n            if (!d && (!activeView() || h.busy())) { return; }\n",
-                   "            var d = null;\n            if (!d && (!activeView() || h.busy())) { return; }\n")],
+    'nodialog': ([('mod', "            var d = topDialog();\n            // (findsweep 50)", "            var d = null;\n            // (findsweep 50)")],   # (findsweep 50 re-anchor: the line after it changed)
                  ['L-dlg_find-dlgTaken'], ['dlg_find']),
     # the bar left under the dialog's layer
     'dialogbelow': ([('mod', "            bar.style.zIndex = dlg ? String(dialogZ(dlg) + 1) : '';\n", "            bar.style.zIndex = '';\n")],

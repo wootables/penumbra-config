@@ -1770,8 +1770,8 @@
                     },
                     {
                         "name":  "vertical: a list field keeps its own rules (computed: the group top-aligned, each row its own full border)",
-                        "pass":  true,
-                        "detail":  "flex-start 1px 1px"
+                        "pass":  false,
+                        "detail":  "flow-start 1px 1px"
                     },
                     {
                         "name":  "segmented: a list field still scrolls (computed overflow-y auto under a max height; it was hidden, so rows past it were out of reach)",

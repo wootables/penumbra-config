@@ -846,6 +846,50 @@ MUTANTS.update({
     'wm-wide': ([('pcss', "/* (wcag mod 2026-11-07, 1.4.10) the full-screen sheet keeps a close control for pointer and touch: the Esc chip, drawn as an X\n   (its name stays \"Close quick actions\"), 28px square; the desktop chip is untouched */\n@media (max-width: 480px) {", "/* (mutant) */\n@media (min-width: 1px) {")], ['L-pwcagm-escDesktopSame'], ['pwcagm']),
 })
 
+# (palsweep, 2026-11-21) the Quick actions sweep's 40 fixes and improvements (672b50d, ed43d1e, 7014099), held by checks; each check
+# has a mutant reverting its fix. LIVE: old checks from the start (not in NEW). The harness loads the stub BEFORE main.js now (index.php's
+# order since 672b50d), with a page Escape handler after main.js that ppskeys arms (window.__zzPageEsc).
+SCN = SCN + ['ppsrank', 'ppskeys', 'ppsnarrow']
+CHK['ppsrank'] = ['lateRedrawKept', 'groupNoCol', 'groupKwNoCol', 'groupCol', 'feedbackTop', 'mailAddress', 'verbRow', 'verbRuns', 'verbDesc', 'verbWordStart',
+                  'whereQuestion', 'compoundAsTyped', 'andInValue', 'exactFirst', 'accentFold', 'findInRow', 'cmpNoCombos']
+CHK['ppskeys'] = ['escFirst', 'escPageAfter', 'toggleCloses', 'fullscreenIgnored', 'pageMoves', 'chipBack', 'modeSaid', 'backspaceKeeps', 'frameKeepsFocus',
+                  'groupsNamed', 'noteOutside', 'moreKeeps', 'recentsThree', 'disabledNotClicked', 'rowHeightFirst', 'insertReplaces', 'jarvisWaitsForPanel', 'typeLeavesAnswer']
+CHK['ppsnarrow'] = ['greyNameShown']
+MUTANTS.update({
+    'ps-keep': ([('pal', "if (userPick && userPick.tok === tok) {", "if (false) {")], ['L-ppsrank-lateRedrawKept'], ['ppsrank']),
+    'ps-pkcol': ([('pal', "indexOf('combo:' + kind + ':') === 0 && _pkCol(r); }));", "indexOf('combo:' + kind + ':') === 0; }));")], ['L-ppsrank-groupKwNoCol'], ['ppsrank']),
+    'ps-synth': ([('pal', "if (!pick && _pkRest.length && !_pkPlain) {", "if (false) {")], ['L-ppsrank-groupNoCol'], ['ppsrank']),
+    'ps-verb': ([('pal', "        acts = verbPickRows(q).concat(acts);   // (palsweep 6)", "        // (mutant)")], ['L-ppsrank-verbRow', 'L-ppsrank-verbRuns', 'L-ppsrank-verbDesc'], ['ppsrank']),
+    'ps-wordstart': ([('pal', "if (s && (' ' + fold(n).replace(/[_\\s]+/g, ' ')).indexOf(' ' + want) < 0) { s = null; }", "if (false) { s = null; }")], ['L-ppsrank-verbWordStart'], ['ppsrank']),
+    'ps-starts': ([('pal', "            pick = _stA.length === 1 ? _stA[0] : null;", "            pick = null;")], ['L-ppsrank-feedbackTop'], ['ppsrank']),
+    'ps-mailat': ([('pal', "if (String(m[1] || '').indexOf('@') < 0 && /^(?:", "if (/^(?:"), ('pal', "problems?|issues?)(?=\\s|$)/i.test(", "problems?|issues?)/i.test(")], ['L-ppsrank-mailAddress'], ['ppsrank']),
+    'ps-allparts': ([('pal', "var allConds = cparts.length > 1 && cparts.every(", "var allConds = cparts.length > 1 && cparts.some(")], ['L-ppsrank-andInValue'], ['ppsrank']),
+    'ps-compound': ([('pal', "            if (allConds) {", "            if (false) {")], ['L-ppsrank-compoundAsTyped'], ['ppsrank']),
+    'ps-where': ([('pal', "if (/^(do|does|did|can|could|is|are|was|were|should|would|will|i|we|you|how|what|why|which|out)\\b/i.test(rest)) { return null; }", "")], ['L-ppsrank-whereQuestion'], ['ppsrank']),
+    'ps-fold': ([('pal', "        if (!/[^\\x00-\\x7f]/.test(s)) { return s.toLowerCase(); }", "        return s.toLowerCase();")], ['L-ppsrank-accentFold'], ['ppsrank']),
+    'ps-exact': ([('pal', " + q.length * 2 + (q.length === t.length ? 10 : 0), idx: idx };", " + q.length * 2, idx: idx };")], ['L-ppsrank-exactFirst'], ['ppsrank']),
+    'ps-findin': ([('pal', "label: 'Find in this column...', act: 'findIn',", "label: 'zz', act: 'zzFindIn',")], ['L-ppsrank-findInRow'], ['ppsrank']),
+    'ps-cmp': ([('pal', "        if (cmpOn()) { return []; }   // (palsweep 9)", "        // (mutant)")], ['L-ppsrank-cmpNoCombos'], ['ppsrank']),
+    'ps-esc': ([('stub', "if ((e.key === 'Escape' || e.key === 'Esc') && state === 'ready' && P.isOpen && P.isOpen() && P.escape) {", "if (false) {")], ['L-ppskeys-escFirst'], ['ppskeys']),
+    'ps-full': ([('stub', "if (overFull() && !shell && !(P.isOpen && P.isOpen())) { return; }", "")], ['L-ppskeys-fullscreenIgnored'], ['ppskeys']),
+    'ps-page': ([('pal', "        if (k === 'PageDown' || k === 'PageUp') {", "        if (false) {")], ['L-ppskeys-pageMoves'], ['ppskeys']),
+    'ps-chip': ([('pal', "            if (t.closest('.pnb-pal-chip')) { back(); }", "            if (t.closest('.pnb-pal-chip-x')) { back(); }")], ['L-ppskeys-chipBack'], ['ppskeys']),
+    'ps-back': ([('pal', "        if (prev && prev.mode && prev.mode.kind !== 'jarvis'", "        if (false && prev && prev.mode && prev.mode.kind !== 'jarvis'")], ['L-ppskeys-chipBack', 'L-ppskeys-backspaceKeeps'], ['ppskeys']),
+    'ps-frame': ([('pal', "        ui.box.addEventListener('mousedown', function (e) {\n            var t = e.target;", "        ui.box.addEventListener('zzmousedown', function (e) {\n            var t = e.target;")], ['L-ppskeys-frameKeepsFocus', 'L-ppskeys-chipBack'], ['ppskeys']),
+    'ps-say': ([('pal', "    function countSay(n, q) { return modeSay() + (", "    function countSay(n, q) { return (")], ['L-ppskeys-modeSaid'], ['ppskeys']),
+    'ps-groups': ([('pal', """html += s.title ? '<div role="group" aria-labelledby="' + gid + '">""", """html += s.title ? '<div>""")], ['L-ppskeys-groupsNamed'], ['ppskeys']),
+    'ps-notes': ([('pal', """        if (ui.notes) { ui.notes.innerHTML = note ? '<div class="pnb-pal-note">' + note + '</div>' : ''; } else if (note) {""", """        if (false) { } else if (note) {""")], ['L-ppskeys-noteOutside'], ['ppskeys']),
+    'ps-more': ([('pal', "if (at >= 0) { var j = at; while (rows[j] && rows[j].off) { j++; } if (rows[j]) { userSel(j, true); } }", "")], ['L-ppskeys-moreKeeps'], ['ppskeys']),
+    'ps-recent': ([('pal', "RECENT_SHOW = 3;", "RECENT_SHOW = 30;")], ['L-ppskeys-recentsThree'], ['ppskeys']),
+    'ps-disabled': ([('pal', "        if (e.disabled || (e.getAttribute && e.getAttribute('aria-disabled') === 'true')) {", "        if (false) {")], ['L-ppskeys-disabledNotClicked'], ['ppskeys']),
+    'ps-rowh': ([('pal', "t.checked = !on;", "t.checked = !t.checked;")], ['L-ppskeys-rowHeightFirst'], ['ppskeys']),
+    'ps-insert': ([('pal', "if (!sel && w && String(text).toLowerCase().indexOf(w[0].toLowerCase()) === 0) {", "if (false) {")], ['L-ppskeys-insertReplaces'], ['ppskeys']),
+    'ps-jbusy': ([('pal', "if (sbtn && sbtn.classList.contains('ai-btn-loading')) {", "if (false) {")], ['L-ppskeys-jarvisWaitsForPanel'], ['ppskeys']),
+    'ps-jtype': ([('pal', "if (mode && mode.kind === 'jarvis' && mode.state !== 'waiting' && ui.input.value.trim() &&", "if (false &&")], ['L-ppskeys-typeLeavesAnswer'], ['ppskeys']),
+    'ps-jcompose': ([('journal', "mentionMf.setText((cur && text && cur.indexOf(text) < 0) ? cur + ' ' + text : (text || cur));", "mentionMf.setText(text || '');")], ['L-pnote-lazyJournal'], ['pnote']),   # (palsweep, 2026-11-22) a draft kept
+    'ps-narrow': ([('pcss', "    .pnb-pal-it.is-off { flex-wrap: wrap; }", "    .pnb-pal-it.is-off { }")], ['L-ppsnarrow-greyNameShown'], ['ppsnarrow']),
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:
@@ -951,7 +995,7 @@ def run_page(path, shot_path=None):
         call('Page.enable'); call('Network.enable'); call('Network.setCacheDisabled', {'cacheDisabled': True})
         if 'scn=pshot9' in path: call('Emulation.setDeviceMetricsOverride', {'width': 1440, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})   # (round 9) the photo at 1440px
         call('Emulation.setFocusEmulationEnabled', {'enabled': True})
-        if path.endswith('scn=pnarrow'): call('Emulation.setDeviceMetricsOverride', {'width': 400, 'height': 800, 'deviceScaleFactor': 1, 'mobile': False})   # (wcag mod 2026-11-07) the phone / 400% zoom width
+        if path.endswith('scn=pnarrow') or path.endswith('scn=ppsnarrow'): call('Emulation.setDeviceMetricsOverride', {'width': 400, 'height': 800, 'deviceScaleFactor': 1, 'mobile': False})   # (wcag mod 2026-11-07) the phone / 400% zoom width
         if path.endswith('scn=pjbusy'): call('Emulation.setDeviceMetricsOverride', {'width': 1280, 'height': 600, 'deviceScaleFactor': 1, 'mobile': False})   # (jarbusy) a short window
         if 'scn=pjbusy' in path or 'scn=pshotjb' in path:   # (jarbusy) the motion preference set either way: Edge reads Windows' "Animation effects" (off = reduce)
             rm = 'scn=pjbusyrm' in path or ('scn=pshotjb' in path and os.environ.get('PNB_JBRM'))
@@ -1263,6 +1307,8 @@ def static_checks(texts):
          and "act: 'resetWidth'" in pal and "act: 'reset'," not in pal and "fitPage: 'a top-level entry" in pal and "resets: 'the list'" not in pal
          and 'fitPage: function (th)' in texts['colw'] and 'Fit all column widths to page' in texts['topic'], ''),
         ('S-stubSmall', 0 < len(stub.splitlines()) <= 150, '%d lines' % len(stub.splitlines())),
+        # (palsweep 7, 2026-11-21) index.php loads the stub BEFORE main.js: its Esc runs ahead of the page's window Escape handlers
+        ('S-stubFirst', 0 <= idx.find('src="js/penumbra_palette_boot.js') < idx.find('src="js/main.js?v='), ''),
         ('S-noEmdash', not emd, str(emd)),
         ('S-iconsTwin', icon_n >= 12 and not icon_bad, 'toolbar entries %d, without their twin: %s' % (icon_n, icon_bad)),
         # (round 3) the sprite's #pnbi-group is candidate C, and no copy of the old drawing (the framed table)
@@ -1278,7 +1324,7 @@ def static_checks(texts):
          and 'return penumbraReportDiscoveryAllowed($isAdmin);' in texts['disc'] and texts['disc'].count('function penumbra') == 2
          and "require_once 'penumbra_discovery.php';" in texts['gsr'] and 'function penumbraReportDiscoveryAllowed' not in texts['gsr']
          and "require_once 'penumbra_discovery.php';" in texts['mdash'], ''),
-        ('S-dashClient', "x.open('GET', 'manage_dashboard.php?action=list', true);" in pal and 'if (dashFetched || q.length < 2) { return; }' in pal
+        ('S-dashClient', "x.open('GET', 'manage_dashboard.php?action=list'" in pal and 'if (dashFetched || q.length < 2) { return; }' in pal
          and "match(q, d.title, d.id + (admin ? ' ' + d.owner : ''))" in pal and 'if (tag) { if (admin && ' in pal and "secD = { title: 'Dashboards'" in pal
          and "window.location.assign('dashboard.php?id=' + encodeURIComponent(h.d.id))" in pal, ''),
         ('S-dashRecents', "localStorage.setItem('pnb_recent_dashboards'" in pal and 'if (onDashboard()) { try { var dv = (typeof penumbra_dash_vars !== ' in pal and 'dv.shortId && dv.found' in pal, ''),

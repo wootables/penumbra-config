@@ -105,7 +105,7 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 # The app files the two halves read. A stage usually holds only what was edited,
 # so anything it lacks is taken from live - and said out loud, because "green
 # against the stage" must not quietly mean "green against live".
-$appFiles = 'shared_logic.php', 'schedule_runner.php', 'index.php', 'penumbra_search.php', 'js\main.js'
+$appFiles = 'shared_logic.php', 'schedule_runner.php', 'index.php', 'penumbra_search.php', 'penumbra_api.php', 'js\main.js'
 function Copy-AppInto([string]$dest) {
     New-Item -ItemType Directory -Force -Path (Join-Path $dest 'js') | Out-Null
     $fromLive = @()

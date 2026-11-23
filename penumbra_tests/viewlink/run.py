@@ -54,7 +54,9 @@ def tok(obj):
     return base64.urlsafe_b64encode(zlib.compress(json.dumps(obj).encode('utf-8'), 9)).decode().rstrip('=')
 ALL20 = ['V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS', 'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT', 'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE']
 T_WINS = tok({'v': 1, 'm': 'flat', 'o': 'none', 'c': {'o': ALL20, 'v': ['V_ID', 'V_STATUS', 'H_CODE'], 'n': True}, 'fz': 1, 'w': {'V_STATUS': 250}})
-T_STALE = tok({'v': 1, 'm': 'flat', 'o': 'GONE_C|desc', 'c': {'o': ['V_ID', 'GONE_A', 'V_NAME'], 'v': ['V_ID', 'GONE_A', 'V_NAME'], 'n': True},
+# (2026-11-22, vlsweep #10) a real link names EVERY column of the sender's page in c.o (hidden ones too): a column it does not
+# name is new since the link and shows as the report shows it - so the stale fixture names the rest of ALL20 as hidden
+T_STALE = tok({'v': 1, 'm': 'flat', 'o': 'GONE_C|desc', 'c': {'o': ['V_ID', 'GONE_A', 'V_NAME'] + [x for x in ALL20 if x not in ('V_ID', 'V_NAME')], 'v': ['V_ID', 'GONE_A', 'V_NAME'], 'n': True},
                'w': {'OLD_B': 200}, 'fm': {'V_NAME': 'text'}})
 BAD_S = '<img src=x onerror="window.__pwn=1">'
 BAD = {'v': 1, 'm': 'flat', 's': BAD_S, 'o': 'V_NAME|desc',
@@ -141,7 +143,7 @@ CHK = {
     'ggcA': ['compared', 'listOn', 'carriesCmpGroup'], 'ggcB': ['compared', 'listOn', 'rtGroup', 'rtGroupTop'],
     'ggsA': ['stacked', 'carriesOpen'], 'ggsB': ['note', 'rtOpen', 'rtBoxTop', 'rtPageTop'],
     'vcmpS': ['compared', 'stacked', 'carriesOpen', 'carriesSort', 'carriesCmpSel'], 'vcmpT': ['compared', 'rtOpen', 'rtBoxTop', 'rtSort', 'rtCmpSel'],
-    'vselA': ['selected', 'pressCleared', 'carriesSel', 'toastSays'], 'vselB': ['note', 'rtSel', 'noMissNote'], 'vselX': ['note', 'selNone', 'selMissNoted'],
+    'vselA': ['selected', 'pressCleared', 'carriesSel', 'toastSays', 'blankDrops'], 'vselB': ['note', 'rtSel', 'noMissNote'], 'vselX': ['note', 'selNone', 'selMissNoted'],
     'pvselA': ['pivSelected', 'carriesPivSel'], 'vpselB': ['note', 'rtPivSel'],
     'vnest': ['note', 'grouped', 'nestNotMissing', 'nestNoSkip'], 'vgbins': ['note', 'grouped'], 'vsnapv': ['snapFlag', 'snapNote', 'liveNoFlag', 'snapNoPositions', 'liveKeepsTop'],
     'vunit': ['csFormulaKept', 'scVirtualKept', 'longFilterDropped'], 'vnumA': ['numSorted', 'carriesNumSort'], 'vnumB': ['note', 'rtNumSort', 'noSkipNote'],
@@ -219,7 +221,7 @@ MUTANTS = {
     'm-nosel': ([('main', "        if (!snapV) { var selB = _pnbViewLinkSelNow(); if (selB) v.sel = selB; }\n", "")], ['L-vselA-carriesSel', 'L-vselB-rtSel'], ['vselA', 'vselB']),
     'm-noselapply': ([('main', "        if (_pnbViewLink && _pnbViewLink.sel) _pnbViewLinkSelWhenReady(_pnbViewLink);\n", "")], ['L-vselB-rtSel', 'L-vcmpT-rtCmpSel'], ['vselA', 'vselB', 'vcmpS', 'vcmpT']),
     'm-selsig': ([('main', "rows[i].getClientRects().length && _pnbViewLinkRowSig(rows[i]) === h) return i;", "rows[i].getClientRects().length) return i;")], ['L-vselX-selNone', 'L-vselX-selMissNoted'], ['vselX']),
-    'm-selgone': ([('cellsel', "if (keep.length) { gone = { list: keep, at: Date.now() }; }", "")], ['L-vselA-carriesSel'], ['vselA']),
+    'm-selgone': ([('cellsel', "if (keep.length && t && t.closest && t.closest(GONE_KEEP)) { gone = { list: keep, at: Date.now() }; }", "")], ['L-vselA-carriesSel'], ['vselA']),   # (vlsweep2 #R3)
     'm-selpivot': ([('main', "        if (T.id === 'pivotResultTable') return { k: { p: 1 }, rows: _pnbViewLinkPivotRows(T) };\n", "")], ['L-pvselA-carriesPivSel', 'L-vpselB-rtPivSel'], ['pvselA', 'vpselB']),
     'm-selgroup': ([('main', "return { k: { g: path }, rows: _pnbViewLinkSelGroupRows(box) };", "return null;")], ['L-vcmpS-carriesCmpSel', 'L-vcmpT-rtCmpSel'], ['vcmpS', 'vcmpT']),
     # (10-27 review) a formula summary dropped; sort levels on '#' / a journal column dropped, not captured, not applied
@@ -231,7 +233,7 @@ MUTANTS = {
     'm-longs': ([('main', "        if (longS) delete v.s;\n", "")], ['L-vunit-longFilterDropped'], ['vunit']),
     'm-snapvpos': ([('main', "if (v.m === 'flat' && !snapV) {", "if (v.m === 'flat') {")], ['L-vsnapv-snapNoPositions'], ['vsnapv']),
     'm-saveticked': ([('main', "(fromLink ? '' : ' checked')", "' checked'")], ['L-vfmsave-listUnticked'], ['vfmsave']),
-    'm-dropgo': ([('main', "['f fi', 'Find'], ['go ga gp', 'open groups'],", "['f fi', 'Find'],")], ['S-dropOrder'], []),
+    'm-dropgo': ([('main', "['f fi', 'Find'], ['go ga gp pe pc', 'open groups'],", "['f fi', 'Find'],")], ['S-dropOrder'], []),   # (vlsweep #7)
     'm-feedbackcmp': ([('main', "if (!b.token || b.cmp) return none;", "if (!b.token) return none;")], ['S-feedbackNoCmp'], []),
     # (10-23 c) Stacked groups: the open set never captured / never restored
     'm-nogo': ([('main', "            if (gst) { v.go = gst.go; if (gst.ga) v.ga = true; if (gst.gb) v.gb = gst.gb; if (gst.gt) v.gt = gst.gt; }", "            if (gst) { }")], ['L-ggsA-carriesOpen', 'L-ggsB-rtOpen'], ['ggsA', 'ggsB']),
@@ -274,11 +276,14 @@ def static_checks(t):
     out = []
     idx, pal, form, main = t['index'], t['pal'], t['form'], t['main']
     out.append(('S-pakoForView', "isset($_GET['state']) || isset($_GET['view'])" in idx, 'index.php loads pako for ?view='))
-    out.append(('S-copyButton', 'id="copyViewLinkBtn"' in idx and "<?php if (!empty($_GET['id'])): ?>" in idx.split('id="copyViewLinkBtn"')[0][-200:], 'the Copy dialog button, ?id= pages only'))
+    # (2026-11-22, vlsweep2 #R11) the button is always drawn, hidden without ?id= (main.js shows it as the dialog opens once a
+    # first Save has added an id)
+    out.append(('S-copyButton', 'id="copyViewLinkBtn"' in idx and "<?php if (empty($_GET['id'])) { echo ' style=\"display: none;\"'; } ?>" in idx.split('id="copyViewLinkBtn"')[1][:200]
+                and "$('#copyViewLinkBtn, #copyViewLinkHelp').toggle(_vlHasId);" in main, 'the Copy dialog button, hidden without ?id=, shown by the dialog once an id is there'))
     out.append(('S-viewReadOnce', len(re.findall(r"\$_GET\['view'\]", idx)) <= 1 and "$_GET['view']" not in form, "?view= read by PHP only to load pako (no auth path touched)"))
     m = re.search(r"\{ id: 'viewlink', label: 'Copy a link to this view'.*?\},\n", pal, re.S)
     out.append(('S-paletteRow', bool(m) and all(k in m.group(0) for k in ('share', 'link', 'url', 'permalink', 'send view')) and 'PenumbraViewLink' in m.group(0), (m.group(0)[:200] if m else 'no row')))
-    out.append(('S-feedbackLink', "preg_match('/^[A-Za-z0-9_-]+$/', $viewTok)" in form and "rawurlencode(trim((string)$reportRow['SHORT_ID']))\n            . $vpPart\n            . '&view=' . $viewTok" in form
+    out.append(('S-feedbackLink', "preg_match('/^[A-Za-z0-9_-]+$/', $viewTok)" in form and "rawurlencode(trim((string)$reportRow['SHORT_ID']))\n            . $vpPart\n            . $vxPart\n            . '&view=' . $viewTok" in form
                 and "htmlspecialchars($viewLink, ENT_QUOTES)" in form and "ctx.id ? _pnbViewLinkFeedback() : { viewlink: '', viewprompts: '' }" in main, 'the feedback email builds the link on the report id, token checked'))
     out.append(('S-emailOption', 'id="emailLinkAsView"' in idx and 'id="emailViewLinkRow"' in idx and "if ($('#emailLinkAsView').is(':checked')) {" in main
                 and '#emailIncludeLink, #emailLinkAsView, #emailShowRecipients' in main and 'id="emailCopyViewLink"' in idx
@@ -290,7 +295,7 @@ def static_checks(t):
     # (10-27 review) the size trim drops scrolls and open groups before the grouping; no feedback token during a comparison
     dro = re.search(r'var PNB_VIEW_DROP_ORDER = \[(.*?)\];', main, re.S)
     dtx = dro.group(1) if dro else ''
-    out.append(('S-dropOrder', bool(dtx) and "'go ga gp'" in dtx and "'gb gt gr gc tr lc'" in dtx and dtx.find("'go ga gp'") < dtx.find("['g', 'grouping']"), 'scrolls and open groups drop before the grouping'))
+    out.append(('S-dropOrder', bool(dtx) and "'go ga gp" in dtx and "'gb gt gr gc tr lc'" in dtx and dtx.find("'go ga gp") < dtx.find("['g', 'grouping']"), 'scrolls and open groups drop before the grouping'))   # (vlsweep #7) 'go ga gp pe pc'
     out.append(('S-feedbackNoCmp', "if (!b.token || b.cmp) return none;" in main, 'no feedback-email token during a comparison'))
     out.append(('S-help', 'viewLinkHelpLightbox' in t['manifest'] and 'Copy a link to this view' in t['topic'] and 'data-tip="us-tip-viewlink"' in t['tip'] and 'data-tip="us-tip-viewlink"' in idx, 'help topic + tip (defined + consumed) + manifest'))
     ui = re.findall(r'(?:Link copied|Opened a shared view|Copy a link to this view|Skipped, no longer|Left out to fit)[^"\n]*', main + idx + pal + t['topic'] + t['tip'])

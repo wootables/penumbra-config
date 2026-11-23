@@ -229,7 +229,7 @@ return [
 	// Run one now without waiting: create an empty file log\maint_<job>.request (log\maint_<job>.paused holds one).
 	'maintenance' => [
 		'people_sync' => '05:30',   // HR -> NC_REPORTING.PENUMBRA_PEOPLE (people_sync.php)
-		'db_backup'   => '01:30',   // every NC_REPORTING.PENUMBRA_* table -> D:\Utilities\PHP_8.2-p\penumbra_backups (db_backup_job.php)
+		'db_backup'   => '01:30',   // every NC_REPORTING.PENUMBRA_* table -> D:\Utilities\PHP_penumbra\penumbra_backups (db_backup_job.php)
 	],
 	
 ];

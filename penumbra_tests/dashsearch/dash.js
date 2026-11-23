@@ -1827,6 +1827,7 @@
     // handling never sees it as well.
     window.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape' && e.key !== 'Esc') { return; }
+        if (window.PenumbraPalette && typeof PenumbraPalette.isOpen === 'function' && PenumbraPalette.isOpen()) { return; }   // (palsweep 36) Quick actions' Esc
         var lb = document.getElementById('searchBuilderLightbox');
         if (!lb || !$(lb).is(':visible') || $('#dashSsoLightbox').length || $('#dashHelpOverlay').length) { return; }
         if ($('#sbAutocompleteDropdown').is(':visible') || $('#ui-datepicker-div').is(':visible')) { return; }
@@ -5219,7 +5220,7 @@
     // arrives as fullscreenchange below. On the window at capture: the page's
     // own Escape handlers stop the event lower down.
     window.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && KIOSK && !document.fullscreenElement && !$('#dashOverlay').length) { exitKioskMode(); }
+        if (e.key === 'Escape' && KIOSK && !document.fullscreenElement && !$('#dashOverlay').length && !(window.PenumbraPalette && typeof PenumbraPalette.isOpen === 'function' && PenumbraPalette.isOpen())) { exitKioskMode(); }   // (palsweep 36)
     }, true);
     document.addEventListener('fullscreenchange', function () {
         if (document.fullscreenElement) { $('.dash-kiosk-hint').remove(); }

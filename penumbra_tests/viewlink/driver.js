@@ -676,12 +676,21 @@
         await dragSel(cellAt(9, 'V_AMOUNT'), cellAt(9, 'V_AMOUNT'), true);
         R.info.sel = selInfo();
         R.chk.selected = R.info.sel.n === 9;
-        var away = document.getElementById('tableSearch'); mev('mousedown', away); mev('mouseup', away); await sleep(200);
+        // (2026-11-22, vlsweep2 #R3) a press on a CONTROL keeps the cleared blocks for a link (the toolbar's Copy is a button); a
+        // press on blank page drops them (blankDrops below)
+        var away = document.getElementById('tableSearchPlay');
+        if (!away) { away = document.createElement('button'); away.type = 'button'; away.textContent = 'x'; document.body.appendChild(away); }
+        mev('mousedown', away); mev('mouseup', away); await sleep(200);
         R.chk.pressCleared = CSn().count() === 0;
         var bs1 = capture(), vs1 = bs1.token ? (V().decode(bs1.token) || {}) : {};
         R.info.view = vs1; R.info.token = bs1.token;
         R.chk.carriesSel = Array.isArray(vs1.sel) && vs1.sel.length === 2 && JSON.stringify(vs1.sel[0].c) === JSON.stringify(['V_NAME', 'V_AMOUNT']);
         R.chk.toastSays = (bs1.included || []).indexOf('selected cells') >= 0;
+        // (vlsweep2 #R3) select again, press on the page itself: that is a deselect, and the link carries no cells
+        await dragSel(cellAt(3, 'V_NAME'), cellAt(4, 'V_NAME'));
+        mev('mousedown', document.body); mev('mouseup', document.body); await sleep(200);
+        var bs2 = capture(), vs2 = bs2.token ? (V().decode(bs2.token) || {}) : {};
+        R.chk.blankDrops = CSn().count() === 0 && !vs2.sel && (bs2.included || []).indexOf('selected cells') < 0;
       } else {
         R.chk.note = await noteShown(); await sleep(3000);
         R.info.sel = selInfo();

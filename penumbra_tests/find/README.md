@@ -346,3 +346,25 @@ that part was left out at their word. ABOUT = "Highlights what you type and step
 (even across other pages); every row stays in the table. ..." - the (i) title, the line under the box and
 #pnbFindAbout. `info3` gained `aboutWords`; mutant `oldabout` (the old words) turns it red. stage12 (cut
 23:25): 319/0, control exact; `deploy8.ps1` (the module only); after: 319/0 against LIVE.
+
+# Find sweep (2026-11-21, findsweep) - the suite brought to 01d260b / bac3238 / 8ac5a53
+
+The app changed contracts on purpose (js/penumbra_find.js, tagged `findsweep N` / `findsweep Fx`), and 15 checks still
+asserted the old ones. Updated (backups: driver.js / suite_def.py `.bak-20261121-findsweep`; script in that session's
+scratchpad find-sweep\suite_update.py, suite_fix2.py, suite_fix3.py):
+
+* `open`: `typingFree` became `filterBoxOpens` (Ctrl+F from the filter box opens Find), `textareaFree` (a text area keeps
+  the browser's) and `modalFree` (a modal of its own, as Quick actions, keeps it). `busyFree` closes the bar first.
+* `order`: `ctrlShiftGFree` (outside the box Ctrl+Shift+G is main.js's Group Controls: Find does not step; main.js's own
+  handler may take the key) and `ctrlShiftG` (in the box: the previous match).
+* `grp_closed`, `grp_nest_closed`, `grp_list`: `named` - with no match on screen, the first one in a closed group is
+  named under the box ("In a closed group: Enter opens it"), not opened; the old checks run after one Enter.
+* `wide_edge`: `wOneRow` measures the controls' row (the location line and the overview strip sit under it now).
+* New scenario `fs_flat`: `whereLine` (F1), `strip` (F2: drawn, 8 px, the bar's width steady over steps), `selectOnScreen`
+  (F3: the matches on the page selected, cell selection's count), `colScope` (F4: one column's matches, and none when
+  scoped to a column the term is not in), `accentFold` (13).
+* Mutants: 11 stale anchors re-anchored (hiddencols, markbg, grabtyping, filterlieasync, noand, nosheet, noreveal,
+  nobands, reoffer, noguard3, marksclass); new: editinginput, nomodal, shiftganywhere, nonamed, nofold, noscope,
+  noselect, nowhere. 100 mutants.
+
+Results against LIVE (8ac5a53): 333/0 (then `fs_flat` 6/0 after the colScope addition), mutants 100/100 bite.

@@ -1268,7 +1268,7 @@
     type('v_lin'); await sleep(200); var h2 = hrow('Filter by V_LINK');
     thL.style.display = '';
     R.info.hidden = [h1, h2];
-    R.chk.hiddenNoRow = ok && !h1 && !h2;
+    R.chk.hiddenNoRow = ok && !!h1 && !h1.off && /^Filter: V_LINK = /i.test(h1.text) && !h2;   // (palsweep 3) the condition, never the quoted phrase
     key('Escape', { target: input() }); await sleep(30);
     ts.value = ''; if (window._penumbraSearchAPI && window._penumbraSearchAPI.runTableSearch) { window._penumbraSearchAPI.runTableSearch(); } await sleep(600);
   };
@@ -1332,12 +1332,13 @@
     R.chk.tabRows = !!tr && !tr.off && tabRows === nTabs && nTabs >= 4;
     var clicks = 0, jq = 0, btn = document.getElementById('addNewTaskBtn'); if (btn) { btn.addEventListener('click', function () { clicks++; }, true); $(btn).on('click', function () { jq++; }); }
     var xhrUrls = [], xo = XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open = function (m, u) { xhrUrls.push(String(u)); return xo.apply(this, arguments); };
-    await open('schedule an email'); picked = await pickRow('Schedule an email of this report'); if (picked) { await enter(); } await sleep(800);
+    await open('schedule an email'); var schRow = row('Schedule an email of this report'), schSaved = /[?&]id=[^&]/.test(location.search);   // (palsweep) a saved report only
+    picked = schSaved ? await pickRow('Schedule an email of this report') : false; if (picked) { await enter(); } await sleep(800);
     try { active = $('#editorTabs').tabs('option', 'active'); } catch (e) { }
     var schIdx = $('#editorTabs li > a[href="#scheduler-tab"]').parent().index();
     var saves = xhrUrls.filter(function (u) { return /manage_schedule|schedule_save|save_schedule|save_task/i.test(u); });
     R.info.sched = [picked, clicks, jq, $('#schedNewEventType').val(), active, schIdx, $('#schedulerPlaceholder').is(':visible'), $('.scheduler-config-panel').is(':visible'), xhrUrls.filter(function (u) { return /sched|task/i.test(u); })];
-    R.chk.schedRow = picked && !box() && (clicks === 1 || jq === 1) && clicks <= 1 && jq <= 1 && $('#schedNewEventType').val() === 'EMAIL' && active === schIdx && schIdx >= 0 && saves.length === 0;
+    R.chk.schedRow = !schSaved ? (!!schRow && schRow.off && /Save the report first/.test(schRow.why) && clicks === 0 && jq === 0) : picked && !box() && (clicks === 1 || jq === 1) && clicks <= 1 && jq <= 1 && $('#schedNewEventType').val() === 'EMAIL' && active === schIdx && schIdx >= 0 && saves.length === 0;
     XMLHttpRequest.prototype.open = xo;
     await open('manage sched'); var mr = row("Manage this report's schedules"); R.chk.manageRow = !!mr && !mr.off;   // (two words: three would be a question, loosely matched and capped)
     key('Escape', { target: input() }); await sleep(30);
@@ -1559,7 +1560,9 @@
     var more = row('Show '); if (more) { var pm = await pickRow('Show '); if (pm) { await enter(); } await sleep(200); }
     var got = trows().map(function (r) { return r.text.replace(/^Theme: /, ''); });
     R.info.themes = [regThemes.length, got.length, got.slice(0, 25), ai, ti];
-    R.chk.everyTheme = ok && regThemes.length >= 10 && got.length === regThemes.length && regThemes.every(function (n) { return got.indexOf(n) >= 0; });
+    var SPECIAL = /\((the report's own theme|a different theme each load)\)$/, gotT = got.filter(function (n) { return !SPECIAL.test(n); });   // (palsweep I7)
+    var specN = ts ? Array.prototype.filter.call(ts.options, function (o) { return o.value === 'report-default' || o.value === 'random'; }).length : 0;
+    R.chk.everyTheme = ok && regThemes.length >= 10 && gotT.length === regThemes.length && regThemes.every(function (n) { return gotT.indexOf(n) >= 0; }) && got.length - gotT.length === specN;
     R.chk.themeActionKept = ok && ai >= 0 && (ti < 0 || ai < ti);
     R.chk.themeCurrentMarked = trows().some(function (r) { return r.sub === 'now'; });
     type('cyanotype'); await sleep(150); var db = row('Theme: Cyanotype'); R.chk.themeByName = !!db && !db.off;
@@ -2300,7 +2303,8 @@
     await open('add a note lazy draft'); await sleep(200); var nl = notes()[0]; R.info.lazy = [nl, typeof window.PenumbraJournal];
     picked = await pickRow('Add a note to the Report journal'); if (picked) { await enter(); } await sleep(1500);
     var nt2 = document.getElementById('journalNoteText'); R.info.lazyAfter = [picked, jbClicks, nt2 ? nt2.textContent : null, posts];
-    R.chk.lazyJournal = !!nl && !nl.off && picked && jbClicks === 1 && !!nt2 && nt2.textContent === 'lazy draft' && posts.length === 0;
+    // (palsweep, 2026-11-22) the composer still holds the unposted draft an earlier step left ("budget overrun"): the new words go after it
+    R.chk.lazyJournal = !!nl && !nl.off && picked && jbClicks === 1 && !!nt2 && nt2.textContent === 'budget overrun lazy draft' && posts.length === 0;
     $(jbEl).off('click.zz'); window.PenumbraJournal = Jwas; $(document.getElementById('journalLightbox')).hide(); await sleep(100);
     var wrapEl = document.getElementById('journalBtnWrap'); if (wrapEl) wrapEl.style.display = 'none';
     await open('add a note'); await sleep(200); var gn = notes().filter(function (r) { return r.text === 'Add a note'; })[0]; R.info.noSurface = [gn, notes().map(function (r) { return r.text; })];
@@ -2379,7 +2383,7 @@
     R.chk.partialAddressOpens = picked && $(lb).is(':visible') && !!inp2 && inp2.value === 'a@x.' && chips().length === 1 && !chips().some(function (c) { return /a@x\./.test(c); }) && sends === 0 && shares.length === 0;
     $(lb).hide(); await sleep(100);
     await open('send feedback'); await sleep(200); var m4 = mrows()[0], i4 = rowIndex('Email this report to'); R.info.m4 = [m4, i4, selIdx(), texts().slice(0, 3)];
-    R.chk.verbAlwaysLeads = !!m4 && !m4.off && i4 === 0 && selIdx() === 0;
+    R.chk.verbAlwaysLeads = !m4 && i4 < 0;   // (palsweep 4) "send feedback": no Email row (the feedback action's words); "send ..." to a person still leads (partialName, partialAddress)
     key('Escape', { target: input() }); await sleep(30);
     var disp = btn.style.display; btn.style.display = 'none';
     await open('email a@x.edu'); await sleep(200); R.info.gate = mrows();
@@ -2920,7 +2924,10 @@
     R.info.opened = opened;
     R.chk.toolOpens = !box() && opened.length === 1 && opened[0] === 'grants_admin.php';
     // the report tools are untouched on the report page: the Actions section still leads with them
-    await open(''); R.chk.toolsAfterReport = rows().length > 0 && rows()[0].section !== 'Admin tools' && toolRows().length === menu.length;
+    // (palsweep hotfix, 2026-11-21) a tool just opened sits under Recent (Grants) and is not listed twice: the two sections together hold the menu
+    await open(''); var recT = rows().filter(function (r) { return r.section === 'Recent' && menu.some(function (m) { return m.label === r.text; }); });
+    R.info.afterReport = [recT.map(function (r) { return r.text; }), toolRows().length];
+    R.chk.toolsAfterReport = rows().length > 0 && rows()[0].section !== 'Admin tools' && toolRows().length + recT.length === menu.length && recT.some(function (r) { return r.text === 'Grants'; }) && !toolRows().some(function (r) { return r.text === 'Grants'; });
     key('Escape', { target: input() });
   };
   S.ptoolsv = async function () {
@@ -3274,6 +3281,9 @@
   function shownText() { var s = box() ? box().querySelector('.pnb-pal-status') : null; if (!s) return null; var t = ''; Array.prototype.forEach.call(s.childNodes, function (n) { if (n.nodeType === 3) t += n.nodeValue; }); return t; }
   function srHiddenNow() { var s = box() ? box().querySelector('.pnb-pal-status .pnb-pal-sr') : null; if (!s) return false; var r = s.getBoundingClientRect(), cs = getComputedStyle(s); return r.width <= 1 && r.height <= 1 && cs.position === 'absolute' && cs.overflow === 'hidden'; }
   function cnt(n, typed) { return n ? n + (typed ? (n === 1 ? ' match' : ' matches') : (n === 1 ? ' option' : ' options')) : 'No matches'; }
+  // (palsweep I9, 2026-11-21) the list modes say which list they are first: "Sort ascending: 12 options"; palM() drops that name, palHas() asks for it
+  function palM(s) { return String(s == null ? '' : s).replace(/^[^:]+: /, ''); }
+  function palHas(s) { return /^[^:]+: /.test(String(s == null ? '' : s)); }
   S.pwcagm = async function () {
     await boot(); await ready();
     // the main list: a typed search with no match says "No matches"; nothing shown in the footer for it; the hidden words not drawn
@@ -3300,15 +3310,15 @@
     type('zzqq'); await sleep(60);
     var p2 = [rows().length, shownText(), srText()];
     R.info.pick = [p0, p1, p2];
-    R.chk.pickCount = p0[0] === 'pick' && p0[1] > 1 && p0[2] === '' && p0[3] === cnt(p0[1], false) && p1[0] >= 1 && p1[1] === '' && p1[2] === cnt(p1[0], true);
-    R.chk.pickNone = p0[0] === 'pick' && p2[0] === 0 && p2[1] === '' && p2[2] === 'No matches';
+    R.chk.pickCount = p0[0] === 'pick' && p0[1] > 1 && p0[2] === '' && palHas(p0[3]) && palM(p0[3]) === cnt(p0[1], false) && p1[0] >= 1 && p1[1] === '' && palM(p1[2]) === cnt(p1[0], true);
+    R.chk.pickNone = p0[0] === 'pick' && p2[0] === 0 && p2[1] === '' && palM(p2[2]) === 'No matches';
     // a column's actions
     await open('v_name'); await pickRow('V_NAME', 'Columns'); await enter(); await sleep(60);
     var c0 = [modeOf(), rows().length, shownText(), srText()];
     type('sort'); await sleep(60);
     var c1 = [rows().length, shownText(), srText()];
     R.info.col = [c0, c1];
-    R.chk.colCount = c0[0] === 'col' && c0[1] > 3 && c0[2] === '' && c0[3] === cnt(c0[1], false) && c1[0] >= 1 && c1[2] === cnt(c1[0], true);
+    R.chk.colCount = c0[0] === 'col' && c0[1] > 3 && c0[2] === '' && palHas(c0[3]) && palM(c0[3]) === cnt(c0[1], false) && c1[0] >= 1 && palM(c1[2]) === cnt(c1[0], true);
     // Filter COLUMN by...: the column's buckets
     var B = window._penumbraSearchBuilder, ob = B ? B.openBucketRow : null;
     if (B) B.openBucketRow = function () { return true; };
@@ -3316,7 +3326,7 @@
       await open('filter v_date by'); await pickRow('Filter V_DATE by...'); await enter(); await sleep(150);
       var b0 = [modeOf(), rows().length, shownText(), srText()];
       R.info.bucket = b0;
-      R.chk.bucketCount = b0[0] === 'fbucket' && b0[1] >= 10 && b0[2] === '' && b0[3] === cnt(b0[1], false);
+      R.chk.bucketCount = b0[0] === 'fbucket' && b0[1] >= 10 && b0[2] === '' && palHas(b0[3]) && palM(b0[3]) === cnt(b0[1], false);
     } finally { if (B) B.openBucketRow = ob; }
     // the theme list
     await open('theme'); await pickRow('Theme...', 'Actions'); await enter(); await sleep(60);
@@ -3324,7 +3334,7 @@
     type('dark'); await sleep(60);
     var t1 = [rows().length, shownText(), srText()];
     R.info.theme = [t0, t1];
-    R.chk.themeCount = t0[0] === 'theme' && t0[1] > 5 && t0[2] === '' && t0[3] === cnt(t0[1], false) && t1[0] >= 1 && t1[2] === cnt(t1[0], true);
+    R.chk.themeCount = t0[0] === 'theme' && t0[1] > 5 && t0[2] === '' && palHas(t0[3]) && palM(t0[3]) === cnt(t0[1], false) && t1[0] >= 1 && palM(t1[2]) === cnt(t1[0], true);
     key('Escape', { target: input() }); await sleep(60);
     // the desktop Esc chip: shown, its word "Esc", no X drawn (a guard: unchanged)
     await open('');
@@ -3382,6 +3392,179 @@
     var shown = !!esc0 && ecs.display !== 'none';
     if (shown) { esc0.click(); await sleep(80); }
     R.chk.escNarrowCloses = shown && !box();
+  };
+
+  // ================================================================ (palsweep, 2026-11-21) the Quick actions sweep's 40 fixes, held
+  // ppsrank: the Top match and the hand-offs (672b50d, ed43d1e); ppskeys: keys, focus, Esc order, Jarvis, the editor insert (batch 2,
+  // 7014099); ppsnarrow: a 400px window (a greyed row's reason under its name). Each check has a mutant in run.py reverting its fix.
+  function ppsSetup(name) {
+    r21Vars();
+    history.replaceState(null, '', window.location.pathname + '?scn=' + name + '&id=zzconf');
+    var hiddenUp = $('#resultsTable').parents().filter(function () { return $(this).css('display') === 'none'; }); hiddenUp.show(); $('#resultsTable').show();
+    penumbra_vars.aiAllowed = true; penumbra_vars.canEditReport = true;
+  }
+  function ppsTop() { var r = rows()[0]; return (r && r.section === 'Top match') ? r : null; }
+  async function ppsTopFor(q) { await open(q); await sleep(q.length >= 3 ? 450 : 200); var t = ppsTop(); R.info['t_' + q] = [t ? t.text : null, t ? !!t.off : null, t ? t.why : null, texts().slice(0, 4)]; return t; }
+  S.ppsrank = async function () {
+    await boot(); await ready(); ppsSetup('ppsrank'); await sleep(100);
+    // (1) a late redraw - the functions index answering 500 ms after the first open - keeps the row the keyboard moved to
+    fnDelay = 500;
+    await open('v_'); await sleep(30);
+    key('ArrowDown', { target: input() }); key('ArrowDown', { target: input() });
+    var bi = selIdx(), before = selRow().text;
+    await until(function () { return fnStateOf() === 'ready' || fnStateOf() === 'failed'; }, 5000); await sleep(150);
+    fnDelay = 0;
+    R.info.late = [bi, before, selIdx(), selRow().text, fnStateOf()];
+    R.chk.lateRedrawKept = bi >= 2 && !!before && selRow().text === before && selIdx() === bi && fnStateOf() === 'ready';
+    var t;
+    // (2) "group by X": a row for X only; no such column = a greyed row that says so, never the first column's
+    t = await ppsTopFor('group by zz'); R.chk.groupNoCol = !!t && t.off && /No shown column matches "zz"/.test(t.why || '');
+    // ...and a word that every Group by row carries as a keyword ("sections") names no column: never the first column's row
+    t = await ppsTopFor('group by sections'); R.chk.groupKwNoCol = rows().length > 0 && !(t && !t.off && /^Group by V_/.test(t.text));
+    t = await ppsTopFor('group by v_status'); R.chk.groupCol = !!t && !t.off && t.text.indexOf('Group by V_STATUS') === 0;
+    // (4) an action whose name starts with the words leads; "send feedback" is no recipient; "email questions@..." is
+    t = await ppsTopFor('send feedback'); R.chk.feedbackTop = !!t && /^Send feedback/.test(t.text) && rowIndex('Email this report to') < 0;
+    t = await ppsTopFor('email questions@ncsu.edu'); R.chk.mailAddress = !!t && t.text === 'Email this report to questions@ncsu.edu';
+    // (6) "sort by NAME": the column's own sort, from a word of its name; never from the middle of a word
+    t = await ppsTopFor('sort by name'); R.chk.verbRow = !!t && !t.off && t.text === 'Sort V_NAME ascending';
+    if (R.chk.verbRow) { await enter(); await sleep(300); }
+    R.chk.verbRuns = !!R.chk.verbRow && !box() && !!A() && A().sortDir('V_NAME') === 'asc';
+    t = await ppsTopFor('sort v_amount desc'); R.chk.verbDesc = !!t && t.text === 'Sort V_AMOUNT descending';
+    await ppsTopFor('sort by ame'); R.chk.verbWordStart = !rows().some(function (r) { return /^Sort V_NAME/.test(r.text); }) && rows().length > 0;
+    // (25) a question that starts with "where" is no filter
+    t = await ppsTopFor('where do i change the theme'); R.chk.whereQuestion = rows().length > 0 && !(t && /^Filter/.test(t.text)) && !rows().some(function (r) { return /^Filter this report for do i/.test(r.text); });
+    // (8) and/or: every part a condition = as typed; "and" inside one value = one quoted value
+    t = await ppsTopFor('filter v_status = open and v_name = x'); R.chk.compoundAsTyped = !!t && t.text === 'Filter: v_status = open and v_name = x';
+    t = await ppsTopFor('filter v_status = Electrical and Computer'); R.chk.andInValue = !!t && t.text === "Filter: V_STATUS = 'Electrical and Computer'";
+    // (5) the name that IS the text first; (I3) accents folded, the highlight on the text's own characters
+    var m1 = (P() && P().match) ? P().match('pi', 'PI') : null, m2 = (P() && P().match) ? P().match('pi', 'PI_NAME') : null;
+    R.chk.exactFirst = !!m1 && !!m2 && m1.score > m2.score;
+    var mf = (P() && P().match) ? P().match('resume', 'R\u00e9sum\u00e9') : null;
+    R.chk.accentFold = !!mf && mf.idx.join(',') === '0,1,2,3,4,5';
+    // the header menu's Find in this column... has its row
+    await open('find in this column'); await sleep(150); var fi = row('Find in this column...');
+    R.chk.findInRow = !!fi && !fi.off;
+    // (9) a snapshot comparison: no per-column Group by / Chart / Copy rows
+    document.body.classList.add('snapshot-comparison-active');
+    await open('group by v_status'); await sleep(150);
+    R.info.cmp = texts().slice(0, 4);
+    R.chk.cmpNoCombos = rows().length > 0 && !rows().some(function (r) { return /^Group by V_STATUS/.test(r.text); });
+    document.body.classList.remove('snapshot-comparison-active');
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+  };
+  S.ppskeys = async function () {
+    await boot(); await ready(); ppsSetup('ppskeys'); await sleep(100);
+    // (7) Esc with the box open: the box closes and a page Escape handler registered after main.js never sees it
+    window.__zzPageEsc = [];
+    await open('v_');
+    key('Escape', { target: input() }); await sleep(60);
+    R.info.esc = [!!box(), window.__zzPageEsc.length];
+    R.chk.escFirst = !box() && window.__zzPageEsc.length === 0;
+    key('Escape', { target: document.body }); await sleep(30);
+    R.chk.escPageAfter = window.__zzPageEsc.length === 1;   // the box shut: the page's own Escape works (a guard)
+    window.__zzPageEsc = null;
+    // Ctrl+K again closes the box; (12) over the full-screen chart viewer nothing opens
+    await open('v'); ctrlK(); await sleep(60); R.chk.toggleCloses = !box();
+    var ov = document.createElement('div'); ov.id = 'chartCarouselOverlay'; ov.style.cssText = 'position:fixed;inset:0;z-index:5;'; document.body.appendChild(ov);
+    ctrlK(); await sleep(80); R.chk.fullscreenIgnored = !box(); ov.remove();
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    // (31) Page Down / Page Up move a page of the list; the page behind stays
+    await open('a'); await sleep(60);
+    var y0 = window.scrollY, s0 = selIdx(), pd = key('PageDown', { target: input() }), s1 = selIdx(); key('PageUp', { target: input() }); var s2 = selIdx();
+    R.info.page = [s0, s1, s2, rows().length, window.scrollY - y0, pd];
+    R.chk.pageMoves = pd && s1 > s0 + 1 && s2 < s1 && window.scrollY === y0;
+    // (I2, 32) the chip: a click on its name steps back one level with the words typed before; (I9) the mode said first
+    await open('sort asc'); await pickRow('Sort ascending'); await enter(); await sleep(60);
+    var m0 = modeOf(); type('v_n'); await sleep(50);
+    var say = srText(), ct = box() ? box().querySelector('.pnb-pal-chip-t') : null;
+    if (ct) { ct.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); } await sleep(60);
+    R.info.chip = [m0, say, modeOf(), input() ? input().value : null];
+    R.chk.chipBack = m0 === 'pick' && !!ct && modeOf() === 'root' && !!input() && input().value === 'sort asc';
+    R.chk.modeSaid = m0 === 'pick' && /^Sort ascending: /.test(say || '');
+    await pickRow('Sort ascending'); await enter(); await sleep(60); type(''); await sleep(30); key('Backspace', { target: input() }); await sleep(60);
+    R.chk.backspaceKeeps = modeOf() === 'root' && !!input() && input().value === 'sort asc';
+    // (14) a press on the box's own frame keeps the focus in the input
+    await open('v'); var foot = box() ? box().querySelector('.pnb-pal-foot') : null, fe = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    if (foot) { foot.dispatchEvent(fe); } await sleep(30);
+    R.chk.frameKeepsFocus = !!foot && fe.defaultPrevented && document.activeElement === input();
+    // (23) each section a group named by its heading; a note sits outside the listbox
+    await open('v'); await sleep(60);
+    var gs = box() ? box().querySelectorAll('#pnbPaletteList > [role="group"]') : [], named = Array.prototype.filter.call(gs, function (g) { var id = g.getAttribute('aria-labelledby'), h = id ? document.getElementById(id) : null; return !!h && h.textContent.trim().length > 0; });
+    R.info.groups = [gs.length, named.length];
+    R.chk.groupsNamed = named.length >= 2 && !!box() && !box().querySelector('#pnbPaletteList > .pnb-pal-sec') && !box().querySelector('#pnbPaletteList > .pnb-pal-it');
+    await open('sort asc'); await pickRow('Sort ascending'); await enter(); await sleep(60); type('zzqqxx'); await sleep(60);
+    R.chk.noteOutside = !!box() && !!box().querySelector('.pnb-pal-notes .pnb-pal-note') && !box().querySelector('#pnbPaletteList .pnb-pal-note');
+    // (I9) Show N more: the keyboard stays on the first row it brought
+    await open('a'); await sleep(60); var mi = rowIndex('Show ');
+    if (mi >= 0 && P() && P().select) { P().select(mi); await enter(); await sleep(80); }
+    R.info.more = [mi, selIdx(), selRow().text];
+    R.chk.moreKeeps = mi > 0 && selIdx() >= mi && !selRow().off && !/^Show \d+ more/.test(selRow().text || '');
+    // (I5) recents: the first three that apply shown, of the ten kept
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(['refresh', 'settings', 'header', 'rowheight', 'save', 'vh', 'console', 'ai'])); } catch (e) { }
+    await open(''); await sleep(60);
+    var rec = rows().filter(function (r) { return r.section === 'Recent'; });
+    R.info.rec = rec.map(function (r) { return r.text; });
+    R.chk.recentsThree = rec.length === 3;
+    try { localStorage.removeItem(RECENT_KEY); } catch (e) { }
+    // (I6) a switched-off control is never clicked; the toast says so
+    var hb = document.getElementById('settingsPanelHandle'), hclicks = 0;
+    if (hb) { $(hb).on('click.zzps', function () { hclicks++; }); hb.setAttribute('aria-disabled', 'true'); }
+    window.__toasts = [];
+    await open('open or close the settings panel'); await pickRow('Open or close the Settings panel'); await enter(); await sleep(150);
+    R.info.dis = [!!hb, hclicks, window.__toasts.slice(-1)];
+    R.chk.disabledNotClicked = !!hb && hclicks === 0 && window.__toasts.some(function (x) { return /switched off/.test(x); });
+    if (hb) { hb.removeAttribute('aria-disabled'); $(hb).off('click.zzps'); }
+    // (10) row height reads the state in force: on, the panel's checkbox stale (as a page load leaves it), one run turns it off
+    var tg = document.getElementById('spRowExpandToggle');
+    if (tg) {
+      document.body.classList.remove('disable-auto-expand'); tg.checked = false;
+      await open('consistent row height'); await pickRow('Consistent row height'); await enter(); await sleep(200);
+    }
+    R.chk.rowHeightFirst = !!tg && document.body.classList.contains('disable-auto-expand');
+    document.body.classList.remove('disable-auto-expand'); if (tg) { tg.checked = false; }
+    // (28) Shift+Enter replaces the word being typed (the Custom Code editor's own Ctrl+Space way)
+    var cm = window.CodeMirror ? window.CodeMirror(document.body, { mode: 'snippet', value: 'x = cou' }) : null, ci = -1;
+    if (cm) {
+      cm.setCursor({ line: 0, ch: 7 });
+      await openFromCm(cm, 'count');
+      await until(function () { return fnStateOf() === 'ready'; }, 5000); type('count'); await sleep(100);
+      var rs = rows(); for (var k = 0; k < rs.length; k++) { if (rs[k].insert && rs[k].text.indexOf('count(') === 0) { ci = k; break; } }
+      if (ci >= 0) { P().select(ci); key('Enter', { target: input(), shift: true }); await sleep(150); }
+    }
+    R.info.ins = [ci, cm ? cm.getValue() : null];
+    R.chk.insertReplaces = ci >= 0 && /^x = count\(/.test(cm.getValue()) && cm.getValue().indexOf('coucount') < 0;
+    if (cm) { cm.getWrapperElement().remove(); }
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    // (26) Ask Jarvis in the box waits while the panel's own request is on its way; (13) typing over an answer goes back to the list
+    var sb = document.getElementById('aiSendBtn'), madeSb = false;
+    if (!sb) { sb = document.createElement('button'); sb.id = 'aiSendBtn'; document.body.appendChild(sb); madeSb = true; }
+    sb.classList.add('ai-btn-loading');
+    var asks = 0, AIw = window.penumbraAi;
+    var stubAi = { ask: function () { asks++; return { abort: function () { } }; }, render: function (x) { return String(x); }, split: function (x) { return { text: String(x), actions: [] }; }, chips: function () { }, open: function () { } };
+    window.penumbraAi = stubAi;
+    await open('how do i sum a column'); await sleep(200); var ji = rowIndex('Ask Jarvis:');
+    if (ji >= 0) { P().select(ji); await enter(); await sleep(150); }
+    R.info.jb = [ji, asks, modeOf()];
+    R.chk.jarvisWaitsForPanel = ji >= 0 && asks === 0 && modeOf() !== 'jarvis';
+    sb.classList.remove('ai-btn-loading');
+    stubAi.ask = function (q, h) { asks++; setTimeout(function () { h.done('An answer.'); }, 10); return { abort: function () { } }; };
+    await open('how do i sum a column'); await sleep(200); ji = rowIndex('Ask Jarvis:');
+    if (ji >= 0) { P().select(ji); await enter(); await sleep(150); }
+    var jm = modeOf(); type('sort by name'); await sleep(80);
+    R.info.jt = [ji, jm, modeOf()];
+    R.chk.typeLeavesAnswer = jm === 'jarvis' && modeOf() === 'root' && !!box() && !box().querySelector('.pnb-pal.pnb-pal-jarvis');
+    if (madeSb) { sb.remove(); } window.penumbraAi = AIw;
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+  };
+  // (22) a 400px window: a greyed row's reason goes under its name (it squeezed the name away)
+  S.ppsnarrow = async function () {
+    await boot(); await ready();
+    await open('leave the version preview'); await sleep(150);
+    var it = box() ? box().querySelector('.pnb-pal-it.is-off') : null, lab = it ? it.querySelector('.pnb-pal-lab') : null, why = it ? it.querySelector('.pnb-pal-why') : null;
+    var lr = lab ? lab.getBoundingClientRect() : null, wr = why ? why.getBoundingClientRect() : null;
+    R.info.narrow = { w: window.innerWidth, lab: lr ? Math.round(lr.width) : null, why: (wr && lr) ? [Math.round(wr.width), Math.round(wr.top - lr.top)] : null };
+    R.chk.greyNameShown = window.innerWidth <= 480 && !!lr && lr.width >= 120 && !!wr && wr.top >= lr.bottom - 2;
+    if (box()) { key('Escape', { target: input() }); }
   };
 
   window.addEventListener('error', function (e) { (R.errors = R.errors || []).push(String(e.message)); });

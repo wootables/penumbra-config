@@ -204,7 +204,7 @@
       if (b) {
         // round 3: the WINDOW's top right (where a browser's find bar is), the same in every view
         var br = b.getBoundingClientRect(), vw = document.documentElement.clientWidth;
-        R.chk.placed = Math.round(br.top) === 8 && Math.abs(vw - br.right - 16) <= 1;
+        R.chk.placed = Math.round(br.top) === 20 && Math.abs(vw - br.right - 16) <= 1;   // (2026-11-21) 20: under the hide-header tab
         R.info.place = [Math.round(br.top), Math.round(br.right), vw];
       }
       var ev2 = await ctrlF();
@@ -218,11 +218,22 @@
       var ev4 = await ctrlF({ meta: true });
       R.chk.metaF = ev4.defaultPrevented && barShown();
       key('Escape'); await sleep(30);
-      // a text field keeps Ctrl+F (the browser's)
+      // (findsweep 6) the filter box - a one-line field - has no Ctrl+F of its own: Find opens from it
       document.getElementById('tableSearch').focus();
       var ev5 = await ctrlF();
-      R.chk.typingFree = !ev5.defaultPrevented && !barShown();
-      blurAll();
+      R.chk.filterBoxOpens = ev5.defaultPrevented && barShown();
+      key('Escape'); await sleep(30); blurAll();
+      // ...a text area keeps Ctrl+F (the browser's)
+      var ta = document.createElement('textarea'); document.body.appendChild(ta); ta.focus();
+      var ev5b = await ctrlF();
+      R.chk.textareaFree = !ev5b.defaultPrevented && !barShown();
+      ta.remove(); blurAll();
+      // ...and so does a modal of its own (Quick actions; findsweep hotfix): Find opened hidden under it
+      var md = document.createElement('div'); md.setAttribute('role', 'dialog'); md.setAttribute('aria-modal', 'true');
+      md.innerHTML = '<input type="text">'; document.body.appendChild(md); md.firstChild.focus();
+      var ev5c = await ctrlF();
+      R.chk.modalFree = !ev5c.defaultPrevented && !barShown();
+      md.remove(); blurAll();
       // a dialog owns the screen
       $('#settingsPanel').addClass('is-open');
       var ev6 = await ctrlF();
@@ -282,8 +293,13 @@
       R.chk.f3 = e1.defaultPrevented && st().cur === 0;
       var e2 = key('g', { ctrl: true }); await settle();
       R.chk.ctrlG = e2.defaultPrevented && st().cur === 1;
+      // (findsweep 15) outside the box Ctrl+Shift+G is main.js's Group Controls; in the box, the previous match
       var e3 = key('G', { ctrl: true, shift: true }); await settle();
-      R.chk.ctrlShiftG = e3.defaultPrevented && st().cur === 0;
+      R.chk.ctrlShiftGFree = st().cur === 1;   // Find did not step (main.js's own handler takes the key: Group Controls)
+      var gl = document.getElementById('groupingLightbox'); if (gl && shown(gl)) { $('#groupingLightbox .close-lightbox').first().click(); await sleep(60); }
+      inp().focus();
+      var e4 = key('G', { ctrl: true, shift: true }); await settle();
+      R.chk.ctrlShiftG = e4.defaultPrevented && st().cur === 0;
     },
 
     // Only the rows the search keeps; a line counts the rest; the count follows a
@@ -515,12 +531,25 @@
       key('Escape'); await sleep(60);
       R.chk.bandEsc = !!cur && !barShown() && !!F() && !F().isOpen() && !document.querySelector('#groupedResultsContainer .pnb-find-cur, #groupedResultsContainer .pnb-find-hit');
       R.info.stack = { n: hs.length, want: want, cur: st().cur };
+      // (findsweep 32) a column sort in the grouped view with Find open: read again, the matches in page order
+      blurAll(); await ctrlF(); await find('kilo');
+      var sc0 = st().scans, hth = Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer .group-content > table > thead th[data-colname]'), function (t) { return shown(t) && t.getAttribute('data-colname') !== '#'; })[0];
+      if (hth) { hth.click(); await sleep(300); await settle(); hth.click(); await sleep(300); await settle(); }
+      var hs2 = hits(), ordOk = hs2.length > 1;
+      for (var q = 1; q < hs2.length; q++) { if (hs2[q - 1].el.compareDocumentPosition(hs2[q].el) & Node.DOCUMENT_POSITION_PRECEDING) { ordOk = false; break; } }
+      R.chk.sortRereads = !!hth && st().scans > sc0 && ordOk;
+      key('Escape'); await sleep(30);
     },
     // Stacked, every group collapsed: stepping to a match opens its group (only it).
     grp_closed: async function () {
       var ws = gWraps();
       R.chk.saneClosed = ws.length === 6 && ws.every(function (w) { return !w.classList.contains('open'); });
       blurAll(); await ctrlF(); await find('zulu unique');
+      // (findsweep F5) no match on screen, the first in a closed group: named under the box, not opened; Enter opens it
+      var s0 = st(), h0 = hits()[s0.cur];
+      R.chk.named = s0.closed === true && !!h0 && !shown(h0.el) && ws.every(function (x) { return !x.classList.contains('open'); }) &&
+        /closed group/.test(String(F()._where ? F()._where() : ''));
+      key('Enter'); await settle();
       var td = curTd(), w = td && td.closest('.group-wrapper');
       R.chk.opened = !!w && w.classList.contains('open') && shown(td);
       R.chk.othersClosed = !!w && ws.filter(function (x) { return x !== w; }).every(function (x) { return !x.classList.contains('open'); });
@@ -537,6 +566,8 @@
     // Two levels, collapsed: both groups around the match open.
     grp_nest_closed: async function () {
       blurAll(); await ctrlF(); await find('zulu unique');
+      R.chk.named = st().closed === true;   // (findsweep F5) named first; Enter opens both levels
+      key('Enter'); await settle();
       var td = curTd(), chain = [];
       for (var w = td && td.closest('.group-wrapper'); w; w = w.parentElement ? w.parentElement.closest('.group-wrapper') : null) chain.push(w);
       R.chk.saneNested = document.querySelectorAll('#groupedResultsContainer > .group-wrapper.group-branch').length === 6;
@@ -549,6 +580,8 @@
       R.chk.saneList = document.body.classList.contains('pnb-gl-on') && !!document.getElementById('pnbGroupList');
       var before = document.querySelector('#groupedResultsContainer > .group-wrapper.pnb-gl-sel');
       blurAll(); await ctrlF(); await find('zulu unique');
+      R.chk.named = st().closed === true;   // (findsweep F5) a group not picked is a closed one: named first, Enter picks it
+      key('Enter'); await settle();
       var td = curTd(), w = td && td.closest('.group-wrapper');
       R.chk.otherGroup = !!before && !!w && w !== before;
       R.chk.picked = !!w && w.classList.contains('pnb-gl-sel') && shown(td);
@@ -558,6 +591,7 @@
       // A band that moves AFTER the pick (live: the List layout draws the picked band's crumb a
       // frame later, which slid a long group name under the bar): the bar follows it.
       await find('central');
+      if (st().closed) { key('Enter'); await settle(); }   // (findsweep F5)
       var nm = document.querySelector('#groupedResultsContainer .group-name.pnb-find-cur'), fb = document.querySelector('.pnb-find-bar');
       function box(el) { var r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; }
       function over(a, b) { return a.r > b.l && a.l < b.r && a.b > b.t && a.t < b.b; }
@@ -640,6 +674,10 @@
       var hiddenRows = Array.prototype.filter.call(P.tBodies[0].rows, function (tr) { return tr.hasAttribute('data-pivot-row') && !shown(tr); }).length;
       R.chk.saneClosed = hiddenRows > 6;
       blurAll(); await ctrlF(); await find('tier 2');
+      // (findsweep 42) named first ("Enter opens its group"), nothing opened while typing; Enter opens it
+      var hiddenNow = Array.prototype.filter.call(P.tBodies[0].rows, function (tr) { return tr.hasAttribute('data-pivot-row') && !shown(tr); }).length;
+      R.chk.named = st().closed === true && hiddenNow === hiddenRows;
+      key('Enter'); await settle();
       var td = curTd(), tr = td && td.closest('tr');
       R.chk.expanded = !!tr && shown(tr) && shown(td);
       R.chk.inView = !!td && inViewAny(td);
@@ -740,7 +778,7 @@
       function overlap(a, c) { return a.right > c.left && a.left < c.right && a.bottom > c.top && a.top < c.bottom; }
       R.chk.topRow = !!td && pageInfo() === 'Page 2 of 2' && td.parentNode.sectionRowIndex === 200 && inBox(td);
       var home = b ? b.getBoundingClientRect() : null;
-      R.chk.atHome = !!home && Math.round(home.top) === 8;
+      R.chk.atHome = !!home && Math.round(home.top) === 20;
       var box = document.getElementById('table-view-container');
       if (td && b) {
         box.style.marginTop = Math.round(-(td.getBoundingClientRect().top - 14)) + 'px';
@@ -752,7 +790,7 @@
       R.chk.justBelow = !!tr && !!br && br.top >= tr.bottom && br.top <= tr.bottom + 12;
       await find('zulu unique');
       var br2 = barEl() ? barEl().getBoundingClientRect() : null, z = curTd();
-      R.chk.backHome = !!br2 && !!z && !overlap(home, z.getBoundingClientRect()) && Math.round(br2.top) === 8;
+      R.chk.backHome = !!br2 && !!z && !overlap(home, z.getBoundingClientRect()) && Math.round(br2.top) === 20;
       box.style.marginTop = '';
       R.info.cover = { home: home ? [Math.round(home.top), Math.round(home.bottom)] : null, td: tr ? [Math.round(tr.top), Math.round(tr.bottom)] : null,
                        bar: br ? [Math.round(br.top), Math.round(br.bottom)] : null, bar2: br2 ? Math.round(br2.top) : null };
@@ -1238,6 +1276,67 @@
       await S.cmp_names();
       await find('modified rows'); await sleep(150); await frames(2);
     },
+    // (findsweep, 2026-11-21) the additions: the location line (F1), the overview strip (F2), Select (F3), Find in this
+    // column (F4), accent folding and runs of spaces (13 / 9)
+    fs_flat: async function () {
+      blurAll(); await ctrlF(); await find('kilo');
+      var s = st(), w0 = String(F()._where ? F()._where() : ''), col0 = (hits()[0] || {}).name || '';
+      R.chk.whereLine = s.cur >= 0 && /row \d+/.test(w0);
+      var cv = document.querySelector('.pnb-find-bar .pnb-find-map'), bw = barEl().getBoundingClientRect().width;
+      key('Enter'); await settle(); key('Enter'); await settle();
+      R.chk.strip = !!cv && cv.width > 0 && cv.clientHeight === 8 && Math.abs(barEl().getBoundingClientRect().width - bw) < 1;
+      var onPage = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return tr.style.display !== 'none' && !tr.classList.contains('search-hidden'); });
+      var want = 0, seen = new Set(onPage);
+      hits().forEach(function (h) { var row = document.querySelector('#resultsTable tbody').rows[h.pos]; if (row && seen.has(row)) want++; });
+      var n = F()._select ? F()._select() : 0, CS = window.Penumbra.cellSel;
+      R.chk.selectOnScreen = n > 0 && n === want && !!CS && CS.count() === n;
+      R.info.fsel = { n: n, want: want, all: s.n };
+      if (CS && CS.clear) CS.clear();
+      key('Escape'); await sleep(30); key('Escape'); await sleep(30); blurAll();
+      var all = s.n, col = col0;
+      var ok = !!col && (F().openIn ? F().openIn(col) : false);
+      await find('kilo');
+      var s2 = st(), hs = hits();
+      R.chk.colScope = ok && s2.col === col && hs.length > 0 && hs.length <= all && hs.every(function (h) { return h.name === col; }) &&
+        !!document.querySelector('.pnb-find-scope:not([hidden])');
+      // ...and scoped to a column the term is not in: nothing (every match of 'kilo' sits in one column here, so the
+      // first check alone could not tell a scoped read from a whole one)
+      var other = '', ths = document.querySelectorAll('#resultsTable > thead > tr#tableHeader th[data-colname]');
+      for (var oi = 0; oi < ths.length && !other; oi++) {
+        var on = String(ths[oi].getAttribute('data-colname') || '').toUpperCase();
+        if (on && on !== '#' && on !== col && ths[oi].style.display !== 'none') other = on;
+      }
+      var ok2 = !!other && F().openIn(other);
+      await find('kilo');
+      R.chk.colScope = R.chk.colScope && ok2 && st().col === other && hits().length === 0;
+      R.info.fcol = { col: col, n: hs.length, all: all, other: other, otherN: hits().length };
+      key('Escape'); await sleep(30);
+      // (findsweep 33) Select matches, then a copy: the matches one per line (not the selection's bounding box)
+      key('Escape'); await sleep(30); blurAll(); await ctrlF(); await find('kilo');
+      var nSel = F()._select ? F()._select() : 0, dtc = new DataTransfer();
+      (document.activeElement || document.body).dispatchEvent(new ClipboardEvent('copy', { clipboardData: dtc, bubbles: true, cancelable: true }));
+      var cl = dtc.getData('text/plain').split('\n').filter(function (l) { return l; });
+      R.chk.copyLines = nSel > 1 && cl.length === nSel && /kilo/i.test(cl[0]);
+      R.info.fcopy = { n: nSel, lines: cl.length };
+      if (window.Penumbra.cellSel && window.Penumbra.cellSel.clear) window.Penumbra.cellSel.clear();
+      key('Escape'); await sleep(30); key('Escape'); await sleep(30); blurAll();
+      // (findsweep 31) Rows = All, scrolled to the middle, no active cell: the first match on screen, not the page's first
+      var rpp = document.getElementById('rowsPerPageSelector'), rv = rpp ? rpp.value : null;
+      if (rpp) { $(rpp).val('all').trigger('change'); await sleep(400); await frames(2); }
+      var allRows = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return tr.style.display !== 'none'; });
+      if (allRows.length > 150) { allRows[150].scrollIntoView({ block: 'start' }); await frames(2); }
+      var topVis = -1;
+      for (var tv = 0; tv < allRows.length; tv++) { var rb = allRows[tv].getBoundingClientRect(); if (rb.bottom > 60) { topVis = allRows[tv].sectionRowIndex; break; } }
+      var CSx = window.Penumbra.cellSel; if (CSx && CSx.clear) CSx.clear();
+      blurAll(); await ctrlF(); await find('kilo');
+      var hk = hits(), sc = st(), curPos = (sc.cur >= 0 && hk[sc.cur]) ? hk[sc.cur].pos : -1, firstPos = hk.length ? hk[0].pos : -1;
+      R.chk.startOnScreen = topVis > 0 && curPos >= topVis - 2 && curPos !== firstPos;
+      R.info.fstart = { topVis: topVis, cur: curPos, first: firstPos };
+      key('Escape'); await sleep(30);
+      if (rpp && rv) { $(rpp).val(rv).trigger('change'); await sleep(300); }
+      var C = F()._text && F()._text.compile;
+      R.chk.accentFold = !!C && C('jose').test('jos\u00e9 garc\u00eda') && C('smith john').test('smith john') && !C('jose').test('joan');
+    },
     // A narrow window: two rows spanning it (420 px, a phone; 700 px, under the 720 px line)...
     narrow: async function () { await narrowCheck(); },
     narrow_mid: async function () { await narrowCheck(); },
@@ -1247,7 +1346,8 @@
       var b = barEl();
       if (!b || !inp()) { R.chk.wOneRow = R.chk.wInView = false; return; }
       var r = b.getBoundingClientRect(), i = inp().getBoundingClientRect(), c = b.querySelector('.pnb-find-count').getBoundingClientRect();
-      R.chk.wOneRow = Math.abs(c.top - i.top) < 8 && r.height < 45;
+      var rw = b.querySelector('.pnb-find-row').getBoundingClientRect();
+      R.chk.wOneRow = Math.abs(c.top - i.top) < 8 && rw.height < 45;
       R.chk.wInView = r.left >= 0 && r.right <= window.innerWidth;
       R.info.wide = { vw: window.innerWidth, bar: [Math.round(r.left), Math.round(r.right), Math.round(r.height)] };
     },

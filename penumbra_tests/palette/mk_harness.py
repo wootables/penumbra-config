@@ -127,14 +127,19 @@ def build(index_src, menu_html='', theme_opts=''):
         + '</div></div>\n'
         '<script>document.getElementById("zzUserBtn").addEventListener("click", function () { var seg = this.parentNode, open = seg.classList.toggle("sb-open"); this.setAttribute("aria-expanded", open ? "true" : "false"); });</script>\n')
     # (round 4b) the preset engine, EAGER before main.js as index.php loads it: the "Apply ... preset" rows
-    rep('<script src="main_hc.js"></script>\n', '<script src="penumbra_presets.js"></script>\n<script src="main_hc.js"></script>\n<script src="search_builder.js"></script>\n<script>if (/[?&]scn=(pnote|pshot21|ptop|psweep)\\b/.test(location.search)) document.write(\'<script src="penumbra_journal.js"></scr\' + \'ipt>\');</script>\n')   # (round 14) the builder after main.js, as index.php orders them
+    # (palsweep, 2026-11-21) the stub BEFORE main.js, as index.php orders it since 672b50d (its Esc runs ahead of the page's own
+    # window Escape handlers); the cold scenarios never prefetch. A page Escape handler after main.js for ppskeys (armed by the driver)
+    rep('<script src="main_hc.js"></script>\n', '<script src="penumbra_presets.js"></script>\n'
+        '<script>if (/^pcold|^pfail/.test(window.__SCN)) { window.requestIdleCallback = function () {}; }\n'
+        '  document.write(\'<script src="penumbra_palette_boot.js" data-js="\' + (window.__SCN === "pfail" ? "penumbra_palette_missing.js" : "penumbra_palette.js") + \'?v=1" data-css="penumbra_palette.css?v=1" data-fn="help_functions.json?v=1"></scr\' + \'ipt>\');</script>\n'
+        '<script src="main_hc.js"></script>\n'
+        '<script>window.addEventListener("keydown", function (e) { if ((e.key === "Escape" || e.key === "Esc") && window.__zzPageEsc) { window.__zzPageEsc.push(1); e.stopImmediatePropagation(); } }, true);</script>\n'
+        '<script src="search_builder.js"></script>\n<script>if (/[?&]scn=(pnote|pshot21|ptop|psweep|ppsrank|ppskeys)\\b/.test(location.search)) document.write(\'<script src="penumbra_journal.js"></scr\' + \'ipt>\');</script>\n')   # (round 14) the builder after main.js, as index.php orders them
     # the stub AFTER the header menu, as index.php orders them; the cold scenarios never prefetch
     rep('<script src="penumbra_colmenu.js"></script>\n',
         '<script src="penumbra_colmenu.js"></script>\n'
         '<link rel="stylesheet" href="penumbra_find.css"><script src="penumbra_find.js"></script>\n'   # (round 14) Find, as index.php loads it
-        '<script>if (/^pcold|^pfail/.test(window.__SCN)) { window.requestIdleCallback = function () {}; }\n'
-        '  if (/^prow|^pjump|^pnote|^ptop/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_cellsel.css"><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');\n'
-        '  document.write(\'<script src="penumbra_palette_boot.js" data-js="\' + (window.__SCN === "pfail" ? "penumbra_palette_missing.js" : "penumbra_palette.js") + \'?v=1" data-css="penumbra_palette.css?v=1" data-fn="help_functions.json?v=1"></scr\' + \'ipt>\');</script>\n')
+        '<script>if (/^prow|^pjump|^pnote|^ptop/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_cellsel.css"><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');</script>\n')
     # (round 15) the editor console: its tab list and the REAL View Options panel from index.php (PHP stripped), stub
     # panels for the other tabs, a scheduler stub with the new-task controls main.js binds, all inside #admWrapper
     # (hidden until the admin view opens, as main.js keeps it); the headers (title + subtitle) of the dialogs the
@@ -167,7 +172,7 @@ def build(index_src, menu_html='', theme_opts=''):
     r21 = re.sub(r'<\?php.*?\?>', '', r21, flags=re.S)
     rep('<div id="loadingOverlay" style="display:none">',
         '<template id="zzR21">' + r21 + '</template>\n'
-        '<script>if (/[?&]scn=(pnote|pmail|pmiss|pshot21|ptop|psweep)\\b/.test(location.search)) { var zzT = document.getElementById("zzR21"); ["emailLightbox", "journalLightbox", "downloadActionsLightbox", "manageSnapshotsLightbox"].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); }); document.body.appendChild(zzT.content.cloneNode(true)); }</script>\n'
+        '<script>if (/[?&]scn=(pnote|pmail|pmiss|pshot21|ptop|psweep|ppsrank|ppskeys)\\b/.test(location.search)) { var zzT = document.getElementById("zzR21"); ["emailLightbox", "journalLightbox", "downloadActionsLightbox", "manageSnapshotsLightbox"].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); }); document.body.appendChild(zzT.content.cloneNode(true)); }</script>\n'
         '<div id="loadingOverlay" style="display:none">')
     heads = ''
     for lid in ('pivotLightbox', 'visualizationLightbox', 'groupingLightbox', 'downloadActionsLightbox', 'copyActionsLightbox', 'emailLightbox', 'manageSnapshotsLightbox', 'journalLightbox'):
