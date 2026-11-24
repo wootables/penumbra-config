@@ -23,6 +23,8 @@ function lift($src, $from, $to) {
     return substr($src, $i + strlen($from), $j - $i - strlen($from));
 }
 $ix = rd($argv[1]); $ixRef = rd($argv[2]);
+// (apifix, 2026-11-22) the API's sort block calls penumbra_api.php's helpers: load the candidate's own copy.
+if (is_file(dirname($argv[1]) . '/penumbra_api.php')) require_once dirname($argv[1]) . '/penumbra_api.php';
 $LIB = $argv[3]; $SEARCH = $argv[5];
 $fx = json_decode((string)@file_get_contents($argv[6]), true);
 ok($ix !== '' && $ixRef !== '' && is_array($fx) && !empty($fx['fx']), 'H-S0 inputs read');

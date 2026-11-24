@@ -1406,7 +1406,7 @@ def static_checks(t):
     # (topic, tips, the Ctrl+Shift+L row, the manifest's card words); the palette row + the cheat sheet; README
     sec = re.search(r'<div class="sp-section sp-cards-section" id="spCardsSection" hidden>.*?</div>\s*</div>', idx, re.S)
     out.append(('S-roundN', 'Round N (2026-10-30' in t['readme'] and 'pnb-cards-vo' not in idx and 'id="pnbCardsSetup"' not in idx and ((bool(sec) and 'id="spCardConfigBtn"' in sec.group(0)) or ('Round P (2026-10-30' in t['readme'] and not sec))
-                and 'vo-cards' not in vtopic and "Clear the default" in t['ustopic'] and "an editor's Save makes it everyone's" in t['tip'] and 'Make default' not in t['ustopic'] + t['tip'] and 'Configure cards' in t['tip']
+                and 'vo-cards' not in vtopic and "Clear the default" not in t['ustopic'] and 'set the slots back to Automatic' in t['ustopic'] and "an editor's Save makes it everyone's" in t['tip'] and 'Make default' not in t['ustopic'] + t['tip'] and 'Configure cards' in t['tip']
                 and '<kbd>Ctrl+Shift+L</kbd>' in t['pftopic'] and "row(['Ctrl+Shift+L']" in main and "id: 'cardconfig'" in pal and "keys: ['Ctrl', 'Shift', 'L']" in pal
                 and 'configure cards' in t['manifest'] and 'journal cards card view' not in t['manifest']
                 and 'function switchWanted(' in cards and "el.id = 'pnbCardsConfig';" in cards and '#pnbCardsConfig .pnb-ccfg-box' in css and 'openConfig: openConfig' in cards,
@@ -1479,7 +1479,7 @@ def static_checks(t):
     out.append(('S-cfix', 'cfix (2026-10-31' in t['readme'] and 'function packCards(' in cards and '#pnbCardsHost.is-packed' in css and 'savedToReport: savedToReport' in cards
                 and 'window.Penumbra.cards.savedToReport) window.Penumbra.cards.savedToReport(' in main   # (2026-11-17) the guard AND the call: the call's text alone let x-mainhook (a dead guard) through
                 and 'if (v && v.nopack) o.nopack = 1;' in main and 'if (c.nopack === 1 || c.nopack === true) o.nopack = 1;' in main
-                and 'o.fields = v.fields.slice(0, 16);' in main and 'Pack the cards' in t['ustopic'] and '<strong>All</strong> / <strong>None</strong>' in t['ustopic']
+                and 'o.fields = v.fields.slice(0, 200);' in main and 'Pack the cards' in t['ustopic'] and '<strong>All</strong> / <strong>None</strong>' in t['ustopic']
                 and bool(tipm) and '<ul>' in tipm.group(0) and len(tipm.group(0)) < 1100 and 'Pack the cards' in tipm.group(0) and 'Right-click a field\'s name for its column heading\'s menu' in t['ustopic'],
                 'cfix: the module, css, main.js hooks, the help (a short tip), README'))
     out.append(('S-cfix2', 'cfix2 (2026-10-31' in t['readme'] and 'function pdfPages(doc)' in cards and 'function boardFit(el)' in cards and 'var(--pnb-board-h,' in css
@@ -1504,7 +1504,7 @@ def static_checks(t):
                 and '_cdM.emailHtml({ budget: _emailBodyBudgetBytes(attachments) })' in main
                 and 'const pdfContent = await _pnbGeneratePdf({ cards: true });' in main and 'Email Report sends the cards while they show' in t['ustopic'],
                 'the email\'s cards: the module, main.js (the cell helper, the dialog, the send, the PDF), index.php, the help, README'))
-    out.append(('S-csched', 'csched (2026-11-01' in t['readme'] and 'function savedView()' in cards and 'var MAIL_THEME = {' in cards and "if (report && report.open) return 'cards';" in cards
+    out.append(('S-csched', 'csched (2026-11-01' in t['readme'] and 'function savedView()' in cards and 'var MAIL_THEME = {' in cards and "if (report && report.open && !report.tbl) return 'cards';" in cards
                 and 'emailBodyCardsRow' not in t['index'] and 'emailBodyAsCards' not in main and 'window.Penumbra.cards.on()' in main and 'emailVars: function ()' in main
                 and "const _sv = (_svC && _svC.savedView) ? _svC.savedView() : null;" in main
                 and '<strong>saved showing cards</strong>' in t['ustopic'],
@@ -1573,7 +1573,7 @@ def static_checks(t):
     out = _static_checks_before_clay(t)
     out.append(('S-clay', "{ id: 'cardlayouts', label: 'Card layouts...'," in t['pal'] and "run: function () { window.Penumbra.cards.openLayouts(); }" in t['pal']
                 and '<strong>Save these cards...</strong> names what the window shows' in t['ustopic']
-                and 'up to 16 fields; <strong>Layouts</strong> saves them by name.</li>' in t['tip'] and 'clay (2026-11-03, the user' in t['readme'],
+                and 'any of the shown columns as fields; <strong>Layouts</strong> saves them by name.</li>' in t['tip'] and 'clay (2026-11-03, the user' in t['readme'],
                 'the palette row, the Your Settings topic, the tip, the README'))
     return out
 MUTANTS.update({

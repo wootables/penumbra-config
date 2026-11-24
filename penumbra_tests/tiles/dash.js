@@ -455,7 +455,8 @@
                 // clearing a filter after ten minutes must not bring back
                 // ten-minute-old rows.
                 var fk = tileFetchKey(tl), ent = dataCache[fk];
-                if (ent && !(ent.at && (Date.now() - ent.at) < 15000)) { delete dataCache[fk]; }
+                // (apibatch5 #22) ...and never one whose fetch is still out: the tile waits for that answer
+                if (ent && !cacheEntryPending(ent) && !(ent.at && (Date.now() - ent.at) < 15000)) { delete dataCache[fk]; }
                 renderTileInto($t, tl);
             }
         }
@@ -588,13 +589,18 @@
             var ck = src.key + '\u0001' + text, had = _ctlCountRows[ck];
             if (!had) {
                 had = _ctlCountRows[ck] = { pending: true };
+                var ctlGen = _dashGen, ctlHad = had;   // (apibatch5 #22) see the catch below
                 var ss = searchSpecFor({ report: src.tile.report, prompts: src.tile.prompts }, T.splitSearch(text), text);
                 T.fetchRows({ source: 'live', report: src.tile.report, prompts: effPrompts(src.tile), limit: CTL_FILL_LIMIT, search: ss.search, dsearch: ss.dsearch })
                     .then(function (res) {
                         _ctlCountRows[ck] = { rows: res.rows, capped: (typeof res.totalRows === 'number') && res.totalRows > res.rows.length };
                         scheduleControls();
                     })
-                    .catch(function () { _ctlCountRows[ck] = { rows: null }; });
+                    .catch(function () {
+                        // (apibatch5 #22) a call dropped by a kiosk hop is not an answer: the next dashboard asks again
+                        if (ctlGen !== _dashGen) { if (_ctlCountRows[ck] === ctlHad) { delete _ctlCountRows[ck]; } return; }
+                        _ctlCountRows[ck] = { rows: null };
+                    });
             }
             if (had.pending || !had.rows || had.capped) { return null; }
             rows = had.rows;
@@ -753,6 +759,7 @@
             var tc = tileBuilderCols(pick[k]);
             if (!tc || !want.some(function (c) { return c in tc.upper; })) { return; }
             _ctlFillAsked[k] = true;
+            var fillGen = _dashGen;   // (apibatch5 #22) see the catch below
             var tl = pick[k];
             T.fetchRows({ source: 'live', report: tl.report, prompts: effPrompts(tl), limit: CTL_FILL_LIMIT, search: '', dsearch: '' })
                 .then(function (res) {
@@ -765,7 +772,11 @@
                     }
                     scheduleControls();
                 })
-                .catch(function () { /* the chips keep what the tiles hold */ });
+                .catch(function () {
+                    /* the chips keep what the tiles hold */
+                    // (apibatch5 #22) ...but a call dropped by a kiosk hop was never answered: the next dashboard may ask
+                    if (fillGen !== _dashGen) { delete _ctlFillAsked[k]; }
+                });
         });
     }
     // Focus survives a redraw (WCAG 2.4.3): the focused control is found again
@@ -1827,6 +1838,7 @@
     // handling never sees it as well.
     window.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape' && e.key !== 'Esc') { return; }
+        if (window.PenumbraPalette && typeof PenumbraPalette.isOpen === 'function' && PenumbraPalette.isOpen()) { return; }   // (palsweep 36) Quick actions' Esc
         var lb = document.getElementById('searchBuilderLightbox');
         if (!lb || !$(lb).is(':visible') || $('#dashSsoLightbox').length || $('#dashHelpOverlay').length) { return; }
         if ($('#sbAutocompleteDropdown').is(':visible') || $('#ui-datepicker-div').is(':visible')) { return; }
@@ -1931,6 +1943,11 @@
     var chartInstances = {};   // tileId -> Chart
     var refreshTimer = null;
     var _tileLastRefresh = {};   // tileId -> ms of last content render (per-tile refresh engine)
+    // (apibatch5 #22) An entry whose fetch has not answered yet (waiting its turn, or running). Its tiles wait for that
+    // answer: a refresh that dropped the entry started another run of the same report every interval, and each answer
+    // was discarded for the newer call (_tileRenderTok), so a report slower than its tile's interval never rendered
+    // while its runs piled up. Ten minutes at most: a call that never answers must not hold its tiles for good.
+    function cacheEntryPending(ent) { return !!(ent && ent.pending && ent.at && (Date.now() - ent.at) < 600000); }
     var _dashGen = 0;            // bumped when a kiosk cycle swaps dashboards: stale tile fetches must not touch the new dashboard's charts (duplicated dashboards share tile ids)
 
     window.addEventListener('beforeunload', function (e) {
@@ -1967,7 +1984,7 @@
         if (!force && dataCache[key] && dataCache[key].promise) { return dataCache[key].promise; }
 
         if (force) { _ctlCountRows = Object.create(null); }   // fresh rows: fresh chip counts (2026-10-01)
-        var entry = { rows: null, asOf: null, error: null, at: Date.now() };
+        var entry = { rows: null, asOf: null, error: null, at: Date.now(), pending: true };   // (apibatch5 #22) until it answers
         dataCache[key] = entry;
 
         var ss = tileSearchSpec(tile);
@@ -1977,6 +1994,7 @@
                      search: ss.search, dsearch: ss.dsearch };   // the server filters the JSON rows (2026-09-05; routed fragments 2026-09-29)
         entry.promise = T.fetchRows(spec)
             .then(function (res) {
+                entry.pending = false;   // (apibatch5 #22)
                 entry.rows = res.rows;
                 entry.asOf = res.asOf || null;
                 // The true size when a &limit= trimmed (or the rowset's own length):
@@ -1993,6 +2011,7 @@
             .catch(function (err) {
                 // A 403 means the VIEWER lacks access to the source report: the
                 // fail-closed case (the message is the engine's).
+                entry.pending = false;   // (apibatch5 #22)
                 entry.error = T.errorMessage(err);
                 throw entry;
             });
@@ -4193,7 +4212,11 @@
                     var inner;
                     if (p.options && p.options.length) {
                         var found = false;
+                        // (apibatch4 #12) a multi-select's value with a comma in it goes as &#44; (the API's list
+                        // separator is the comma: "Smith, John" was read as two values)
+                        var isMulti = String(p.type || '').toLowerCase() === 'multi-select';
                         var opts = p.options.map(function (o) {
+                            if (isMulti) { o = { label: o.label, value: String(o.value).replace(/,/g, '&#44;') }; }
                             var sel = val !== '' && val === String(o.value);
                             if (sel) { found = true; }
                             return '<option value="' + escapeHtml(String(o.value)) + '"' + (sel ? ' selected' : '') + '>' + escapeHtml(String(o.label)) + '</option>';
@@ -4225,9 +4248,18 @@
                 var known = {};
                 promptDefs.forEach(function (p) { known[p.name] = 1; });
                 var lines = [];
+                // (apibatch4 #14) A prompt with nothing to fall back on (no default, not a multi-select or a control)
+                // left empty is sent as an explicit blank: "name=". Left out, the API refuses the tile's call
+                // ("This report needs an answer for ..."), where it ran with a blank answer before 2026-11-22.
+                var needsBlank = {};
+                promptDefs.forEach(function (p) {
+                    var hasDef = (p['default'] !== null && p['default'] !== undefined) || (p.forcedefault !== null && p.forcedefault !== undefined);
+                    if (!hasDef && !p.resultif && !p.hidden && String(p.type || '').toLowerCase() !== 'multi-select') { needsBlank[p.name] = 1; }
+                });
                 $('.dash-prompt-input').each(function () {
                     var n = String($(this).data('name')), v = $.trim($(this).val());
                     if (v !== '') { lines.push(n + '=' + v); }
+                    else if (needsBlank[n]) { lines.push(n + '='); }
                 });
                 for (var k in cur) {
                     if (Object.prototype.hasOwnProperty.call(cur, k) && !known[k]) { lines.push(k + '=' + cur[k]); }
@@ -4901,7 +4933,9 @@
         // queries for N same-report tiles due in the same tick.
         var key = (tile.type === 'trend') ? trendFetchKey(tile) : tileFetchKey(tile);
         var ent = dataCache[key];
-        if (!(ent && ent.at && (Date.now() - ent.at) < 15000)) { delete dataCache[key]; }
+        // (apibatch5 #22) Its fetch is still out (the report is slower than this tile's interval): no second run. The
+        // render below joins the call already out, and its answer renders when it comes.
+        if (!cacheEntryPending(ent) && !(ent && ent.at && (Date.now() - ent.at) < 15000)) { delete dataCache[key]; }
         renderTileInto($tile, tile);
     }
     var _refreshPaused = false;   // the header's Pause refresh button (viewer-facing)
@@ -5036,6 +5070,8 @@
                 var st = (r.state && Array.isArray(r.state.tiles)) ? r.state : null;
                 if (!st) { return; }
                 _dashGen++;   // stale tile fetches from the outgoing dashboard drop their results
+                // (apibatch5 #22) ...and its report calls still waiting their turn never start (penumbra_tiles.js)
+                if (typeof T.dropQueuedRuns === 'function') { T.dropQueuedRuns(); }
                 // Tear down the current dashboard's live pieces.
                 for (var k in chartInstances) {
                     if (Object.prototype.hasOwnProperty.call(chartInstances, k)) {
@@ -5219,7 +5255,7 @@
     // arrives as fullscreenchange below. On the window at capture: the page's
     // own Escape handlers stop the event lower down.
     window.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && KIOSK && !document.fullscreenElement && !$('#dashOverlay').length) { exitKioskMode(); }
+        if (e.key === 'Escape' && KIOSK && !document.fullscreenElement && !$('#dashOverlay').length && !(window.PenumbraPalette && typeof PenumbraPalette.isOpen === 'function' && PenumbraPalette.isOpen())) { exitKioskMode(); }   // (palsweep 36)
     }, true);
     document.addEventListener('fullscreenchange', function () {
         if (document.fullscreenElement) { $('.dash-kiosk-hint').remove(); }

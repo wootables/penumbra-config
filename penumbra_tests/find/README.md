@@ -368,3 +368,16 @@ scratchpad find-sweep\suite_update.py, suite_fix2.py, suite_fix3.py):
   noselect, nowhere. 100 mutants.
 
 Results against LIVE (8ac5a53): 333/0 (then `fs_flat` 6/0 after the colScope addition), mutants 100/100 bite.
+
+# findfix (2026-11-23, app 3104a6d) - five medium fixes
+
+js/penumbra_find.js, tagged `findfix 1`-`5`: Filter / Alt+Enter / Alt+A while a term is typed wait for it (the old
+offer hides on the first key); a page turned by hand drops the current match (Enter goes on from that page); a leading
+slash goes to the search as a pattern with `\x2f`; the search's own marks fold accents; the current match is moved clear
+of `#floating-button-container`. Backups `driver.js` / `suite_def.py` / `README.md` `.bak-20261123-findfix`.
+
+* `paint`: `noReread` now expects `cur === -1` after the hand page turn (scans unchanged); new `stepFromPage`.
+* `filter`: new `typingFilter` (input then Alt+Enter at once: the new term's rows) and `slashFilter` (`/kil`).
+* Mutants: new `nopagedrop`, `notermpending`, `noslashpattern` (3/3 bite). Not covered here: the accent marks (no
+  accented fixture) and the rail (the harness has none) - both checked live on dirsearch.
+* Live before the deploy: the four new/changed checks red, the rest green.

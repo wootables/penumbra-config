@@ -434,7 +434,27 @@
         await until(function () { return (window.__HC_HIDES || 0) > h2; }, 20000); await sleep(150); await settle();
       }
       R.chk.altEnter = !!ev && ev.defaultPrevented && $('#tableSearch').val() === '"zulu unique"' && kept().length === 1;
-      R.info.filter = { p1: p1, p2: p2, p3: p3, p4: p4, anyKilo: anyKilo, findRows: findRows, openKilo: openKilo };
+      // (findfix 1, 2026-11-23) Alt+Enter right after a key: the new term's rows, never the last term's (the old offer hides)
+      await searched('');
+      await find('kilo');
+      await until(function () { return btnShown(); }, 5000);
+      var hidOnKey = false, h3 = window.__HC_HIDES || 0, ev2 = null;
+      if (inp()) {
+        inp().focus();
+        inp().value = 'zulu unique';
+        inp().dispatchEvent(new Event('input', { bubbles: true }));
+        hidOnKey = !btnShown();
+        ev2 = key('Enter', { alt: true });
+        await until(function () { return (window.__HC_HIDES || 0) > h3; }, 20000); await sleep(150); await settle();
+      }
+      R.chk.typingFilter = hidOnKey && !!ev2 && ev2.defaultPrevented && $('#tableSearch').val() === '"zulu unique"' && kept().length === 1;
+      // (findfix 3) a leading slash: the search read "/kil" as a pattern (the empty one: every row); now the same text
+      await searched('');
+      await find('/kil');
+      var p5 = countNow(), slashRows = FX.filter(function (r) { return anyHas(r, /\/kil/i); }).length;
+      R.chk.slashFilter = !!p5 && p5.n === slashRows && p5.n < FX.length && /^\/\\x2fkil\/$/.test(p5.q);
+      await find('');
+      R.info.filter = { p1: p1, p2: p2, p3: p3, p4: p4, p5: p5, slashRows: slashRows, anyKilo: anyKilo, findRows: findRows, openKilo: openKilo };
     },
 
     // Esc: the bar closes, nothing stays painted, the match becomes cell
@@ -469,8 +489,15 @@
       R.chk.paintsPage = hlSize('pnb-find') + hlSize('pnb-find-cur') === shownOcc() && allOnScreen();
       document.getElementById('firstPageBtn').click(); await sleep(60); await settle();
       R.chk.afterFlip = pageInfo() === 'Page 1 of 2' && hlSize('pnb-find') === shownOcc() && hlSize('pnb-find-cur') === 0 && allOnScreen();
-      R.chk.noReread = typeof s0.scans === 'number' && st().scans === s0.scans && st().cur === s0.cur;
+      // (findfix 2, 2026-11-23) a page turned away from the current match: not read again, and the match is no longer
+      // current ("N matches") - the next step goes on from the page on screen, not back to the match's page
+      R.chk.noReread = typeof s0.scans === 'number' && st().scans === s0.scans && st().cur === -1;
       R.info.paint = { first2: first2, cur: s0.cur, sizes: [hlSize('pnb-find'), hlSize('pnb-find-cur'), shownOcc()], scans: [s0.scans, st().scans] };
+      if (inp()) inp().focus();
+      key('Enter'); await sleep(60); await settle();
+      var hsF = hits(), sF = st();
+      R.chk.stepFromPage = pageInfo() === 'Page 1 of 2' && sF.cur >= 0 && !!hsF[sF.cur] && hsF[sF.cur].pos < 200;
+      R.info.paintStep = { page: pageInfo(), cur: sF.cur, pos: (hsF[sF.cur] || {}).pos };
       var wasOpen = barShown();
       $('#rowsPerPageSelector').val('none').trigger('change'); await sleep(100); await frames(2);
       R.chk.closesOnNone = wasOpen && !barShown() && st().open === false;
@@ -548,7 +575,8 @@
       // (findsweep F5) no match on screen, the first in a closed group: named under the box, not opened; Enter opens it
       var s0 = st(), h0 = hits()[s0.cur];
       R.chk.named = s0.closed === true && !!h0 && !shown(h0.el) && ws.every(function (x) { return !x.classList.contains('open'); }) &&
-        /closed group/.test(String(F()._where ? F()._where() : ''));
+        /closed/.test(String(F()._where ? F()._where() : ''));   // (findgroup) "In G1 > G2 (closed): Enter opens it"
+      R.chk.groupPath = /^In (?!a closed group)\S.* \(closed\): Enter opens it$/.test(String(F()._where ? F()._where() : ''));   // the group named
       key('Enter'); await settle();
       var td = curTd(), w = td && td.closest('.group-wrapper');
       R.chk.opened = !!w && w.classList.contains('open') && shown(td);
@@ -725,12 +753,38 @@
       blurAll(); await ctrlF();
       await find('nestedonly');
       var a = hits(), td = r250.querySelector('td[data-column="' + jc + '"]');
-      R.chk.nestedLazy = a.length === 1 && a[0].name === 'H_JSON' && a[0].ri === 249 && pageInfo() === 'Page 2 of 2' && !td.hasAttribute('data-pnb-lazy') && td.classList.contains('pnb-find-cur');
+      // (findnest) the match is the nested table's cell (its third: S1 | 1 | Nestedonly), outlined itself
+      var ncur = td.querySelector('.nested-json-cell.pnb-find-cur');
+      R.chk.nestedLazy = a.length === 1 && a[0].name === 'H_JSON' && a[0].ri === 249 && a[0].sub === 2 && pageInfo() === 'Page 2 of 2' && !td.hasAttribute('data-pnb-lazy') && !!ncur && ncur.textContent === 'Nestedonly';
       R.chk.nestedMarked = hlTexts('pnb-find-cur').join('|') === 'Nestedonly';
       await find('nestedfirst');
       R.chk.nestedOnce = st().n === 1;
       await find('SUB_NAME');
       R.chk.noKeys = st().n === 0;
+      // (findnest) three nested cells of one drawn row: three matches, stepped one by one, the line naming the nested row
+      await find('triplet');
+      var t3 = hits(), s3 = st();
+      key('Enter'); await settle();
+      var w3 = String(F()._where ? F()._where() : ''), c3 = document.querySelector('#resultsTable .nested-json-cell.pnb-find-cur');
+      R.chk.nestedEach = s3.n === 3 && t3.every(function (x) { return x.ri === 5 && x.name === 'H_JSON'; }) && t3.map(function (x) { return x.sub; }).join(',') === '2,5,8' &&
+        / \u203A SUB_NAME, nested row 2 \u00b7 row 6$/.test(w3) && !!c3 && c3.textContent === 'Triplet two' && F()._verify().n === 3;
+      // ...and two in a lazy row (page 2), read from the build's own HTML
+      await find('lazytwin');
+      var t2 = hits(), s2 = st(), c2 = document.querySelector('#resultsTable .nested-json-cell.pnb-find-cur');
+      R.chk.nestedLazyEach = s2.n === 2 && t2.every(function (x) { return x.ri === 259; }) && t2.map(function (x) { return x.sub; }).join(',') === '2,5' &&
+        pageInfo() === 'Page 2 of 2' && !!c2 && c2.textContent === 'Lazytwin a' && F()._verify().n === 2;
+      R.info.nest = { tri: { n: s3.n, subs: t3.map(function (x) { return x.sub; }), where: w3 }, lazy: { n: s2.n, subs: t2.map(function (x) { return x.sub; }) } };
+    },
+    // (findnest) the grouped view: a nested table's cells, one match each
+    grp_json: async function () {
+      blurAll(); await ctrlF();
+      await find('triplet');
+      var s = st(), hs = hits();
+      key('Enter'); await settle();
+      var w = String(F()._where ? F()._where() : ''), c = document.querySelector('#groupedResultsContainer .nested-json-cell.pnb-find-cur');
+      R.chk.grpNestEach = s.view === 'grouped' && s.n === 3 && hs.every(function (x) { return x.sub >= 0; }) && /SUB_NAME, nested row 2 \u00b7 row 6$/.test(w) &&
+        !!c && c.textContent === 'Triplet two' && F()._verify().n === 3;
+      R.info.grpNest = { n: s.n, subs: hs.map(function (x) { return x.sub; }), where: w };
     },
 
     // Entities read as the cell shows them.
@@ -1336,6 +1390,59 @@
       if (rpp && rv) { $(rpp).val(rv).trigger('change'); await sleep(300); }
       var C = F()._text && F()._text.compile;
       R.chk.accentFold = !!C && C('jose').test('jos\u00e9 garc\u00eda') && C('smith john').test('smith john') && !C('jose').test('joan');
+    },
+    // (findcard, 2026-11-23) Find opened over the card details window: "Search only in the active card", ticked - the
+    // window's values only (its notes are not fields), the field named; unticked, the whole report; the window gone, the
+    // box too. A stand-in window (the harness has no cards module): the body class and the body the module draws.
+    fs_card: async function () {
+      var w = document.createElement('div');
+      w.id = 'pnbCardDetails';
+      w.style.cssText = 'position:fixed;left:40px;top:120px;width:500px;max-height:400px;background:#fff;z-index:20000;display:flex;';
+      w.innerHTML = '<div class="pnb-cdet-box" tabindex="-1"><div class="pnb-cdet-body" style="overflow:auto;max-height:380px">' +
+        '<div class="pnb-cdet-card pnb-card"><div class="pnb-card-top"><div class="pnb-card-head"><div class="pnb-card-title" data-col="TTL">Kilo title</div></div></div></div>' +
+        '<dl class="pnb-cdet-fields"><dt data-colhead="ALPHA">Alpha</dt><dd class="pnb-card-val" data-col="ALPHA">kilo one</dd>' +
+        '<dt data-colhead="BETA">Beta</dt><dd class="pnb-card-val" data-col="BETA">nothing here</dd>' +
+        '<dt data-colhead="GAMMA">Gamma</dt><dd class="pnb-card-val" data-col="GAMMA">another KILO</dd>' +
+        // (findcardnest) a nested table: each of its cells a match of its own
+        '<dt data-colhead="DELTA">Delta</dt><dd class="pnb-card-val" data-col="DELTA"><div class="nested-json-container data-grid-table">' +
+        '<div class="nested-json-header"><div class="nested-json-cell">CODE</div><div class="nested-json-cell">NOTE</div></div>' +
+        '<div class="nested-json-row"><div class="nested-json-cell">kilo-1</div><div class="nested-json-cell">plain</div></div>' +
+        '<div class="nested-json-row"><div class="nested-json-cell">x-2</div><div class="nested-json-cell">kilo two</div></div>' +
+        '<div class="nested-json-row"><div class="nested-json-cell">kilo-3</div><div class="nested-json-cell">kilo three</div></div>' +
+        '</div></dd></dl>' +
+        '<div class="pnb-cdet-notes"><span class="pnb-card-val">a kilo note</span></div></div></div>';
+      document.body.appendChild(w);
+      document.body.classList.add('pnb-cdet-open');
+      // main.js counts the window as busy (a lightbox): Find opens over it while the cards module says it is open
+      var hadC = window.Penumbra.cards; if (!hadC) window.Penumbra.cards = { details: function () { return { open: !!w.isConnected, list: false }; } };
+      var box = w.querySelector('.pnb-cdet-box'); box.focus();
+      await ctrlF(); await find('kilo');
+      var s = st(), cb = document.querySelector('.pnb-find-bar .pnb-find-card');
+      R.chk.cardBox = !!cb && !cb.hidden && cb.querySelector('input').checked && s.card === 'on';
+      R.chk.cardScoped = s.view === 'card' && s.n === 7 && hits().every(function (h) { return h.el && w.contains(h.el) && !h.el.closest('.pnb-cdet-notes'); });
+      key('Enter'); await settle(); key('Enter'); await settle();
+      var w1 = String(F()._where ? F()._where() : ''), curEl = w.querySelector('.pnb-find-cur');
+      R.chk.cardWhere = (w1 === 'Alpha' || w1 === 'Gamma') && !!curEl && curEl.tagName === 'DD';
+      var fb = document.querySelector('.pnb-find-bar .pnb-find-filter');
+      R.chk.cardNoFilter = !fb || fb.hidden;
+      // (findcardnest) on into the nested table: row by row, the cell named by its field, heading and row
+      key('Enter'); await settle(); key('Enter'); await settle();
+      var w2 = String(F()._where ? F()._where() : ''), c2 = w.querySelector('.pnb-find-cur');
+      R.chk.cardNest = w2 === 'Delta \u203A NOTE \u00b7 row 2' && !!c2 && c2.classList.contains('nested-json-cell') && c2.textContent === 'kilo two' &&
+        hits().filter(function (h) { return h.el && h.el.classList.contains('nested-json-cell'); }).length === 4;
+      R.info.fcard = { n: s.n, view: s.view, where: w1, nest: w2 };
+      cb.querySelector('input').click(); await sleep(20); await settle();
+      var s2 = st();
+      R.chk.cardUntick = s2.card === 'off' && s2.view === 'flat' && s2.n > 7;
+      cb.querySelector('input').click(); await sleep(20); await settle();
+      var back = st().view === 'card' && st().n === 7;
+      document.body.classList.remove('pnb-cdet-open'); w.parentNode.removeChild(w);
+      F().paged(); await sleep(40); await settle();
+      var s3 = st();
+      if (!hadC) delete window.Penumbra.cards;
+      R.chk.cardGone = back && s3.card === null && s3.view === 'flat' && cb.hidden && s3.n > 7;
+      R.info.fcard2 = { untick: s2.n, back: back, after: s3.n };
+      key('Escape'); await sleep(30);
     },
     // A narrow window: two rows spanning it (420 px, a phone; 700 px, under the 720 px line)...
     narrow: async function () { await narrowCheck(); },

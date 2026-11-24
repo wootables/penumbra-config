@@ -356,7 +356,9 @@
       R.chk.noScript = window.__pwn === undefined && onAt.length === 0;
       R.chk.pageAlive = vis('#resultsTable') || vis('#pivot-output-container') || vis('#groupedResultsContainer');
       R.info.dom = { pivot: vis('#pivot-output-container'), grouped: vis('#groupedResultsContainer'), flat: vis('#resultsTable'), pwn: window.__pwn };
-      if (SCN === 'vbadpiv' || SCN === 'vbadpiv3') R.chk.pivotShown = vis('#pivot-output-container') && !!document.querySelector('#pivot-output-container td');
+      if (SCN === 'vbadpiv3') R.chk.pivotShown = vis('#pivot-output-container') && !!document.querySelector('#pivot-output-container td');
+      // (pvsweep2 #36, 955e98a) a link's pivot whose formula is not one the pivot can run is refused whole: the report opens flat
+      if (SCN === 'vbadpiv') R.chk.pivotShown = !vis('#pivot-output-container') && vis('#resultsTable');
       if (SCN === 'vbadgrp' || SCN === 'vbadgrp3') R.chk.grouped = vis('#groupedResultsContainer');
     } else if (SCN === 'vfmsave') {
       // (sweep) the link's formats are this page's own, the report's stay the report's: an editor's save keeps them

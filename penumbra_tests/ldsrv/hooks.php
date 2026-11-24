@@ -34,7 +34,9 @@ if (!is_array($fx) || empty($fx['fx'])) done();
 $mb = function_exists('mb_strtoupper');
 
 $IXA = "            // 1. Map Indices to Actual Column Names (0 => 'COL_A', 1 => 'COL_B')\n";
-$IXB = "            // --- NEW: APPLY GROUP MODE ---\n";
+// (apifix, 2026-11-22) the group-mode comment that ended this cut went with the API's new output tail; end at the
+// line every version has and make its assignment in run_ix.
+$IXB = "            // Replace the data in the response\n";
 $SRA = "    if ((isset(\$state['visibleColumns']) || isset(\$state['columnOrder'])) && !empty(\$data)) {\n";
 $SRB = "    // 3. Row Limiting (Handled by API)\n";
 $bIx = lift($ix, $IXA, $IXB); $bIxRef = lift($ixRef, $IXA, $IXB);
@@ -64,6 +66,7 @@ function run_ix($blk, $state, $rows, $jcols) {
     $response = array('data' => $rows);
     $journal_toggle_cols = $jcols;
     eval(uselib2($blk));
+    if (isset($processed_data)) $response['data'] = $processed_data;
     return $response['data'];
 }
 function run_sr($blk, $state, $data, $preserveCols) {

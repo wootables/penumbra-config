@@ -525,7 +525,7 @@ def scenario(name, out):
             time.sleep(0.4)
             p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
             a2 = p.acts() or []
-            A('A-cards', on and 'cardsTable' in a2 and 'rowHeight' not in a2 and 'cardsShow' not in a2, a2)
+            A('A-cards', on and 'cardsTable' in a2 and 'rowHeight' in a2 and 'cardsShow' not in a2, a2)   # (cardcrh, 2026-11-23) Consistent row height listed while cards show: it sets their height
             pt = p.ev('window.__ws.itemAt("cardsTable", 0)')
             if pt: p.click(pt)
             A('A-cardsBack', on and p.wait('window.Penumbra.cards && !window.Penumbra.cards.on()', 5), p.ev('window.Penumbra.cards.view()'))

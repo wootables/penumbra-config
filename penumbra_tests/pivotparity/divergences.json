@@ -1,6 +1,159 @@
 ﻿{
     "divergent":  [
-
+                      {
+                          "id":  "1378-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u00272024-05-15\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1379-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u00272024-05-15\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1412-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u002715-MAY-24\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1413-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u002715-MAY-24\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1446-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u002705/15/2024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1447-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u002705/15/2024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1480-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u00275/15/2024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1481-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u00275/15/2024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1514-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u00272024-05\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1515-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u00272024-05\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1548-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u0027May 2024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1549-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u0027May 2024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1582-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u00272024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1583-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u00272024\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1616-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u00272024-05-15 13:45:00\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1617-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u00272024-05-15 13:45:00\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1650-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u002715-MAY-24 01.02.03.000000 PM\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1651-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u002715-MAY-24 01.02.03.000000 PM\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1684-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u00272023-12-31\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1685-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u00272023-12-31\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1718-filterDate",
+                          "fn":  "filterDate",
+                          "note":  "C: \u00272025-01-01\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      },
+                      {
+                          "id":  "1719-filterDateB",
+                          "fn":  "filterDateB",
+                          "note":  "B: \u00272025-01-01\u0027 vs D \u003e TODAY-36500",
+                          "js":  "b:false",
+                          "php":  "b:true"
+                      }
                   ],
     "notEvaluated":  [
 

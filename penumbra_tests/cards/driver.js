@@ -151,7 +151,7 @@
     var ev = gap ? rclick(el, { x: x, y: y }) : null; await sleep(100);
     var m = menu(), ga = acts();
     R.info.gap = { el: el ? el.className : null, x: x, y: y, acts: ga, prevented: ev && ev.defaultPrevented, page: !!q('#pnbPageMenu') };
-    R.chk.gapMenu = gap && !!m && text(q('.pnb-hm-name', m)) === 'Cards' && ga.join() === 'cardSize,cardConfig,cardsTable,clearPrefs' && !!ev && ev.defaultPrevented && !q('#pnbPageMenu');
+    R.chk.gapMenu = gap && !!m && text(q('.pnb-hm-name', m)) === 'Cards' && ga.join() === 'cardSize,cardRowHeight,cardConfig,cardsTable,clearPrefs' && !!ev && ev.defaultPrevented && !q('#pnbPageMenu');
     var sizes = false;
     if (m) { q('.pnb-hm-item[data-act="cardSize"]', m).click(); await sleep(150); sizes = qa('.pnb-hm-sub .pnb-hm-item').map(function (i) { return i.getAttribute('data-act'); }).join() === 'cardSize-compact,cardSize-standard,cardSize-large,cardSize-xl'; }
     R.chk.gapSizes = sizes;
@@ -444,9 +444,9 @@
     try { C().closeDetails(); } catch (e) { }
     // (cfmt2) the window's buttons named for whom they act
     await sleep(100); C().openConfig(); await sleep(150);
-    R.chk.buttonWords = text(cbtn('pnb-ccfg-reset')) === 'Reset' && !cbtn('pnb-ccfg-default') && text(cbtn('pnb-ccfg-nodefault')) === 'Clear the default'   // (cfix) Make default for everyone gone
+    R.chk.buttonWords = text(cbtn('pnb-ccfg-reset')) === 'Reset' && !cbtn('pnb-ccfg-default') && !cbtn('pnb-ccfg-nodefault') && !cbtn('pnb-ccfg-editor')   // (cfix) Make default for everyone gone
       && !/Use the report|Use as the report|Make default/.test(cfg().textContent);
-    R.info.words = [text(cbtn('pnb-ccfg-reset')), !!cbtn('pnb-ccfg-default'), text(cbtn('pnb-ccfg-nodefault')), cbtn('pnb-ccfg-reset').title];
+    R.info.words = [text(cbtn('pnb-ccfg-reset')), !!cbtn('pnb-ccfg-default'), !!cbtn('pnb-ccfg-nodefault'), cbtn('pnb-ccfg-reset').title];
     C().closeConfig();
   };
   // (cfmt2) 2,500 rows: main.js defers its format pass 50 ms; the cards must show the highlights after it, a page turn too
@@ -518,7 +518,7 @@
     R.chk.cards = on() && cards().length === 200 && !!sl && sl.title === 'V_NAME';
     // (round N) Configure cards for a viewer: no report default to make or remove; a pick is the viewer's own
     C().openConfig(); await until(cfgShown, 3000);
-    R.chk.viewerWindow = cfgShown() && !cbtn('pnb-ccfg-default') && cbtn('pnb-ccfg-editor').hidden && cbtn('pnb-ccfg-reset').disabled && /a change is kept for you|a change makes them your own/.test(text(q('#pnbCcfgSub')));   // (cfix)
+    R.chk.viewerWindow = cfgShown() && !cbtn('pnb-ccfg-default') && !cbtn('pnb-ccfg-editor') && cbtn('pnb-ccfg-reset').disabled && /a change is kept for you|a change makes them your own/.test(text(q('#pnbCcfgSub')));   // (cfix)
     setSel('pnbCcfgTitle1', 'V_STATUS'); await sleep(200);
     R.chk.viewerPick = slots().title === 'V_STATUS' && !!mine() && mine().own === 1 && mine().title === 'V_STATUS' && !cbtn('pnb-ccfg-reset').disabled;
     R.info.viewerPref = mine();
@@ -802,6 +802,8 @@
   };
   // (csize) sizes and the phone default
   function sizeSel() { return q('#pnbCardsSize'); }
+  // (cardsweep3) no cap: "n of <the columns the report shows>" (a hidden one counts once ticked)
+  function ofShown(n) { return n + ' of ' + qa('#pnbCcfgFields input').filter(function (b) { return b.checked || !b.hasAttribute('data-hid'); }).length; }
   function pickSize(v) { var s = sizeSel(); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); }
   function parts() { return { fields: qa('#pnbCardsHost .pnb-card-fields').length, subs: qa('#pnbCardsHost .pnb-card-sub').length, meters: qa('#pnbCardsHost .pnb-card-meter').length, bigs: qa('#pnbCardsHost .pnb-card-big').length, pills: qa('#pnbCardsHost .pnb-card-pill').length }; }
   S.csize = async function () {
@@ -816,7 +818,7 @@
     R.chk.compactParts = p.fields === 0 && p.subs === 0 && p.meters === 0 && p.bigs === 200 && p.pills === 0 && before.fields === 200;
     R.chk.prefSize = (prefs().lrfix || {}).size === 'compact';
     pickSize('standard'); await until(function () { return C().state() && C().state().size === 'standard'; }, 4000);
-    R.chk.backToStandard = !host().classList.contains('is-compact') && !host().classList.contains('is-large') && parts().fields === 200 && (prefs().lrfix || {}).size === undefined;
+    R.chk.backToStandard = !host().classList.contains('is-compact') && !host().classList.contains('is-large') && parts().fields === 200 && (prefs().lrfix || {}).size === 'standard';   // (cardsweep3) the report is saved Large: Medium is a pick
     // (round N) Configure cards: its size list is the viewer's size; an editor's default carries it, Standard drops the key
     var b1 = bsoCards();
     C().openConfig(); await until(cfgShown, 3000);
@@ -887,8 +889,8 @@
     // (2026-11-15) autofields (2026-11-14): with no fields chosen the automatic ones (three at most) are shown ticked,
     // and the count gives their number; "Automatic" is what None leaves.
     var auto0 = qa('#pnbCcfgFields input:checked').length;
-    R.chk.chipsListed = qa('#pnbCcfgFields .pnb-cards-chip').length === 20 && auto0 >= 1 && auto0 <= 3 && text(q('#pnbCcfgFieldsCount')) === auto0 + ' of 16';
-    R.chk.noDefaultYet = bsoCards() === undefined && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-default') && cbtn('pnb-ccfg-editor').hidden && /then Save the report/.test(text(q('#pnbCcfgSub')));   // (cfix)
+    R.chk.chipsListed = qa('#pnbCcfgFields .pnb-cards-chip').length === 20 && auto0 >= 1 && auto0 <= 3 && text(q('#pnbCcfgFieldsCount')) === ofShown(auto0);
+    R.chk.noDefaultYet = bsoCards() === undefined && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-default') && !cbtn('pnb-ccfg-editor') && /then Save the report/.test(text(q('#pnbCcfgSub')));   // (cfix)
     setSel('pnbCcfgTitle1', 'V_NAME'); setSel('pnbCcfgSub1', 'V_ID'); setSel('pnbCcfgBig', 'H_AMT'); setSel('pnbCcfgPill', 'V_STATUS'); setSel('pnbCcfgBar', 'H_NUM');
     // (2026-11-15) None first: the automatic fields are ticked (autofields), and a click on one would take it off
     var none0 = q('.pnb-ccfg-picknone[data-chips="pnbCcfgFields"]'); if (none0) none0.click(); await sleep(120);
@@ -904,20 +906,23 @@
     more.forEach(function (b) { b.click(); }); await sleep(150);
     var rest = qa('#pnbCcfgFields input:not(:checked)');
     R.info.limit = { four: four, now: text(q('#pnbCcfgFieldsCount')), rest: rest.length, off: rest.filter(function (b) { return b.disabled; }).length };
-    R.chk.fieldLimit = four === '4 of 16' && more.length === 12 && text(q('#pnbCcfgFieldsCount')) === '16 of 16' && rest.length > 0 && rest.every(function (b) { return b.disabled && b.parentNode.classList.contains('is-full'); });   // (cfix) sixteen
+    R.chk.fieldLimit = /^4 of \d+$/.test(four) && more.length === 12 && text(q('#pnbCcfgFieldsCount')) === ofShown(16) && rest.length > 0 && rest.every(function (b) { return !b.disabled && !b.parentNode.classList.contains('is-full'); });   // (cardsweep3) no cap: the rest still take a tick   // (cfix) sixteen
     more.forEach(function (b) { b.click(); }); await sleep(150);
-    R.chk.fieldLimit = R.chk.fieldLimit && text(q('#pnbCcfgFieldsCount')) === '4 of 16' && same(mine().fields, PICKS.fields);
+    R.chk.fieldLimit = R.chk.fieldLimit && text(q('#pnbCcfgFieldsCount')) === ofShown(4) && same(mine().fields, PICKS.fields);
     setSel('pnbCcfgSize', 'compact'); await until(function () { return host().classList.contains('is-compact'); }, 3000);
     R.chk.sizePick = C().size() === 'compact' && (prefs().lrfix || {}).size === 'compact' && sizeSel().value === 'compact';
     // an editor's Use as the report's default: the window's setup and size are the report's (saved with it), the editor's own go
     // (cfix) no Make default: Save writes the cards shown, the size too; after it (savedToReport) the editor's own copy goes
     var b = bsoCards(); R.info.bso = b;
-    R.chk.makeDefault = same(b, Object.assign({}, PICKS, { size: 'compact' })) && /Not saved yet/.test(text(q('#pnbCcfgSub'))) && cbtn('pnb-ccfg-editor').hidden;
+    R.chk.makeDefault = same(b, Object.assign({}, PICKS, { size: 'compact' })) && /Not saved yet/.test(text(q('#pnbCcfgSub'))) && !cbtn('pnb-ccfg-editor');
     if (C().savedToReport) C().savedToReport(b); await sleep(250);
-    R.chk.defaultClearsMine = !mine() && (prefs().lrfix || {}).size === undefined && same(slots(), PICKS) && C().size() === 'compact' && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-editor').hidden && /Everyone's cards/.test(text(q('#pnbCcfgSub')));
-    cbtn('pnb-ccfg-nodefault').click(); await sleep(250);
+    R.chk.defaultClearsMine = !mine() && (prefs().lrfix || {}).size === undefined && same(slots(), PICKS) && C().size() === 'compact' && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-editor') && !cbtn('pnb-ccfg-nodefault') && /Everyone's cards/.test(text(q('#pnbCcfgSub')));
+    // (cardsweep3) no Clear the default: the slots back at Automatic / None, no fields, Medium - a Save writes no setup
+    ['pnbCcfgTitle1', 'pnbCcfgSub1', 'pnbCcfgSub2', 'pnbCcfgBig', 'pnbCcfgPill', 'pnbCcfgBar'].forEach(function (id) { setSel(id, ''); }); await sleep(150);
+    q('.pnb-ccfg-picknone[data-chips="pnbCcfgFields"]', cfg()).click(); await sleep(150);
+    setSel('pnbCcfgSize', 'standard'); await sleep(300);
     R.info.after = { bso: bsoCards(), slots: slots(), size: C().size() };
-    R.chk.removeDefault = bsoCards() === undefined && cbtn('pnb-ccfg-editor').hidden && on() && slots().title === 'V_ID' && C().size() === 'standard' && q('#pnbCcfgSize').value === 'standard';
+    R.chk.removeDefault = !!bsoCards() && Object.keys(bsoCards()).length === 0 && on() && slots().title === 'V_ID' && C().size() === 'standard' && q('#pnbCcfgSize').value === 'standard';
     // Escape closes the window (the cards stay); nothing behind it takes the key (the Report Tools console)
     var adm = localStorage.getItem('penumbra_admin_open');
     keyOn(q('#pnbCcfgTitle1'), 'Escape'); await sleep(150);
@@ -945,9 +950,9 @@
     R.chk.switchShown = vis(sw()) && !on();
     R.chk.roundTrip = same(bsoCards(), PICKS); R.info.bso = bsoCards();
     C().openConfig(); await until(function () { return cfgShown() && on(); }, 4000); await sleep(100);
-    R.chk.editorLine = !cbtn('pnb-ccfg-editor').hidden && text(cbtn('pnb-ccfg-has')) === 'This report has default cards for everyone.' && !cbtn('pnb-ccfg-default') && /Everyone's cards/.test(text(q('#pnbCcfgSub')));   // (cfix)
+    R.chk.editorLine = !cbtn('pnb-ccfg-editor') && !cbtn('pnb-ccfg-nodefault') && !cbtn('pnb-ccfg-default') && /Everyone's cards/.test(text(q('#pnbCcfgSub')));   // (cfix)
     R.chk.pickersShow = q('#pnbCcfgTitle1').value === 'V_NAME' && q('#pnbCcfgSub1').value === 'V_ID' && q('#pnbCcfgSub2').value === '' && q('#pnbCcfgBig').value === 'H_AMT' && q('#pnbCcfgPill').value === 'V_STATUS' && q('#pnbCcfgBar').value === 'H_NUM';
-    R.chk.chipsShow = same(qa('#pnbCcfgFields input:checked').map(function (i) { return i.value; }), PICKS.fields) && text(q('#pnbCcfgFieldsCount')) === '4 of 16';   // (cfix) sixteen
+    R.chk.chipsShow = same(qa('#pnbCcfgFields input:checked').map(function (i) { return i.value; }), PICKS.fields) && text(q('#pnbCcfgFieldsCount')) === ofShown(4);   // (cfix) sixteen
     // the title and the subtitle back to Automatic / None: the editor's own setup, the report's untouched (V_ID is
     // guessed: no longer taken by the subtitle)
     setSel('pnbCcfgTitle1', ''); setSel('pnbCcfgSub1', ''); await sleep(200);
@@ -960,11 +965,12 @@
     R.chk.reedit = !!b2 && b2.title === undefined && b2.sub === undefined && b2.big === 'H_AMT' && same(b2.fields, PICKS.fields) && !mine() && slots().title === 'V_ID';
     R.info.reedit = [b1, b2, slots()];
     // Clear the default, then a re-run before the Save hands the saved setup back (formWins): the clearing stays; a state load replaces it
-    cbtn('pnb-ccfg-nodefault').click(); await sleep(150);
+    // (cardsweep3) it was Clear the default's pending state: the editor's own unsaved change across a re-run now
+    setSel('pnbCcfgTitle1', 'V_STATUS'); await sleep(200);
     C().setReport(PICKS, true); await sleep(100);
     var b3 = bsoCards();
     C().setReport(PICKS, false); await sleep(100);
-    R.chk.pendingKept = b3 === undefined && same(bsoCards(), PICKS);
+    R.chk.pendingKept = !!b3 && b3.title === 'V_STATUS' && !!bsoCards() && bsoCards().title === 'V_STATUS' && same(C().report(), PICKS);
     R.info.pending = [b3, bsoCards()];
   };
   // a setup naming columns the query no longer returns: the guesses fill in; the window lists them, marked
@@ -1014,7 +1020,7 @@
     var dirty = tok({ v: 1, m: 'flat', o: 'none', cv: 1, cl: { own: true, title: '<img src=x>', sub: ['V_ID', 'V_NAME', 'V_DATE'], big: 42, pill: '', bar: 'h_num',
       fields: ['V_ID', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS', 'H_CODE', 'H_NUM', 'H_DATE', 'H_MONEY', 'H_AMT', 'H_TEXT', 'H_GROUP', 'H_NULL', 'H_HTML', 'V_AMOUNT', 'H_JSON', 'H_ENT', 'H_NL'], nolabels: true } });   // (cfix) eighteen sent
     var dd = window.PenumbraViewLink.decode(dirty); R.info.dirty = dd && dd.cl;
-    R.chk.cleaned = !!dd && !!dd.cl && dd.cl.title === undefined && same(dd.cl.sub, ['V_ID', 'V_NAME']) && dd.cl.big === undefined && dd.cl.pill === undefined && dd.cl.bar === 'H_NUM' && dd.cl.fields.length === 16 && dd.cl.own === 1 && dd.cl.nolabels === 1;   // (cfix) sixteen
+    R.chk.cleaned = !!dd && !!dd.cl && dd.cl.title === undefined && same(dd.cl.sub, ['V_ID', 'V_NAME']) && dd.cl.big === undefined && dd.cl.pill === undefined && dd.cl.bar === 'H_NUM' && dd.cl.fields.length === 18 && dd.cl.own === 1 && dd.cl.nolabels === 1;   // (cfix) sixteen
     var de = window.PenumbraViewLink.decode(tok({ v: 1, m: 'flat', o: 'none', cv: 1, cl: { pill: 'V_STATUS' } }));
     R.chk.emptyDropped = !!de && de.cl === undefined;   // a pill alone is no setup (as layoutSet keeps none)
     window.Penumbra.cardsHost.layoutSet(null);
@@ -1688,7 +1694,7 @@
     var gtT = qa('#pnbCardsHost .pnb-card.is-total')[0] || cs[0];   // (gtlast) the total by its class: the last tile now
     ev = rclick(q('.pnb-card-title', gtT)); await sleep(80);
     a = acts(); R.info.pvTotalActs = a;
-    R.chk.totalTileMenu = ev.defaultPrevented && !!menu() && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0 && a[a.length - 1] === 'clearPrefs' && a.every(function (x) { return x === 'cardSize' || x === 'cardsTable' || x === 'cardOpen' || x === 'cardLink' || x === 'cardConfig' || x === 'clearPrefs'; });   // (menufix: Clear all last)   // (round T: Configure cards greyed)   // (cdet: Open details joins the card's own items)
+    R.chk.totalTileMenu = ev.defaultPrevented && !!menu() && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0 && a[a.length - 1] === 'clearPrefs' && a.every(function (x) { return x === 'cardSize' || x === 'cardRowHeight' || x === 'cardsTable' || x === 'cardOpen' || x === 'cardLink' || x === 'cardConfig' || x === 'clearPrefs'; });   // (menufix: Clear all last)   // (round T: Configure cards greyed)   // (cdet: Open details joins the card's own items)
     // (round O) a tile value's white space: the tile's own menu - its row label's (not the value cell's)
     var wdd = q('.pnb-card-pvfields dd[data-pvc]', leaf), wtr = wdd ? textRect(wdd) : null, wr2 = wdd ? wdd.getBoundingClientRect() : null;
     if (wdd && wtr) { rclick(wdd, { x: Math.min(wr2.right - 2, wtr.right + 24), y: (wtr.top + wtr.bottom) / 2 }); await sleep(80); }
@@ -2000,7 +2006,7 @@
     if (rx) { rx.checked = false; rx.dispatchEvent(new Event('change', { bubbles: true })); }
     await until(function () { return host().style.getPropertyValue('--pnb-card-cap') === (window.innerHeight - 140) + 'px'; }, 3000);
     var c1x = cardFor(rows[1]);
-    R.chk.capOff = !!rx && document.body.classList.contains('disable-auto-expand') && host().style.getPropertyValue('--pnb-card-cap') === (window.innerHeight - 140) + 'px' && !!c1x && !c1x.classList.contains('is-clipped');
+    R.chk.capOff = !!rx && document.body.classList.contains('disable-auto-expand') && host().style.getPropertyValue('--pnb-card-cap') === 'none' && !!c1x && !c1x.classList.contains('is-clipped');
     R.info.capOff = { rx: !!rx, cap: host().style.getPropertyValue('--pnb-card-cap'), vh: window.innerHeight, cls: c1x ? c1x.className : null };
     if (rx) { rx.checked = true; rx.dispatchEvent(new Event('change', { bubbles: true })); await sleep(250); }
     // a Notes column the viewer hid: no notes on the cards, as no hidden column
@@ -2727,7 +2733,7 @@
     R.chk.seededDrawn = !!slots() && slots().title === 'V_STATUS' && same(slots().fields, ['V_ID', 'V_AMOUNT']);
     R.chk.formIsAuthors = same(C().report(), { title: 'V_NAME', fields: ['V_DATE'] }) && !!bsoCards() && bsoCards().title === 'V_STATUS' && same(bsoCards().fields, ['V_ID', 'V_AMOUNT']);   // (cfix) an editor's Save writes the cards shown
     C().openConfig(); await until(cfgShown, 3000);
-    R.chk.seededShown = q('#pnbCcfgTitle1').value === 'V_STATUS' && cchip('V_ID').checked && cchip('V_AMOUNT').checked && !cchip('V_DATE').checked && text(q('#pnbCcfgFieldsCount')) === '2 of 16' && !cbtn('pnb-ccfg-reset').disabled;   // (cfix) sixteen
+    R.chk.seededShown = q('#pnbCcfgTitle1').value === 'V_STATUS' && cchip('V_ID').checked && cchip('V_AMOUNT').checked && !cchip('V_DATE').checked && text(q('#pnbCcfgFieldsCount')) === ofShown(2) && !cbtn('pnb-ccfg-reset').disabled;   // (cfix) sixteen
   };
 
   S.pvfind = async function () {
@@ -3088,7 +3094,7 @@
     var took = two.filter(function (b) { return b.checked; });   // (cfix) the ones the cap let through
     var rest = qa('#pnbCcfgFields input:not(:checked)'), m12 = mine();
     R.info.win = { ten: ten, now: text(q('#pnbCcfgFieldsCount')), mine: m12 && m12.fields, rest: rest.length };
-    R.chk.windowCount = ten === '10 of 16' && text(q('#pnbCcfgFieldsCount')) === '16 of 16' && rest.length > 0 && rest.every(function (b) { return b.disabled; }) && !!m12 && m12.fields.length === 16 && slots().fields.length === 16;
+    R.chk.windowCount = /^10 of \d+$/.test(ten) && text(q('#pnbCcfgFieldsCount')) === ofShown(16) && took.length === 6 && rest.every(function (b) { return !b.disabled; }) && !!m12 && m12.fields.length === 16 && slots().fields.length === 16;   // (cardsweep3) no cap
     took.forEach(function (b) { b.click(); }); await sleep(200);
     R.chk.labelsBox = !!lblBox() && lblBox().checked === true;
     // labels off
@@ -4168,9 +4174,9 @@
     // Configure cards: Reset, no Make default, the lists' own dress
     C().openConfig(); await until(cfgShown, 3000); await sleep(100);
     var sel = q('#pnbCcfgTitle1'), cssel = getComputedStyle(sel);
-    R.info.win = { reset: text(cbtn('pnb-ccfg-reset')), def: !!cbtn('pnb-ccfg-default'), app: cssel.appearance, rad: cssel.borderTopLeftRadius, sub: text(q('#pnbCcfgSub')), clear: text(cbtn('pnb-ccfg-nodefault')) };
-    R.chk.windowWords = text(cbtn('pnb-ccfg-reset')) === 'Reset' && !cbtn('pnb-ccfg-default') && text(cbtn('pnb-ccfg-nodefault')) === 'Clear the default' && /Everyone's cards/.test(text(q('#pnbCcfgSub')))
-      && qa('.pnb-ccfg-tips li', cfg()).filter(vis).length === 3 && !/Make default/.test(cfg().textContent);
+    R.info.win = { reset: text(cbtn('pnb-ccfg-reset')), def: !!cbtn('pnb-ccfg-default'), app: cssel.appearance, rad: cssel.borderTopLeftRadius, sub: text(q('#pnbCcfgSub')), clear: !!cbtn('pnb-ccfg-nodefault') };
+    R.chk.windowWords = text(cbtn('pnb-ccfg-reset')) === 'Reset' && !cbtn('pnb-ccfg-default') && !cbtn('pnb-ccfg-nodefault') && !cbtn('pnb-ccfg-editor') && /Everyone's cards/.test(text(q('#pnbCcfgSub')))
+      && qa('.pnb-ccfg-tips li', cfg()).filter(vis).length === 4 && /details window/.test(cfg().textContent) && !/Make default/.test(cfg().textContent);   // (cardsweep3) the fourth tip: what the window sets up
     R.chk.listsStyled = cssel.appearance === 'none' && parseFloat(cssel.borderTopLeftRadius) >= 4 && /url\(/.test(cssel.backgroundImage);
     // All: sixteen ticked (the table's order), kept; None: Automatic
     var pa = q('.pnb-ccfg-pickall[data-chips="pnbCcfgFields"]', cfg()); if (pa) pa.click(); await sleep(250);
@@ -4178,7 +4184,7 @@
     var pn = q('.pnb-ccfg-picknone[data-chips="pnbCcfgFields"]', cfg()); if (pn) pn.click(); await sleep(250);
     var none = { count: text(q('#pnbCcfgFieldsCount')), mine: mine() && mine().fields, slots: slots() && slots().fields };
     R.info.allNone = { all: all, none: none };
-    R.chk.allNone = all.count === '16 of 16' && !!all.mine && all.mine.length === 16 && !!all.slots && all.slots.length === 16 && none.count === 'Automatic' && !none.mine && !!none.slots && none.slots.length === 3;
+    R.chk.allNone = /^(\d+) of \1$/.test(all.count) && !!all.mine && all.mine.length === parseInt(all.count, 10) && all.mine.length >= 6 && all.mine.every(function (n) { return !/^H_/.test(n) || n === 'H_TEXT'; }) && !!all.slots && all.slots.length === all.mine.length && none.count === 'Automatic' && !none.mine && !!none.slots && none.slots.length === 3;
     // an editor's Save writes the cards shown; the window says it is not saved yet; savedToReport: the editor's own copy goes
     setSel('pnbCcfgTitle1', 'V_STATUS'); await sleep(200);
     var b = bsoCards(), sub1 = text(q('#pnbCcfgSub'));
@@ -5350,6 +5356,7 @@
     ctrlShiftH(); await sleep(80); ctrlShiftH(); await sleep(150);   // twice: false again, which would differ from the reader's true if written
     R.chk.visitNoWrite = lsMap('penumbra_pref_rowExpand').lrfix === true && lsMap('penumbra_calc_columns').lrfix && lsMap('penumbra_calc_columns').lrfix[0].name === 'MYCALC';
     // Keep this as my view
+    window.__nav = null; window.__pnbVlNav = function (u) { window.__nav = u; };   // (vlsweep #8, 2026-11-22) Keep ends the visit with a reload: the suite's seam first, or the page left for ?id= alone (no scn)
     if (keepB && keepB.isConnected) keepB.click(); else window.PenumbraViewLink.keep();
     await sleep(400);
     var cp = lsMap('penumbra_column_prefs').lrfix, calc = lsMap('penumbra_calc_columns').lrfix;
@@ -5372,6 +5379,7 @@
   S.vstC = async function () {
     await until(function () { return shownRows().length > 0 && window.PenumbraViewLink.active(); }, 10000); await sleep(800);
     R.chk.linkDensity = document.body.classList.contains('density-compact');   // no density of the reader's own: the link's
+    window.__nav = null; window.__pnbVlNav = function (u) { window.__nav = u; };   // (vlsweep #8, 2026-11-22) Keep ends the visit with a reload: the suite's seam first, or the page left for ?id= alone (no scn)
     window.PenumbraViewLink.keep(); await sleep(300);
     R.chk.keptDensity = lsMap('penumbra_pref_density').lrfix === 'compact';
   };

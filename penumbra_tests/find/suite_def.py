@@ -12,6 +12,8 @@ SCN = [('boot', ''), ('open', ''), ('lazy', ''), ('order', ''), ('search', ''), 
        ('narrow', '&vw=420&vh=800'), ('narrow_mid', '&vw=700&vh=800'), ('wide_edge', '&vw=760&vh=800'),
        ('mk_flat', ''), ('mk_col', ''), ('mk_forms', ''), ('grp_marks_closed', ''), ('piv_marks', ''), ('mk_find', ''),
        ('fs_flat', ''),   # (findsweep, 2026-11-21)
+       ('fs_card', ''),   # (findcard, 2026-11-23)
+       ('grp_json', ''),   # (findnest, 2026-11-23)
        # the sweep (never in a default run: --scn sweep_a,...): a seeded random walk, invariants after each step
        ('sweep_a', '&seed=11&steps=70'), ('sweep_b', '&seed=23&steps=70'), ('sweep_c', '&seed=37&steps=70'),
        ('grp_sweep_list', '&seed=41&steps=70'), ('piv_sweep', '&seed=53&steps=70'),
@@ -31,17 +33,19 @@ CHK = {
     'fmt': ['saneFmt', 'saneLazy', 'shownLazy', 'rawLazy', 'shownFilled', 'rawFilled', 'rawTint'],
     'exact': ['containsWide', 'exactNarrow', 'exactWhole'],
     'regex': ['re9', 'reCase', 'reNoCase', 'bad', 'reHighlight'],
-    'filter': ['labelOne', 'labelAsync', 'honest', 'clickFilters', 'noReoffer', 'andAdds', 'andFilters', 'orHides', 'altEnter'],
+    'filter': ['labelOne', 'labelAsync', 'honest', 'clickFilters', 'noReoffer', 'andAdds', 'andFilters', 'orHides', 'altEnter', 'typingFilter', 'slashFilter'],
     'cover': ['topRow', 'atHome', 'underHome', 'notCovered', 'justBelow', 'backHome'],
     'esc': ['closed', 'unpainted', 'activeCell', 'arrowsOn', 'termKept'],
-    'paint': ['sanePage2', 'startHere', 'paintsPage', 'afterFlip', 'noReread', 'closesOnNone'],
+    'paint': ['sanePage2', 'startHere', 'paintsPage', 'afterFlip', 'noReread', 'stepFromPage', 'closesOnNone'],
     'export': ['openOk', 'csvSame', 'htmlSame'],
     'gview': ['saneGrouped', 'taken'],
     'grp_stack': ['saneGrouped', 'taken', 'oneCell', 'inView', 'highlighted', 'allGroups', 'pageOrder', 'stepped', 'band', 'bandOutline', 'bandEsc', 'sortRereads'],
-    'grp_closed': ['saneClosed', 'named', 'opened', 'othersClosed', 'inView', 'stepOpens'],
+    'grp_closed': ['saneClosed', 'named', 'groupPath', 'opened', 'othersClosed', 'inView', 'stepOpens'],
     'grp_nest_closed': ['saneNested', 'named', 'twoLevels', 'bothOpen', 'inView'],
     'grp_list': ['saneList', 'named', 'otherGroup', 'picked', 'inView', 'listFollows', 'barFollows'],
     'fs_flat': ['whereLine', 'strip', 'selectOnScreen', 'colScope', 'copyLines', 'startOnScreen', 'accentFold'],   # (findsweep)
+    'grp_json': ['grpNestEach'],   # (findnest)
+    'fs_card': ['cardBox', 'cardScoped', 'cardWhere', 'cardNest', 'cardNoFilter', 'cardUntick', 'cardGone'],   # (findcard, findcardnest)
     'grp_search': ['saneSearched', 'allBefore', 'liveRescope', 'moreLine', 'scoped'],
     'grp_filter': ['offered', 'filtered', 'noReoffer'],
     'grp_esc': ['closed', 'activeCell', 'arrowsOn'],
@@ -49,7 +53,7 @@ CHK = {
     'piv_closed': ['saneClosed', 'named', 'expanded', 'inView', 'othersClosed', 'stepExpands'],
     'piv_esc': ['closed', 'activeCell'],
     'none': ['saneNone', 'notTaken'],
-    'json': ['saneJson', 'nestedLazy', 'nestedMarked', 'nestedOnce', 'noKeys'],
+    'json': ['saneJson', 'nestedLazy', 'nestedMarked', 'nestedOnce', 'noKeys', 'nestedEach', 'nestedLazyEach'],
     'ent': ['decoded', 'noEntity', 'apos', 'lt'],
     'big': ['saneBig', 'bigCount', 'bigFast', 'bigLast'],
     'all': ['saneAll', 'allFound'],
@@ -158,6 +162,34 @@ MUTANTS = {
     # (findsweep 31) the flat start from the page's first row again
     'nostartscreen': ([('mod', "                ref = shownRows[lo].sectionRowIndex;\n", "                ref = shownRows[0].sectionRowIndex;\n")],
                       ['L-fs_flat-startOnScreen'], ['fs_flat']),
+    # (findfix 2) a page turned by hand keeps the current match: Enter goes back to its page
+    'nopagedrop': ([('mod', "            if (ch && !ch.dom && ch.tr && ch.tr.isConnected && ch.tr.style.display === 'none') { cur = -1; closedAt = false; }\n", "")],
+                   ['L-paint-noReread', 'L-paint-stepFromPage'], ['paint']),
+    # (findfix 1) Filter / Alt+Enter on the old term while the new one is typed
+    'notermpending': ([('mod', "        if (termPending('filter')) { return; }   // (findfix 1)\n", ""),
+                       ('mod', "        pendingAct = null;\n        if (promo || counting || countTimer) {\n", "        pendingAct = null;\n        if (false) {\n")],
+                      ['L-filter-typingFilter'], ['filter']),
+    # (findfix 3) a leading slash quoted as text again
+    'noslashpattern': ([('mod', "            else if (t.charAt(0) === '/') {", "            else if (false) {")],
+                       ['L-filter-slashFilter'], ['filter']),
+    # (findgroup) the location line without the groups around a grouped match
+    'nogrouppath': ([('mod', "        if (!hit || !hit.dom || hit.view !== 'grouped' || !hit.el || !hit.el.closest) { return ''; }\n", "        return '';\n")],
+                    ['L-grp_closed-groupPath'], ['grp_closed']),
+    # (findcard) the card scope never taken: Find reads the report over the window
+    'nocardscope': ([('mod', "    function cardScope() { return !!(cardOffer && cardOnly && !dlg && cardBody()); }\n", "    function cardScope() { return false; }\n")],
+                    ['L-fs_card-cardScoped'], ['fs_card']),
+    # (findcard) never offered: no box over the window
+    'nocardoffer': ([('mod', "        if (cardOffer) { return false; }\n        cardOffer = true; cardOnly = true;\n", "        return false;\n")],
+                    ['L-fs_card-cardBox'], ['fs_card']),
+    # (findcardnest) a nested table in the card details window read as one match again
+    'nocardnest': ([('mod', "                if (!vs[i].querySelector('.nested-json-container')) { out.push(", "                if (true) { out.push(")],
+                   ['L-fs_card-cardNest'], ['fs_card']),
+    # (findnest) the flat read keeps a nested table as one match
+    'nonestflat': ([('mod', "                        var subs = (m === 1) ? nestSubs(td, map, col, c) : null;\n", "                        var subs = null;\n")],
+                   ['L-json-nestedEach', 'L-json-nestedLazyEach'], ['json']),
+    # (findnest) the grouped read keeps a nested table as one match
+    'nonestdom': ([('mod', "        if (td.classList.contains('cell-contains-nested-table') || (deep && ", "        if (false && (deep && ")],
+                  ['L-grp_json-grpNestEach'], ['grp_json']),
     # (findsweep 13) no accent folding
     'nofold': ([('mod', "        return NON_ASCII.test(s) ? s.normalize('NFD').replace(MARKS, '') : s;\n", "        return s;\n")],
                ['L-fs_flat-accentFold'], ['fs_flat']),

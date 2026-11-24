@@ -252,7 +252,7 @@ $dA = strpos($runN, '$pdfHtml = _drop_file_build_pdf_html(');
 $dB = $dA !== false ? strpos($runN, "\$GLOBALS['penumbra_cards_tiles_ctx'] = array('theme' => \$themeName, 'settings' => isset(\$apiResult['pivot']) ? \$apiResult['pivot'] : null, 'format' =>", $dA) : false;
 $dC = $dB !== false ? strpos($runN, "'card_pages'  => (function_exists('penumbra_cards_pdf_for') ? penumbra_cards_pdf_for(\$processedData, \$viewMode, \$reportTitle) : null)", $dB) : false;
 ok('S-pvDropCtx', $dA !== false && $dB !== false && $dC !== false && ($dC - $dB) < 4000, json_encode(array($dA, $dB, $dC)));
-ok('S-pvSaved', strpos($cjs, "if (H.inPivot()) { var tv = { size: curSize() }, tp = cleanPivot(pvSetup()), tk; if (tp) for (tk in tp) tv[tk] = tp[tk]; return { open: 1, tiles: tv }; }") !== false,
+ok('S-pvSaved', strpos($cjs, "if (H.inPivot()) { var tv = { size: curSize() }, tp = cleanPivot(pvSetup()), tk; if (tp) for (tk in tp) if (tk !== 'auto') tv[tk] = tp[tk]; return { open: 1, tiles: tv }; }") !== false,
     'cards.js savedView saves a pivot\'s tiles (size + setup)');
 ok('P-pvNoWarnings', empty($ERRS), implode(' | ', array_slice(array_unique($ERRS), 0, 4)));
 echo implode("\n", $out) . "\n";

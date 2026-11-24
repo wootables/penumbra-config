@@ -38,7 +38,7 @@ ok('P-cfgNoSent', penumbra_cards_email_cfg($st(array('open' => 1, 'title' => 'A'
 ok('P-cfgNone', penumbra_cards_email_cfg(array()) === null && penumbra_cards_email_cfg($st(array('open' => 1, 'sent' => array('pill' => 'S')))) === null);
 $c = penumbra_cards_email_cfg($st(array('open' => 1, 'size' => 'xl', 'sent' => array('title' => 'v_id', 'sub' => array('a', 'b', 'c'), 'big' => '<b>x', 'fields' => array_map(function ($i) { return 'f' . $i; }, range(1, 20)),
     'nolabels' => 1, 'lists' => array('f1' => 'dsemi', 'f2' => 'dbogus', '<i>' => 'dpipe')))));
-ok('P-cfgParse', is_array($c) && $c['title'] === 'V_ID' && $c['sub'] === array('A', 'B') && $c['big'] === '' && count($c['fields']) === 16 && $c['fields'][0] === 'F1'
+ok('P-cfgParse', is_array($c) && $c['title'] === 'V_ID' && $c['sub'] === array('A', 'B') && $c['big'] === '' && count($c['fields']) === 20 && $c['fields'][0] === 'F1'
     && $c['nolabels'] === true && $c['lists'] === array('F1' => 'dsemi') && $c['size'] === 'xl', json_encode($c));
 $c2 = penumbra_cards_email_cfg($st(array('open' => true, 'size' => 'huge', 'sent' => array('title' => 'A'))));
 ok('P-cfgSize', is_array($c2) && $c2['size'] === 'standard' && $c2['nolabels'] === false, json_encode($c2));
@@ -157,14 +157,14 @@ ok('P-groupAgg', $am[1] === array('Sum of A&amp;B: 2') && substr_count($ha, 'mar
 ok('P-groupCards', count($cards($hg)) === 3 && $rg['total'] === 3 && strpos($hg, 'background-color:' . $T['theme-dark-blue']['vars']['bg-surface'] . ';') !== false);
 
 // ---- the runner's wiring (source) ------------------------------------------------------------------
-ok('S-require', substr_count($run, "require_once dirname(__FILE__) . '/penumbra_cards_email.php';") === 1);
+ok('S-require', substr_count($run, "require_once dirname(__FILE__) . '/penumbra_cards_email.php';") === 2);   // (apifix, d88af6c) the API's include block requires it too
 ok('S-globalGuarded', strpos($run, "\$GLOBALS['penumbra_cards_email'] = function_exists('penumbra_cards_email_cfg') ? penumbra_cards_email_cfg(\$state) : null;") !== false);
 ok('S-bodyOnly', strpos($run, "(\$isEmail && \$viewMode !== 'pivot' && !empty(\$data) && !empty(\$GLOBALS['penumbra_cards_email']) && function_exists('penumbra_cards_email_html'))") !== false);
 ok('S-sameCell', strpos($run, "\$cellValue = isset(\$rwMap[\$colUpper]) ? \$rwMap[\$colUpper] : (\$hlEmail ? penumbra_email_cell_format(\$colUpper, \$cell) : \$cell);\r\n                \$o['cells']") !== false
     && strpos($run, "'html' => penumbra_notes_cell_html(formatCellContent(\$cellValue), \$colName)") !== false);
 ok('S-budget', strpos($run, "penumbra_cards_email_html(\$data, \$viewMode === 'grouped', \$_cardsCfg, \$themeName, \$_cardsCell, \$_truncLimit ? max(1, \$_truncLimit - strlen(\$html)) : 0") !== false   // (cleft) up to the budget
     && strpos($run, '" cards &mdash; "') !== false);
-ok('S-aggWired', strpos($run, "return compute_group_agg_summary(\$rows, \$groupAgg['column'], \$groupAgg['type'], isset(\$groupAgg['groupByCol']) ? \$groupAgg['groupByCol'] : null, \$path);") !== false
+ok('S-aggWired', strpos($run, "return compute_group_agg_summary(\$rows, \$groupAgg['column'], \$groupAgg['type'], isset(\$groupAgg['groupByCol']) ? \$groupAgg['groupByCol'] : null, _cf_group_agg_key(\$path, \$data));") !== false
     && strpos($run, "strlen(\$html)) : 0, \$_cardsAgg);") !== false);   // (cleft) the summary to the card email's headings
 ok('S-tableKept', substr_count($run, "    } else if (empty(\$data)) {\r\n        \$html .= \"<p>No results found.</p>\";") === 1);
 foreach (array('inc' => $INC, 'runner' => $RUN) as $k => $p) { $l = shell_exec(escapeshellarg(PHP_BINARY) . ' -n -l ' . escapeshellarg($p) . ' 2>&1'); ok('P-lint-' . $k, strpos((string)$l, 'No syntax errors') !== false, trim((string)$l)); }
