@@ -149,7 +149,7 @@ MUTANTS = {
     # (cind) back at the foot of the menu, where they were
     # (2026-11-17) second anchor moved: e8f6467 (2026-11-11, wsclear) put a rule and Clear all customizations... after Consistent row height
     'ws-fitorder': ([('ws', "        if (kind === 'report') { fitItems().forEach(add); rule(); }\n", ""),
-                     ('ws', "            add(rowHeightItem());\n            rule();\n            add(clearItem());", "            add(rowHeightItem());\n            fitItems().forEach(add);\n            rule();\n            add(clearItem());")], ['R-items', 'F-items'], ['rmenu', 'rfit']),
+                     ('ws', "            if (rhCardsOn()) { add(rowHeightItem()); }   // (rhmove) a table's is up with the column widths\n            rule();\n            add(clearItem());", "            if (rhCardsOn()) { add(rowHeightItem()); }   // (rhmove) a table's is up with the column widths\n            fitItems().forEach(add);\n            rule();\n            add(clearItem());")], ['R-items', 'F-items'], ['rmenu', 'rfit']),
     'dp-noload': ([('dash', "<script src=\"js/penumbra_wsmenu.js?v=<?php echo (int)@filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-dashLoads'], []),
     'dp-notools': ([('dash', "<?php if (!empty($isAdmin)): ?><div hidden><?php penumbra_admin_tools_menu(); ?></div><?php endif; ?>", "")], ['S-dashLoads'], []),
     'ix-noload': ([('index', "<script defer src=\"js/penumbra_wsmenu.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-indexLoads'], []),
@@ -376,8 +376,8 @@ def scenario(name, out):
             A('R-opensBar', m is not None and c.get('prevented') and not c.get('head') and c.get('id') == 'resultsHeader', '%s %s' % (gap, c))
             # (2026-11-06, cind; the user) the two Fit all items right under Quick actions, a block of their own
             # (2026-11-15) e8f6467 (2026-11-11, wsclear) added 'Clear all customizations...' (clearPrefs) as a report menu's last item: R / V / E / O / F-items expect it
-            A('R-items', m and [i['act'] for i in m['items']] == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow',
-                                                                  'rowHeight', 'clearPrefs'], m and [i['act'] for i in m['items']])
+            A('R-items', m and [i['act'] for i in m['items']] == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'rowHeight', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow',
+                                                                  'clearPrefs'], m and [i['act'] for i in m['items']])
             A('R-title', m and m['name'] == 'Lazy rows fixture (lrfix)', m and m['name'])
             A('R-foot', m and m['foot'] == FOOT, m and m['foot'])
             notes = dict((i['act'], i['note']) for i in m['items']) if m else {}
@@ -671,11 +671,11 @@ def scenario(name, out):
             m = p.menu() or {'items': []}
             acts = [i['act'] for i in m['items']]
             if name == 'rviewer':
-                A('V-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'rerun', 'metrics', 'feedback', 'cardsShow', 'rowHeight', 'clearPrefs'], acts)
+                A('V-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'rowHeight', 'recent', 'rerun', 'metrics', 'feedback', 'cardsShow', 'clearPrefs'], acts)
                 A('V-rerunNote', [i['note'] for i in m['items'] if i['act'] == 'rerun'] == [''], [i for i in m['items'] if i['act'] == 'rerun'])
             else:
-                A('E-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow',
-                                      'rowHeight', 'clearPrefs'], acts)
+                A('E-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'rowHeight', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow',
+                                      'clearPrefs'], acts)
                 p.click(p.ev('window.__ws.itemAt("admin", 0)'))
                 time.sleep(0.5)
                 mm = p.menu() or {'subs': []}
@@ -727,7 +727,7 @@ def scenario(name, out):
             p, ok = rpt('id=lrfix&scn=wso&role=owner')
             p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
             acts = p.acts() or []
-            A('O-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'recent', 'admin', 'rerun', 'metrics', 'history', 'cardsShow', 'rowHeight', 'clearPrefs'], acts)
+            A('O-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'fitAll', 'fitPage', 'rowHeight', 'recent', 'admin', 'rerun', 'metrics', 'history', 'cardsShow', 'clearPrefs'], acts)
         elif name == 'rfit':
             # (round 3, 2026-11-02) Fit all column widths to contents / to page: the header menu's two items, made through
             # a heading of the view on screen; none over the cards, a pivot or a table without rows. The widths module's
@@ -761,7 +761,7 @@ def scenario(name, out):
             its = (p.menu() or {'items': []})['items']
             fit = [i for i in its if i['act'] in ('fitAll', 'fitPage')]
             _acts = [i['act'] for i in its]
-            A('F-items', 'quick' in _acts and _acts[_acts.index('quick') + 1:_acts.index('quick') + 3] == ['fitAll', 'fitPage'] and _acts[-2:] == ['rowHeight', 'clearPrefs'] and [i['label'] for i in fit] == ['Fit all column widths to contents', 'Fit all column widths to page']
+            A('F-items', 'quick' in _acts and _acts[_acts.index('quick') + 1:_acts.index('quick') + 4] == ['fitAll', 'fitPage', 'rowHeight'] and _acts[-1:] == ['clearPrefs'] and [i['label'] for i in fit] == ['Fit all column widths to contents', 'Fit all column widths to page']
               and all(i['role'] == 'menuitem' and not i['disabled'] and not i['note'] and (i['title'] or '').startswith('Every shown column') for i in fit),
               [(i['act'], i['label'], i['role'], i['note'], (i['title'] or '')[:30]) for i in its])
             p.key('Escape')

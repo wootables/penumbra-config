@@ -2010,6 +2010,104 @@
     Array.prototype.forEach.call(document.querySelectorAll('.cw-stub-toast'), function (n) { n.remove(); });
   }
 
+  // (2026-11-24, pvpage) a pivot's Fit all column widths to page: a SETTING (PIVOT:@FIT = 'page', kept and saved
+  // beside the pivot's widths), worked out each time the pivot lays out against its box, SHRINK ONLY: row labels wrap
+  // to their longest word, value columns stop at their widest number, headings wrap and none goes under its longest word.
+  async function phaseN() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !cw.fitPivotPage) { rec('N a pivot fitted to the page', false, 'this build has no fitPivotPage'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rpg'); H.hydrate();
+    setReport({}); host.clearUser();
+    window.show_text = function (html) { var d = document.createElement('div'); d.className = 'cw-stub-toast'; d.innerHTML = html; document.body.appendChild(d); };
+    await mountPivot(['C11', 'NAME'], ['C10']);
+    var box = document.getElementById('pivot-output-container');
+    function cut() {
+      return Array.prototype.filter.call(pivT().querySelectorAll('tbody td:not([data-row-field]):not([colspan]), tfoot td:not([data-row-field]):not([colspan])'),
+        function (c) { return c.offsetParent && c.scrollWidth > c.clientWidth + 1; }).length;
+    }
+    function clipped() {
+      return Array.prototype.filter.call(pivT().querySelectorAll('thead .pivot-header-text'), function (s) { return s.scrollWidth > s.clientWidth + 1; }).length;
+    }
+    function pcss() { var s = document.getElementById('pnbColWidthPivotStyle'); return s ? s.textContent : ''; }
+    function heads() { return Array.prototype.map.call(pivT().tHead.rows[0].cells, function (c) { return Math.round(width(c)); }).join(','); }
+    // natural: the pivot in a box far wider than it, nothing of ours
+    box.style.width = '2000px'; apply(); await sleep(60);
+    var nat = heads();
+    // a box about 60% as wide as the pivot's content (its width with the base min-width: 100% out)
+    pivT().style.minWidth = '0px'; await sleep(20);
+    var cw0 = width(pivT()); pivT().style.minWidth = '';
+    var narrow = Math.max(200, Math.round(cw0 * 0.6));
+    box.style.width = narrow + 'px'; apply(); await sleep(60);
+    var before = width(pivT()), cut0 = cut();
+    var ok1 = cw.fitPivotPage();
+    await sleep(80);
+    var st = host.state(), after = width(pivT()), pp = cw.pivotPage(), toast = document.querySelector('.cw-stub-toast:last-child');
+    rec('N1 Fit to page on a pivot wider than its box: the setting goes in (PIVOT:@FIT = page and nothing else), the pivot comes out narrower, with a toast offering Undo',
+      ok1 && st.user['PIVOT:@FIT'] === 'page' && Object.keys(st.user).length === 1 && after < before - 5 && !!pp && pp.out.length > 0 && !!(toast && toast.querySelector('.pnb-colw-undo')),
+      'ok=' + ok1 + ' user=' + JSON.stringify(st.user) + ' width ' + r1(before) + ' > ' + r1(after) + ' box=' + narrow + ' narrowed=' + (pp ? pp.out.length : '-') + ' content=' + r1(cw0));
+    rec('N2 ...and nothing is cut: no number cell overflows, no heading is clipped (they wrap while the fit narrows), the rule that lets them wrap is in',
+      cut() === 0 && clipped() === 0 && /pivot-header-text[^{]*\{white-space:normal!important/.test(pcss()),
+      'cut=' + cut() + ' (before ' + cut0 + ') clipped=' + clipped() + ' wrapRule=' + /white-space:normal/.test(pcss()));
+    var pcss1 = pcss();
+    box.style.width = '2000px'; apply(); await sleep(60);
+    var pp3 = cw.pivotPage();
+    rec('N3 shrink only: in a box the pivot fits, the setting stays on and no column is narrowed (no rule, the headings one line again)',
+      cw.pivotPageOn() && !!pp3 && pp3.out.length === 0 && !/white-space:normal/.test(pcss()) && heads() === nat,
+      'on=' + cw.pivotPageOn() + ' narrowed=' + (pp3 ? pp3.out.length : '-') + ' heads ' + heads() + ' | natural ' + nat);
+    // a box only just wide enough: the pivot's content, the scrollbar buffer and the 4px slack, 2px to spare. It fits, so
+    // nothing narrows - read stretched to the box (the base min-width: 100%), the pivot never would, and the measure's few
+    // px per column over the browser's would narrow it (awdspon at 3000px, 2026-11-24)
+    var barN = (function () { var d = document.createElement('div'); d.style.cssText = 'position:absolute;left:-9999px;top:0;width:100px;height:50px;overflow-y:scroll'; document.body.appendChild(d); var x = d.offsetWidth - d.clientWidth; d.remove(); return Math.max(12, x); })();
+    box.style.width = (Math.ceil(cw0) + barN + 6) + 'px'; apply(); await sleep(60);
+    var pp3b = cw.pivotPage();
+    rec('N3b ...also in a box only just wide enough (content + the scrollbar buffer + 2px): nothing narrowed',
+      cw.pivotPageOn() && !!pp3b && pp3b.out.length === 0, 'box=' + box.style.width + ' content=' + r1(cw0) + ' narrowed=' + (pp3b ? pp3b.out.length : '-') + ' room=' + (pp3b ? pp3b.room : '-'));
+    box.style.width = narrow + 'px'; apply(); await sleep(60);
+    rec('N4 ...and back in the narrow box it narrows again, the same as before (the box\'s width is the room, each pass)',
+      near(width(pivT()), after, 2) && pcss() === pcss1, 'width=' + r1(width(pivT())) + ' was ' + r1(after));
+    // a narrowed column fitted on its own: at its content, by a width of ours; the setting stays
+    var pp5 = cw.pivotPage();   // null when the fit is off (a mutant): N5 goes red, the phase runs on
+    var k5 = Object.keys(pp5 ? pp5.byKey : {}).filter(function (k) { return /^PIVOT:[^=@]/.test(k) && k.indexOf('PIVOT:TOTAL=') !== 0; })[0];
+    var lv5 = k5 ? Array.prototype.filter.call(pivT().querySelectorAll('thead th[data-row-field]'), function (th) { return 'PIVOT:' + host.pivotRowFields()[+th.getAttribute('data-row-field')].toUpperCase() === k5; })[0] : null;
+    var need5 = k5 ? pp5.byKey[k5].need : 0, sized5 = lv5 ? cw.pivotSized(lv5) : false;
+    if (lv5) { cw.fitPivot(lv5); await sleep(60); }
+    var u5 = host.state().user;
+    rec('N5 Fit this column to contents on a row label the fit narrows: that column gets its content width as a width of ours, the fit stays on for the rest',
+      !!lv5 && sized5 && u5[k5] === need5 && u5['PIVOT:@FIT'] === 'page' && near(width(lv5), need5, 2),
+      'key=' + k5 + ' sized=' + sized5 + ' user=' + JSON.stringify(u5) + ' width=' + (lv5 ? r1(width(lv5)) : '-') + ' need=' + need5);
+    // every column to its content: the fit goes, and a second Fit to page clears the width of ours again
+    cw.fitPivotAll(); await sleep(60);
+    var u6 = host.state().user;
+    rec('N6 Fit all column widths to contents takes the fit off (nothing of ours left), and the item comes back: Fit to page is not "done"',
+      !cw.pivotPageOn() && Object.keys(u6).length === 0 && !cw.pivotPageDone() && cw.pivotPage() === null, 'user=' + JSON.stringify(u6) + ' on=' + cw.pivotPageOn());
+    host.setUser('PIVOT:=AMOUNT', 300); apply();
+    cw.fitPivotPage(); await sleep(60);
+    var u6b = host.state().user;
+    rec('N6b Fit to page over a width of ours on the pivot: that width goes, the fit sizes every column, and the item is "done"',
+      u6b['PIVOT:@FIT'] === 'page' && !('PIVOT:=AMOUNT' in u6b) && cw.pivotPageDone(), 'user=' + JSON.stringify(u6b));
+    // the report's setting: kept as written, a viewer can take it off, nothing else gets in
+    host.clearUser(); setReport({ 'PIVOT:@FIT': 'page' });
+    var on7 = cw.pivotPageOn();
+    host.setUser('PIVOT:@FIT', 'auto'); apply();
+    var off7 = !cw.pivotPageOn() && host.userDiff().indexOf('PIVOT:@FIT') !== -1;
+    host.clearUser(); setReport({ 'PIVOT:@FIT': 'yes', 'PIVOT:C10': 'page' });
+    var bad7 = !cw.pivotPageOn() && !('PIVOT:C10' in host.state().report) && !('PIVOT:@FIT' in host.state().report);
+    setReport({ 'PIVOT:@FIT': 300 });
+    var num7 = !cw.pivotPageOn() && !('PIVOT:@FIT' in host.state().report);
+    rec('N7 the report\'s setting turns the fit on; a viewer\'s "auto" takes it off for them (and counts as a change); any other value - and "page" under any other key - is dropped',
+      on7 && off7 && bad7 && num7, 'on=' + on7 + ' off=' + off7 + ' bad=' + bad7 + ' num=' + num7 + ' report=' + JSON.stringify(host.state().report));
+    setReport({}); host.clearUser();
+    host.setUser('PIVOT:@FIT', 'page');
+    var s8 = H.buildState();
+    rec('N8 a save carries the setting (columnWidths PIVOT:@FIT = page)', !!(s8 && s8.columnWidths && s8.columnWidths['PIVOT:@FIT'] === 'page'), JSON.stringify(s8 && s8.columnWidths));
+    host.clearUser(); setReport({});
+    box.style.width = '520px';
+    localStorage.removeItem(KEY);
+    Array.prototype.forEach.call(document.querySelectorAll('.cw-stub-toast'), function (n) { n.remove(); });
+    $('#pivot-output-container').empty().hide();
+  }
+
   var FLATONLY = /[?&]colwidths=flat/.test(location.search);
   (async function () {
     try {
@@ -2019,7 +2117,7 @@
       if (FLATONLY) { await phaseW(); finish(); return; }
       phaseU();
       var ok = await phaseG();
-      if (ok) { await phaseD(); await phaseK(); phaseP(); phaseR(); phaseC(); phaseS(); await phaseV(); await phaseQ(); await phaseY(); await phaseZ(); await phaseM(); await phaseL(); await phaseE(); await phaseF(); }
+      if (ok) { await phaseD(); await phaseK(); phaseP(); phaseR(); phaseC(); phaseS(); await phaseV(); await phaseQ(); await phaseY(); await phaseZ(); await phaseM(); await phaseL(); await phaseE(); await phaseF(); await phaseN(); }
       finish();
     } catch (e) { finish('driver threw: ' + ((e && e.stack) || e)); }
   })();

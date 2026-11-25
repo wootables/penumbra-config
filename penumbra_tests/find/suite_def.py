@@ -14,6 +14,8 @@ SCN = [('boot', ''), ('open', ''), ('lazy', ''), ('order', ''), ('search', ''), 
        ('fs_flat', ''),   # (findsweep, 2026-11-21)
        ('fs_card', ''),   # (findcard, 2026-11-23)
        ('grp_json', ''),   # (findnest, 2026-11-23)
+       ('grp_only_closed', ''), ('grp_only_list', ''),   # (findgrp, 2026-11-24)
+       ('piv_rows', ''),   # (pvfindrows, 2026-11-24)
        # the sweep (never in a default run: --scn sweep_a,...): a seeded random walk, invariants after each step
        ('sweep_a', '&seed=11&steps=70'), ('sweep_b', '&seed=23&steps=70'), ('sweep_c', '&seed=37&steps=70'),
        ('grp_sweep_list', '&seed=41&steps=70'), ('piv_sweep', '&seed=53&steps=70'),
@@ -45,6 +47,9 @@ CHK = {
     'grp_list': ['saneList', 'named', 'otherGroup', 'picked', 'inView', 'listFollows', 'barFollows'],
     'fs_flat': ['whereLine', 'strip', 'selectOnScreen', 'colScope', 'copyLines', 'startOnScreen', 'accentFold'],   # (findsweep)
     'grp_json': ['grpNestEach'],   # (findnest)
+    'grp_only_closed': ['grpBox', 'grpNone', 'grpOpens', 'grpSteps', 'grpLink', 'grpUntick'],   # (findgrp)
+    'grp_only_list': ['listLabel', 'listScoped', 'listFollows'],   # (findgrp)
+    'piv_rows': ['rowsBox', 'rowsOne', 'rowsCount', 'rowsShow', 'rowsFocus', 'rowsClickFollow', 'rowsBack', 'rowsUntick'],   # (pvfindrows, pvfindrows 2)
     'fs_card': ['cardBox', 'cardScoped', 'cardWhere', 'cardNest', 'cardNoFilter', 'cardUntick', 'cardGone'],   # (findcard, findcardnest)
     'grp_search': ['saneSearched', 'allBefore', 'liveRescope', 'moreLine', 'scoped'],
     'grp_filter': ['offered', 'filtered', 'noReoffer'],
@@ -176,6 +181,33 @@ MUTANTS = {
     'nogrouppath': ([('mod', "        if (!hit || !hit.dom || hit.view !== 'grouped' || !hit.el || !hit.el.closest) { return ''; }\n", "        return '';\n")],
                     ['L-grp_closed-groupPath'], ['grp_closed']),
     # (findcard) the card scope never taken: Find reads the report over the window
+    # (findgrp) ticked, the grouped read still takes every group
+    'nogrpkeep': ([('mod', "                if (keepG && !keepG(el)) { continue; }\n", "")],
+                  ['L-grp_only_closed-grpNone', 'L-grp_only_list-listScoped'], ['grp_only_closed', 'grp_only_list']),
+    # (findgrp) a group opened or picked is not read again
+    'nogrpsig': ([('mod', "                    gs = '|o' + ws.length + ':' + g;\n", "                    gs = '|o';\n")],
+                 ['L-grp_only_closed-grpOpens'], ['grp_only_closed']),
+    # (findgrp) ticked from the start
+    'grpdefaulton': ([('mod', "    var grpOnly = false, grpEl = null;\n", "    var grpOnly = true, grpEl = null;\n")],
+                     ['L-grp_only_closed-grpBox'], ['grp_only_closed']),
+    # (findgrp sweep) a link copied while ticked carries the scoped number
+    'nogrplink': ([('mod', "            if (onlyCol || grpScope() || (scanned", "            if (onlyCol || (scanned")],
+                  ['L-grp_only_closed-grpLink'], ['grp_only_closed']),
+    # (pvfindrows) ticked from the start
+    'pvrowsdefaulton': ([('mod', "    var pvRows = false, pvRowsEl = null,", "    var pvRows = true, pvRowsEl = null,")],
+                        ['L-piv_rows-rowsBox'], ['piv_rows']),
+    # (pvfindrows) the rows behind the cells never put on a cell
+    'nopvcells': ([('mod', "            if (n) { out.set(td, n); done.add(rk + '\\u0001' + ck); }\n", "")],
+                  ['L-piv_rows-rowsOne', 'L-piv_rows-rowsCount'], ['piv_rows']),
+    # (pvfindrows) Alt+Enter does nothing on a pivot cell found by its rows
+    'nopvshow': ([('mod', "        if (!scanning && cur >= 0 && hits[cur] && hits[cur].rows) { pvShowRows(); return; }\n", "")],
+                 ['L-piv_rows-rowsShow'], ['piv_rows']),
+    # (pvfindrows 2) a click on a pivot cell leaves Find under the breakdown
+    'nopvfollow': ([('mod', "            document.addEventListener('click', onPvClick, true);", "            void 0;")],
+                   ['L-piv_rows-rowsClickFollow'], ['piv_rows']),
+    # (pvfindrows 2) the breakdown closed: Find stays closed
+    'nopvreturn': ([('mod', "                if (back) { pvReturn(back); }", "                if (false) { pvReturn(back); }")],
+                   ['L-piv_rows-rowsBack'], ['piv_rows']),
     'nocardscope': ([('mod', "    function cardScope() { return !!(cardOffer && cardOnly && !dlg && cardBody()); }\n", "    function cardScope() { return false; }\n")],
                     ['L-fs_card-cardScoped'], ['fs_card']),
     # (findcard) never offered: no box over the window

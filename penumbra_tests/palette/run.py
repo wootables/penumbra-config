@@ -426,8 +426,8 @@ MUTANTS = {
     # the act the menu dropped; Fit to page neither an entry nor an exemption
     'w-nofitpage': ([('pal', "        { id: 'fitpage', label: 'Fit all column widths to page',", "        { id: 'zzfitpage', hide: function () { return true; }, label: 'Zz',")],
                     ['L-pwidth-fitPageRow', 'L-pwidth-fitPageRuns', 'S-widthRows'], ['pwidth']),
-    'w-fitall': ([('pal', "          run: function () { W().fitPage(firstTh()); }, needs: function () { return !!(W() && W().fitPage); } },",
-                          "          run: function () { W().fitAll(firstTh()); }, needs: function () { return !!(W() && W().fitPage); } },")],
+    'w-fitall': ([('pal', "          run: function () { if (pivotOn()) { W().fitPivotPage(); } else { W().fitPage(firstTh()); } }, needs: function () { return !!(W() && W().fitPage); } },",
+                          "          run: function () { W().fitAll(firstTh()); }, needs: function () { return !!(W() && W().fitPage); } },")],   # (pvpage 2026-11-24: the run line branches on a pivot)
                  ['L-pwidth-fitPageRuns', 'L-pwidth-resetWidthRuns'], ['pwidth']),
     'w-deadreset': ([('pal', "act: 'resetWidth', icon: { pal: 'width' }", "act: 'reset', icon: { pal: 'width' }")],
                     ['L-pwidth-noDeadColRows', 'L-pwidth-widthCoverage', 'L-pwidth-resetWidthPick'], ['pwidth']),
@@ -718,6 +718,22 @@ NEW = NEW - {'L-phlcol-splitFindsOptions'}   # (cfsplit is LIVE since 37ecd5d, 2
 MUTANTS['pf-splitkw'] = ([('pal', "kw: 'format summary shading links filter split delimiter highlight", "kw: 'format summary shading links filter highlight")], ['L-phlcol-splitFindsOptions'], ['phlcol'])
 MUTANTS['sl-palrows'] = ([('pal', "            if (['selFilter', 'selExclude', 'selCopy'].indexOf(it.act) >= 0 && !it.disabled) {", "            if (false) {")], ['L-prow-rowSel', 'L-prow-rowSelRuns'], ['prow'])
 MUTANTS['sl-palsub'] = ([('pal', "sub: 'the ' + nSel + ' selected cells',", "sub: where,")], ['L-prow-rowSel'], ['prow'])
+# (2026-11-24, cselhint) cell selection's discoverability: Quick actions' Sum this column (greyed with no active cell,
+# leads "sum", selects the active cell's column) and Select cells to add them up (the help row)
+CHK['prow'] = CHK['prow'] + ['sumColIdleGrey', 'sumColLeads', 'sumColRuns', 'selCellsHelpRow']
+CHK['prow'] = CHK['prow'] + ['selRowRuns']   # (2026-11-24, cselmenu)
+CHK['prow'] = CHK['prow'] + ['sumColClicked']   # (2026-11-24, cselsweep)
+MUTANTS['sw-palrecent'] = ([('csel', "if (td || old) { recentTd = td || old; }", "")], ['L-prow-sumColClicked'], ['prow'])
+MUTANTS['ch-rowcol'] = ([('pal', "if (!S.selectRow(typeof S.recent", "if (!S.selectColumn(typeof S.recent")], ['L-prow-selRowRuns'], ['prow'])
+NEW = NEW | {'L-prow-sumColIdleGrey', 'L-prow-sumColLeads', 'L-prow-sumColRuns', 'L-prow-selCellsHelpRow'}
+MUTANTS['ch-noapi'] = ([('csel', "        selectColumn: function (td) {", "        selectColumnX: function (td) {")], ['L-prow-sumColLeads', 'L-prow-sumColRuns'], ['prow'])
+MUTANTS['ch-idle'] = ([('pal', "return td ? true : 'Click a cell of the column first", "return true || td ? true : 'Click a cell of the column first")], ['L-prow-sumColIdleGrey'], ['prow'])
+MUTANTS['ch-helprow'] = ([('pal', "{ id: 'cellselhelp',", "{ id: 'cellselhelp', hide: function () { return true; },")], ['L-prow-selCellsHelpRow'], ['prow'])
+# (2026-11-24, cselhint 2) Clear all custom preferences lists the hidden cell selection tip and brings it back
+CHK['pmain'] = CHK['pmain'] + ['clearHintListed', 'clearHint']
+NEW = NEW | {'L-pmain-clearHintListed', 'L-pmain-clearHint'}
+MUTANTS['ch-clear'] = ([('main', "        try { localStorage.removeItem('penumbra_cellsel_hint'); } catch(e) {}\r\n", "\r\n")], ['L-pmain-clearHint'], ['pmain'])
+MUTANTS['ch-clearlist'] = ([('main', "items.push('Cell selection tip in the status bar: shown again (all reports, not just this one)');", "void 0;")], ['L-pmain-clearHintListed'], ['pmain'])
 
 # (2026-11-05, dtpick) Chart COLUMN by... on a date column: red on live (no row); pcbText holds on live (a guard)
 SCN = SCN + ['pchartby']
@@ -1303,7 +1319,7 @@ def static_checks(texts):
         ('S-registry', not missing_ids and not missing_fns, 'ids %s fns %s' % (missing_ids, missing_fns)),
         # (colmenu round 33) the width rows: Fit columns to the page runs the module's own fit; the per-column reset the menu
         # still has (its width), never the dropped act; the new list and act exempted, the old ones gone; the topic names the row
-        ('S-widthRows', "{ id: 'fitpage', label: 'Fit all column widths to page'" in pal and 'run: function () { W().fitPage(firstTh()); }' in pal
+        ('S-widthRows', "{ id: 'fitpage', label: 'Fit all column widths to page'" in pal and 'run: function () { if (pivotOn()) { W().fitPivotPage(); } else { W().fitPage(firstTh()); } }' in pal
          and "act: 'resetWidth'" in pal and "act: 'reset'," not in pal and "fitPage: 'a top-level entry" in pal and "resets: 'the list'" not in pal
          and 'fitPage: function (th)' in texts['colw'] and 'Fit all column widths to page' in texts['topic'], ''),
         ('S-stubSmall', 0 < len(stub.splitlines()) <= 150, '%d lines' % len(stub.splitlines())),

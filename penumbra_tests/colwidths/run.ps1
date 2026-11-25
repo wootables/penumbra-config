@@ -281,6 +281,14 @@ $mutantDefs = [ordered]@{
   # 2026-10-23 (lnk40) - no scrollbar's width kept back: a taller open group, or a flat table whose rows outgrow its box,
   # scrolls sideways after Fit to page
   'barres'      = @{ file = 'module'; edits = @(,@("        return Math.max(PAGE_BUFFER_MIN, barW);", "        return 0;")); red = @('F15') }
+  # (2026-11-24, pvpage) a pivot fitted to the page
+  # (the shrink-only test itself is defensive: only a column narrowed under its need gets a rule. What N3 rests on is
+  # reading the pivot's natural width with the base min-width: 100% out - stretched to the box it never reads as fitting)
+  'pgminw'      = @{ file = 'module'; edits = @(,@("        t.style.setProperty('min-width', '0px', 'important');", "")); red = @('N3b') }
+  'pgsave'      = @{ file = 'main'; edits = @(,@("            if (name === 'PIVOT:@FIT') { if (v === 'page' || (v === 'auto' && allowAuto)) out[name] = v; return; }", "            if (name === 'PIVOT:@FIT') { return; }")); red = @('N1','N7','N8') }
+  'pgwrap'      = @{ file = 'module'; edits = @(,@("            var pcss = buildPivotCss(pickPivot().concat(pgl)) + (pgl.length ? PAGE_WRAP_CSS : '');", "            var pcss = buildPivotCss(pickPivot().concat(pgl));")); red = @('N2') }
+  'pgall'       = @{ file = 'module'; edits = @(,@("        if (all && pivotPageOn()) {", "        if (false) {")); red = @('N6') }
+  'pgone'       = @{ file = 'module'; edits = @(,@("            host.setUser(k, own ? 'auto' : sq[k]);", "            host.setUser(k, 'auto');")); red = @('N5') }
 }
 
 function Apply-Mutant([string]$name) {

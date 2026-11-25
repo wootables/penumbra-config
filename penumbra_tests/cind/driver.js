@@ -114,7 +114,11 @@
       var td = sel.querySelector('.group-content table tbody td:not(:first-child)');
       rclick(td); await sleep(200);
       R.info.cellActs = acts().slice(0, 6);
-      R.chk.cellStays = !!menu() && acts().indexOf('gStacked') < 0 && acts().indexOf('gCopyName') < 0;
+      // (2026-11-24, grpswitch) the column's menu (no group-only items such as Copy group name), and the grouped view's
+      // other layouts in it right before Ungroup, as the group's own menu has them
+      var ca = acts();
+      R.chk.cellStays = !!menu() && ca.indexOf('sortAsc') >= 0 && ca.indexOf('gCopyName') < 0;
+      R.chk.cellSwitch = ca.indexOf('gStacked') >= 0 && ca.indexOf('ungroup') === ca.indexOf('gStacked') + 1 + (ca.indexOf('gBoard') > ca.indexOf('gStacked') ? 1 : 0);
       closeMenu(); await sleep(100);
       // (glmenu, 2026-11-17) the list's header, and the frame's own empty space (the list's column under the
       // list): the active row's group menu, as the list's rows have it
@@ -141,7 +145,9 @@
       // the last two, after a rule of their own
       var fa = itemOf('gFitAll'), fp = itemOf('gFitPage');
       var prev = fa ? fa.previousElementSibling : null;
-      R.chk.bandItems = a.slice(-2).join() === 'gFitAll,gFitPage' || (a.indexOf('gFitPage') === a.indexOf('gFitAll') + 1 && a.indexOf('gFitAll') > a.indexOf('gCollapseAll'));
+      // (2026-11-24, bandrh; the user: "move the column widths/consistent row height section to be above the 'group by' section")
+      // right under the group's own items: Fit all to contents, to page, then Consistent row height, before Group by
+      R.chk.bandItems = a.indexOf('gFitAll') >= 0 && a.indexOf('gFitPage') === a.indexOf('gFitAll') + 1 && a.indexOf('rowHeight') === a.indexOf('gFitPage') + 1 && (a.indexOf('gBy') < 0 || a.indexOf('gBy') > a.indexOf('rowHeight'));
       R.chk.bandRule = !!prev && prev.classList.contains('pnb-hm-sep');
       R.chk.bandLabels = !!fa && !!fp && fa.querySelector('.pnb-hm-label').textContent === 'Fit all column widths to contents' && fp.querySelector('.pnb-hm-label').textContent === 'Fit all column widths to page';
       if (fa) fa.click();

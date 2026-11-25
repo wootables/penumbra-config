@@ -25,7 +25,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 SCN = ['mcind', 'ggcind', 'gglcind']
 CHK = {'mcind': ['plainNoDot', 'dotOn', 'dotPlace', 'dotFilter', 'chipOpts', 'chipSort', 'noSave'],
        'ggcind': ['bandItems', 'bandRule', 'bandLabels', 'bandRuns', 'bandFolded'],
-       'gglcind': ['stackedNone', 'paneMenu', 'paneMarks', 'contentMenu', 'cellStays',
+       'gglcind': ['stackedNone', 'paneMenu', 'paneMarks', 'contentMenu', 'cellStays', 'cellSwitch',
                    'headMenu', 'fillMenu']}   # glmenu (2026-11-17): the list's header and the frame's space under the list
 # red on the live build (--control); plainNoDot, noSave and bandFolded hold there too
 NEW = {'L-mcind-dotOn', 'L-mcind-dotPlace', 'L-mcind-dotFilter', 'L-mcind-chipOpts', 'L-mcind-chipSort',

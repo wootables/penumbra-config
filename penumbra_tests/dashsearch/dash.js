@@ -144,6 +144,16 @@
         else if (!URL_SEARCH && def) { parts.push('search='); }
         return 'dashboard.php' + (parts.length ? '?' + parts.join('&') : '');
     }
+    // (apibatch6 #2) The names in a tile's data call that came from the dashboard's address and not from the tile
+    // itself: PenumbraTiles.fetchRows sends them as &pnbdash= (spec.dashParams), so a report whose prompt is spelt
+    // otherwise (FY in the address, fy in the report) ignores the answer instead of refusing the tile's call.
+    function dashParamNames(tile) {
+        var own = (tile && tile.prompts) || {}, out = [];
+        for (var k in URL_PROMPTS) {
+            if (Object.prototype.hasOwnProperty.call(URL_PROMPTS, k) && !Object.prototype.hasOwnProperty.call(own, k)) { out.push(k); }
+        }
+        return out;
+    }
     // A tile's effective prompt answers: its own, with the URL's on top.
     function effPrompts(tile) {
         if (!Object.keys(URL_PROMPTS).length) { return tile.prompts || {}; }
@@ -591,7 +601,7 @@
                 had = _ctlCountRows[ck] = { pending: true };
                 var ctlGen = _dashGen, ctlHad = had;   // (apibatch5 #22) see the catch below
                 var ss = searchSpecFor({ report: src.tile.report, prompts: src.tile.prompts }, T.splitSearch(text), text);
-                T.fetchRows({ source: 'live', report: src.tile.report, prompts: effPrompts(src.tile), limit: CTL_FILL_LIMIT, search: ss.search, dsearch: ss.dsearch })
+                T.fetchRows({ source: 'live', report: src.tile.report, prompts: effPrompts(src.tile), dashParams: dashParamNames(src.tile), limit: CTL_FILL_LIMIT, search: ss.search, dsearch: ss.dsearch })   // (apibatch6 #2) dashParams
                     .then(function (res) {
                         _ctlCountRows[ck] = { rows: res.rows, capped: (typeof res.totalRows === 'number') && res.totalRows > res.rows.length };
                         scheduleControls();
@@ -761,7 +771,7 @@
             _ctlFillAsked[k] = true;
             var fillGen = _dashGen;   // (apibatch5 #22) see the catch below
             var tl = pick[k];
-            T.fetchRows({ source: 'live', report: tl.report, prompts: effPrompts(tl), limit: CTL_FILL_LIMIT, search: '', dsearch: '' })
+            T.fetchRows({ source: 'live', report: tl.report, prompts: effPrompts(tl), dashParams: dashParamNames(tl), limit: CTL_FILL_LIMIT, search: '', dsearch: '' })   // (apibatch6 #2) dashParams
                 .then(function (res) {
                     var capped = (typeof res.totalRows === 'number') && res.totalRows > res.rows.length;
                     // A tile that meanwhile holds MORE rows (a report the filter
@@ -1991,6 +2001,7 @@
         _tileSearchSent[tile.id] = tileSearchKey(tile);
         var spec = { source: tile.source, report: tile.report, url: tile.url, json: tile.json,
                      prompts: effPrompts(tile), limit: tileRowLimit(tile),
+                     dashParams: dashParamNames(tile),   // (apibatch6 #2) the address's names, as &pnbdash=
                      search: ss.search, dsearch: ss.dsearch };   // the server filters the JSON rows (2026-09-05; routed fragments 2026-09-29)
         entry.promise = T.fetchRows(spec)
             .then(function (res) {
@@ -4178,6 +4189,14 @@
                     })
                     .fail(function () { promptDefs = null; renderPromptRows({}); });
             }
+            // (apibatch6 #16b) A yes / no prompt with no default takes one of its two values, never a blank: the server
+            // refuses a blank yes / no answer (400), so the editor offers no "(report default)" for it, picks the first
+            // value (manage_dashboard.php lists yes first) and writes it, and never writes "name=" for it.
+            function promptMustPick(p) {
+                var dv = (p.forcedefault !== null && p.forcedefault !== undefined && p.forcedefault !== '') ? p.forcedefault : p['default'];
+                return String(p.type || '').toLowerCase() === 'boolean' && !p.hidden && !!(p.options && p.options.length) &&
+                       (dv === null || dv === undefined || $.trim(String(dv)) === '');
+            }
             function renderPromptRows(meta) {
                 var $wrap = $('#tePromptRows'), $hints = $('#tePromptHints');
                 var notes = [];
@@ -4203,6 +4222,7 @@
                     return;
                 }
                 var cur = textToPrompts($('#tePrompts').val());
+                var autoPicked = 0;   // (apibatch6 #16b) yes / no prompts given their first value here
                 var html = promptDefs.map(function (p) {
                     if (p.hidden) { return ''; }
                     var label = p.label || p.title || p.name;
@@ -4215,16 +4235,18 @@
                         // (apibatch4 #12) a multi-select's value with a comma in it goes as &#44; (the API's list
                         // separator is the comma: "Smith, John" was read as two values)
                         var isMulti = String(p.type || '').toLowerCase() === 'multi-select';
-                        var opts = p.options.map(function (o) {
+                        var mustPick = promptMustPick(p);   // (apibatch6 #16b)
+                        if (mustPick && val === '') { autoPicked++; }
+                        var opts = p.options.map(function (o, oi) {
                             if (isMulti) { o = { label: o.label, value: String(o.value).replace(/,/g, '&#44;') }; }
-                            var sel = val !== '' && val === String(o.value);
+                            var sel = (val !== '' && val === String(o.value)) || (mustPick && val === '' && oi === 0);
                             if (sel) { found = true; }
                             return '<option value="' + escapeHtml(String(o.value)) + '"' + (sel ? ' selected' : '') + '>' + escapeHtml(String(o.label)) + '</option>';
                         }).join('');
                         // A previously-typed custom value survives as its own entry.
                         if (val !== '' && !found) { opts += '<option value="' + escapeHtml(val) + '" selected>' + escapeHtml(val) + '</option>'; }
                         inner = '<select class="dash-prompt-input" id="dashPrompt-' + String(p.name).replace(/[^A-Za-z0-9_-]/g, '_') + '" data-name="' + escapeHtml(p.name) + '">' +
-                                '<option value="">(report default' + (dflt ? ': ' + escapeHtml(dflt) : '') + ')</option>' + opts + '</select>';
+                                (mustPick ? '' : '<option value="">(report default' + (dflt ? ': ' + escapeHtml(dflt) : '') + ')</option>') + opts + '</select>';
                     } else {
                         var ph = dflt ? ('default: ' + dflt) : (p.autofill ? 'autofilled - type a value to override' : 'report default');
                         inner = '<input type="text" class="dash-prompt-input" id="dashPrompt-' + String(p.name).replace(/[^A-Za-z0-9_-]/g, '_') + '" data-name="' + escapeHtml(p.name) + '" value="' + escapeHtml(val) + '" placeholder="' + escapeHtml(ph) + '">';
@@ -4240,6 +4262,9 @@
                 }
                 $wrap.html(html);
                 $('#tePromptsField').toggle(extras.length > 0);
+                // (apibatch6 #16b) a yes / no prompt shown with its first value picked is written as picked (the change
+                // handler rebuilds the lines from every row and re-reads the columns); the next render finds it answered
+                if (autoPicked) { $wrap.find('.dash-prompt-input').first().trigger('change'); }
             }
             var promptSyncTimer = null;
             $ov.on('change', '.dash-prompt-input', function () {
@@ -4254,7 +4279,8 @@
                 var needsBlank = {};
                 promptDefs.forEach(function (p) {
                     var hasDef = (p['default'] !== null && p['default'] !== undefined) || (p.forcedefault !== null && p.forcedefault !== undefined);
-                    if (!hasDef && !p.resultif && !p.hidden && String(p.type || '').toLowerCase() !== 'multi-select') { needsBlank[p.name] = 1; }
+                    // (apibatch6 #16b) never a yes / no prompt: a blank is refused there, it always has a value picked
+                    if (!hasDef && !p.resultif && !p.hidden && String(p.type || '').toLowerCase() !== 'multi-select' && !promptMustPick(p)) { needsBlank[p.name] = 1; }
                 });
                 $('.dash-prompt-input').each(function () {
                     var n = String($(this).data('name')), v = $.trim($(this).val());

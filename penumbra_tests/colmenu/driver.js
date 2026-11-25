@@ -3667,7 +3667,10 @@
       }
       if (!(await until(function () { return !!(window.Penumbra && window.Penumbra.cellSel); }, 8000))) throw new Error('no cell selection module');
       var CS = window.Penumbra.cellSel;
-      SUBS.selFilter = SUBS.selExclude = 'filterMenu'; SUBS.selCopy = 'copyMenu';
+      // (2026-11-24, cselmenu) a right-click inside a selection opens the selection's own menu: its Filter to / Exclude the
+      // selected values and Copy the selected cells are its own items (the column's menu, its last item, keeps them in its lists)
+      delete SUBS.selFilter; delete SUBS.selExclude; delete SUBS.selCopy;
+      async function colMenuOf(el) { closeMenu(); rclick(el); var o = item('selOther'); if (!o) return false; o.click(); await sleep(60); return !!menu() && !menu().classList.contains('pnb-hm-sel'); }
       function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
       function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }
       function noteOf(el) { var x = el && el.querySelector('.pnb-hm-note'); return x ? x.textContent : ''; }
@@ -3692,19 +3695,27 @@
       R.chk.selCells = n0 === 3 && cl.length === 3 && [a, b, c].every(function (td) { return cl.indexOf(td) >= 0; });
       // the right-click inside it: the Filter list is the selection's (no Filter to "value", Exclude, At least...)
       closeMenu(); rclick(b);
-      var a0 = acts(); sub('filterMenu'); await sleep(100);
-      var l0 = subActs(), fi = item('selFilter');
-      R.info.menu = { acts: a0, list: l0, note: noteOf(fi), title: fi ? fi.getAttribute('title') : null, va: va, vb: vb, vc: vc };
-      R.chk.selMenu = a0[0] === 'filterMenu' && a0[1] === 'copyMenu' && l0.join() === 'selFilter,selExclude,filter,clickFilter' && lab(fi) === 'Filter to the selected values'
-        && lab(item('selExclude')) === 'Exclude the selected values';
+      var a0 = acts(), fi = item('selFilter');
+      var aSel = a0.slice(), fiLab = lab(fi), exLab = lab(item('selExclude'));
+      var colOk = await colMenuOf(b); var aCol = acts(); sub('filterMenu'); await sleep(100);
+      var l0 = subActs();
+      closeMenu(); rclick(b); fi = item('selFilter');
+      R.info.menu = { acts: aSel, col: aCol.slice(0, 3), list: l0, note: noteOf(fi), title: fi ? fi.getAttribute('title') : null, va: va, vb: vb, vc: vc };
+      // (cselmenu) the selection's menu: Copy the selected cells, Filter to / Exclude the selected values, ... the column's menu
+      // last; that menu's Filter list is the selection's still (no Filter to "value", Exclude, At least...)
+      R.chk.selMenu = aSel.indexOf('selFilter') > aSel.indexOf('selCopy') && aSel.indexOf('selExclude') === aSel.indexOf('selFilter') + 1 && aSel[aSel.length - 1] === 'selOther'
+        && fiLab === 'Filter to the selected values' && exLab === 'Exclude the selected values'
+        && colOk && aCol[0] === 'filterMenu' && aCol[1] === 'copyMenu' && l0.join() === 'selFilter,selExclude,filter,clickFilter';
       // (the first item takes the focus as the list opens: jQuery UI's tooltip then holds its title, in the tip it points to)
       function tipOf(el) { if (!el) return ''; var t = el.getAttribute('title'); if (t) return t; var d = el.getAttribute('aria-describedby'), n = d ? document.getElementById(d) : null; return n ? n.textContent : ''; }
       var t0 = tipOf(fi);
       R.chk.selNote = noteOf(fi) === '3 values, 2 columns' && t0.indexOf(va) >= 0 && t0.indexOf(vb) >= 0 && t0.indexOf(vc) >= 0;
-      closeMenu(); rclick(b); sub('copyMenu'); await sleep(100);
+      closeMenu(); rclick(b); var sci = item('selCopy'), sciL = lab(sci), sciN = noteOf(sci);
+      await colMenuOf(b); sub('copyMenu'); await sleep(100);
       var l1 = subActs(), ci = item('selCopy');
-      R.info.copy = { list: l1, note: noteOf(ci) };
-      R.chk.selCopyList = l1[0] === 'selCopy' && l1.indexOf('cellCopy') < 0 && l1.indexOf('copyRow') > 0 && lab(ci) === 'The selected cells' && noteOf(ci) === '3 cells';
+      R.info.copy = { list: l1, note: noteOf(ci), sel: [sciL, sciN] };
+      R.chk.selCopyList = l1[0] === 'selCopy' && l1.indexOf('cellCopy') < 0 && l1.indexOf('copyRow') > 0 && lab(ci) === 'The selected cells' && noteOf(ci) === '3 cells'
+        && sciL === 'Copy the selected cells' && sciN === 'Ctrl+C';
       closeMenu();
       // Copy > The selected cells: the press on the item clears the selection, the copy is Ctrl+C's (its copy event: text and table)
       var exp = CS.payload(), realExec = document.execCommand, got = null;
@@ -3717,7 +3728,7 @@
       };
       await runItem(b, 'selCopy');
       R.info.copied = { got: got, exp: exp ? { text: exp.text.slice(0, 300) } : null, toasts: window.__toasts.slice(-2) };
-      R.chk.selCopyRuns = !!got && !!exp && got.text === exp.text && got.html === exp.html && got.prevented && got.count === 0 && got.text.indexOf(va) >= 0 && got.text.indexOf(vc) >= 0;
+      R.chk.selCopyRuns = !!got && !!exp && got.text === exp.text && got.html === exp.html && got.prevented && got.count === 3 && got.text.indexOf(va) >= 0 && got.text.indexOf(vc) >= 0;
       // ...where the copy event is refused: the text alone, through the clipboard
       document.execCommand = function (cmd) { return cmd === 'copy' ? false : realExec.apply(document, arguments); };
       a = cellIn(trOf(ni), 'V_NAME'); c = cellIn(trOf(ni), 'V_STATUS');
@@ -3735,8 +3746,8 @@
       // two cells of one value: still the selection's, one value
       var sj = cellIn(trOf(nj), 'V_STATUS');
       pick([c, sj]);
-      closeMenu(); rclick(c); sub('filterMenu'); await sleep(100);
-      R.chk.selOne = subActs()[0] === 'selFilter' && noteOf(item('selFilter')) === '1 value';
+      closeMenu(); rclick(c); await sleep(50);
+      R.chk.selOne = !!item('selFilter') && noteOf(item('selFilter')) === '1 value';
       closeMenu();
       // past 100 values: greyed, the reason its title
       var rows40 = visTrs().slice(0, 40), blk = CS.select([{ a: cellIn(rows40[0], 'V_ID'), b: cellIn(rows40[rows40.length - 1], 'V_STATUS') }]);
@@ -3854,14 +3865,107 @@
       var tr = tb ? Array.prototype.filter.call(tb.querySelectorAll('tbody tr'), function (x) { return !x.classList.contains('search-hidden') && x.style.display !== 'none' && !!x.querySelector('td[data-column]'); })[0] : null;
       var a = tr ? tr.querySelector('td[data-column="' + th.getAttribute('data-column') + '"]') : null, c = tr ? tr.querySelector('td[data-column="' + ths.getAttribute('data-column') + '"]') : null;
       var n = (a && c && CS) ? CS.select([{ a: a, b: a }, { a: c, b: c }]) : 0;
-      closeMenu(); rclick(a); sub('filterMenu'); await sleep(100);
-      var l = subActs(), it = item('selFilter');
+      closeMenu(); rclick(a); await sleep(100);
+      var l = acts().filter(function (x) { return /^sel(Filter|Exclude)$/.test(x); }), it = item('selFilter');   // (cselmenu) the selection's menu
       if (it) it.click();
       await sleep(1200);
       var q = searchVal();
       R.info.g = { n: n, list: l, q: q };
       R.chk.gsMenu = n === 2 && l[0] === 'selFilter' && l[1] === 'selExclude';
       R.chk.gsFilter = /V_NAME = \/\^\(\?:/.test(q) && /V_STATUS = \/\^\(\?:/.test(q);
+    },
+    // (2026-11-24, cselmenu) the selection's own menu: every figure (a click copies it, the selection stays), Copy all figures,
+    // Show in the status bar (a tick in place, the menu stays), Select this column / row, Clear, the column's menu last, and
+    // the readout's right-click
+    mselm: async function () {
+      if (!(window.Penumbra && window.Penumbra.cellSel)) {
+        var lk = document.createElement('link'); lk.rel = 'stylesheet'; lk.href = 'penumbra_cellsel.css'; document.head.appendChild(lk);
+        var sc = document.createElement('script'); sc.src = 'penumbra_cellsel.js'; document.body.appendChild(sc);
+      }
+      if (!(await until(function () { return !!(window.Penumbra && window.Penumbra.cellSel); }, 8000))) throw new Error('no cell selection module');
+      var CS = window.Penumbra.cellSel;
+      function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }
+      function noteOf(el) { var x = el && el.querySelector('.pnb-hm-note'); return x ? x.textContent : ''; }
+      function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
+      function press(el) { if (el) el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1 })); }
+      function clickIt(el) { if (!el) return false; press(el); el.click(); return true; }   // (a mutant may take the item away: the checks go red, not the scenario)
+      function visTrs() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && tr.getClientRects().length && !!tr.querySelector('td[data-column]'); }); }
+      function cellIn(tr, name) { var t = fth(name); return (t && tr) ? tr.querySelector('td[data-column="' + t.getAttribute('data-column') + '"]') : null; }
+      try { localStorage.removeItem('penumbra_cellsel_stats'); } catch (e0) { }
+      var trs = visTrs(), c1 = cellIn(trs[0], 'V_AMOUNT'), c2 = cellIn(trs[1], 'V_AMOUNT'), c3 = cellIn(trs[2], 'V_AMOUNT');
+      CS.select([{ a: c1, b: c3 }]); await sleep(150);
+      closeMenu(); rclick(c2);
+      var m = menu(), a0 = acts(), sumIt = item('selStat-sum'), roSum = document.querySelector('#pnbCellSelReadout .pnb-csel-v[data-k="sum"]');
+      var sumV = noteOf(sumIt);
+      R.info.m = { acts: a0, cls: m && m.className, sum: sumV, ro: roSum && roSum.textContent };
+      R.chk.smOpens = !!m && m.classList.contains('pnb-hm-sel') && a0[0] === 'selStat-sum';
+      R.chk.smFigures = ['selStat-sum', 'selStat-avg', 'selStat-count', 'selStat-min', 'selStat-max', 'selStat-median', 'selStat-distinct', 'selStat-numbers'].every(function (x) { return a0.indexOf(x) >= 0; })
+        && !!roSum && sumV === roSum.textContent;
+      R.chk.smOrder = a0.slice(-8).join() === 'selCopy,selFilter,selExclude,selColumn,selRow,selTable,selClear,selOther';
+      // a figure: copied, the selection stays (a press inside the menu keeps it)
+      clickIt(sumIt); await sleep(300);
+      R.info.statCopy = { clip: lastClip(), count: CS.count() };
+      R.chk.smStatCopies = !!sumIt && lastClip() === sumV && CS.count() === 3;
+      // Copy all figures: a label and a value on each line
+      closeMenu(); if (CS.count() !== 3) { CS.select([{ a: c1, b: c3 }]); await sleep(100); }
+      rclick(c2); var ca = item('selStatsCopy'); var caOk = clickIt(ca); await sleep(300);
+      var txt = String(lastClip() || '');
+      R.info.copyAll = txt.slice(0, 200);
+      R.chk.smCopyAll = caOk && /^Sum\t/.test(txt) && txt.split('\n').length === 8 && txt.indexOf('\nMedian\t') > 0 && txt.indexOf('\nDistinct\t') > 0;
+      // Show in the status bar: Median on - ticked in place, the menu stays, the readout shows it - then off again
+      closeMenu(); rclick(c2); sub('selStatsShow'); await sleep(100);
+      var md = item('selShow-median'); clickIt(md); await sleep(200);
+      var md2 = item('selShow-median');
+      R.info.show = { menu: !!menu(), checked: md2 && md2.getAttribute('aria-checked'), ro: !!document.querySelector('#pnbCellSelReadout .pnb-csel-median'), count: CS.count(), stored: localStorage.getItem('penumbra_cellsel_stats') };
+      R.chk.smShowStays = !!menu() && !!md2 && md2.getAttribute('aria-checked') === 'true' && !!document.querySelector('#pnbCellSelReadout .pnb-csel-median') && CS.count() === 3;
+      if (md2) { md2.click(); } await sleep(150);
+      R.chk.smShowOff = !document.querySelector('#pnbCellSelReadout .pnb-csel-median') && !!item('selShow-median') && item('selShow-median').getAttribute('aria-checked') === 'false';
+      try { localStorage.removeItem('penumbra_cellsel_stats'); } catch (e1) { }
+      closeMenu();
+      // Select this column, this row; Clear
+      if (CS.count() !== 3) { CS.select([{ a: c1, b: c3 }]); await sleep(100); }
+      rclick(c2); var col = item('selColumn'); clickIt(col); await sleep(300);
+      var wantCol = visTrs().filter(function (tr) { return !!cellIn(tr, 'V_AMOUNT'); }).length;
+      R.info.col = { count: CS.count(), want: wantCol };
+      R.chk.smColumn = wantCol > 3 && CS.count() === wantCol && CS.active() === c2;
+      closeMenu(); rclick(c2); var rw = item('selRow'); clickIt(rw); await sleep(300);
+      var wantRow = Array.prototype.filter.call(c2.parentNode.cells, function (td) { return td.getAttribute('data-column') !== '#' && td.style.display !== 'none' && td.getClientRects().length > 0; }).length;
+      R.info.row = { count: CS.count(), want: wantRow };
+      R.chk.smRow = wantRow > 2 && CS.count() === wantRow;
+      closeMenu(); rclick(c2); var cl = item('selClear'); var clOk = clickIt(cl); await sleep(200);
+      R.chk.smClear = clOk && CS.count() === 0;
+      // the column's own menu, last
+      CS.select([{ a: c1, b: c3 }]); await sleep(100);
+      closeMenu(); rclick(c2); var ot = item('selOther'), otL = lab(ot); clickIt(ot); await sleep(150);
+      var a1 = acts();
+      R.info.other = { label: otL, acts: a1.slice(0, 6) };
+      R.chk.smOther = /^Column menu: .+\.\.\.$/.test(otL) && a1.indexOf('filterMenu') >= 0 && a1.indexOf('sortAsc') >= 0 && !!menu() && !menu().classList.contains('pnb-hm-sel');
+      closeMenu();
+      // the readout in the status bar: the same menu
+      CS.select([{ a: c1, b: c3 }]); await sleep(150);
+      var ro = document.getElementById('pnbCellSelReadout');
+      if (ro) { rclick(ro); }
+      R.chk.smReadout = !!ro && !!menu() && menu().classList.contains('pnb-hm-sel') && !!item('selStat-sum');
+      closeMenu(); CS.clear();
+      // (2026-11-24, cselsweep) Esc closes the menu and leaves the selection; the status-bar ticks are checkboxes; the
+      // menu goes with its selection
+      CS.select([{ a: c1, b: c3 }]); await sleep(120);
+      rclick(c2); await sleep(50);
+      var hadMenu = !!menu();
+      keyOn('Escape'); await sleep(80);
+      R.info.esc = { hadMenu: hadMenu, menu: !!menu(), count: CS.count() };
+      R.chk.smEscKeeps = hadMenu && !menu() && CS.count() === 3;
+      closeMenu(); if (CS.count() !== 3) { CS.select([{ a: c1, b: c3 }]); await sleep(100); }
+      rclick(c2); sub('selStatsShow'); await sleep(100);
+      var tk = item('selShow-sum');
+      R.info.role = tk && tk.getAttribute('role');
+      R.chk.smTickRole = !!tk && tk.getAttribute('role') === 'menuitemcheckbox' && tk.getAttribute('aria-checked') === 'true';
+      closeMenu();
+      rclick(c2); await sleep(50);
+      var open1 = !!menu();
+      CS.clear(); await sleep(50);
+      R.chk.smClosesWithSel = open1 && !menu();
+      closeMenu(); CS.clear();
     },
     // (2026-11-03, menufix) Freeze past the first five greyed with its reason; the '#' heading's Copy (the view link alone);
     // the summary row's menu: the types (None first, the one in force ticked, no Custom Formula), a pick redraws the footer,

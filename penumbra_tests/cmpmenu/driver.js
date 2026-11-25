@@ -281,7 +281,7 @@
     rclick(hd);
     var a5 = acts();
     rec('C5 a group\'s band opens the comparison menu under the group\'s name: Expand, Show only, Hide this group, then the comparison\'s items',
-      !!menu() && title() === 'Modified Rows' && J(a5) === J(['cmpGroupToggle', 'cmpGroupOnly', 'cmpGroupHide', 'cmpGroupCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']),   // (menufix2 M8) Copy group name
+      !!menu() && title() === 'Modified Rows' && J(a5) === J(['cmpGroupToggle', 'cmpGroupOnly', 'cmpGroupHide', 'cmpGroupCopyName', 'rowHeight', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']),   // (menufix2 M8) Copy group name; (2026-11-24, bandrh) Consistent row height, as its headings have it
       'title=' + title() + ' acts=' + J(a5));
     closeMenu();
 

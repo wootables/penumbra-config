@@ -639,6 +639,56 @@
       R.chk.barFollows = !!nm && slid && !still;
       R.info.follow = { nm: !!nm, slid: slid, still: still };
     },
+    // (findgrp, 2026-11-24) Stacked, every group closed: "Search only in open groups" shows unticked; ticked, nothing in a
+    // closed group is a match, a group opened by hand is read again (only its matches), unticked: every match again.
+    grp_only_closed: async function () {
+      var ws = gWraps();
+      blurAll(); await ctrlF(); await find('kilo');
+      var n0 = st().n, box = document.querySelector('.pnb-find-grp'), cb = box && box.querySelector('input');
+      R.chk.grpBox = st().grp === 'off' && !!box && !box.hidden && shown(box) && !!cb && !cb.checked && /open groups/.test(box.textContent);
+      if (cb) { cb.click(); } await sleep(30); await settle();
+      R.chk.grpNone = ws.length === 6 && ws.every(function (w) { return !w.classList.contains('open'); }) && n0 > 0 && st().grp === 'on' && st().n === 0 &&
+        document.querySelector('.pnb-find-input').placeholder === 'Find in open groups';
+      var w0 = null;
+      for (var i = 0; i < ws.length && !w0; i++) { if (ws[i].querySelector('.group-content td') && Array.prototype.some.call(ws[i].querySelectorAll('.group-content > table > tbody > tr'), function (tr) { return kiloIn(rowNo(tr)) > 0; })) { w0 = ws[i]; } }
+      var want = 0;
+      if (w0) {
+        Array.prototype.forEach.call(w0.querySelectorAll('.group-content > table > tbody > tr'), function (tr) { want += kiloIn(rowNo(tr)) > 0 ? 1 : 0; });
+        w0.querySelector(':scope > .group-header').click(); await sleep(450); await settle();
+      }
+      var hs = hits();
+      R.chk.grpOpens = !!w0 && w0.classList.contains('open') && st().n === want && want > 0 && want < n0 &&
+        hs.every(function (h) { return w0.contains(h.el) && shown(h.el); });
+      key('Enter'); await settle();
+      var td = curTd();
+      R.chk.grpSteps = !!td && w0.contains(td) && shown(td);
+      var lk = F().current ? F().current() : null;   // (findgrp sweep) a link carries no number while ticked
+      R.chk.grpLink = !!lk && lk.q === 'kilo' && lk.at === -1 && st().cur >= 0;
+      if (cb) { cb.click(); } await sleep(30); await settle();
+      R.chk.grpUntick = st().grp === 'off' && st().n === n0;
+      R.info.grpOnly = { n0: n0, want: want, n: st().n };
+      key('Escape'); await sleep(30);
+    },
+    // (findgrp) the List layout: "Search only in the selected group"; ticked, the picked group's matches only, and the
+    // next group picked is read again.
+    grp_only_list: async function () {
+      blurAll(); await ctrlF(); await find('kilo');
+      var all = hits(), box = document.querySelector('.pnb-find-grp'), cb = box && box.querySelector('input');
+      R.chk.listLabel = !!box && !box.hidden && /selected group/.test(box.textContent) && !!cb && !cb.checked;
+      function inSel() { var s = document.querySelector('#groupedResultsContainer .group-wrapper.pnb-gl-sel'); return s ? all.filter(function (h) { return s.contains(h.el); }).length : -1; }
+      var want = inSel();
+      if (cb) { cb.click(); } await sleep(30); await settle();
+      var sel = document.querySelector('#groupedResultsContainer .group-wrapper.pnb-gl-sel');
+      R.chk.listScoped = want > 0 && st().n === want && hits().every(function (h) { return sel.contains(h.el); }) &&
+        document.querySelector('.pnb-find-input').placeholder === 'Find in this group';
+      var ws = gWraps(), other = null;
+      for (var i = 0; i < ws.length && !other; i++) { if (ws[i] !== sel && all.some(function (h) { return ws[i].contains(h.el); })) { other = ws[i]; } }
+      var want2 = other ? all.filter(function (h) { return other.contains(h.el); }).length : -1;
+      if (other) { window.Penumbra.groupList.selectGroup(other); await sleep(300); await settle(); }
+      R.chk.listFollows = !!other && other.classList.contains('pnb-gl-sel') && st().n === want2 && hits().every(function (h) { return other.contains(h.el); });
+      R.info.grpList = { all: all.length, want: want, want2: want2, n: st().n };
+      key('Escape'); await sleep(30);
+    },
     // A search in the grouped view: only the rows it keeps; a line counts the rest;
     // a search run while Find is open re-reads the matches by itself.
     grp_search: async function () {
@@ -724,6 +774,73 @@
       var cs = window.Penumbra.cellSel;
       R.chk.closed = !barShown();
       R.chk.activeCell = !!td && document.activeElement === td && !!cs && cs.active() === td;
+    },
+
+    // (pvfindrows, 2026-11-24) "Also search the rows behind each cell": unticked by default (a name only the rows say is
+    // not found); ticked, the cells whose rows say it are matches (one per cell, the row counts right, outlined, no
+    // totals), the line under the box counts the current cell's rows, Alt+Enter opens its breakdown with Find in it on
+    // the term, and the box keeps the focus; the tick is kept for the page and unticking takes them away.
+    piv_rows: async function () {
+      var P = document.getElementById('pivotResultTable');
+      function cellKey(r) { return (r.H_GROUP == null || r.H_GROUP === '' ? '[Blank]' : r.H_GROUP) + '|||' + r.H_GROUP2 + '\u0001' + r.V_STATUS; }
+      function says(r, re) { return ['V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_STATUS'].some(function (c) { return re.test(String(r[c] == null ? '' : r[c])); }); }
+      blurAll(); await ctrlF(); await find('Zulu Unique');
+      var box = document.querySelector('.pnb-find-pvrows'), cb = box && box.querySelector('input');
+      R.chk.rowsBox = st().pvrows === 'off' && !!box && shown(box) && !!cb && !cb.checked && st().n === 0 &&
+        /breakdown tables behind each cell/.test(box.textContent);   // (pvfindrows 2: the user's wording)
+      if (cb) { cb.click(); } await sleep(30); await settle();
+      var z = FX[249], hs = hits(), h0 = hs[0], el0 = h0 && h0.el;
+      R.chk.rowsOne = st().pvrows === 'on' && hs.length === 1 && h0.rows === 1 && !!el0 &&
+        el0.getAttribute('data-row-key') + '\u0001' + el0.getAttribute('data-col-key') === cellKey(z) &&
+        el0.classList.contains('pnb-find-hit') && st().rowsLine === "1 row in this cell's breakdown matches";
+      // every cell holding a 'kilo' row, once each, with its rows counted; no total, no summary row
+      await find('kilo');
+      var want = new Map();
+      FX.forEach(function (r) { if (says(r, /kilo/i)) { var k = cellKey(r); want.set(k, (want.get(k) || 0) + 1); } });
+      hs = hits();
+      var seen = new Set(), right = hs.length === want.size;
+      hs.forEach(function (h) {
+        var k = h.el.getAttribute('data-row-key') + '\u0001' + h.el.getAttribute('data-col-key');
+        if (seen.has(k) || want.get(k) !== h.rows) { right = false; }
+        seen.add(k);
+      });
+      R.chk.rowsCount = want.size > 5 && right && F()._verify().n === hs.length &&
+        hs.every(function (h) { return !(P.tFoot && P.tFoot.contains(h.el)) && !h.el.closest('tr.pivot-group-summary-row') && !h.el.hasAttribute('data-grand-total'); });
+      // Alt+Enter on the cell: its breakdown, Find in it on the same term
+      await find('Zulu Unique');
+      var before = overlays().length;
+      inp().focus(); key('Enter', { alt: true });
+      await until(function () { return overlays().length > before && st().dialog === true; }, 5000);
+      await sleep(700); await settle();
+      var ov = topOverlay(), s2 = st();
+      R.chk.rowsShow = overlays().length > before && s2.dialog === true && s2.n === 1 && inp().value === 'Zulu Unique' && !!ov &&
+        hits().every(function (h) { return ov.contains(h.el); }) && /Zulu Unique/.test(ov.textContent);
+      R.chk.rowsFocus = document.activeElement === inp();
+      key('Escape'); await sleep(60);
+      if (ov) { var okb = Array.prototype.filter.call(ov.querySelectorAll('button'), function (b) { return /^(OK|Close)$/i.test(b.textContent.trim()) || b.classList.contains('infobox-close'); })[0]; if (okb) okb.click(); }
+      await until(function () { return overlays().length === before; }, 3000); await sleep(300);
+      // (pvfindrows 2) a click on the cell opens its breakdown over the bar: Find goes into it on the term, and comes
+      // back to the pivot on that cell when the breakdown closes (OK)
+      blurAll(); await ctrlF(); await find('Zulu Unique');
+      var zc = hits()[0] ? hits()[0].el : null, b0 = overlays().length;
+      if (zc) { zc.click(); }
+      await until(function () { return overlays().length > b0 && st().dialog === true; }, 5000);
+      await sleep(700); await settle();
+      var ov2 = topOverlay(), s5 = st();
+      R.chk.rowsClickFollow = !!zc && s5.dialog === true && s5.n === 1 && inp().value === 'Zulu Unique' && !!ov2 && barShown();
+      if (ov2) { var okc = Array.prototype.filter.call(ov2.querySelectorAll('button'), function (b) { return /^(OK|Close)$/i.test(b.textContent.trim()) || b.classList.contains('infobox-close'); })[0]; if (okc) okc.click(); }
+      await until(function () { return overlays().length === b0 && st().open && st().dialog === false && !st().scanning; }, 5000); await sleep(300); await settle();
+      var s6 = st(), hb = hits()[s6.cur];
+      R.chk.rowsBack = s6.open === true && s6.view === 'pivot' && s6.dialog === false && s6.pvrows === 'on' && inp().value === 'Zulu Unique' && !!hb && hb.el === zc;
+      key('Escape'); await sleep(60);
+      // the tick is kept for the page; unticked, the name is not found again
+      blurAll(); await ctrlF(); await find('Zulu Unique');
+      var kept = st().pvrows === 'on' && st().n === 1;
+      cb = document.querySelector('.pnb-find-pvrows input');
+      if (cb) { cb.click(); } await sleep(30); await settle();
+      R.chk.rowsUntick = kept && st().pvrows === 'off' && st().n === 0 && st().rowsLine === null;
+      R.info.pvrows = { want: want.size, n: hs.length, before: before, dialog: s2.dialog, dn: s2.n };
+      key('Escape'); await sleep(30);
     },
 
     // Esc in the grouped view: the match becomes cell selection's active cell.

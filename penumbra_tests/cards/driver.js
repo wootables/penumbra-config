@@ -3211,10 +3211,12 @@
     // a card's own menu on a board: its way out is the grouping's layout (Switch to Stacked view), never Show as table
     rclick(q('.pnb-card-title', c0[0])); await sleep(100);
     var cm = acts(); R.info.cardActs = cm;
-    R.chk.cardMenu = cm.indexOf('cardsStacked') >= 0 && cm.indexOf('cardsTable') < 0 && cm.indexOf('cardsBoard') < 0;
-    // (2026-11-03, menufix) ...in every card's words: Show as table (it read Switch to Stacked view)
-    var cst = menu() ? q('.pnb-hm-item[data-act="cardsStacked"] .pnb-hm-label', menu()) : null;
-    R.chk.cardTableWord = !!cst && cst.textContent === 'Show as table';
+    // (2026-11-24, menugaps 4; the user: "Do all five") the grouped view's own list, as every grouped menu has it: Switch to
+    // Stacked view and the rest ONCE each (the card's own Show as table went: it doubled Switch to Stacked view)
+    var once = function (a) { return cm.filter(function (x) { return x === a; }).length === 1; };
+    R.chk.cardMenu = once('gStacked') && once('ungroup') && cm.indexOf('cardsStacked') < 0 && cm.indexOf('cardsTable') < 0 && cm.indexOf('cardsBoard') < 0;
+    var cst = menu() ? q('.pnb-hm-item[data-act="gStacked"] .pnb-hm-label', menu()) : null;
+    R.chk.cardTableWord = !!cst && cst.textContent === 'Switch to Stacked view';
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
     // the keys: down the lane, across to the next lane (the same place), back, up
     c0 = laneCards(lanes()[0]);

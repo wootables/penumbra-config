@@ -10,7 +10,8 @@
 //           (freeze, unfreeze, sort, hide, show all, a theme), the column's own list, Backspace
 //   pview   the authoring gate: a viewer never sees Save / Version history / the admin controls
 //           (Save greyed when typed in full); an editor does
-//   prow    row-level items only while a cell is selected; Filter to "value" runs
+//   prow    row-level items only while a cell is selected; Filter to "value" runs; (cselhint) Sum this column greyed
+//           with no active cell, leads "sum" and selects the active cell's column; Select cells to add them up
 (function () {
   var SCN = window.__SCN;
   var R = { scn: SCN, chk: {}, info: {} }; window.__R = R;
@@ -231,8 +232,16 @@
     // the page (and this driver) from the top, so that one timer is dropped on the floor here
     var st0 = window.setTimeout;
     window.setTimeout = function (fn) { if (typeof fn === 'function' && /location\.reload/.test(String(fn))) { trace('clearPrefs: reload timer dropped'); return 0; } return st0.apply(window, arguments); };
-    try { document.getElementById('spClearStorage').click(); await sleep(100); } finally { window.setTimeout = st0; }
+    // (2026-11-24, cselhint 2) the cell selection tip, hidden by its x: the clear lists it and brings it back
+    localStorage.setItem('penumbra_cellsel_hint', '{"off":1}');
+    var cf0 = window.confirm, cfMsg = '';
+    window.confirm = function (m) { cfMsg = String(m); return cf0.apply(window, arguments); };
+    try { document.getElementById('spClearStorage').click(); await sleep(100); } finally { window.setTimeout = st0; window.confirm = cf0; }
     R.info.cleared = localStorage.getItem(RECENT_KEY);
+    R.info.clearMsg = cfMsg.slice(0, 400);
+    R.chk.clearHintListed = /Cell selection tip in the status bar: shown again/.test(cfMsg);
+    R.chk.clearHint = localStorage.getItem('penumbra_cellsel_hint') === null;
+    localStorage.removeItem('penumbra_cellsel_hint');
     R.chk.clearPrefs = Array.isArray(stored) && stored[0] === 'top' && localStorage.getItem(RECENT_KEY) === null;   // (stored first, then gone)
     // every header-menu act has a palette entry or a recorded exemption
     var acts = {}, M = window.Penumbra.colMenu;
@@ -246,6 +255,7 @@
     var ABSENT = ['pivot', 'viz', 'download', 'dl-xls', 'dl-pdf', 'dl-print', 'dl-csv', 'dl-tsv', 'dl-json', 'email', 'snapshots', 'journal', 'subscribe', 'settings', 'header', 'find', 'nextpage', 'prevpage', 'clearfilter', 'builder',
                   'taggen', 'managedata', 'formatsql', 'rowlimit', 'wordwrap', 'editorheight', 'tablelist', 'sharestate', 'popout', 'stopquery', 'firstpage', 'lastpage', 'scrollleft', 'scrollright', 'exitpivot', 'expandgroups', 'collapsegroups', 'restoregroup', 'restorepivot', 'asofexit', 'profile', 'rowscard', 'datacard', 'loadcard',
                   'dictionary', 'gendict', 'cmpevergreen', 'col:about',
+                  'cellsum', 'cellselhelp', 'cellrow',   /* (2026-11-24, cselhint; cellrow: cselmenu) cell selection loads in prow / pjump / pnote / ptop only: prow tests both rows */
                   'cards', 'cardstable', 'cardsize-compact', 'cardsize-standard', 'cardsize-large', 'cardsize-xl', 'carddetails', 'cardlayout', 'cardconfig', 'cardlayouts', 'board', 'cardsort', 'cardprint', 'cardprintone', 'cardlink'];   /* (2026-10-31, cards round U) Sort the cards...: the cards suite tests it */   /* (2026-10-30, clayout) Settings > Cards (#spCardsSection) is not in this harness either; (round N, ccfg) nor the card view's Configure cards */   /* (2026-10-28, cards + csize) the Table / Cards switch (#pnbCardsSwitch) and the size control (#pnbCardsSize) are not in this harness: the cards suite tests these rows */   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
     var reg = pal('registry')(), bad = reg.filter(function (e) { return !e.needs && ABSENT.indexOf(e.id) < 0; }).map(function (e) { return e.id; });
     R.info.regBad = bad; R.info.regN = reg.length;
@@ -741,6 +751,12 @@
     await boot();
     await ready();   // (false on the control: no module)
     if (!(await until(function () { return !!(window.Penumbra && window.Penumbra.cellSel); }, 5000))) throw new Error('no cell selection module');
+    // (2026-11-24, cselhint) no cell clicked yet: Sum this column is there, greyed, its reason teaching the drag
+    await open('sum this column');
+    var sumIdle = row('Sum this column');
+    R.info.sumIdle = sumIdle && [sumIdle.off, sumIdle.sub, texts().slice(0, 4)];
+    R.chk.sumColIdleGrey = !!sumIdle && !!sumIdle.off;
+    key('Escape', { target: input() }); await sleep(30);
     await open('');
     R.chk.noRowItemsIdle = !rows().some(function (r) { return /^(Filter to|Copy this value|Exclude)/.test(r.text); });
     key('Escape', { target: input() }); await sleep(30);
@@ -802,6 +818,50 @@
     var qs = ts.value;
     R.info.selRun = { picked: pickedSel, q: qs };
     R.chk.rowSelRuns = pickedSel && /V_NAME = \/\^\(\?:[^)]*\|[^)]*\)\$\//.test(qs) && /V_STATUS = \/\^\(\?:/.test(qs);
+    // (2026-11-24, cselhint) a number cell active: "sum" leads with Sum this column, and Enter selects that column's
+    // rows on screen (the readout's Sum); "select cells" finds the help row
+    ts.value = ''; $(ts).trigger('input'); await sleep(1200);
+    var thv = fth('V_AMOUNT'), vis2 = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && tr.getClientRects().length && !!tr.querySelector('td[data-column]'); });
+    var tdv = vis2.length > 1 ? cIn(vis2[1], thv) : null;
+    var actv = !!tdv && CS2.activate(tdv);
+    await sleep(50);
+    await open('sum');
+    var sr = row('Sum this column'), top = rows()[0];
+    R.info.sumCol = { act: actv, shown: vis2.length, top: top && top.text, off: sr && sr.off, sel: selRow() ? selRow().text : null };
+    R.chk.sumColLeads = actv && !!sr && !sr.off && !!selRow() && selRow().text.indexOf('Sum this column') === 0;
+    key('Enter', { target: input() }); await sleep(300);
+    var stv = CS2.stats(), want = vis2.filter(function (tr) { return !!cIn(tr, thv); }).length;
+    R.info.sumColRun = { box: !!box(), count: CS2.count(), want: want, stats: stv, active: CS2.active() === tdv };
+    R.chk.sumColRuns = !box() && CS2.count() === want && want > 1 && !!stv && !!stv.sum && CS2.active() === tdv;
+    CS2.clear();
+    await open('select cells');
+    var hr = row('Select cells to add them up');
+    R.info.selHelp = hr && [hr.off, hr.sub];
+    R.chk.selCellsHelpRow = !!hr && !hr.off;
+    key('Escape', { target: input() }); await sleep(30);
+    // (2026-11-24, cselmenu) Select this row (Shift+Space): the active cell's row
+    if (tdv) { CS2.activate(tdv); await sleep(30); }
+    await open('select this row');
+    var srw = row('Select this row'), srwSel = !!selRow() && selRow().text.indexOf('Select this row') === 0;
+    key('Enter', { target: input() }); await sleep(300);
+    var rcs = CS2.cells();
+    R.info.selRowRun = { row: srw && [srw.off, srw.sub], lead: srwSel, n: rcs.length, box: !!box() };
+    R.chk.selRowRuns = !!srw && !srw.off && srwSel && !box() && rcs.length > 2 && rcs.every(function (c) { return c.parentNode === tdv.parentNode; });
+    CS2.clear();
+    // (2026-11-24, cselsweep) Sum this column CLICKED: the press on the row dropped the active cell, so it said the column
+    // had nothing to add up
+    if (tdv) { CS2.activate(tdv); await sleep(30); }
+    await open('sum this column'); await sleep(50);
+    var opt = Array.prototype.filter.call(box() ? box().querySelectorAll('[role="option"]') : [], function (el) { return el.textContent.indexOf('Sum this column') >= 0; })[0];
+    if (opt) {
+      opt.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1 }));
+      opt.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0 }));
+      opt.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    }
+    await sleep(300);
+    R.info.sumClick = { opt: !!opt, count: CS2.count(), want: want, box: !!box(), toasts: window.__toasts.slice(-2) };
+    R.chk.sumColClicked = !!opt && CS2.count() === want && want > 1;
+    CS2.clear();
     if (rtStyle === null) rtS.removeAttribute('style'); else rtS.setAttribute('style', rtStyle);
   };
 

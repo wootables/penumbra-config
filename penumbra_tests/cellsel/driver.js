@@ -683,6 +683,246 @@
       R.chk.floatSum = !!val('sum');
     },
 
+    // (2026-11-24, cselmenu) Median / Distinct / Numbers; Ctrl+Space and Shift+Space from the active cell; "on screen only"
+    // when a column's selection leaves rows off screen; the status bar's pick of figures (Show in the status bar)
+    lines: async function () {
+      var S = CS();
+      var st = S._stats(['1', '2', '3', '10', 'x', 'x', ''], null), st2 = S._stats(['5', '1', '3'], null);
+      R.info.st = [st.median, st2.median, st.distinct];
+      R.chk.statMedianEven = st.median === '2.5' && st2.median === '3';
+      R.chk.statDistinct = st.distinct === 5 && st.numbers === 4 && st.count === 6;
+      // Ctrl+Space: the active cell's column, its rows on screen; Shift+Space: its row
+      try { localStorage.removeItem('penumbra_cellsel_stats'); } catch (e0) { }
+      S.clear();
+      var td = cell(2, 'V_AMOUNT');
+      S.activate(td); await frames(2);
+      key(' ', { ctrl: true }); await sleep(80);
+      var wantCol = shownRows().filter(function (tr) { return !!tr.querySelector('td[data-column="' + colId('V_AMOUNT') + '"]'); }).length;
+      R.info.col = { count: count(), want: wantCol, active: S.active() === td };
+      R.chk.ctrlSpaceColumn = wantCol > 3 && count() === wantCol && S.active() === td && segShown();
+      key(' ', { shift: true }); await sleep(80);
+      var wantRow = Array.prototype.filter.call(td.parentNode.cells, function (c) { return c.getAttribute('data-column') !== '#' && c.style.display !== 'none' && c.getClientRects().length > 0; }).length;
+      R.info.row = { count: count(), want: wantRow };
+      R.chk.shiftSpaceRow = wantRow > 2 && count() === wantRow && S.active() === td;
+      R.chk.noPageNoteRow = !(seg() && seg().querySelector('.pnb-csel-page'));
+      S.clear();
+      // rows off screen (as a page's): a column's selection says so; two cells do not
+      // (the harness draws 200 of its rows: the rest are off screen already) - the count before, then 5 more hidden
+      S.selectColumn(cell(0, 'V_AMOUNT')); await sleep(50);
+      var off0 = S.offScreen(), n0 = off0 ? off0.n : 0;
+      S.clear();
+      var rs = shownRows(), hid = rs.slice(8, 13);
+      hid.forEach(function (tr) { tr.style.display = 'none'; });
+      await sleep(50);
+      S.selectColumn(cell(0, 'V_AMOUNT')); await sleep(80);
+      var pg = seg() && seg().querySelector('.pnb-csel-page');
+      var want = (n0 + 5).toLocaleString('en-US');
+      R.info.page = { text: pg && pg.textContent, title: pg && pg.getAttribute('title'), off: S.offScreen(), n0: n0 };
+      R.chk.pageNote = !!pg && /^(on screen|this page) only$/.test(pg.textContent) && (pg.getAttribute('title') || '').indexOf(want + ' more rows are not on screen') === 0
+        && !!S.offScreen() && S.offScreen().n === n0 + 5;
+      S.clear();
+      await drag([cell(0, 'V_AMOUNT'), cell(1, 'V_AMOUNT')]); await sleep(50);
+      R.chk.noPageNotePart = segShown() && !seg().querySelector('.pnb-csel-page');
+      S.clear();
+      hid.forEach(function (tr) { tr.style.display = ''; });
+      await sleep(50);
+      // the status bar's pick: Median on (an extra), then off; the last figure cannot go
+      await drag([cell(0, 'V_AMOUNT'), cell(1, 'V_AMOUNT'), cell(2, 'V_AMOUNT')]); await sleep(50);
+      var before = !seg().querySelector('.pnb-csel-median');
+      S.toggleStat('median'); await sleep(30);
+      var md = seg().querySelector('.pnb-csel-median');
+      R.chk.pickMedian = before && !!md && md.classList.contains('pnb-csel-extra') && JSON.parse(localStorage.getItem('penumbra_cellsel_stats') || '[]').indexOf('median') >= 0;
+      var figs = S.figures().map(function (f) { return f.k; });
+      R.info.figs = figs;
+      R.chk.figuresAll = ['sum', 'avg', 'count', 'min', 'max', 'median', 'distinct', 'numbers'].every(function (k) { return figs.indexOf(k) >= 0; });
+      ['sum', 'avg', 'count', 'min', 'max', 'median'].forEach(function (k) { S.toggleStat(k); });
+      var left = JSON.parse(localStorage.getItem('penumbra_cellsel_stats') || '[]');
+      R.info.left = left;
+      R.chk.pickLastStays = left.length === 1 && left[0] === 'median' && !!seg().querySelector('.pnb-csel-median');
+      try { localStorage.removeItem('penumbra_cellsel_stats'); } catch (e1) { }
+      S.clear();
+    },
+    // (2026-11-24, cselsweep) the bug sweep's fixes: a % cell's stored value x 100, pivot labels no numbers, money
+    // averages in cents, Hide Empty Columns (its stylesheet) skipped by the arrows and the copy and clearing a selection,
+    // Esc in a box keeps the selection, the cell last clicked kept for Quick actions, a line selected takes the focus,
+    // a drag inside one cell redoes nothing, Excel text / line breaks in the copy, Ctrl+A by its key code, the tip a
+    // segment only while it shows, no divider before the profile cell with nothing between
+    sweep: async function () {
+      var S = CS();
+      S.clear();
+      function fakeTd(attrs) { var t = document.createElement('td'); for (var k in attrs) t.setAttribute(k, attrs[k]); return t; }
+      var pst = S._stats(['0%', '0%'], [fakeTd({ 'data-pnb-raw': '0.004' }), fakeTd({ 'data-pnb-raw': '0.004' })]);
+      R.info.pct = pst.raw;
+      R.chk.pctTimes100 = !!pst.raw && Math.abs(pst.raw.sum - 0.8) < 1e-9;
+      var lst = S._stats(['2024', '5'], [fakeTd({ 'data-row-field': '0' }), fakeTd({})]);
+      R.info.lab = [lst.count, lst.numbers, lst.sum];
+      R.chk.pivotLabelNotNumber = lst.count === 2 && lst.numbers === 1 && lst.sum === '5';
+      var cst = S._stats(['$10', '$11'], null);
+      R.info.cents = [cst.avg, cst.median];
+      R.chk.avgCents = cst.avg === '$10.50' && cst.median === '$10.50';
+      // Hide Empty Columns
+      var ths = Array.prototype.filter.call(document.querySelectorAll('#tableHeader th[data-column]'), function (th) {
+        return /^\d+$/.test(th.getAttribute('data-column')) && th.style.display !== 'none' && th.getClientRects().length; });
+      var A = ths[0].getAttribute('data-column'), B = ths[1].getAttribute('data-column'), Cc = ths[2].getAttribute('data-column');
+      function cid(r, id) { var tr = shownRows()[r]; return tr ? tr.querySelector('td[data-column="' + id + '"]') : null; }
+      var st = document.createElement('style');
+      st.textContent = 'table[data-pnb-na~="' + B + '"] > * > tr > [data-column="' + B + '"] { display: none !important; }';
+      document.head.appendChild(st);
+      await drag([cid(1, A), cid(2, Cc)]); await sleep(50);
+      var before = count();
+      T().setAttribute('data-pnb-na', B); await sleep(80);
+      R.info.na = { cols: [A, B, Cc], before: before, after: count() };
+      R.chk.naClears = before === 6 && count() === 0;
+      S.activate(cid(2, A)); await frames(2);
+      key('ArrowRight'); await sleep(50);
+      R.info.naStep = { active: S.active() && S.active().getAttribute('data-column'), want: Cc, focus: document.activeElement === S.active() };
+      R.chk.naArrowSkips = !!S.active() && S.active() === cid(2, Cc) && document.activeElement === S.active();
+      S.clear();
+      await drag([cid(1, A), cid(2, Cc)]); await sleep(50);
+      var pl = S.payload();
+      R.info.naCopy = pl && { cols: pl.cols, cells: pl.cells, count: count() };
+      R.chk.naCopySkips = !!pl && pl.cols === 2 && pl.cells === 4 && count() === 4;
+      S.clear();
+      T().removeAttribute('data-pnb-na'); st.remove(); await sleep(50);
+      // Esc typed in a box is the box's; on the page it clears
+      await drag([cid(0, A), cid(1, A)]); await sleep(30);
+      var inp = document.createElement('input'); document.body.appendChild(inp); inp.focus();
+      key('Escape'); await sleep(30);
+      R.info.esc = { inBox: count() };
+      R.chk.escInputKeeps = count() === 2;
+      inp.blur(); inp.remove(); blurAll();
+      key('Escape'); await sleep(30);
+      R.chk.escBodyClears = count() === 0;
+      // a press elsewhere drops the active cell; recent() keeps it (Quick actions' rows); a line selected takes the focus
+      var rc = cid(3, A);
+      S.activate(rc); await frames(1);
+      mouse('mousedown', document.body); mouse('mouseup', document.body);
+      R.info.recent = { active: !!S.active(), recent: !!(S.recent && S.recent() === rc) };
+      R.chk.recentKept = !S.active() && !!S.recent && S.recent() === rc;
+      blurAll();
+      var nrow = S.selectRow(S.recent ? S.recent() : null); await sleep(30);
+      R.info.lineFocus = { n: nrow, focus: document.activeElement === rc };
+      R.chk.lineFocuses = nrow > 2 && document.activeElement === rc;
+      S.clear();
+      // a drag still inside the same cell: nothing redone (no attribute writes, the readout's nodes kept)
+      var a0 = cid(0, A), a1 = cid(1, A);
+      mouse('mousedown', a0); mouse('mousemove', a0); mouse('mousemove', a1);
+      var n1 = seg() && seg().firstChild, recs = 0, mo = new MutationObserver(function (l) { recs += l.length; });
+      mo.observe(T(), { attributes: true, subtree: true });
+      mouse('mousemove', a1); mouse('mousemove', a1);
+      await sleep(0);
+      mo.disconnect();
+      var same = !!n1 && seg().firstChild === n1;
+      mouse('mouseup', a1); mouse('click', common(a0, a1)); await sleep(20);
+      R.info.dragSame = { recs: recs, same: same, count: count() };
+      R.chk.dragSameNoRewrite = same && recs === 0 && count() === 2;
+      S.clear();
+      // the copy for Excel: 1E5 kept text, a line break kept in its cell
+      var c0 = cid(5, A), c1 = cid(6, A), h0 = c0.innerHTML, h1 = c1.innerHTML;
+      c0.textContent = '1E5'; c1.innerHTML = 'line one<br>line two';
+      await drag([c0, c1]); await sleep(30);
+      var ph = S.payload();
+      R.info.xl = ph && ph.html.slice(0, 400);
+      R.chk.copySciText = !!ph && ph.html.indexOf("mso-number-format:'\\@'\">1E5<") >= 0;
+      R.chk.copyBrSameCell = !!ph && ph.html.indexOf('line one<br style="mso-data-placement:same-cell">line two') >= 0;
+      S.clear(); c0.innerHTML = h0; c1.innerHTML = h1; await sleep(30);
+      // Ctrl+A by its key code (another keyboard layout's letter)
+      S.activate(cid(0, A)); await frames(1);
+      var ev = new KeyboardEvent('keydown', { key: '\u0444', code: 'KeyA', ctrlKey: true, bubbles: true, cancelable: true });
+      document.activeElement.dispatchEvent(ev); await sleep(30);
+      R.info.ctrlA = { count: count(), prevented: ev.defaultPrevented };
+      R.chk.ctrlAByCode = count() > 10 && ev.defaultPrevented;
+      S.clear();
+      // the tip: a segment (a divider) only while it shows; nothing shown between the spring and the profile cell: no divider
+      var H = S._hint; H.reset(); await sleep(350); await frames(3);
+      var he = H.el();
+      var shownSeg = !!he && !he.hidden && he.classList.contains('sb-seg');
+      await drag([cid(0, A), cid(1, A)]); await sleep(350);
+      var hidNoSeg = !!he && he.hidden && !he.classList.contains('sb-seg');
+      R.info.hintSeg = { shownSeg: shownSeg, hidNoSeg: hidNoSeg };
+      R.chk.hintSegOnlyShown = shownSeg && hidNoSeg;
+      S.clear(); await sleep(350); await frames(2);
+      if (he) { he.hidden = true; he.classList.remove('sb-seg'); }
+      var spr = document.createElement('div'); spr.className = 'sb-spring'; var cs0 = document.getElementById('sbColsSeg');
+      if (cs0) { cs0.parentNode.insertBefore(spr, cs0.nextSibling); }   // the app's bar has one (the harness's does not)
+      // both orders the two can take: the readout alone between the spring and the profile cell (the tip taken out),
+      // then the tip (hidden, no sb-seg) before the readout
+      var u = document.getElementById('sbUserSeg'), ro = seg();
+      function noDiv() { var d = getComputedStyle(u, '::before'); return d.display === 'none' || d.content === 'none' || d.content === 'normal'; }
+      var hp = he && he.parentNode, hn = he && he.nextSibling;
+      if (he && hp) { hp.removeChild(he); }
+      if (ro) { u.parentNode.insertBefore(ro, u); }
+      var d1 = noDiv();
+      if (he && ro) { ro.parentNode.insertBefore(he, ro); }
+      var d2 = noDiv();
+      if (he && hp) { hp.insertBefore(he, hn && hn.parentNode === hp ? hn : u); }
+      R.info.divider = { readoutAlone: d1, tipThenReadout: d2, ro: !!ro, he: !!he };
+      R.chk.noIdleDivider = !!u && !!ro && d1 && d2;
+      spr.remove();
+      H.reset();
+    },
+    // (2026-11-24, cselhint) the idle hint where the readout will show ("Drag across cells for Sum, Average, Count"):
+    // shown with no readout, hidden while it shows, back when it clears, counted once per selection, retired after
+    // three, the x hides it for good, none without the bar or without a number on screen, fewer words when short
+    hint: async function () {
+      var H = CS()._hint, sb = document.getElementById('pnbStatusBar');
+      function el() { return document.getElementById('pnbCellSelHint'); }
+      function hShown() { var h = el(); return !!(h && !h.hidden && h.getClientRects().length && !h.classList.contains('pnb-csel-hint-clip')); }
+      async function settle() { await sleep(350); await frames(3); }
+      CS().clear(); H.reset(); await settle();
+      var h0 = el();
+      R.info.start = { has: !!h0, cls: h0 && h0.className, text: h0 && h0.textContent, next: h0 && h0.nextElementSibling && h0.nextElementSibling.id };
+      R.chk.hintShown = hShown() && /Drag across cells for Sum, Average, Count/.test(h0.textContent) && h0.parentNode === sb &&
+        !!h0.nextElementSibling && h0.nextElementSibling.id === 'sbUserSeg';
+      await drag([cell(0, 'V_AMOUNT'), cell(1, 'V_AMOUNT')]); await settle();
+      R.chk.hintHidesOnReadout = segShown() && !hShown();
+      R.chk.hintCounts = H.state().n === 1;
+      var c3 = cell(3, 'V_AMOUNT');
+      mouse('mousedown', c3, { ctrl: true }); mouse('mouseup', c3, { ctrl: true }); mouse('click', c3, { ctrl: true }); await settle();
+      R.info.afterCtrl = { count: count(), state: H.state() };
+      R.chk.hintOnce = count() === 3 && H.state().n === 1;
+      CS().clear(); await settle();
+      R.chk.hintBack = hShown() && !segShown();
+      await drag([cell(0, 'V_AMOUNT'), cell(2, 'V_AMOUNT')]); await settle();
+      CS().clear(); await settle();
+      var twice = hShown() && H.state().n === 2;
+      await drag([cell(1, 'V_AMOUNT'), cell(2, 'V_AMOUNT')]); await settle();
+      CS().clear(); await settle();
+      R.info.retire = { twice: twice, state: H.state(), el: !!el() };
+      R.chk.hintRetires = twice && H.state().n === 3 && !el();
+      // the x: gone for good
+      H.reset(); await settle();
+      var shownAgain = hShown();
+      el().querySelector('.pnb-csel-hint-x').click(); await settle();
+      R.chk.hintXOff = shownAgain && H.state().off === 1 && !el();
+      // no bar drawn (an embedded report): none
+      H.reset(); await settle();
+      sb.style.display = 'none'; H.sync(); await settle();
+      var noBar = !!el() && el().hidden;   // the module hid it (inside a hidden bar it would not show anyway)
+      sb.style.display = ''; H.sync(); await settle();
+      R.chk.hintNoBar = noBar && hShown();
+      // short of room: fewer words, then the sign, then invisible - never wider than the room
+      var rightWas = sb.style.right, seq = [], okRoom = true;
+      for (var w = 2400; w >= 200; w -= 20) {
+        sb.style.right = (window.innerWidth - w) + 'px';
+        await frames(2); await sleep(20);
+        var h = el(), t = h.querySelector('.pnb-csel-hint-t');
+        var k = h.classList.contains('pnb-csel-hint-clip') ? 4 : h.classList.contains('pnb-csel-hint-sig-only') ? 3 :
+          (t.textContent === 'Drag across cells for Sum, Average, Count' ? 0 : t.textContent === 'Drag cells to sum' ? 1 : t.textContent === 'Drag to sum' ? 2 : -1);
+        if (k !== 4 && h.scrollWidth - h.clientWidth > 1) okRoom = false;
+        if (!seq.length || seq[seq.length - 1][1] !== k) seq.push([w, k]);
+      }
+      sb.style.right = rightWas; await settle();
+      R.info.fitSeq = seq;
+      var ks = seq.map(function (x) { return x[1]; });
+      R.chk.hintFitSteps = ks[0] === 0 && ks.indexOf(-1) < 0 && ks.every(function (k, i) { return !i || k > ks[i - 1]; }) && ks.length >= 3 && okRoom;
+      R.chk.hintFitBack = hShown() && /Drag across cells for Sum, Average, Count/.test(el().textContent);
+      // a table of text alone: no hint (nothing to sum)
+      shownRows().slice(0, 10).forEach(function (tr) { Array.prototype.forEach.call(tr.cells, function (td) { if (td.getAttribute('data-column') !== '#') td.textContent = 'abc'; }); });
+      H.sync(); await settle();
+      R.chk.hintTextOnly = !hShown();
+    },
+
     // 2026-10-12 csfit: a crowded bar gives way to the readout, one step at a
     // time (the muted "no nesting" chip - csfit2; Data, Load to icons; the profile
     // cell; Min + Max; Average). The

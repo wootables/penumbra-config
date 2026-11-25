@@ -766,6 +766,8 @@ SCN = SCN + ['msel', 'ggsel']
 CHK['msel'] = ['selCells', 'selMenu', 'selNote', 'selCopyList', 'selCopyRuns', 'selCopyFallback', 'selOutside', 'selOne', 'selCap', 'capStops', 'selMemo',
                'selFilterRuns', 'selKeepsBox', 'selExcludeRuns', 'roButton', 'roNoNumbers', 'roRuns', 'macCtrl', 'altAdds', 'altDouble', 'altLinkNum', 'plainClickReplaces']
 CHK['ggsel'] = ['gsMenu', 'gsFilter']
+SCN = SCN + ['mselm']   # (2026-11-24, cselmenu)
+CHK['mselm'] = ['smOpens', 'smFigures', 'smOrder', 'smStatCopies', 'smCopyAll', 'smShowStays', 'smShowOff', 'smColumn', 'smRow', 'smClear', 'smOther', 'smReadout', 'smEscKeeps', 'smTickRole', 'smClosesWithSel']
 SEL_GUARDS = {'L-msel-selOutside', 'L-msel-roNoNumbers', 'L-msel-altLinkNum', 'L-msel-plainClickReplaces'}
 NEW_SEL = ({'L-%s-%s' % (s, c) for s in ('msel', 'ggsel') for c in CHK[s]} - SEL_GUARDS) | {'S-helpSelFilter'}
 NEW = NEW | NEW_SEL
@@ -791,6 +793,19 @@ MUTANTS.update({
     # main.js: a column's first value alone; the box's other conditions dropped
     'sl-onevalue': ([('main', "            if (!byCol[K]) { byCol[K] = []; order.push(K); }", "            if (!byCol[K]) { byCol[K] = []; order.push(K); } else return;")], ['L-msel-selFilterRuns'], ['msel']),
     'sl-droprest': ([('main', "        var state = _pnbFsState(String($('#tableSearch').val() || ''), flds);", "        var state = _pnbFsState('', flds);")], ['L-msel-selKeepsBox'], ['msel']),
+    # (2026-11-24, cselmenu) the selection's own menu
+    'sm-nosel': ([('menu', "        var sh = fromCard ? null : selTarget(e.target);\n", "        var sh = null;\n")], ['L-mselm-smOpens', 'L-mselm-smReadout'], ['mselm']),
+    'sm-stay': ([('menu', "        if (it.stay) { it.run(el); return; }", "        if (false) { it.run(el); return; }")], ['L-mselm-smShowStays'], ['mselm']),
+    'sm-keep': ([('csel', "        if (rects.length && t && t.closest && t.closest('.pnb-hm.pnb-hm-sel')) { return; }\n", "")], ['L-mselm-smStatCopies'], ['mselm']),
+    'sm-copyall': ([('menu', "return f.label + '\\t' + f.value; }).join('\\n')", "return f.label + '\\t' + f.value; }).join(' ')")], ['L-mselm-smCopyAll'], ['mselm']),
+    'sm-other': ([('menu', "        if (other) { items.push('-'); items.push(other); }\n", "")], ['L-mselm-smOther', 'L-mselm-smOrder'], ['mselm']),
+    # (2026-11-24, cselsweep)
+    'sm-esc': ([('menu', "close(true); e.stopImmediatePropagation(); }", "close(true); }"),
+                ('csel', "if (CM && typeof CM.isOpen === 'function' && CM.isOpen()) { return; }", ""),
+                ('csel', "            if (!ours) { return; }\n", "\n")], ['L-mselm-smEscKeeps'], ['mselm']),
+    'sm-role': ([('menu', "(it.stay ? 'menuitemcheckbox' : 'menuitemradio')", "'menuitemradio'")], ['L-mselm-smTickRole'], ['mselm']),
+    'sm-closesel': ([('csel', "if (CM && typeof CM.closeSel === 'function') { CM.closeSel(); }", "")], ['L-mselm-smClosesWithSel'], ['mselm']),
+    'sm-row': ([('csel', "        selectRow: function (td) { return selectLine(td, 'row'); },", "        selectRow: function (td) { return selectLine(td, 'col'); },")], ['L-mselm-smRow'], ['mselm']),
     # cell selection: cells() empty; the copy event's table left out; no readout button; one for numbers too; a button that runs nothing
     'sl-nocells': ([('csel', "        cells: function () { return rects.length ? selectedCells().map(function (x) { return x.td; }) : []; },", "        cells: function () { return []; },")],
                    ['L-msel-selCells', 'L-msel-selMenu', 'L-msel-roButton'], ['msel']),

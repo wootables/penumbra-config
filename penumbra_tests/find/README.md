@@ -381,3 +381,50 @@ of `#floating-button-container`. Backups `driver.js` / `suite_def.py` / `README.
 * Mutants: new `nopagedrop`, `notermpending`, `noslashpattern` (3/3 bite). Not covered here: the accent marks (no
   accented fixture) and the rail (the harness has none) - both checked live on dirsearch.
 * Live before the deploy: the four new/changed checks red, the rest green.
+
+# findgrp (2026-11-24) - Search only in open groups / in the selected group
+
+js/penumbra_find.js + css/penumbra_find.css, tagged `findgrp`: in the grouped view Find shows a box under its controls,
+UNticked: "Search only in open groups" (Stacked, Board) or "Search only in the selected group" (List). Ticked, a row
+counts only when every group around it is open (Board: only the lanes fold), a heading/summary when the groups around
+its group are open; List: inside `.pnb-gl-sel`. domSig adds the groups' open state (or the picked group) while ticked, so
+a group opened, closed or picked is read again. The tick is kept for the page. `_state().grp` = 'on' | 'off' | null (box
+not shown). Backups `driver.js` / `suite_def.py` / `README.md` `.bak-20261124-findgrp`.
+
+* New scenarios `grp_only_closed` (grpBox, grpNone, grpOpens, grpSteps, grpUntick) and `grp_only_list` (listLabel,
+  listScoped, listFollows). Mutants `nogrpkeep`, `nogrpsig`, `grpdefaulton` (3/3 bite on stage13).
+* Sweep (same day): Copy link while ticked carried the current match's number among the OPEN groups' matches; the
+  recipient opens unticked, so the number pointed at another match. `current()` now gives `at: -1` while ticked (as for
+  Find in this column and the pivot). Check `grpLink` in `grp_only_closed` (red on 5f706c7), mutant `nogrplink`.
+
+# pvfindrows (2026-11-24) - Also search the rows behind each cell (pivot)
+
+js/penumbra_find.js + css/penumbra_find.css + js/main.js, tagged `pvfindrows`: in the pivot Find shows a box, UNticked:
+"Also search the rows behind each cell". Ticked, a body cell is also a match when a row it was built from says the term
+(the columns its breakdown shows, as a flat cell shows them or the stored value). main.js exposes
+`Penumbra.pivotMenu.findRows()` -> { rows (currentPivotSourceData), cols (_pnbPvDrillCols), keys(row) -> {r, c} (the
+row and column keys it was filed under, penumbraPivotRowKeysFn), agg(i) (value i's own Filter), cell(rk, ck, i) (the
+breakdown's own test, used for (Other) cells) }. One match per grid cell (the first value's cell); totals, subtotal rows,
+the Grand Total and derived values are left out. `hit.rows` = that cell's matching rows; the line `.pnb-find-rows` says
+"N rows behind this cell match" with a Show them button; Alt+Enter (no Filter in a pivot) does the same: the cell's
+breakdown opens and Find moves into it on the term (the box gets the focus back at 150 / 450 ms - the live breakdown
+takes it on open; the harness's does not, so there is no focus mutant). Rows found are memoised per term and source
+array (pvMemo), texts per Find session (pvTexts). A pivot with noBreakdown (no data-row-key) does not show the box.
+`_state().pvrows` 'on' | 'off' | null, `_state().rowsLine`, `_hits()[i].rows`. Backups `driver.js` / `suite_def.py` /
+`README.md` `.bak-20261124-pvfindrows`.
+
+* New scenario `piv_rows` (rowsBox, rowsOne, rowsCount, rowsShow, rowsFocus, rowsUntick). Mutants `pvrowsdefaulton`,
+  `nopvcells`, `nopvshow` (3/3 bite). Full run on the candidate 371/0.
+* Checked live by injection (main.js + find.js candidates in an iframe, 2026-11-24): awdspon (4 values, 1,272 rows:
+  107 cells, every count equal to the breakdown's own test, none missed), awdgeo (31,416 rows, no column fields,
+  aggFilters, a rank with (Other): first ticked read 1.4 s, later terms ~0.3 s, longest block 31 ms), int-col-mat-dev
+  (tiles, aggFilters on every value: rows a value's Filter drops are not matches; tile lines outlined).
+
+## pvfindrows 2 (2026-11-24) - the user's wording, and Find stays up over a breakdown
+
+The box reads "Also search the breakdown tables behind each cell" and the line "N rows in this cell's breakdown match"
+(the user's words). A click anywhere but the bar while Find reads the pivot (onPvClick, capture) waits up to 2 s for a
+breakdown on top; Find then goes into it on the same term (pvFollow - Show them uses it too). When that breakdown goes
+away (OK, its x: not shown / not connected, not merely covered) Find comes back to the pivot (pvReturn) and the cell it
+left from is the current match again (pvReturnEl in readTerm). Esc in the breakdown still closes Find first, and then
+nothing comes back. New checks rowsClickFollow, rowsBack; mutants nopvfollow, nopvreturn.

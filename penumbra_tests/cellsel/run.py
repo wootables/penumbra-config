@@ -33,7 +33,7 @@ SCN = [('boot', ''), ('drag', ''), ('inside', ''), ('filter', ''), ('shift', '')
        ('copy', ''), ('float', ''), ('crowd', ''), ('big', ''), ('off', '&cellsel=off'),
        ('gdrag', ''), ('gmerge', ''), ('gndrag', ''), ('pdrag', ''), ('pspan', ''), ('ptotal', ''), ('pclick', ''),
        ('keys', ''), ('kstale', ''), ('gkeys', ''), ('pkeys', ''),
-       ('gsnap', ''), ('pdrill', ''),
+       ('gsnap', ''), ('pdrill', ''), ('hint', ''), ('lines', ''), ('sweep', ''),
        ('gprobe', ''), ('gnprobe', ''), ('pprobe', ''), ('pfprobe', '')]
 PROBES = {'gprobe', 'gnprobe', 'pprobe', 'pfprobe'}   # DOM dumps (--dump), never in a default run
 CHK = {
@@ -75,6 +75,16 @@ CHK = {
     'pdrill': ['saneDrillOpen', 'saneDrillCols', 'drillTabStop', 'drillSum', 'drillReadoutOnTop', 'drillHashOut', 'drillNoHashInBlock',
                'escKeepsDialog', 'drillArrow', 'drillCtrlHomeSkipsHash', 'drillTabInto'],
     'gprobe': [], 'gnprobe': [], 'pprobe': [], 'pfprobe': [],
+    # (2026-11-24, cselhint) the idle hint in the status bar
+    'hint': ['hintShown', 'hintHidesOnReadout', 'hintCounts', 'hintOnce', 'hintBack', 'hintRetires', 'hintXOff', 'hintNoBar',
+             'hintFitSteps', 'hintFitBack', 'hintTextOnly'],
+    # (2026-11-24, cselmenu) Median / Distinct / Numbers, Ctrl+Space / Shift+Space, the page note, the status bar's pick
+    'lines': ['statMedianEven', 'statDistinct', 'ctrlSpaceColumn', 'shiftSpaceRow', 'noPageNoteRow', 'pageNote', 'noPageNotePart',
+              'pickMedian', 'figuresAll', 'pickLastStays'],
+    # (2026-11-24, cselsweep) the bug sweep's fixes
+    'sweep': ['pctTimes100', 'pivotLabelNotNumber', 'avgCents', 'naClears', 'naArrowSkips', 'naCopySkips', 'escInputKeeps',
+              'escBodyClears', 'recentKept', 'lineFocuses', 'dragSameNoRewrite', 'copySciText', 'copyBrSameCell', 'ctrlAByCode',
+              'hintSegOnlyShown', 'noIdleDivider'],
 }
 # In --control (no module) these may hold: they hold with or without the module
 # because they assert an ABSENCE (noBlock etc.). Listed so the control report reads cleanly.
@@ -89,6 +99,35 @@ CONTROL_OK = {'L-inside-noBlock', 'L-inside-textSelKept', 'L-inside-hashIgnored'
               'L-crowd-handBack'}   # csfit2: with no module main.js's own collapse holds it
 # (L-drag-outline is red in control: no module, no classes)
 MUTANTS = {
+    # (2026-11-24, cselmenu)
+    'cm-median': ([('mod', "var med = (n % 2) ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;", "var med = vals[Math.floor(n / 2)];")], ['L-lines-statMedianEven'], ['lines']),
+    'cm-distinct': ([('mod', "            if (!seen[tx]) { seen[tx] = true; distinct++; }\n", "            distinct++;\n")], ['L-lines-statDistinct'], ['lines']),
+    'cm-keys': ([('mod', "        } else if ((k === ' ' || k === 'Spacebar') && mod !== extend) {", "        } else if (false) {")], ['L-lines-ctrlSpaceColumn', 'L-lines-shiftSpaceRow'], ['lines']),
+    'cm-page': ([('mod', "        if (!n) { return null; }\n        var nb = document.getElementById('nextPageBtn')", "        return null;\n        var nb = document.getElementById('nextPageBtn')")], ['L-lines-pageNote'], ['lines']),
+    'cm-pageall': ([('mod', "if (g._off && g._fs >= 0 && q.r0 <= g._fs && q.r1 >= g._ls)", "if (g._off)")], ['L-lines-noPageNotePart'], ['lines']),
+    'cm-last': ([('mod', "            if (i >= 0) { if (show.length > 1) { show.splice(i, 1); } }", "            if (i >= 0) { show.splice(i, 1); }")], ['L-lines-pickLastStays'], ['lines']),
+    # (2026-11-24, cselsweep)
+    'sw-pct': ([('mod', "if (p.pct && Math.abs(rn * 100 - p.v) <= tol)", "if (false && p.pct && Math.abs(rn * 100 - p.v) <= tol)")], ['L-sweep-pctTimes100'], ['sweep']),
+    'sw-label': ([('mod', "if (tds && tds[i] && tds[i].hasAttribute && tds[i].hasAttribute('data-row-field')) { continue; }", "")], ['L-sweep-pivotLabelNotNumber'], ['sweep']),
+    'sw-cents': ([('mod', "return (cur && dec < 2 && Math.round(x * 100)", "return (false && dec < 2 && Math.round(x * 100)")], ['L-sweep-avgCents'], ['sweep']),
+    'sw-na': ([('mod', "return !!na && (' ' + na + ' ')", "return false && (' ' + na + ' ')")], ['L-sweep-naArrowSkips', 'L-sweep-naCopySkips'], ['sweep']),
+    'sw-naobs': ([('mod', "if (m.type === 'attributes' && m.attributeName === 'data-pnb-na') { clear(); return; }", "")], ['L-sweep-naClears'], ['sweep']),
+    'sw-esc': ([('mod', "            if (!ours) { return; }\n", "\n")], ['L-sweep-escInputKeeps'], ['sweep']),
+    'sw-recent': ([('mod', "if (td || old) { recentTd = td || old; }", "")], ['L-sweep-recentKept', 'L-sweep-lineFocuses'], ['sweep']),
+    'sw-focus': ([('mod', "if (!ae || ae === document.body || ae === document.documentElement) { try { td.focus", "if (false) { try { td.focus")], ['L-sweep-lineFocuses'], ['sweep']),
+    'sw-drag': ([('mod', "if (was && was.T === q.T", "if (false && was.T === q.T")], ['L-sweep-dragSameNoRewrite'], ['sweep']),
+    'sw-br': ([('mod', "'<br style=\"mso-data-placement:same-cell\">'", "'<br>'")], ['L-sweep-copyBrSameCell'], ['sweep']),
+    'sw-sci': ([('mod', r"|| /^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/.test(v) ||", "||")], ['L-sweep-copySciText'], ['sweep']),
+    'sw-keya': ([('mod', " || e.code === 'KeyA')) {", ")) {")], ['L-sweep-ctrlAByCode'], ['sweep']),
+    'sw-seg': ([('mod', "el.classList.toggle('sb-seg', on); }", "el.classList.add('sb-seg'); }")], ['L-sweep-hintSegOnlyShown'], ['sweep']),
+    # (2026-11-24, cselhint) the idle hint
+    'hn-nohide': ([('mod', "        hintUsed();   // (cselhint) the readout is up", "        void 0;   // (cselhint) the readout is up")],
+                  ['L-hint-hintHidesOnReadout', 'L-hint-hintCounts'], ['hint']),
+    'hn-once': ([('mod', "        hintSel = true;   // once per selection (clear() resets it)\n", "\n")], ['L-hint-hintOnce'], ['hint']),
+    'hn-fit': ([('mod', "            if (hint.scrollWidth <= room + 0.5) { pick = i; break; }", "            pick = i; break;")], ['L-hint-hintFitSteps'], ['hint']),
+    'hn-gate': ([('mod', "&& !(seg && !seg.hidden) && hintNumbers();", "&& !(seg && !seg.hidden) && true;")], ['L-hint-hintTextOnly'], ['hint']),
+    'hn-nobar': ([('mod', "var show = barDrawn() && ", "var show = ")], ['L-hint-hintNoBar'], ['hint']),
+    'hn-nox': ([('mod', "var o = hintState(); o.off = 1; hintSave(o);", "var o = hintState(); hintSave(o);")], ['L-hint-hintXOff'], ['hint']),
     # glsweep: a table drawn as one with others keeps its own grid - a drag stops at its edge
     'csmerge': ([('mod', "    function tableOf(td) { var T = td.closest('table'), ms = mergedOf(T); return ms ? ms[0] : T; }", "    function tableOf(td) { return td.closest('table'); }")],
                 ['L-gmerge-mDrag', 'L-gmerge-mAll'], ['gmerge']),
@@ -99,7 +138,7 @@ MUTANTS = {
     'hiddenrows': ([('mod', "        return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && tr.getClientRects().length > 0;\n", "        return true;\n")],
                    ['L-search-skipHiddenRows'], ['search']),
     # hidden columns take part
-    'hiddencols': ([('mod', "        if (!p || td.style.display === 'none' || td.getAttribute('data-column') === '#') { return false; }\n",
+    'hiddencols': ([('mod', "        if (!p || colHidden(td) || td.getAttribute('data-column') === '#') { return false; }\n",
                      "        if (!p || td.getAttribute('data-column') === '#') { return false; }\n")],
                    ['L-hidcol-skipHiddenCol'], ['hidcol']),
     # nothing clears a stale selection
