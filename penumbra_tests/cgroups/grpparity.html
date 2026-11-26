@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>pending</title></head><body>
+<pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',function(e){window.__errs.push(e.message+' @'+e.lineno+':'+e.colno);});</script>
+<script src="penumbra_calc.js"></script>
+<script src="grpcorpus.js"></script>
+<script>
+(function () {
+  var C = window.PenumbraCalc, K = window.GRP_CORPUS, res = { errs: window.__errs, rows: K.rows, sets: [] };
+  try {
+    K.sets.forEach(function (s) {
+      C.fromState(s.defs, 'state');
+      var out = C.applyRows(K.rows.map(function (r) { var o = {}; for (var k in r) o[k] = r[k]; return o; }));
+      // (cgroups sweep) the cells both engines must give
+      var expectBad = (s.expect || []).map(function (e) { var row = out[e[0]], got = row ? row[e[1]] : undefined; return got === e[2] ? null : { row: e[0], col: e[1], want: e[2], got: got === undefined ? null : got }; }).filter(Boolean);
+      res.sets.push({ id: s.id, defs: s.defs, expect: s.expect || [], expectBad: expectBad, out: out.map(function (r) { return { keys: Object.keys(r).join('|'), vals: Object.keys(r).slice(4).map(function (k) { return r[k]; }) }; }),
+        problems: C.applied().map(function (d) { return d.name; }), order: C.applied().filter(function (d) { return d.groups; }).map(function (d) { return [d.name, C.groupOrder(d.name)]; }) });
+    });
+  } catch (e) { res.fatal = String(e && e.stack || e); }
+  document.getElementById('out').textContent = JSON.stringify(res);
+  document.title = 'done';
+})();
+</script></body></html>

@@ -138,7 +138,10 @@
       { name: 'REM', formula: '{A} - 1', format: 'number' }, { name: 'PCT', formula: '{REM} / {A}', format: 'percent' } ] }));
     C.applyRows([{ A: '5' }]);
     var copied = '';
+    // (2026-11-26) since vlsweep #18 (7bff2f7, 2026-11-22) the dialog copies through main.js's window.penumbraCopyText(text, ok,
+    // fail); the build before the sweep (--control) through window._pnbCopyText: both caught
     window._pnbCopyText = function (u) { copied = String(u); };
+    window.penumbraCopyText = function (u, ok) { copied = String(u); if (typeof ok === 'function') ok(); };
     C.openDialog('PCT');
     document.getElementById('pnbCalcLink').click();
     document.querySelectorAll('#pnbCalcOverlay').forEach(function (n) { n.remove(); });

@@ -42,6 +42,16 @@ a spy on window.Penumbra.openDataDictionary reads the name the dialog is opened 
 and the touched bullet and cell stay within L16. 10 x- mutants; j-nomenu / j-menuany follow `dictEntry`. The
 comparison menu's What this column means is cmpmenu's C34.
 
+(2026-11-26) menufix2 D1 (`e19fb87`, 2026-11-19) took the line out of Column stats: it opened the same entry as the
+heading's What this column means, whose tip now carries the meaning (cut past 280, `Do not use. ` / ` (AI draft)` as
+words, `Source:` on its own line, then what a click does). The 15 `dstats` checks went red on live; same ids, new premises:
+the tip (meanShown, meanAria, meanEscaped, draftTag, avoidBlank, longCut, hardCut, cutTidy, byLabel), Column stats with its
+counts alone (meanFirst, meanFocused, keyboard's ArrowRight), the item's one line (meanWraps), its click / Enter (meanOpens,
+opensAtEntry, keyboard). `hardCut` / `cutTidy` stay RED on live: the tip's cut (colmenu `aboutItem`) lost the review's two
+rules that the line's cut (`meanHtml`, now dead) had - a real app bug, reported. `S-helpStats` now fails while the help still
+says Column stats starts with the meaning (three passages did). Mutants re-anchored on `aboutItem`; x-meanback puts the line
+back; x-nowrapcss / x-notitem retired.
+
 ## Later rounds (all live)
 
 - 2026-10-22 b `4d15f3b` the pivot's part (`[pivot]` / `[columns]`): scenario `pdict`, `pv*` unit checks.

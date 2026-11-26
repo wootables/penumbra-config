@@ -177,9 +177,15 @@
   // a name two tables share once - the grouping dialog's Nested Table Columns holds the same names, in the order its rows show them
   var NB_COLS = ['H_TEXT', 'H_JSON', 'H_ENT', 'H_NULL'];
   var NB_OWN = { H_TEXT: ['NOTE_KIND', 'NOTE_DAYS'], H_JSON: ['SUB_ID', 'SUB_AMT', 'SUB_NAME'], H_ENT: ['ENT_KIND', 'SUB_NAME'], H_NULL: [] };
+  // (2026-11-26, nestqual) since jsonsweep2 U2 (e42ff7e, 2026-11-19) a name two nested-table columns share is no longer one
+  // pooled field: each table's is its own, PARENT.KEY (H_JSON.SUB_NAME, H_ENT.SUB_NAME), in its own table's place. The
+  // sharing is the result's, not the shown columns': with H_ENT hidden H_JSON's stays H_JSON.SUB_NAME (the bare name, which
+  // reads every table holding it, is the grouping dialog's alone)
+  function nbName(c, s) { return NB_COLS.filter(function (o) { return NB_OWN[o].indexOf(s) >= 0; }).length > 1 ? c + '.' + s : s; }
+  var NB_SUB = 'H_JSON.SUB_NAME';   // (nestqual) SUB_NAME as the band menu and the chip offer it for H_JSON's tables
   function nbWant(cols) {
     var hdr = allNames(), out = [];
-    cols.slice().sort(function (a, b) { return hdr.indexOf(a) - hdr.indexOf(b); }).forEach(function (c) { NB_OWN[c].forEach(function (s) { if (out.indexOf(s) < 0) out.push(s); }); });
+    cols.slice().sort(function (a, b) { return hdr.indexOf(a) - hdr.indexOf(b); }).forEach(function (c) { NB_OWN[c].forEach(function (s) { var q = nbName(c, s); if (out.indexOf(q) < 0) out.push(q); }); });
     return out;
   }
   // the groups on screen: each top group's key, its rows (its own table's, never a nested table's) and the groups below it
@@ -1161,7 +1167,9 @@
       await sleep(900);
       var want = window.__rowsFixture.filter(function (r) { return r.H_JSON && JSON.parse(r.H_JSON.substring(6)).some(function (x) { return String(x.SUB_NAME) === v; }); }).length;
       var vis = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); }).length;
-      R.chk.nestSubFilter = v !== '' && searchVal() === 'SUB_NAME = //' + v + '//' && vis === want && want > 0;
+      // (2026-11-26, nestqual) since jsonsweep2 B13 (e42ff7e) Filter to ADDS the value through headerMenu.filterAdd, which writes
+      // the filter strip's COL = /^(?:v)$/ (it wrote SUB_NAME = //v// by replacing the whole box); a plain fixture value, no escaping
+      R.chk.nestSubFilter = /^\w+$/.test(v) && searchVal() === 'SUB_NAME = /^(?:' + v + ')$/' && vis === want && want > 0;
       R.info.nestFilter = { search: searchVal(), vis: vis, want: want };
       (function (t) { var a = document.createElement('a'); a.className = 'snippet-action'; a.setAttribute('data-action-name', 'search'); a.setAttribute('data-action-value', t); document.getElementById('reportSnippetOutput').appendChild(a); $(a).trigger('click'); a.remove(); })('');
       await sleep(900);
@@ -1226,7 +1234,7 @@
       await sleep(900);
       var vis2 = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); }).length;
       var want2 = window.__rowsFixture.filter(function (r) { return r.H_JSON && JSON.parse(r.H_JSON.substring(6)).some(function (x) { return String(x.SUB_ID) === idText; }); }).length;
-      R.chk.nestLinkFilter = searchVal() === 'SUB_ID = //' + idText + '//' && vis2 === want2 && want2 > 0;
+      R.chk.nestLinkFilter = /^\w+$/.test(idText) && searchVal() === 'SUB_ID = /^(?:' + idText + ')$/' && vis2 === want2 && want2 > 0;   // (nestqual) B13's form
       R.info.nestLinkFilter = { search: searchVal(), vis: vis2, want: want2 };
       (function (t) { var a = document.createElement('a'); a.className = 'snippet-action'; a.setAttribute('data-action-name', 'search'); a.setAttribute('data-action-value', t); document.getElementById('reportSnippetOutput').appendChild(a); $(a).trigger('click'); a.remove(); })('');
       await sleep(900);
@@ -2797,20 +2805,22 @@
       R.chk.nbTopList = levelsNow() === 'H_GROUP,H_GROUP2' && hi > 1 && tBy[hi - 1] === '-' && tBy.slice(0, hi - 1).every(function (a) { return /^gby:V_/.test(a); })
         && tBy.indexOf('gby:V_STATUS') >= 0 && tBy.slice(hi + 1, hi + 1 + want.length).join() === wantActs.join()
         && tBy[hi + 1 + want.length] === '-' && tBy[hi + 2 + want.length] === 'gby-other' && tBy.length === hi + 3 + want.length;
-      R.chk.nbDedupe = tBy.filter(function (a) { return a === 'gby:SUB_NAME'; }).length === 1 && tBy.indexOf('gby:ENT_KIND') >= 0 && tBy.indexOf('gby:NOTE_KIND') >= 0;
+      // (nestqual) a name two tables share: each table's once, as PARENT.KEY, and no pooled bare SUB_NAME beside them
+      R.chk.nbDedupe = tBy.filter(function (a) { return a === 'gby:H_JSON.SUB_NAME'; }).length === 1 && tBy.filter(function (a) { return a === 'gby:H_ENT.SUB_NAME'; }).length === 1
+        && tBy.indexOf('gby:SUB_NAME') < 0 && tBy.indexOf('gby:ENT_KIND') >= 0 && tBy.indexOf('gby:NOTE_KIND') >= 0;
       R.chk.nbNoParent = [tBy, tAdd, iBy, iAdd].every(function (s) { return plainToo(s) && noParent(s); });
       R.chk.nbInnerNone = [tAdd, iBy, iAdd].every(function (s) { return plainToo(s) && noNest(s); });
       R.chk.nbOtherTitle = /nested fields/.test(tByOther || '') && iByOther !== null && !/nested/.test(iByOther) && iAddOther !== null && !/nested/.test(iAddOther);
-      // the mouse: SUB_NAME for the top level - the notice with its Undo, the pick ticked after
+      // the mouse: SUB_NAME for the top level (H_JSON's: NB_SUB, nestqual) - the notice with its Undo, the pick ticked after
       var asked = [];
       window.confirm = function (m) { asked.push(String(m)); return true; };
       window.__toasts.length = 0;
-      var picked = await chooseIn(topBand(), 'gBy', 'gby:SUB_NAME');
-      var g1 = picked && await until(function () { return levelsNow() === 'SUB_NAME,H_GROUP2'; }, 15000);
+      var picked = await chooseIn(topBand(), 'gBy', 'gby:' + NB_SUB);
+      var g1 = picked && await until(function () { return levelsNow() === NB_SUB + ',H_GROUP2'; }, 15000);
       await sleep(500);
-      var s1 = g1 ? nbShape() : '', ub = undoBtn(/Grouped level 1 by SUB_NAME/);
+      var s1 = g1 ? nbShape() : '', ub = undoBtn(/Grouped level 1 by H_JSON\.SUB_NAME/);
       var tk = null;
-      if (g1) { var sb = listOf(topBand(), 'gBy'), x = item('gby:SUB_NAME'); tk = (x && sb.length) ? x.getAttribute('aria-checked') : null; }
+      if (g1) { var sb = listOf(topBand(), 'gBy'), x = item('gby:' + NB_SUB); tk = (x && sb.length) ? x.getAttribute('aria-checked') : null; }
       closeMenu();
       R.info.pick = { picked: picked, levels: levelsNow(), groups: tops().length, asked: asked.slice(), toasts: window.__toasts.slice(-2), tick: tk };
       R.chk.nbPickTick = !!g1 && tk === 'true';
@@ -2818,7 +2828,7 @@
       R.chk.nbUndo = !!ub && await until(function () { return levelsNow() === 'H_GROUP,H_GROUP2'; }, 15000);
       await sleep(400);
       // the same levels from the dialog: the same groups
-      var s2 = await nbDialog(['SUB_NAME', 'H_GROUP2']);
+      var s2 = await nbDialog([NB_SUB, 'H_GROUP2']);
       R.info.shapes = { n: [s1.split('|').length, s2.split('|').length], s1: s1.slice(0, 240), s2: s2.slice(0, 240) };
       R.chk.nbPick = !!g1 && !!ub && asked.length === 0 && !!s1 && s1 === s2 && tops().length > 5;
       // the keyboard: a top band's name, Shift+F10, down to Group this level by, ArrowRight, down to SUB_ID, Enter
@@ -2845,10 +2855,11 @@
       closeMenu();
       R.info.hidden = hBy;
       R.chk.nbHiddenNot = plainToo(hBy) && hBy.indexOf('gby:ENT_KIND') < 0 && hBy.indexOf('gby:H_ENT') < 0;
-      // ...the list: the shown ones' tables' columns alone, SUB_NAME kept (H_JSON's tables, shown, hold it too)
+      // ...the list: the shown ones' tables' columns alone, SUB_NAME kept (H_JSON's tables, shown, hold it too) - as
+      // H_JSON.SUB_NAME (nestqual: the hidden H_ENT's tables still share the name)
       var hi2 = hBy.indexOf('H:Nested table columns'), wantH = nbWant(['H_TEXT', 'H_JSON', 'H_NULL']);
       R.chk.nbHiddenList = hi2 > 0 && hBy.slice(hi2 + 1, hi2 + 1 + wantH.length).join() === wantH.map(function (s) { return 'gby:' + s; }).join()
-        && hBy[hi2 + 1 + wantH.length] === '-' && wantH.indexOf('SUB_NAME') >= 0;
+        && hBy[hi2 + 1 + wantH.length] === '-' && wantH.indexOf(NB_SUB) >= 0;
     },
     // (2026-10-25, nestgb2) the status bar's grouping chip (index.php's, lifted for this scenario), grouped by H_GROUP with
     // every nested-table column hidden (the chip lists every column): no button for one; their tables' columns after the
@@ -2876,12 +2887,12 @@
       R.chk.ncPlain = s.indexOf('B:V_STATUS') >= 0 && s.indexOf('B:H_GROUP2') >= 0 && s.indexOf('B:H_GROUP*') >= 0;
       R.chk.ncNestList = bi > 0 && s.slice(0, bi).every(function (x) { return /^B:/.test(x); })
         && s.slice(bi + 1).join() === want.map(function (x) { return 'B:' + x; }).join();
-      // SUB_NAME: grouped by it, as the dialog groups by it; lit when the chip opens again
+      // SUB_NAME (H_JSON's: NB_SUB, nestqual): grouped by it, as the dialog groups by it; lit when the chip opens again
       var asked = [];
       window.confirm = function (m) { asked.push(String(m)); return true; };
-      var bt = document.querySelector('#sbGrpCols .sb-grp-col[data-col="SUB_NAME"]');
+      var bt = document.querySelector('#sbGrpCols .sb-grp-col[data-col="' + NB_SUB + '"]');
       if (bt) bt.click();
-      var g1 = !!bt && await groupedBy('SUB_NAME');
+      var g1 = !!bt && await groupedBy(NB_SUB);
       await sleep(500);
       var s1 = g1 ? nbShape() : '';
       open();
@@ -2889,8 +2900,8 @@
       var sa = cseq();
       shut();
       R.info.after = { s: sa, levels: levelsNow(), groups: tops().length, asked: asked.slice() };
-      R.chk.ncActive = !!g1 && sa.indexOf('B:SUB_NAME*') >= 0 && sa.filter(function (x) { return /\*$/.test(x); }).length === 1;
-      var s2 = await nbDialog(['SUB_NAME']);
+      R.chk.ncActive = !!g1 && sa.indexOf('B:' + NB_SUB + '*') >= 0 && sa.filter(function (x) { return /\*$/.test(x); }).length === 1;
+      var s2 = await nbDialog([NB_SUB]);
       R.info.shapes = { n: [s1.split('|').length, s2.split('|').length], s1: s1.slice(0, 240), s2: s2.slice(0, 240) };
       R.chk.ncPick = !!g1 && asked.length === 0 && !!s1 && s1 === s2 && tops().length > 5;
     },

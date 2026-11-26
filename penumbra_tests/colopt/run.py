@@ -662,7 +662,7 @@ def static_checks(texts):
         # (2026-10-25, hltip) the tip's line names the column's header too
         ('S-helpHl', "<li><strong>Highlight</strong> - color the cells, whole rows or the column's header on a condition.</li>" in hlp
          and '<h4 id="us-highlight"' in top and 'data-jump-to="us-highlight"' in top and '<code>RULE</code>' in top
-         and 'shading, highlight rules, filter and links' in top and chr(0x2014) not in top and '&mdash;' not in top and chr(0x2014) not in hlp, ''),
+         and 'shading, highlight rules, sort order, filter and links' in top and chr(0x2014) not in top and '&mdash;' not in top and chr(0x2014) not in hlp, ''),
         # (2026-10-24, hlhead) the topic: Apply to's Header, what a header takes, the menu's Highlight... (its table and the section)
         ('S-helpHlHd', "or the column's <em>Header</em>" in top and 'A header takes color, background-color' in top
          and '<strong>Highlight...</strong></td>' not in top and '(<em>Column options...</em> in its right-click menu), click <em>+ Add a rule</em>' in top, ''),   # (2026-10-27, fltmenu) Highlight... left the menu

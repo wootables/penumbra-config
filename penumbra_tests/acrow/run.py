@@ -286,6 +286,9 @@ DBL_GUARD = ('            if (e.detail > 1 && pt && (pressed === pt.v ||' + CRLF
 HELP5_TEXT = "Reopens its value list with your ticks intact"   # (2026-10-19) the v2 Search topic's row
 HELP5_BULLET = ('            <tr><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;">Pick the row\'s column again</td><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;">' + HELP5_TEXT + ', for example after clicking away by accident.</td></tr>\n')
 MUTANTS = {
+    # (2026-11-26, gsumac) the summary label left out of the names the value reader knows: its last word is read as NAME
+    'gsumcol': ([('js', "                (typeof _acApi.getGroupSummaryColumns === 'function' ? (_acApi.getGroupSummaryColumns() || []) : [])" + CRLF
+                  + "                    .forEach(function (gs) { if (gs) allCols.push(String(gs)); });" + CRLF, '')], ['G-gsum']),
     # the old fork: a row press toggles only once the row already holds a set; before
     # that the label single-picks and closes
     'gate': ([('js', '            if ($cb.length) {' + CRLF,
@@ -1286,6 +1289,25 @@ def s_btwdiff(t, o):
     time.sleep(0.6)
     o['s'] = t.state(); o['w'] = t.js('T.where(0)')
 
+# (2026-11-26, gsumac) the report search box itself (#tableSearch, the free-text list): after the grouped view's summary
+# label ("Distinct of NAME = ") it offers the summary's own values - the label read whole - never NAME's (its last word is
+# a column, and the list offered people, none of which a group's count can equal). The host's API answers as main.js does.
+def s_gsum(t, o):
+    o['prep'] = t.js("""(function () {
+        var A = window._penumbraSearchAPI, ov = A.getColumnAutocompleteValues;
+        A.getGroupSummaryColumns = function () { return ['Distinct of NAME']; };
+        A.getColumnAutocompleteValues = function (c) { return String(c).toUpperCase() === 'DISTINCT OF NAME' ? ['1', '2', '3'] : ov.apply(this, arguments); };
+        $('#searchBuilderLightbox').hide();
+        window._penumbraSearchBuilder.attachFilterAutocomplete('#tableSearch');
+        var b = document.getElementById('tableSearch'); b.value = ''; b.focus();
+        return document.activeElement === b;
+    })()""")
+    time.sleep(0.2)
+    t.type('Distinct of NAME = ', 0.9)
+    o['items'] = t.js("""Array.prototype.slice.call(document.querySelectorAll('.ui-autocomplete')).filter(function (u) { return $(u).is(':visible'); })
+        .reduce(function (a, u) { return a.concat(Array.prototype.map.call(u.querySelectorAll('li'), function (li) { return li.textContent.trim(); })); }, [])""")
+    o['box'] = t.js("document.getElementById('tableSearch').value")
+
 SCENARIOS = [
     ('pc_typed', 'report', s_pc_typed), ('pl_typed', 'report', s_pl_typed),
     ('pc_whole', 'report', s_pc_whole), ('pl_whole', 'report', s_pl_whole), ('pp_whole', 'report', s_pp_whole),
@@ -1337,6 +1359,7 @@ SCENARIOS = [
     # round-5 fix
     ('tolist_769', 'report', s_tolist, 769), ('tolist_800', 'report', s_tolist, 800), ('tolist_dash', 'dash', s_tolist, 769),
     ('btwdiff', 'report', s_btwdiff),
+    ('gsum', 'report', s_gsum),   # (2026-11-26, gsumac)
 ]
 
 # --- Asserts --------------------------------------------------------------------------
@@ -1454,6 +1477,10 @@ def evaluate(O):
       {'target': g(d, 'after', 'targets', 'dash'), 'submit': g(d, 'after', 'calls', 'submit'), 'label': g(d, 'after', 'submitLabel')})
     cc = g(O['colchange'], 's') or {}
     A('C-col', cc.get('col') == 'CODE' and cc.get('set') is None and cc.get('box') == '', pick(cc))
+    gsm = O.get('gsum') or {}
+    gsi = [x for x in (gsm.get('items') or []) if x]
+    A('G-gsum', gsm.get('prep') is True and gsi[:3] == ['1', '2', '3'] and not any(x in gsi for x in ('Alice', 'Alan', 'Albert', 'Bob')),
+      {'prep': gsm.get('prep'), 'items': gsi[:12], 'box': gsm.get('box')})   # (2026-11-26, gsumac)
     f = g(O['free'], 's') or {}
     A('F-free', f.get('box') == 'Zork' and f.get('preview') == 'NAME = Zork' and f.get('set') is None, pick(f))
     rm = O['remove']

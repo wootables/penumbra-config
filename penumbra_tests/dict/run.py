@@ -33,6 +33,7 @@ CHK = {
     'dlink': ['linkRendered', 'commentStripped', 'snippetIntact', 'has', 'dialogTitle', 'rows', 'note', 'draftTag', 'avoidTag', 'source', 'escaped', 'filter', 'filterEmpty', 'missingLine', 'goneTag', 'authorBar', 'wraps'],
     'dmenu': ['aboutItem', 'aboutBeforeFilter', 'focusRow', 'noItemWithoutEntry', 'cellMenuItem'],
     # (2026-10-24, dictstat) Column stats starts with the column's meaning; the dialog opens at the entry's name
+    # (2026-11-26) since menufix2 D1 (e19fb87) the meaning is the heading item's tip, Column stats its counts alone: same ids, new premises
     'dstats': ['meanShown', 'meanEscaped', 'meanFirst', 'meanAria', 'meanFocused', 'meanOpens', 'draftTag', 'noMeanWithoutEntry', 'longCut', 'meanWraps',
                'avoidBlank', 'hardCut', 'cutTidy', 'byLabel', 'opensAtEntry', 'keyboard'],
     'dopts': ['aboutLink', 'aboutBrandText', 'linkOpens', 'popoverClosed', 'noLinkWithoutEntry'],   # +aboutBrandText (wcag mod 2026-11-07, M17)
@@ -161,26 +162,31 @@ MUTANTS = {
     'w-genclose': ([('dui', "        q('[data-dg=\"cancel\"]').addEventListener('click', userClose);", "        q('[data-dg=\"cancel\"]').addEventListener('click', close);")], ['L-dgen2-genAsks'], ['dgen2']),
     'w-againbase': ([('dui', "            var base = review() || existing;", "            var base = existing;")], ['L-dgen2-againKeepsChecked'], ['dgen2']),
     's-nobutton': ([('snip', "(w.PenumbraDict ? '<div class=\"snip-panel-tools\">", "(false ? '<div class=\"snip-panel-tools\">")], ['L-dgen-sidebarButton'], ['dgen']),
-    # --- (2026-10-24, dictstat) Column stats' meaning
-    'x-nomean': ([('menu', "        if (!e) { return body; }\n", "        return body;\n")], ['L-dstats-meanShown', 'L-dstats-meanFirst', 'L-dstats-keyboard'], ['dstats']),
-    'x-rawtext': ([('menu', "(t ? esc(cut) : '<span class=\"pnb-hm-mean-blank\">", "(t ? cut : '<span class=\"pnb-hm-mean-blank\">")], ['L-dstats-meanEscaped'], ['dstats']),
-    'x-nocut': ([('menu', "        if (t.length > MEAN_MAX) {\n", "        if (false) {\n")], ['L-dstats-longCut'], ['dstats']),
-    # the wrap rule gone: the long meaning's unbroken name runs out of the list sideways
-    'x-nowrapcss': ([('mcss', ".pnb-hm-mean .pnb-hm-label { white-space: normal; overflow-wrap: anywhere; }\n", "")], ['L-dstats-meanWraps'], ['dstats']),
-    'x-noaria': ([('menu', "'\" title=\"' + esc(it.title) + '\" aria-label=\"' + esc(said) + '\">' +", "'\" title=\"' + esc(it.title) + '\">' +")], ['L-dstats-meanAria'], ['dstats']),
-    # not an item: the keyboard never lands on it
-    'x-notitem': ([('menu', "'<div class=\"pnb-hm-item pnb-hm-mean\" role=\"menuitem\"", "'<div class=\"pnb-hm-mean\" role=\"menuitem\"")], ['L-dstats-meanFocused', 'L-dstats-keyboard'], ['dstats']),
-    # the dialog opened at the column again (an entry found by the heading's label not focused): the meaning; the header's item
-    'x-meancol': ([('menu', "run: function () { window.Penumbra.openDataDictionary(e.name); } },\n            '-'].concat(body);", "run: function () { window.Penumbra.openDataDictionary(col); } },\n            '-'].concat(body);")], ['L-dstats-opensAtEntry'], ['dstats']),
+    # --- (2026-10-24, dictstat) Column stats' meaning; (2026-11-26) re-anchored on the heading item's tip (aboutItem): menufix2 D1
+    # (e19fb87) took the line out of Column stats, so its code (meanHtml, the .pnb-hm-mean CSS) is dead; x-nowrapcss / x-notitem retired
+    'x-nomean': ([('menu', "return { act: 'about', label: 'What this column means', title: tip, run:", "return { act: 'about', label: 'What this column means', title: '', run:")], ['L-dstats-meanShown', 'L-dstats-meanAria', 'L-dstats-draftTag'], ['dstats']),
+    # the line back in Column stats (what D1 took out: the same entry twice; the focus lands on it)
+    'x-meanback': ([('menu', '    function statsItems(col, given) { return statsBody(col, given); }', "    function statsItems(col, given) { var e = given ? null : dictEntry(col, col); return e ? [{ heading: 'What it means' }, { act: 'statsAbout', mean: e, title: '', run: function () { window.Penumbra.openDataDictionary(e.name); } }, '-'].concat(statsBody(col, given)) : statsBody(col, given); }")], ['L-dstats-meanShown', 'L-dstats-meanFirst', 'L-dstats-meanFocused'], ['dstats']),
+    'x-rawtext': ([('menu', '(it.title ? \' title="\' + esc(it.title) + \'"\' : \'\')', '(it.title ? \' title="\' + it.title + \'"\' : \'\')')], ['L-dstats-meanEscaped'], ['dstats']),
+    'x-nocut': ([('menu', "cut = t.length > MEAN_MAX ? t.slice(0, MEAN_MAX).replace(/\\s+\\S*$/, '') + '...' : t;", 'cut = t;')], ['L-dstats-longCut'], ['dstats']),
+    # the meaning drawn in the menu instead of its tip
+    'x-meaninmenu': ([('menu', "label: 'What this column means', title: tip,", "label: cut || 'What this column means', title: tip,")], ['L-dstats-meanWraps'], ['dstats']),
+    # the tip no longer says what a click does
+    'x-noaria': ([('menu', "'\\n\\nOpens its entry in the report\\'s data dictionary';", "'';")], ['L-dstats-meanAria'], ['dstats']),
+    # the dialog opened at the entry's key, not its name
+    'x-meancol': ([('menu', 'run: function () { window.Penumbra.openDataDictionary(e.name); } };', 'run: function () { window.Penumbra.openDataDictionary(e.key); } };')], ['L-dstats-opensAtEntry'], ['dstats']),
+    'x-norun': ([('menu', 'run: function () { window.Penumbra.openDataDictionary(e.name); } };', 'run: function () { } };')], ['L-dstats-meanOpens', 'L-dstats-opensAtEntry', 'L-dstats-keyboard'], ['dstats']),
     'x-aboutcol': ([('menu', "        if (ent) { look.push(aboutItem(ent)); }\n", "        if (ent) { look.push({ act: 'about', label: 'What this column means', run: function () { window.Penumbra.openDataDictionary(col); } }); }\n")], ['L-dstats-opensAtEntry'], ['dstats']),
-    'x-nodraft': ([('menu', "(e.draft ? ' <span class=\"pnb-hm-tag pnb-hm-tag-draft\"", "(false ? ' <span class=\"pnb-hm-tag pnb-hm-tag-draft\"")], ['L-dstats-draftTag'], ['dstats']),
+    'x-nodraft': ([('menu', "(cut || 'No description yet.') + (e.draft ? ' (AI draft)' : '')", "(cut || 'No description yet.')")], ['L-dstats-draftTag'], ['dstats']),
     # (wcag mod 2026-11-07, M17) the link back to bare --brand-primary text
     'm17color': ([('dcss', "color: var(--brand-text, var(--brand-primary, #2a6ebb)); text-decoration: underline;", "color: var(--brand-primary, #2a6ebb); text-decoration: underline;")], ['L-dopts-aboutBrandText'], ['dopts']),
-    'x-noavoid': ([('menu', "(e.avoid ? '<span class=\"pnb-hm-tag pnb-hm-tag-avoid\">Do not use</span> ' : '')", "''")], ['L-dstats-avoidBlank'], ['dstats']),
+    'x-noavoid': ([('menu', "var tip = (e.avoid ? 'Do not use. ' : '') + ", 'var tip = ')], ['L-dstats-avoidBlank'], ['dstats']),
     # (the review) the hard cut splitting an emoji; the dots after an opening bracket; the heading's label never asked
+    # (2026-11-26) x-halfemoji / x-tidy still anchor in meanHtml, dead since D1: hardCut / cutTidy are red on live (the tip's cut,
+    # aboutItem, has neither rule), so these two pass only by that until aboutItem cuts as meanHtml did
     'x-halfemoji': ([('menu', "            if (hi >= 0xD800 && hi <= 0xDBFF) { at--; }\n", "")], ['L-dstats-hardCut'], ['dstats']),
     'x-tidy': ([('menu', ".replace(/[\\s.,;:(\\[\\/-]+$/, '') + '...';", ".replace(/[\\s.,;:]+$/, '') + '...';")], ['L-dstats-cutTidy'], ['dstats']),
-    'x-nolabel': ([('menu', "dictEntry(col, th ? labelOf(th) : col)", "dictEntry(col, col)")], ['L-dstats-byLabel'], ['dstats']),
+    'x-nolabel': ([('menu', '        var ent = dictEntry(col, name);\n', '        var ent = dictEntry(col, col);\n')], ['L-dstats-byLabel'], ['dstats']),
 }
 
 args = sys.argv[1:]
@@ -332,14 +338,17 @@ def php_checks(texts):
 # (2026-10-24, dictstat) the help names Column stats' meaning (the ways in, the menu's table, Column stats' paragraph) and the
 # comparison's item; the new cell and the comparison's list item stay within 70 words (help L16)
 def _words(h): return len(re.sub(r'<[^>]+>', ' ', h).split())
+# (2026-11-26) menufix2 D1 (e19fb87, 2026-11-19) took the meaning out of Column stats (the heading item's tip carries it): the help
+# must no longer say Column stats starts with it (three passages still did on 2026-11-26), and the item's cell says its tip shows it
+STALE_STATS_HELP = ['<em>Column stats</em> starts with the meaning', 'the list starts with its meaning', '<em>Column stats</em> starts with the same meaning']
 def help_stats(topic, ut):
     m1 = re.search(r'<strong>What this column means</strong></td><td[^>]*>(.*?)</td>', ut, re.S)
     m2 = re.search(r'<li>(In a snapshot comparison,.*?)</li>', ut, re.S)
     n1, n2 = (_words(m1.group(1)) if m1 else None), (_words(m2.group(1)) if m2 else None)
-    good = (bool(m1 and m2) and '<em>Column stats</em> starts with the meaning' in topic
-            and 'the list starts with its meaning; a click on it opens the dictionary' in ut and 'offers <em>What this column means</em>' in m2.group(1)
-            and n1 <= 70 and n2 <= 70)
-    return ('S-helpStats', good, 'cell=%s li=%s words' % (n1, n2))
+    stale = [x for x in STALE_STATS_HELP if x in topic or x in ut]
+    good = (bool(m1 and m2) and not stale and re.search(r'\btip\b', re.sub(r'<[^>]+>', ' ', m1.group(1))) is not None
+            and 'offers <em>What this column means</em>' in m2.group(1) and n1 <= 70 and n2 <= 70)
+    return ('S-helpStats', good, 'cell=%s li=%s words; stale: %s' % (n1, n2, stale or 'none'))
 
 def static_checks(texts):
     idx, pal, snip, seed, topic, ai = texts['index'], texts['pal'], texts['snip'], texts['seed'], texts['topic'], texts['ai']

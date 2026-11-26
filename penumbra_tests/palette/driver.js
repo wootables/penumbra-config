@@ -1372,7 +1372,7 @@
     var more = row('Show '); R.info.vo1 = [vo().length, more ? more.text : null];
     if (more) { var pm = await pickRow('Show '); if (pm) { await enter(); } await sleep(200); }
     var tab = document.getElementById('view-options-tab');
-    var want = tab ? tab.querySelectorAll('.view-option-item input[type="checkbox"]').length + 4 : -1;   // + layout, title, subtitle, sort orders (the journal row features are hidden)
+    var want = tab ? tab.querySelectorAll('.view-option-item input[type="checkbox"]').length + 3 : -1;   // + layout, title, subtitle (the journal row features are hidden; custom sort orders left View Options 2026-11-25, csmine)
     R.info.vo2 = [vo().length, want, vo().map(function (r) { return r.text + ' | ' + r.sub; })];
     R.chk.voCount = ok && vo().length === want && want >= 10;
     R.chk.voState = vo().some(function (r) { return /^(on|off); /.test(r.sub); }) && vo().some(function (r) { return /^Default; /.test(r.sub); });

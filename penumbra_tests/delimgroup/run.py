@@ -304,6 +304,8 @@ MUTANTS.update({
     'ga-far': ('main', [("        if (e !== null && e > today + PENUMBRA_ACTIVE_FAR_DAYS) e = null;", "        if (false) e = null;")]),
     'ga-offer': ('main', [("                if (_gap && String(_gap.start).toUpperCase() === String(col).toUpperCase()) {", "                if (false) {")]),
     'ga-act': ('colmenu', [("act: 'groupAs-' + (v.active ? 'active' + v.active : String(v.token).split(':').pop())", "act: 'groupAs-' + String(v.token).split(':').pop()")]),
+    # (2026-11-26) Pivot active by: the builder no longer says which Rows fields it moved to Columns (Y-open had no mutant)
+    'ya-movednote': ('main', [("        if (moved.length) showPivotError(escapeHtml('Moved ' + moved.join(', ') + ' to Columns: an active field takes Rows to itself.'), true);", "        if (false) showPivotError('');")]),
 })
 MUTANT_RED = {
     # (G-total, G-other and G-csort hold here: the cell grouped whole still counts each row once, and on this fixture
@@ -424,6 +426,7 @@ MUTANT_RED.update({
     'ga-far': ['A-bands', 'A-order', 'A-status'],
     'ga-offer': ['A-offer', 'A-label', 'A-bands', 'A-order', 'A-total', 'A-status', 'A-act'],
     'ga-act': ['A-act'],
+    'ya-movednote': ['Y-open'],   # (2026-11-26)
 })
 def mutant_scns(name):
     which = MUTANTS[name][0]

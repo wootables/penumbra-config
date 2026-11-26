@@ -248,7 +248,9 @@
     rec('Y-saved', S(s0.rows) === S(['AWARD_DATE:fy@END_DATE:prorate']), S(s0.rows));
     // a plain pivot first (STATUS in Rows), then Pivot active by: AWARD_DATE alone in Rows, STATUS moved to Columns
     var built = pm.rebuild({ rows: ['STATUS'], cols: [], vals: 'AMT', agg: ['sum'] });
-    await until(function () { return pm.on(); }, 15000);
+    // (2026-11-26) since pvsweep2 #39 (955e98a) the rebuild hands the builder a draft and Generate commits it in its deferred
+    // step: the pivot on screen (the active one above) stays current until then, so wait for the plain one itself
+    await until(function () { var s = pm.settings(); return pm.on() && !!s && S(s.rows) === S(['STATUS']); }, 15000);
     var okOpen = false; try { okOpen = hm.pivotActive('AWARD_DATE', 'fy'); } catch (e) { R.obs.yOpenErr = String(e.message); }
     await until(function () { return $('#pivotLightbox').is(':visible'); }, 5000);
     var rp = $('#pivot-rows .pivot-column-item'), cp = $('#pivot-cols .pivot-column-item');
@@ -1045,8 +1047,9 @@
     var dsum = build(M, 'PI_LIST:dsemi', 'AMT', 'none', 'sum'), wsum = tally(FX, chartKeys, function (r) { return parseFloat(r.AMT); });
     rec('V-sum', !!dsum && sameMap(chartMap(dsum), wsum), S(chartMap(dsum)) + ' want ' + S(wsum));
     // V-series: STATUS across, a series per value of the list
-    // (a cell listing nothing is the builder's 'default' series, as any blank series is)
-    function seriesKeys(r) { var k = pieces(r.PI_LIST, ';'); return k.length ? k : ['default']; }
+    // (a cell listing nothing is the builder's blank series, as any blank series is: 'Unknown' since the chart sweep
+    // a8e02f5, 2026-11-18 - 'default' before it; the bars' blank, chartKeys, is the same)
+    function seriesKeys(r) { var k = pieces(r.PI_LIST, ';'); return k.length ? k : ['Unknown']; }
     var dser = build(M, 'STATUS', 'AMT', 'PI_LIST:dsemi', 'count'), serBad = [];
     if (!dser || !dser.datasets) serBad.push('no data');
     else Object.keys(tally(FX, seriesKeys, function () { return 1; })).forEach(function (p) {

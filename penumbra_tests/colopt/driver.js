@@ -731,7 +731,7 @@
       cogOf('V_AMOUNT').click();
       var pop = popover(), g = pop ? geo(pop) : [];
       // (2026-10-20, hl) Highlight after Shading
-      R.chk.formRows = even(g, 6) && g.map(function (x) { return x.sec; }).join() === 'summary,format,shade,highlight,filter,freeze';
+      R.chk.formRows = even(g, 7) && g.map(function (x) { return x.sec; }).join() === 'summary,format,shade,highlight,sort,filter,freeze';   // (2026-11-25, csmine) Sort order
       // a long name wraps in the head, not cut short: its title tooltip is held while open
       var tt = pop && pop.querySelector('.pnb-colopt-title'), tw = null;
       if (tt) {
@@ -766,7 +766,7 @@
       cogOf('V_NAME').click();
       var pn = popover(), gn = pn ? geo(pn) : [];
       // the same label and control columns as the number column's popover
-      R.chk.textCol = even(gn, 4) && gn.map(function (x) { return x.sec; }).join() === 'summary,highlight,filter,freeze' && g.length > 0
+      R.chk.textCol = even(gn, 5) && gn.map(function (x) { return x.sec; }).join() === 'summary,highlight,sort,filter,freeze' && g.length > 0
         && gn[0].lblLeft === g[0].lblLeft && gn[0].ctlLeft === g[0].ctlLeft;
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       await sleep(60);
@@ -1050,7 +1050,7 @@
       if (hasSet) window.Penumbra.setColSummary('V_NAME', 'mode');
       var items = window.__HC.clearItems('lrfix');
       // (2026-10-20, hl) the column options hold highlight rules too
-      R.chk.listed = items.some(function (t) { return /^Shading \(1 column\)$/.test(t); }) && items.some(function (t) { return /^Column options: formats, highlights and links \(1 column\)$/.test(t); });
+      R.chk.listed = items.some(function (t) { return /^Shading \(1 column\)$/.test(t); }) && items.some(function (t) { return /^Column options: formats, highlights, links and sort orders \(1 column\)$/.test(t); });
       R.chk.listsSummary = hasSet && items.some(function (t) { return /^Column summaries \(1 column\)$/.test(t); });
       window.confirm = function () { return true; };
       document.getElementById('spClearStorage').click();
@@ -1608,7 +1608,7 @@
       var pop = popover();
       var secs = pop ? Array.prototype.filter.call(pop.children, function (n) { return n.classList.contains('pnb-colopt-sec'); }).map(function (s) { return s.getAttribute('data-sec'); }).join() : '';
       var hsec = pop && pop.querySelector('[data-sec="highlight"]'), add = hsec && hsec.querySelector('[data-co="hl-add"]');
-      R.chk.popHasHl = secs === 'summary,format,shade,highlight,filter,freeze' && !!add && /^\+ Add a rule$/.test(add.textContent)
+      R.chk.popHasHl = secs === 'summary,format,shade,highlight,sort,filter,freeze' && !!add && /^\+ Add a rule$/.test(add.textContent)
         && hsec.querySelector('.pnb-colopt-lbl').textContent.trim() === 'Highlight' && hsec.querySelectorAll('.pnb-hl-item').length === 0;
       // Add a rule: its own view in the popover's place; nothing stored until it reads
       add.click();

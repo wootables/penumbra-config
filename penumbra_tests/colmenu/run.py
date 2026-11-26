@@ -286,7 +286,10 @@ MUTANTS = {
     'nb-parent': ([('menu', "                    nest.push(gmColumnItem(info, mode, subs[j], subs[j]));\n                }\n                continue;\n",
                     "                    nest.push(gmColumnItem(info, mode, subs[j], subs[j]));\n                }\n")], ['L-gnnestbd-nbNoParent'], ['gnnestbd']),
     'nb-deep': ([('menu', "                for (var j = 0; outer && j < subs.length; j++) {", "                for (var j = 0; j < subs.length; j++) {")], ['L-gnnestbd-nbInnerNone'], ['gnnestbd']),
-    'nb-dedupe': ([('menu', "                    if (nestSeen[k] || used.indexOf(k) >= 0) { continue; }", "                    if (used.indexOf(k) >= 0) { continue; }")],
+    # (2026-11-26, nestqual) nb-dedupe / nc-dedupe re-anchored: since jsonsweep2 U2 (e42ff7e, 2026-11-19) a name two tables share is
+    # PARENT.KEY in each table's list (main.js _pnbNestQualify's byCol), so the lists' own dedupe (nestSeen) never meets a twin and
+    # both mutants had gone equivalent. Now the qualification undone: each list gets one pooled bare SUB_NAME again.
+    'nb-dedupe': ([('main', "        for (C in byCol) outB[C] = byCol[C].map(function (n) { return (q[C] && q[C][n]) ? C + '.' + n : n; });", '        for (C in byCol) outB[C] = byCol[C].slice();')],
                   ['L-gnnestbd-nbDedupe', 'L-gnnestbd-nbTopList'], ['gnnestbd']),
     'nb-title': ([('menu', "'Configure grouping: hidden columns, date and number ranges' + (outer ? ', nested fields' : '')", "'Configure grouping: hidden columns, date and number ranges, nested fields'")],
                  ['L-gnnestbd-nbOtherTitle'], ['gnnestbd']),
@@ -298,7 +301,7 @@ MUTANTS = {
                   ['L-gchipnest-ncNoParent'], ['gchipnest']),
     'nc-nonest': ([('main', "            if (nest.length) cols = cols.concat([{ head: 'Nested table columns' }], nest);", "            if (false) cols = cols.concat([{ head: 'Nested table columns' }], nest);")],
                   ['L-gchipnest-ncNestList', 'L-gchipnest-ncPick', 'L-gchipnest-ncActive'], ['gchipnest']),
-    'nc-dedupe': ([('main', "if (!nestSeen[k]) { nestSeen[k] = true; nest.push(", "if (true) { nestSeen[k] = true; nest.push(")], ['L-gchipnest-ncNestList'], ['gchipnest']),
+    'nc-dedupe': ([('main', "        for (C in byCol) outB[C] = byCol[C].map(function (n) { return (q[C] && q[C][n]) ? C + '.' + n : n; });", '        for (C in byCol) outB[C] = byCol[C].slice();')], ['L-gchipnest-ncNestList'], ['gchipnest']),   # (nestqual, as nb-dedupe)
     'nc-head': ([('main', "                if (c.head) { $('<div class=\"sb-pop-h\"></div>').toggleClass('sb-mt', cols[0] !== c).text(c.head).appendTo($list); return; }",
                   "                if (c.head) { return; }")], ['L-gchipnest-ncNestList'], ['gchipnest']),
     'nc-token': ([('main', "nest.push({ colname: String(s), label: String(s) });", "nest.push({ colname: String(colname), label: String(s) });")], ['L-gchipnest-ncPick'], ['gchipnest']),

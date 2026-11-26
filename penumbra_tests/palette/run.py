@@ -1066,6 +1066,10 @@ ENTRY_SKIP_RULES = [
     (r'^(generatePrompt|testPrompt|resetPromptForm|generateSubquery|formatSubquerySql|resetSubqueryForm|promptSwapBoolean|linkToPromptGenerator|retryPromptLink|resetAllPromptsLink|selectDefaultsFromAutofill|sidebarImportPrompt)', 'the Tag Generator / prompt form\'s own steps (the generator is a row)'),
     (r'^(viz|copyChartImage|downloadChart|injectVizInfoboxBtn|removeVizSnippetBtn|updateVizSnippetBtn|copyViz)', 'the chart builder\'s own tabs and steps (the builder is a row)'),
     (r'^(copy(Copy|Group|Pivot)SnippetBtn|updatePivotSnippetBtn|downloadCopySnippetBtn|confirmCopyBtn|createDownloadLinkBtn|dlLink|pnbDlManual|pnbDlRetry)', 'a step inside the Copy / Download dialogs (each is a row)'),
+    # (2026-11-26) the API token panel (apifix 2026-11-22, apitok / apiremote 2026-11-23): one panel with two homes, the Copy dialog's API
+    # option and the Save dialog's Security & Access card (its Manage button moves it there). Named one by one: a new button of the
+    # panel still needs a row or a reason.
+    (r'^(apiTokenCreate|apiTokenCopy|apiTokenDismiss|apiAddrApply|saveApiTokenManage)$', 'the API token panel\'s own steps (in the Copy dialog\'s API option and the Save dialog\'s Security & Access card; each dialog is a row)'),
     (r'^(generatePivotBtn|modifyPivotBtn|resetPivotBtn|pivotTransposeBtn|closePivotBtn|pivot-agg-table)$', 'the pivot builder\'s own steps (the builder, Exit the pivot view and the pivot rows cover it)'),
     (r'^(resetGroupingBtn|configureGroupingBtn|removeGroupingLink|ungroupBtn)$', 'the Group dialog\'s own steps (Group, Ungroup, Expand / Collapse all groups are rows)'),
     (r'^(snap|dm|pnbSnapHdr|createSnap|compareSnapshot|loadSnapshotBtn|linkToSchedulerFromSnapshot|unifiedSnapshotTableBody|schedOpenSnapshots|createNewSnapshotBtnV2)', 'a step inside the Snapshots dialog (the dialog is a row; a snapshot is created there)'),

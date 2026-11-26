@@ -23,7 +23,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 CALC_URL = '&'.join('calc=' + urllib.parse.quote(v, safe='') for v in
                     ['HALF|{H_NUM} / 2', 'DBL|{V_AMOUNT} * 2|currency', 'FLAG|IF({V_STATUS} = "open", "yes", "no")|text', 'BAD|{NOPE} + 1'])
-SCN = ['curl', 'cadd', 'cstate', 'cclear', 'cadj']
+SCN = ['curl', 'cadd', 'cstate', 'cclear', 'cadj', 'cgrp', 'cgsweep']
 SCN_Q = {'curl': '&' + CALC_URL}
 CHK = {
     # (2026-10-18, calcadj) an adjustable value: the dialog's row, the panel's knob, Enter re-runs,
@@ -35,10 +35,16 @@ CHK = {
              'chipPop',   # round 6: the chip's popover
              'escOneSurface', 'realColNoAdjust', 'armDropped'],   # round 8 (closing sweep): one Escape one surface, no Adjust on a real column, a dropped replay arm
     'curl': ['halfShown', 'dblCurrency', 'flagText', 'badLeftOut', 'atEnd', 'panelFromLink', 'summable'],
-    'cadd': ['addButton', 'dialog', 'layout', 'cheatPlain', 'adjOneLine', 'kindNoOverlap', 'errInFooter', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
+    'cadd': ['addButton', 'dialog', 'layout', 'cheatPlain', 'adjOneLine', 'kindNoOverlap', 'errInFooter', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'replayed', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
              'editFocus', 'removeFocus', 'panelLabel', 'editShowsLabel'],   # moderate 2026-10-15: WCAG 2.4.3; cheatPlain / adjOneLine 2026-10-19 (calcadj round 2)
     'cclear': ['before', 'listed', 'cleared'],
+    # (2026-11-25, cgroups) custom groups: the editor, the column, the grouping dialog's entries, an edit, the state, the lock, the menu
+    'cgrp': ['dlgOpens', 'defaultName', 'valuesListed', 'noEarlyError', 'addCount', 'newGroupFocus', 'singleNamed', 'preview', 'marked', 'saved', 'hidden', 'noQuery',
+             'values', 'order', 'panelRow', 'stateCarries', 'groupedOrder', 'dlgEditEntry', 'dlgEntries', 'dlgNewOpens', 'dlgNewCancel', 'dlgUse', 'dlgNewCol', 'dlgNewSaves', 'dlgNewKeepsForm', 'dlgNewEditEntry', 'editOpens', 'edited',
+             'lockKeepsGroups', 'lockRefusesFormula', 'lockOpensGroups', 'cancelCalled', 'menuItem', 'removed', 'removeLeavesGroupMode'],
     'cstate': ['stateShown', 'viewStateCarries', 'saveStrips'],
+    # (2026-11-25, cgroups sweep) the editor's sweep
+    'cgsweep': ['findAutofocus', 'escFindClears', 'addToFollows', 'addFocusTarget', 'escAsks', 'backdropKeeps', 'colKeepsFocus', 'staleNamed', 'staleGoneBack', 'otherMerged', 'otherCaseRefused', 'rxRefused', 'saved', 'showFlips', 'renameKeepsGrouping', 'goneColKept', 'goneColSaves', 'multiLineValue', 'lockReportNoEdit', 'lockReportNoDialog', 'arrowArms', 'enterOpens', 'splitLevelCarried', 'staleTakenOut', 'splitNameRefused', 'dragOutKeeps', 'backdropCloses', 'gsumValues', 'noQuerySweep'],
 }
 ENGINE = ['add', 'accounting', 'pctIn', 'divZero', 'textIsBlank', 'blankIsBlank', 'missingIsBlank', 'leadPartial', 'precedence', 'parens',
           'unary', 'doubleNeg', 'leftAssoc', 'divAssoc', 'caseCols', 'floatNoise', 'round2', 'roundNeg', 'roundTens', 'roundBlank', 'roundCase',
@@ -73,6 +79,35 @@ ENGINE = ['add', 'accounting', 'pctIn', 'divZero', 'textIsBlank', 'blankIsBlank'
 NEW = {'N-labelDef', 'N-labelUrl', 'N-labelRowKey', 'N-labelRef', 'N-labelApplied', 'N-labelState', 'N-labelOpenEdit', 'N-labelRemove',
        'L-cadd-added', 'L-cadd-panelLabel', 'L-cadd-editShowsLabel'}
 MUTANTS = {
+    # --- (2026-11-25, cgroups) custom groups: hidden column, the groups' order, no query, the lock, the dialog's entries, the menu
+    'm-cg-hide': ([('main', "                                    if (d.groups && d.hide) visibleColumnsSet.delete(raw); else visibleColumnsSet.add(raw);\r\n",
+                   "                                    visibleColumnsSet.add(raw);\r\n")], ['L-cgrp-hidden'], ['cgrp']),
+    'm-cg-order': ([('main', "            if (_csGo && Array.isArray(_csGo.values) && _csGo.values.length) values = _csGo.values;\r\n", "")], ['L-cgrp-groupedOrder'], ['cgrp']),
+    'm-cg-entries': ([('main', "        (typeof C.groupsOf === 'function' ? C.groupsOf(base) : []).forEach(function (g) { out.push({ v: '=cg:use:' + g.name, t: 'Custom groups: ' + g.label }); });\r\n", "")],
+                     ['L-cgrp-dlgEntries'], ['cgrp']),
+    'm-cg-raw': ([('main', "        if (key === null) return [];\r\n        var out = new Array(masterRowData.length);", "        return [];\r\n        var out = new Array(masterRowData.length);")],
+                 ['L-cgrp-valuesListed', 'L-cgrp-values'], ['cgrp']),
+    'j-cg-replay': ([('calc', "        replayArm();\n        rerun(r.def.name, true, after);", "        rerun(r.def.name, true, after);")], ['L-cgrp-noQuery', 'L-cadd-replayed'], ['cgrp', 'cadd']),
+    'j-cg-lock': ([('calc', "        return savedDefs().filter(function (d) { return !!d.groups && !isReport(d.name); }).map(function (d) { var o = plain(d); o.hide = true; return o; });",
+                   "        return [];")], ['L-cgrp-lockKeepsGroups'], ['cgrp']),
+    'j-cg-lockdlg': ([('calc', "        if (locked() && (name ? !lockOwnGroups(dPre) : !asGroups)) { say(LOCK_MSG); return; }", "        if (locked()) { say(LOCK_MSG); return; }")], ['L-cgrp-lockOpensGroups'], ['cgrp']),
+    # --- (2026-11-25, cgroups sweep) the editor's fixes, each turned off
+    'j-cgs-escfind': ([('calc', "            if (grpWork && e.target && e.target.id === 'pnbGrpFind' && e.target.value) { e.target.value = ''; grpFindTxt = ''; grpRenderVals(); return; }", "")], ['L-cgsweep-escFindClears'], ['cgsweep']),
+    'j-cgs-addto': ([('calc', "        to.value = (cur && to.querySelector('option[value=\"' + cur + '\"]')) ? cur : 'new';", "        to.value = 'new';")], ['L-cgsweep-addToFollows'], ['cgsweep']),
+    'j-cgs-rename': ([('calc', "        if (renamedFrom) { try {", "        if (false) { try {")], ['L-cgsweep-renameKeepsGrouping'], ['cgsweep']),
+    'j-cgs-hideflip': ([('calc', "var wasGd = (r.def.groups && editing) ? defNamed(editing) : null", "var wasGd = null")], ['L-cgsweep-showFlips'], ['cgsweep']),
+    'j-cgs-gone': ([('calc', "        if (cols.indexOf(col) === -1 && !gone) col = cols[0] || '';", "        if (cols.indexOf(col) === -1) col = cols[0] || '';")], ['L-cgsweep-goneColKept'], ['cgsweep']),
+    'j-cgs-lockrep': ([('calc', "    function lockOwnGroups(d) { return !!(d && d.groups && d.src === 'saved' && !isReport(d.name)); }", "    function lockOwnGroups(d) { return !!(d && d.groups); }")], ['L-cgsweep-lockReportNoEdit', 'L-cgsweep-lockReportNoDialog'], ['cgsweep']),
+    'j-cgs-rx': ([('calc', "                var px = grpRxProblem(rv);\n", "                var px = null;\n")], ['L-cgsweep-rxRefused'], ['cgsweep']),
+    'm-cgs-arrow': ([('main', "            if (Date.now() - _grpCgKeyAt < 500) { this.setAttribute('data-cg-armed', '1'); return; }   // (sweep) a key's step: Enter acts", "")], ['L-cgsweep-arrowArms'], ['cgsweep']),
+    'm-cgs-split': ([('main', "split: (typeof lvDl === 'string' && /^d(semi|pipe|comma)$/.test(lvDl)) ? lvDl : undefined, ", "")], ['L-cgsweep-splitLevelCarried'], ['cgsweep']),
+    # (2026-11-26) the backdrop guard (bdclick) and the group summary's own values (gsumac), each turned off
+    'm-bdclick': ([('main', "            if (d === t && (!u || u === t)) return;\r\n            e.stopImmediatePropagation();\r\n", "            return;\r\n            e.stopImmediatePropagation();\r\n")], ['L-cgsweep-dragOutKeeps'], ['cgsweep']),
+    'm-gsumac': ([('main', "                var _gsVals = _pnbGroupSummaryValues();\r\n                return _gsVals.length ? _gsVals : null;\r\n", "")], ['L-cgsweep-gsumValues'], ['cgsweep']),
+    'j-cg-cancel': ([('calc', "        if (t.closest('#pnbCalcOverlay .pnb-calc-cancel')) { e.preventDefault(); closeDialog(true); return; }",
+                     "        if (t.closest('#pnbCalcOverlay .pnb-calc-cancel')) { e.preventDefault(); closeDialog(); return; }")], ['L-cgrp-cancelCalled'], ['cgrp']),
+    'm-cg-snap': ([('main', "            var s = snap ? $.extend({}, snap) : { v: 1, levels: _groupLevelsFromDialog() };\r\n", "            var s = { v: 1, levels: _groupLevelsFromDialog() };\r\n")], ['L-cgrp-dlgNewKeepsForm'], ['cgrp']),
+    'n-cg-menu': ([('menu', "        var cgi = canGroup ? customGroupsItem(col, gcol, grouped) : null;", "        var cgi = null;")], ['L-cgrp-menuItem'], ['cgrp']),
     # --- (2026-10-22) the label: never kept; dropped by plain(); the row keyed by the upper-case name; a reference
     # not following the label; the dialog and Remove matching a name exactly
     'l-nolabel': ([('calc', "        if (lb !== name) out.label = lb;\n", "")], ['N-labelDef', 'N-labelRowKey', 'L-cadd-added'], ['cadd']),

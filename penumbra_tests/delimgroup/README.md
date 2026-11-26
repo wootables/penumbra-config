@@ -104,3 +104,12 @@ A clean run is 114 asserts. Earlier rounds' controls were run at their deploys: 
 jsontot (881c6b5^, exactly its 9 checks), grpbucket (815d7ac^, exactly its 35: CONTROL_RED_GRPBUCKET); --control now
 runs the latest round's only. The chart scenario loads the chart libraries main.js asks for from the app's js\. Run from a LOCAL cwd copy or `cd` into this folder first. One headless
 suite at a time on this workstation.
+
+## 2026-11-26 drift repairs (both red on live since November; no app change)
+
+- `V-series`: the chart builder's blank series is `Unknown` since the chart sweep a8e02f5 (2026-11-18), `default` before it.
+  `seriesKeys` now says `Unknown` (the bars' `chartKeys` already did). `vizsplit` still turns exactly its ten red.
+- `Y-open`: since pvsweep2 #39 (955e98a, 2026-11-21) the pivot menu's `rebuild` hands the builder a draft and Generate commits it
+  in its deferred step, so `pm.on()` was already true (the active pivot before it) and Pivot active by opened over the OLD pivot
+  (STATUS already in Columns: nothing moved, no notice). The scenario now waits for the plain pivot's own rows. Bisected with
+  git files (47c7278 green, 955e98a red). New mutant `ya-movednote` (the moved-fields notice gone) turns exactly Y-open red.

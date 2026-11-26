@@ -105,10 +105,12 @@
       R.chk.preview = document.querySelectorAll('#pnbCalcPrev tbody tr').length === 5 && document.getElementById('pnbCalcErr').textContent === '';
       var q0 = window.__queryDone;
       document.getElementById('pnbCalcGo').click();
-      await until(function () { return window.__queryDone > q0 && !!th('RATIO'); }, 15000); await sleep(400);
+      // (2026-11-25, cgroups) adding, editing or removing a column replays the last answer (window.Penumbra.replayNextRun,
+      // as a knob's move does): the table is drawn again, no query goes out
+      await until(function () { return !!th('RATIO'); }, 15000); await sleep(400);
       var f = F();
       var want = Math.round(num(f.H_NUM) / num(f.H_AMT) * 100 * (1 + 1e-12)) / 100;
-      R.chk.reran = window.__queryDone > q0;
+      R.chk.replayed = window.__queryDone === q0 && !!th('RATIO');
       // (2026-10-22) the name keeps the case it was typed in: the heading reads Ratio (its data-colname, the
       // key every heading has, stays RATIO)
       var hadRatio = !!th('RATIO'), headRatio = hadRatio ? th('RATIO').textContent.replace(/[\u25b2\u25bc]/g, '').trim() : null;
@@ -127,8 +129,8 @@
       document.getElementById('pnbCalcFormula').value = '{H_NUM} * 0';
       var q1 = window.__queryDone;
       document.getElementById('pnbCalcGo').click();
-      await until(function () { return window.__queryDone > q1; }, 15000); await sleep(400);
-      R.chk.edited = cell('RATIO') === '0';
+      await until(function () { return cell('RATIO') === '0'; }, 15000); await sleep(400);
+      R.chk.edited = cell('RATIO') === '0' && window.__queryDone === q1;
       // WCAG 2.4.3: the list is rebuilt under the Edit button that opened the dialog; Save lands
       // on that row's Edit button again, not on the page
       var ae1 = document.activeElement;
@@ -143,8 +145,8 @@
       var ae2 = document.activeElement;
       R.chk.removeFocus = !!ae2 && ae2.id === 'pnbCalcAdd';
       R.info.focus2 = ae2 ? ae2.tagName + '#' + ae2.id : null;
-      await until(function () { return window.__queryDone > q2; }, 15000); await sleep(400);
-      R.chk.removed = hadRatio && !th('RATIO');
+      await until(function () { return !th('RATIO'); }, 15000); await sleep(400);
+      R.chk.removed = hadRatio && !th('RATIO') && window.__queryDone === q2;
       await until(function () { return !listed('RATIO'); }, 4000);
       R.chk.listAfterRemove = !listed('RATIO') && listed('V_ID');
       R.info = { head: R.info.headRatio, ratio: cell('RATIO'), want: want, q: [q0, q1, q2, window.__queryDone], act: window.PenumbraCalc.active(), applied: window.PenumbraCalc.applied() };
@@ -206,8 +208,9 @@
       var it = subP ? subP.querySelector('[data-act="calcAdj"]') : null;
       R.chk.menuItem = !!it && /Adjust RATE/.test(it.textContent) && !!ce && /Calculated column/.test(ce.textContent)
         && topActs.indexOf('calcEdit') < 0 && topActs.indexOf('calcRemove') < 0 && topActs.indexOf('calcAdj') < 0;
+      // (2026-11-25) Remove is last, after Adjust, since menufix2 P4 (2026-11-19): the old order read red on live
       R.chk.menuEditItem = acts.indexOf('calc-left') === 0 && acts.indexOf('calcEdit') > acts.indexOf('calc-end') && acts.indexOf('calcDup') > acts.indexOf('calcEdit')
-        && acts.indexOf('calcRemove') > acts.indexOf('calcDup') && acts.indexOf('calcAdj') > acts.indexOf('calcRemove');
+        && acts.indexOf('calcAdj') > acts.indexOf('calcDup') && acts.indexOf('calcRemove') > acts.indexOf('calcAdj');
       R.info.subActs = acts;
       if (it) it.click();
       await sleep(300);
@@ -348,6 +351,381 @@
       R.info.r8 = r8;
     },
     // Clear All Custom Preferences takes the calculated columns too (calccol3)
+    // (2026-11-25, cgroups) CUSTOM GROUPS: the editor as the grouping dialog and the header menu open it (values with
+    // their rows, ticked into groups, the rest named), the column it makes (hidden, worked out, no query, sorting in its
+    // groups' order), the grouping dialog's entries, an edit, the view state, a locked reader, the header menu, a remove
+    cgrp: async function () {
+      var C = window.PenumbraCalc, done = [], cancelled = 0, q0 = window.__queryDone;
+      function vt() { return Array.prototype.map.call(document.querySelectorAll('#pnbGrpVals .pnb-grp-vt'), function (e) { return e.textContent; }); }
+      function tick(v) {
+        var i = vt().indexOf(v), b = document.querySelectorAll('#pnbGrpVals input[data-grp-v]')[i];
+        if (!b) return false;
+        b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); return true;
+      }
+      function typeIn(el, v) { if (!el) return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
+      C.openGroups({ col: 'H_GROUP', hide: true, onDone: function (n) { done.push(n); }, onCancel: function () { cancelled++; } });
+      await sleep(250);
+      var part = document.getElementById('pnbGrpPart');
+      R.chk.dlgOpens = !!part && !part.hidden && (document.getElementById('pnbCalcTitle') || {}).textContent === 'Add custom groups' &&
+        document.getElementById('pnbCalcFxPart').hidden === true;
+      R.chk.defaultName = (document.getElementById('pnbCalcName') || {}).value === 'H_GROUP_GROUPS';
+      var labels = vt(), counts = Array.prototype.map.call(document.querySelectorAll('#pnbGrpVals .pnb-grp-vn'), function (e) { return Number(e.textContent.replace(/,/g, '')); });
+      R.chk.valuesListed = labels.length === 6 && labels[0] === '[Blank]' && counts.reduce(function (a, b) { return a + b; }, 0) === 300;
+      R.info.labels = labels; R.info.counts = counts;
+      R.chk.noEarlyError = (document.getElementById('pnbCalcErr') || {}).textContent === '';
+      tick('North'); tick('South');
+      R.chk.addCount = /2 ticked/.test((document.getElementById('pnbGrpAdd') || {}).textContent || '');
+      document.getElementById('pnbGrpAdd').click();
+      await sleep(150);
+      var nm = document.querySelector('#pnbCalcOverlay [data-grp-name="0"]');
+      R.chk.newGroupFocus = !!nm && document.activeElement === nm && nm.value === 'Group 1';
+      typeIn(nm, 'NS');
+      tick('East');
+      document.getElementById('pnbGrpTo').value = 'new';
+      document.getElementById('pnbGrpAdd').click();
+      await sleep(150);
+      R.chk.singleNamed = ((document.querySelector('#pnbCalcOverlay [data-grp-name="1"]') || {}).value) === 'East';
+      typeIn(document.getElementById('pnbGrpOther'), 'Rest');
+      await sleep(450);
+      var want = { NS: 0, East: 0, Rest: 0, blank: 0 };
+      window.__rowsFixture.forEach(function (r) { var g = r.H_GROUP; if (g === 'North' || g === 'South') want.NS++; else if (g === 'East') want.East++; else if (g) want.Rest++; else want.blank++; });
+      var prev = ((document.getElementById('pnbGrpPrev') || {}).textContent || '').replace(/,/g, '');
+      R.chk.preview = prev.indexOf('NS ' + want.NS) !== -1 && prev.indexOf('East ' + want.East) !== -1 && prev.indexOf('Rest ' + want.Rest) !== -1 && prev.indexOf('[Blank] ' + want.blank) !== -1;
+      R.chk.marked = Array.prototype.some.call(document.querySelectorAll('#pnbGrpVals .pnb-grp-v-in .pnb-grp-vin'), function (e) { return e.textContent === 'NS'; });
+      R.info.prev = prev; R.info.want = want;
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return !!th('H_GROUP_GROUPS') && done.length > 0; }, 15000); await sleep(400);
+      R.chk.saved = done[0] === 'H_GROUP_GROUPS' && !document.getElementById('pnbCalcOverlay');
+      R.chk.hidden = !!th('H_GROUP_GROUPS') && !shown('H_GROUP_GROUPS');
+      R.chk.noQuery = window.__queryDone === q0;
+      var exp = function (g) { return (g === 'North' || g === 'South') ? 'NS' : (g === 'East' ? 'East' : (g ? 'Rest' : '')); };
+      var vals = window.Penumbra.columnRawValues('H_GROUP_GROUPS');
+      R.chk.values = vals.length === 300 && window.__rowsFixture.every(function (r, i) { return vals[i] === exp(r.H_GROUP); });
+      var go = C.groupOrder('H_GROUP_GROUPS');
+      R.chk.order = !!go && go.values.join('|') === 'NS|East|Rest';
+      R.chk.panelRow = /Groups of \{H_GROUP\}: NS, East, Rest/.test(((document.querySelector('#pnbCalcList') || {}).textContent) || '');
+      // the view state carries the groups (no formula), hidden
+      var st = window.__HC.bso(), cc = ((st && st.calcColumns) || []).filter(function (d) { return d.name === 'H_GROUP_GROUPS'; })[0];
+      R.chk.stateCarries = !!cc && !!cc.groups && cc.hide === true && cc.groups.sets.length === 2 && cc.groups.other === 'Rest' && !('formula' in cc);
+      // grouped by it: the groups in the order they were made
+      window.Penumbra.groupByColumn('H_GROUP_GROUPS');
+      await until(function () { return document.querySelectorAll('#groupedResultsContainer .group-header .group-name').length >= 3; }, 15000); await sleep(700);
+      var heads = Array.prototype.map.call(document.querySelectorAll('#groupedResultsContainer .group-header .group-name'), function (e) { return e.textContent.trim(); });
+      var real = heads.filter(function (h) { return h === 'NS' || h === 'East' || h === 'Rest'; });
+      R.chk.groupedOrder = real.join('|') === 'NS|East|Rest';
+      R.info.heads = heads;
+      // the grouping dialog: on the custom groups column, Edit these...; on H_GROUP, its custom groups and New...
+      $('#groupTableBtn').trigger('click');
+      await sleep(500);
+      // (the harness's Group button leaves the dialog closed: shown here, as a person has it while picking)
+      if (!$('#groupingLightbox').is(':visible')) $('#groupingLightbox').css('display', 'flex');
+      var opt = function () { var s1 = document.getElementById('groupingBucket1'); return s1 ? Array.prototype.map.call(s1.options, function (o) { return o.value; }) : []; };
+      R.chk.dlgEditEntry = opt().indexOf('=cg:edit') !== -1;
+      var it = document.querySelector('#groupingColumnSelector .pcs-item[data-value="H_GROUP"]');
+      if (it) it.click();
+      await sleep(400);
+      R.chk.dlgEntries = opt().indexOf('=cg:use:H_GROUP_GROUPS') !== -1 && opt().indexOf('=cg:new') !== -1;
+      R.info.opts = opt();
+      var s1 = document.getElementById('groupingBucket1');
+      s1.value = '=cg:new'; $(s1).trigger('change');
+      await sleep(300);
+      R.chk.dlgNewOpens = !!document.getElementById('pnbGrpPart') && (document.getElementById('pnbGrpCol') || {}).value === 'H_GROUP';
+      document.querySelector('#pnbCalcOverlay .pnb-calc-cancel').click();
+      await sleep(200);
+      R.chk.dlgNewCancel = !document.getElementById('pnbCalcOverlay') && document.getElementById('groupingBucket1').value === '';
+      s1 = document.getElementById('groupingBucket1');
+      s1.value = '=cg:use:H_GROUP_GROUPS'; $(s1).trigger('change');
+      await sleep(400);
+      R.chk.dlgUse = ((document.querySelector('#groupingColumnSelector .pcs-selected') || { getAttribute: function () { return ''; } }).getAttribute('data-value')) === 'H_GROUP_GROUPS';
+      // New custom groups... saved from the dialog: the level holds the new column once the table shows it, the dialog
+      // still open, the other levels kept; no query
+      var itv = document.querySelector('#groupingColumnSelector .pcs-item[data-value="V_STATUS"]');
+      if (itv) itv.click();
+      await sleep(400);
+      var it2 = document.querySelector('#groupingColumnSelector2 .pcs-item[data-value="H_GROUP"]');
+      if (it2) it2.click();
+      await sleep(400);
+      $('#groupSortSelect').val('count|desc');
+      var qd = window.__queryDone;
+      s1 = document.getElementById('groupingBucket1');
+      s1.value = '=cg:new'; $(s1).trigger('change');
+      await sleep(300);
+      R.chk.dlgNewCol = (document.getElementById('pnbGrpCol') || {}).value === 'V_STATUS' && (document.getElementById('pnbCalcName') || {}).value === 'V_STATUS_GROUPS';
+      tick('Open');
+      document.getElementById('pnbGrpAdd').click();
+      await sleep(150);
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { var sel = document.querySelector('#groupingColumnSelector .pcs-selected'); return !!sel && sel.getAttribute('data-value') === 'V_STATUS_GROUPS'; }, 15000);
+      await sleep(300);
+      R.chk.dlgNewSaves = ((document.querySelector('#groupingColumnSelector .pcs-selected') || { getAttribute: function () { return ''; } }).getAttribute('data-value')) === 'V_STATUS_GROUPS' &&
+        $('#groupingLightbox').is(':visible') && !shown('V_STATUS_GROUPS') && !!th('V_STATUS_GROUPS') && window.__queryDone === qd;
+      // ...the form as the person left it: the second level and the sort
+      R.chk.dlgNewKeepsForm = ((document.querySelector('#groupingColumnSelector2 .pcs-selected') || { getAttribute: function () { return ''; } }).getAttribute('data-value')) === 'H_GROUP' &&
+        $('#groupSortSelect').val() === 'count|desc';
+      R.chk.dlgNewEditEntry = (function () { var s2 = document.getElementById('groupingBucket1'); return !!s2 && Array.prototype.some.call(s2.options, function (o) { return o.value === '=cg:edit'; }); })();
+      C.remove('V_STATUS_GROUPS');
+      await until(function () { return !th('V_STATUS_GROUPS'); }, 15000); await sleep(300);
+      $('#groupingLightbox').hide();
+      // an edit: East renamed E; the cells follow, no query
+      var q1 = window.__queryDone, done2 = [];
+      C.openGroups({ name: 'H_GROUP_GROUPS', onDone: function (n) { done2.push(n); } });
+      await sleep(250);
+      R.chk.editOpens = (document.getElementById('pnbCalcTitle') || {}).textContent === 'Edit custom groups' && !document.querySelector('input[name="pnbCalcKind"]') &&
+        ((document.querySelector('#pnbCalcOverlay [data-grp-name="1"]') || {}).value) === 'East';
+      typeIn(document.querySelector('#pnbCalcOverlay [data-grp-name="1"]'), 'E');
+      await sleep(200);
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return done2.length > 0; }, 15000); await sleep(400);
+      vals = window.Penumbra.columnRawValues('H_GROUP_GROUPS');
+      R.chk.edited = window.__queryDone === q1 && window.__rowsFixture.every(function (r, i) { var w = exp(r.H_GROUP); return vals[i] === (w === 'East' ? 'E' : w); });
+      // a locked reader (Column Organization closed): their custom groups run, hidden; a formula column is refused; the
+      // editor opens for custom groups only, with no kind and no "show it"
+      penumbra_vars.isAdmin = false; C.setLock(true);
+      R.chk.lockKeepsGroups = C.active().some(function (d) { return d.name === 'H_GROUP_GROUPS' && d.hide === true && !!d.groups; });
+      C.openDialog(null); await sleep(150);
+      R.chk.lockRefusesFormula = !document.getElementById('pnbCalcOverlay');
+      C.openGroups({ col: 'V_STATUS', onCancel: function () { cancelled++; } }); await sleep(250);
+      R.chk.lockOpensGroups = !!document.getElementById('pnbGrpPart') && !document.querySelector('input[name="pnbCalcKind"]') && !document.getElementById('pnbGrpShow');
+      var ov = document.getElementById('pnbCalcOverlay'), c0 = cancelled;
+      if (ov) ov.querySelector('.pnb-calc-cancel').click();
+      await sleep(150);
+      R.chk.cancelCalled = cancelled === c0 + 1 && !document.getElementById('pnbCalcOverlay');
+      C.setLock(false); penumbra_vars.isAdmin = true;
+      // the header menu: Custom groups (a list: these, then New custom groups...) on H_GROUP
+      var its = (window.Penumbra.colMenu && typeof window.Penumbra.colMenu.items === 'function') ? window.Penumbra.colMenu.items(th('H_GROUP')) : [];
+      var acts = its.map(function (x) { return x && x.act; }).filter(Boolean);
+      R.chk.menuItem = acts.some(function (a) { return /^groupCustom/.test(a); });
+      R.info.acts = acts.filter(function (a) { return /group/i.test(a); });
+      // removed while the table is grouped by it: gone, no query, and the table flat again - group mode with it
+      // (cgroups sweep S1: body.group-mode-active stayed on over the flat table)
+      var q2 = window.__queryDone;
+      if (!document.body.classList.contains('group-mode-active')) { window.Penumbra.groupByColumn('H_GROUP_GROUPS'); await sleep(1200); }
+      var wasGrouped = document.body.classList.contains('group-mode-active');
+      C.remove('H_GROUP_GROUPS');
+      await until(function () { return !th('H_GROUP_GROUPS'); }, 15000); await sleep(800);
+      R.chk.removed = !th('H_GROUP_GROUPS') && window.__queryDone === q2 && !C.groupOrder('H_GROUP_GROUPS');
+      R.chk.removeLeavesGroupMode = wasGrouped && !document.body.classList.contains('group-mode-active') && $('#resultsTable').is(':visible') &&
+        !$('#groupedResultsContainer').is(':visible') && window.Penumbra.headerMenu.groupingColumn() === '';
+    },
+    // (2026-11-25, cgroups sweep) the editor's sweep: Esc in Find, Add ticked to by key and its focus, Esc / a click outside
+    // ask first, the column's dropdown keeps the focus, values gone after a switch (named, taken out), Other merged and its
+    // case, a pattern the server reads differently, "show it" in an edit, a rename keeps the grouping, a column not in
+    // this run, a multi-line value, the lock and the report's own, the Group by dialog's arrow keys, a split level, a
+    // split name
+    cgsweep: async function () {
+      var C = window.PenumbraCalc, q0 = window.__queryDone;
+      function vt() { return Array.prototype.map.call(document.querySelectorAll('#pnbGrpVals .pnb-grp-vt'), function (e) { return e.textContent; }); }
+      function tick(v) {
+        var i = vt().indexOf(v), b = document.querySelectorAll('#pnbGrpVals input[data-grp-v]')[i];
+        if (!b) return false;
+        b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); return true;
+      }
+      function typeIn(el, v) { if (!el) return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
+      function key(el, k) { el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+      function err() { return ((document.getElementById('pnbCalcErr') || {}).textContent) || ''; }
+      function ov() { return document.getElementById('pnbCalcOverlay'); }
+      function cancel() { var o = ov(); if (o) o.querySelector('.pnb-calc-cancel').click(); }
+      function nameBox(i) { return document.querySelector('#pnbCalcOverlay [data-grp-name="' + i + '"]'); }
+      function setSel(el, v) { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }
+      var done = [];
+      C.openGroups({ col: 'H_GROUP', hide: true, onDone: function (n) { done.push(n); } });
+      await sleep(300);
+      var fd = document.getElementById('pnbGrpFind');
+      R.chk.findAutofocus = !!fd && fd.hasAttribute('autofocus');
+      // Esc in Find clears Find; the editor stays
+      typeIn(fd, 'No'); await sleep(250);
+      key(fd, 'Escape'); await sleep(150);
+      R.chk.escFindClears = !!ov() && fd.value === '' && vt().length === 6;
+      if (!ov()) { C.openGroups({ col: 'H_GROUP', hide: true, onDone: function (n) { done.push(n); } }); await sleep(300); }   // (a broken Esc closed it)
+      tick('North'); tick('South');
+      document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      typeIn(nameBox(0), 'NS');
+      tick('East');
+      document.getElementById('pnbGrpTo').value = 'new';
+      document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      // Add ticked to East, then East moved up: the pick follows East (it kept the place, and named NS)
+      var to = document.getElementById('pnbGrpTo');
+      to.value = to.options[2].value;
+      var eastKey = to.value;
+      document.querySelector('#pnbCalcOverlay [data-grp-up="1"]').click(); await sleep(150);
+      to = document.getElementById('pnbGrpTo');
+      R.chk.addToFollows = to.value === eastKey && /East/.test(to.options[to.selectedIndex].textContent);
+      // Add into a group already made: the focus goes to that group's name (Add itself is off)
+      tick('West');
+      document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      R.chk.addFocusTarget = document.activeElement === nameBox(0) && nameBox(0).value === 'East';
+      // Esc with groups made asks first; a click outside keeps them too
+      key(document.getElementById('pnbCalcName'), 'Escape'); await sleep(120);
+      R.chk.escAsks = !!ov() && /Esc again/.test(err());
+      ov().click(); await sleep(120);
+      R.chk.backdropKeeps = !!ov() && /not saved/.test(err());
+      // the column's dropdown keeps the focus through a switch; values the new column does not hold are named and marked
+      var colSel = document.getElementById('pnbGrpCol');
+      colSel.focus(); setSel(colSel, 'V_STATUS'); await sleep(300);
+      R.chk.colKeepsFocus = document.getElementById('pnbGrpCol') === colSel && document.activeElement === colSel;
+      var stale = document.getElementById('pnbGrpStale');
+      R.chk.staleNamed = !!stale && !stale.hidden && /4 picked values are not in V_STATUS/.test(stale.textContent) && document.querySelectorAll('#pnbGrpSets .pnb-grp-chip-gone').length === 4;
+      R.info.stale = stale ? stale.textContent : null;
+      setSel(colSel, 'H_GROUP'); await sleep(300);
+      R.chk.staleGoneBack = document.getElementById('pnbGrpStale').hidden === true && document.querySelectorAll('#pnbGrpSets .pnb-grp-chip-gone').length === 0;
+      // a group named as the rest's group (Other) is that group: one count, said so ("Other 273 · Other 0" before)
+      document.getElementById('pnbGrpTo').value = 'new';
+      tick('Central');
+      document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      typeIn(nameBox(2), 'Other'); await sleep(450);
+      var pv = ((document.getElementById('pnbGrpPrev') || {}).textContent || '').replace(/,/g, '');
+      R.chk.otherMerged = /Other \d+ \(with every value in no group\)/.test(pv) && !/Other 0/.test(pv);
+      R.info.otherPrev = pv;
+      // ...and not in another case
+      typeIn(nameBox(2), 'OTHER'); await sleep(200);
+      document.getElementById('pnbCalcGo').click(); await sleep(200);
+      R.chk.otherCaseRefused = !!ov() && /differ only in case/.test(err());
+      typeIn(nameBox(2), 'Middle'); await sleep(200);
+      typeIn(document.getElementById('pnbCalcName'), 'SWEEP_G');
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return !!th('SWEEP_G') && done.length > 0; }, 15000); await sleep(400);
+      R.chk.saved = done[0] === 'SWEEP_G' && !shown('SWEEP_G');
+      // "Show it as a column" ticked in an edit shows it (read after the save, the change never registered)
+      var d2 = [];
+      C.openGroups({ name: 'SWEEP_G', onDone: function (n) { d2.push(n); } }); await sleep(300);
+      var shw = document.getElementById('pnbGrpShow'); shw.checked = true; shw.dispatchEvent(new Event('change', { bubbles: true }));
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return d2.length > 0; }, 15000); await sleep(500);
+      R.chk.showFlips = shown('SWEEP_G');
+      // renamed while the table is grouped by it: still grouped, by the new name (it dropped the grouping)
+      window.Penumbra.groupByColumn('SWEEP_G');
+      await until(function () { return document.body.classList.contains('group-mode-active') && document.querySelectorAll('#groupedResultsContainer .group-header').length >= 2; }, 15000); await sleep(700);
+      var d3 = [];
+      C.openGroups({ name: 'SWEEP_G', onDone: function (n) { d3.push(n); } }); await sleep(300);
+      typeIn(document.getElementById('pnbCalcName'), 'TEAMS');
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return d3.length > 0; }, 15000); await sleep(1200);
+      var ut = document.getElementById('undo_text');
+      R.chk.renameKeepsGrouping = d3[0] === 'TEAMS' && document.body.classList.contains('group-mode-active') && window.Penumbra.headerMenu.groupingColumn() === 'TEAMS' &&
+        !(ut && /Previous grouping dropped/.test(ut.textContent));
+      R.info.rename = { gc: window.Penumbra.headerMenu.groupingColumn(), ut: ut ? ut.textContent : null };
+      // custom groups of a column this run does not have: the editor keeps it, marked; a save keeps it
+      C.fromState([{ name: 'GONE_G', groups: { col: 'NOPE_COL', sets: [{ name: 'A', values: ['x'] }], rest: 'other' } }], 'state');
+      C.openGroups({ name: 'GONE_G' }); await sleep(300);
+      var cs = document.getElementById('pnbGrpCol');
+      R.chk.goneColKept = !!cs && cs.value === 'NOPE_COL' && /not in this run/.test(cs.options[cs.selectedIndex].textContent) &&
+        /not in this run/.test(((document.getElementById('pnbGrpVals') || {}).textContent) || '');
+      typeIn(nameBox(0), 'A2'); await sleep(150);
+      document.getElementById('pnbCalcGo').click(); await sleep(700);
+      var gd = C.active().filter(function (d) { return d.name === 'GONE_G'; })[0];
+      R.chk.goneColSaves = !ov() && !!gd && gd.groups.col === 'NOPE_COL' && gd.groups.sets[0].name === 'A2';
+      C.remove('GONE_G'); await sleep(700);
+      // a multi-line cell's value goes into its group (it went in as nothing), named on one line
+      var d5 = [];
+      C.openGroups({ col: 'H_NL', hide: true, onDone: function (n) { d5.push(n); } }); await sleep(350);
+      var v0 = vt()[0];
+      tick(v0); document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      typeIn(document.getElementById('pnbCalcName'), 'NL_G');
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return d5.length > 0; }, 15000); await sleep(400);
+      var nlv = window.Penumbra.columnRawValues('NL_G'), want5 = window.__rowsFixture.filter(function (r) { return r.H_NL === v0; }).length;
+      R.chk.multiLineValue = want5 > 0 && /\n/.test(v0) && nlv.filter(function (x) { return x === v0.replace(/\s+/g, ' '); }).length === want5;
+      R.info.nl = { v0: v0, want: want5, got: nlv.slice(0, 5) };
+      // Column Organization closed: the report's own custom groups are not the reader's to change; their own are
+      C.fromState([{ name: 'REP_G', groups: { col: 'H_GROUP', sets: [{ name: 'N', values: ['North'] }], rest: 'other' } }], 'report');
+      penumbra_vars.isAdmin = false; C.setLock(true);
+      R.chk.lockReportNoEdit = C.canEdit('REP_G') === false && C.canEdit('NL_G') === true;
+      C.openDialog('REP_G'); await sleep(200);
+      R.chk.lockReportNoDialog = !ov();
+      if (ov()) cancel();
+      C.setLock(false); penumbra_vars.isAdmin = true;
+      C.fromState([], 'report');
+      // the Group by dialog: an arrow key onto New custom groups... waits for Enter (it opened the editor)
+      $('#groupTableBtn').trigger('click'); await sleep(500);
+      if (!$('#groupingLightbox').is(':visible')) $('#groupingLightbox').css('display', 'flex');
+      var itg = document.querySelector('#groupingColumnSelector .pcs-item[data-value="H_GROUP"]');
+      if (itg) itg.click();
+      await sleep(400);
+      var b1 = document.getElementById('groupingBucket1');
+      b1.focus(); key(b1, 'ArrowDown');
+      b1.value = '=cg:new'; $(b1).trigger('change'); await sleep(300);
+      R.chk.arrowArms = !ov() && b1.getAttribute('data-cg-armed') === '1';
+      key(b1, 'Enter'); await sleep(400);
+      R.chk.enterOpens = !!ov() && (document.getElementById('pnbGrpCol') || {}).value === 'H_GROUP';
+      cancel(); await sleep(250);
+      // a level split at a delimiter: New custom groups... starts split the same way
+      var sel1 = document.querySelector('#groupingColumnSelector .pcs-selected');
+      sel1.setAttribute('data-value', 'V_NAME:dcomma'); $('#groupingColumnSelector').trigger('pcs-change', ['V_NAME:dcomma']); await sleep(700);
+      b1 = document.getElementById('groupingBucket1');
+      b1.value = '=cg:new'; $(b1).trigger('change'); await sleep(400);
+      R.chk.splitLevelCarried = !!ov() && (document.getElementById('pnbGrpSplit') || {}).value === 'dcomma' && (document.getElementById('pnbGrpCol') || {}).value === 'V_NAME';
+      R.info.splitOpts = Array.prototype.map.call(b1.options, function (o) { return o.value; });
+      cancel(); await sleep(250);
+      $('#groupingLightbox').hide();
+      // a pattern the server reads differently: refused, and why (a dialog of its own: a broken check saves it)
+      C.openGroups({ col: 'V_STATUS', hide: true }); await sleep(300);
+      tick('Open'); document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      setSel(document.querySelector('#pnbCalcOverlay [data-grp-op="0"]'), 'matches'); await sleep(120);
+      typeIn(document.querySelector('#pnbCalcOverlay [data-grp-rv="0"]'), '\\p{L}'); await sleep(250);
+      document.getElementById('pnbCalcGo').click(); await sleep(300);
+      var rxBox = document.querySelector('#pnbCalcOverlay [data-grp-rv="0"]');
+      R.chk.rxRefused = !!ov() && /read differently on the server/.test(err()) && !!rxBox && rxBox.getAttribute('aria-invalid') === 'true';
+      R.info.rxErr = err();
+      if (ov()) cancel(); else { await sleep(1500); C.remove('V_STATUS_GROUPS'); }
+      await sleep(400);
+      // values of the old column: taken out in one click; a split column's group named with < is refused
+      C.openGroups({ col: 'H_GROUP', hide: true }); await sleep(300);
+      tick('North'); document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      setSel(document.getElementById('pnbGrpCol'), 'H_GROUP2'); await sleep(300);
+      var dropBtn = document.getElementById('pnbGrpDropStale');
+      if (dropBtn) dropBtn.click();
+      await sleep(200);
+      R.chk.staleTakenOut = !!dropBtn && document.querySelectorAll('#pnbGrpSets .pnb-grp-chip').length === 0 && document.getElementById('pnbGrpStale').hidden === true;
+      // (the group the values left is empty now: out, or its own error comes first)
+      var del0 = document.querySelector('#pnbCalcOverlay [data-grp-del="0"]');
+      if (del0) del0.click();
+      await sleep(150);
+      setSel(document.getElementById('pnbGrpSplit'), 'dsemi'); await sleep(250);
+      tick('Tier 1'); document.getElementById('pnbGrpTo').value = 'new'; document.getElementById('pnbGrpAdd').click(); await sleep(150);
+      var nb = document.querySelectorAll('#pnbCalcOverlay [data-grp-name]');
+      typeIn(nb[nb.length - 1], 'a<b'); await sleep(150);
+      document.getElementById('pnbCalcGo').click(); await sleep(200);
+      R.chk.splitNameRefused = !!ov() && /may not hold ; < or >/.test(err());
+      R.info.splitErr = err();
+      cancel(); await sleep(250);
+      // (2026-11-26, bdclick) a press inside the dialog released over the backdrop is no click outside: the dialog stays
+      // (the user: "when clicking outside the UI it closes -- which can happen on accident when rapid selecting the group
+      // name"); a click wholly on the backdrop still closes it (nothing changed)
+      function fire(el, type) { el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, detail: 1, view: window })); }
+      C.openDialog(null); await sleep(250);
+      var ovx = ov(), nmx = document.getElementById('pnbCalcName');
+      if (ovx && nmx) { fire(nmx, 'mousedown'); fire(ovx, 'mouseup'); fire(ovx, 'click'); }
+      await sleep(150);
+      R.chk.dragOutKeeps = !!ovx && !!nmx && !!ov();
+      if (ov()) { fire(ov(), 'mousedown'); fire(ov(), 'mouseup'); fire(ov(), 'click'); }
+      await sleep(150);
+      R.chk.backdropCloses = !ov();
+      if (ov()) cancel();
+      await sleep(150);
+      // (2026-11-26, gsumac) the group summary as a filter offers ITS values - the bands' own counts - where it offered
+      // nothing and the search box listed a column's values (none of which a count can equal)
+      window.Penumbra.groupByColumn('H_GROUP');
+      await until(function () { return document.body.classList.contains('group-mode-active'); }, 15000); await sleep(600);
+      $('#groupTableBtn').trigger('click'); await sleep(500);
+      if (!$('#groupingLightbox').is(':visible')) $('#groupingLightbox').css('display', 'flex');
+      $('#groupAggCheckbox').prop('checked', true).trigger('change');
+      var agSel = document.querySelector('#groupAggColumn .pcs-selected');
+      if (agSel) agSel.setAttribute('data-value', 'V_STATUS');
+      // (the harness's stub dialog lists sum and avg only: the page's own select has Count (distinct))
+      if (!$('#groupAggType option[value="count_distinct"]').length) $('#groupAggType').append('<option value="count_distinct">Count (distinct)</option>');
+      $('#groupAggType').val('count_distinct');
+      $('#confirmGroupingBtn').trigger('click');
+      await until(function () { return !!document.querySelector('#groupedResultsContainer .group-wrapper[data-agg-value]'); }, 15000); await sleep(600);
+      var gsl = (window._penumbraSearchAPI.getGroupSummaryColumns() || [])[0] || '';
+      var gsv = gsl ? window._penumbraSearchAPI.getColumnAutocompleteValues(gsl) : null;
+      var bandVals = Array.prototype.map.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-agg-value]'), function (w) { return String(parseFloat(w.getAttribute('data-agg-value'))); });
+      R.chk.gsumValues = gsl === 'Distinct of V_STATUS' && Array.isArray(gsv) && gsv.length > 0 && gsv.every(function (v) { return /^\d+$/.test(v) && bandVals.indexOf(v) !== -1; });
+      if (!R.chk.gsumValues) R.info = { gsum: { label: gsl, vals: gsv, bands: bandVals.slice(0, 12), agg: $('#groupAggType').val(), aggCol: agSel ? agSel.getAttribute('data-value') : null, grouped: document.body.classList.contains('group-mode-active') } };
+      $('#groupingLightbox').hide();
+      C.remove('TEAMS'); await sleep(500);
+      C.remove('NL_G'); await sleep(500);
+      R.chk.noQuerySweep = window.__queryDone === q0;
+    },
     cclear: async function () {
       window.PenumbraCalc.openDialog(null);
       document.getElementById('pnbCalcName').value = 'GONE';

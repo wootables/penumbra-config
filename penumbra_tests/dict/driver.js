@@ -597,12 +597,13 @@
     gq('[data-dg="cancel"]').click();
   }
 
-  // ------------------------------------------------------------------ dstats (2026-10-24)
-  // Column stats starts with the column's meaning (the user: "now that we have data dictionaries should we add an
-  // entry to show column definition if one exists?" ... "could be in the stats submenu even"): its heading, then one
-  // item (the text, escaped, cut past 280 characters; a draft's / do-not-use tag; its source; the whole of it for a
-  // screen reader), then the counts as before. A click (or Enter: the keyboard enters the list AT it) opens the
-  // dictionary at the ENTRY's name, as the header's What this column means now does too.
+  // ------------------------------------------------------------------ dstats (2026-10-24; re-pointed 2026-11-26)
+  // Column stats started with the column's meaning (the user: "now that we have data dictionaries should we add an
+  // entry to show column definition if one exists?" ... "could be in the stats submenu even"). (2026-11-26) menufix2 D1
+  // (e19fb87, 2026-11-19) took that line out: it opened the same entry as the heading's own What this column means, whose
+  // tip carries the meaning instead (cut past 280 characters, the Do not use / AI draft tags as words, the source, what a
+  // click does). The check ids stay; their premises are now that tip's, and a Column stats that holds its counts alone. A
+  // click (or Enter) on the item opens the dictionary at the ENTRY's name.
   function stPanel() { var s = document.querySelectorAll('.pnb-hm.pnb-hm-sub'); return s.length ? s[s.length - 1] : null; }
   async function openStats(name) {
     closeMenu();
@@ -613,104 +614,114 @@
     return stPanel();
   }
   function keyAt(k) { var t = document.activeElement || document.body; t.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+  // (2026-11-26) the heading's menu and its What this column means item; the item's tip, and the tip's first line (the meaning, cut, tagged)
+  async function openHead(name) { closeMenu(); rclick(fth(name)); await until(function () { return !!document.getElementById('pnbHeadMenu'); }, 3000); return menuItem('about'); }
+  function tipOf(it) { return it ? String(it.getAttribute('title') || '') : null; }
+  function tipHead(it) { var t = tipOf(it); return t === null ? null : t.split('\n')[0]; }
+  var CLICK_SAYS = "\n\nOpens its entry in the report's data dictionary";
   async function dstats() {
-    var s = await openStats('V_AMOUNT'), mean = s && s.querySelector('.pnb-hm-mean');
-    ok('meanShown', !!mean && mean.getAttribute('data-act') === 'statsAbout' && mean.getAttribute('role') === 'menuitem' && mean.classList.contains('pnb-hm-item')
-       && mean.textContent.indexOf('What was paid, in dollars (<b>not</b> cents).') !== -1 && mean.textContent.indexOf('Source: LR_FIXTURE.AMT') !== -1, mean && mean.outerHTML.slice(0, 400));
-    ok('meanEscaped', !!mean && !mean.querySelector('b'));
+    // the heading's item: the meaning in its tip with its source and what a click does; the item named by its label alone
+    var ab = await openHead('V_AMOUNT'), tip = tipOf(ab), abName = ab ? ab.textContent.trim() : null, abAria = ab ? ab.getAttribute('aria-label') : null;
+    var s = await openStats('V_AMOUNT');
+    ok('meanShown', !!ab && tip.indexOf('What was paid, in dollars (<b>not</b> cents).') === 0 && tip.indexOf('\nSource: LR_FIXTURE.AMT') !== -1
+       && !!s && !s.querySelector('.pnb-hm-mean'), [tip, !!s && !!s.querySelector('.pnb-hm-mean')]);
+    ok('meanAria', abName === 'What this column means' && abAria === null && tip === 'What was paid, in dollars (<b>not</b> cents).\nSource: LR_FIXTURE.AMT' + CLICK_SAYS,
+       [abName, abAria, tip]);
+    // Column stats: its counts from the first line, no meaning line ahead of them; the click puts the focus on that first count
     var kids = s ? Array.prototype.slice.call(s.children) : [];
-    ok('meanFirst', kids.length > 4 && kids[0].classList.contains('pnb-hm-head') && kids[0].textContent === 'What it means' && kids[1] === mean
-       && kids[2].classList.contains('pnb-hm-sep') && kids[3].classList.contains('pnb-hm-head') && /^Over the .+ the filter keeps$/.test(kids[3].textContent),
-       kids.slice(0, 5).map(function (k) { return k.className + ':' + String(k.textContent).slice(0, 30); }));
-    ok('meanAria', !!mean && mean.getAttribute('aria-label') === 'What it means: What was paid, in dollars (<b>not</b> cents). Source: LR_FIXTURE.AMT', mean && mean.getAttribute('aria-label'));
-    ok('meanFocused', !!mean && document.activeElement === mean, document.activeElement && document.activeElement.className);
-    if (mean) mean.click();
+    ok('meanFirst', kids.length > 3 && kids[0].classList.contains('pnb-hm-head') && /^Over the .+ the filter keeps$/.test(kids[0].textContent)
+       && !kids.some(function (k) { return k.textContent === 'What it means' || k.classList.contains('pnb-hm-mean'); }),
+       kids.slice(0, 4).map(function (k) { return k.className + ':' + String(k.textContent).slice(0, 30); }));
+    var first = s ? s.querySelector('.pnb-hm-item, .pnb-hm-info[role="menuitem"]') : null;
+    ok('meanFocused', !!first && document.activeElement === first && first.classList.contains('pnb-hm-info'), document.activeElement && document.activeElement.className);
+    // a click on the item: the dictionary at the column's entry, focused; the menu gone
+    ab = await openHead('V_AMOUNT');
+    if (ab) ab.click();
     await until(function () { return rows().length > 0; }, 4000);
     var fr = dlgBody() && dlgBody().querySelector('tr.is-focus');
     ok('meanOpens', !!fr && fr.getAttribute('data-key') === 'V_AMOUNT' && !document.getElementById('pnbHeadMenu'), fr && fr.getAttribute('data-key'));
     await closeDialog();
-    // an AI draft: its tag, said too
-    s = await openStats('V_NAME'); mean = s && s.querySelector('.pnb-hm-mean');
-    var dt = mean && mean.querySelector('.pnb-hm-tag-draft');
-    ok('draftTag', !!dt && dt.textContent === 'AI draft' && /The vendor's name, as on the invoice\./.test(mean.textContent) && / \(AI draft\)$/.test(mean.getAttribute('aria-label') || ''),
-       mean && mean.outerHTML.slice(0, 400));
-    // a column the dictionary does not name: the counts, as before
+    // an AI draft: said after the meaning
+    ab = await openHead('V_NAME');
+    ok('draftTag', !!ab && tipHead(ab) === "The vendor's name, as on the invoice. (AI draft)" && tipOf(ab) === tipHead(ab) + CLICK_SAYS, tipOf(ab));
+    // a column the dictionary does not name: no item, and the counts as before
+    ab = await openHead('V_STATUS');
+    var noAb = !!document.getElementById('pnbHeadMenu') && !ab;
     s = await openStats('V_STATUS');
-    ok('noMeanWithoutEntry', !!s && !s.querySelector('.pnb-hm-mean') && !!s.firstElementChild && /^Over the /.test(s.firstElementChild.textContent),
-       s && s.firstElementChild && s.firstElementChild.textContent);
+    ok('noMeanWithoutEntry', noAb && !!s && !s.querySelector('.pnb-hm-mean') && !!s.firstElementChild && /^Over the /.test(s.firstElementChild.textContent),
+       [noAb, s && s.firstElementChild && s.firstElementChild.textContent]);
     closeMenu();
     // stand-in entries for V_AMOUNT (the lookup the menu asks)
     var dd = D(), real = dd.entryFor, realOpen = window.Penumbra.openDataDictionary, spy = [];
     function stub(e) { dd.entryFor = function (col) { return String(col) === 'V_AMOUNT' ? e : real.apply(dd, arguments); }; }
     try {
-      // a long meaning: cut past 280 characters at a word, the whole of it said; it wraps (an unbroken name too)
+      // quotes, an ampersand and markup in the meaning and its source: the tip holds them as text, the item none of their markup
+      var nasty = 'Say "hi" & <b>bye</b> \'now\'';
+      stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: nasty, source: 'T."Q"', draft: false, avoid: false });
+      ab = await openHead('V_AMOUNT');
+      ok('meanEscaped', !!ab && tipOf(ab) === nasty + '\nSource: T."Q"' + CLICK_SAYS && !ab.querySelector('b'), tipOf(ab));
+      closeMenu();
+      // a long meaning: the tip cuts it past 280 characters at a word; the menu keeps its one line (the item is its label)
       var longT = 'Paid from LR_FIXTURE.A_VERY_LONG_SOURCE_COLUMN_NAME_WITH_NO_SPACES_AT_ALL_IN_IT, ' + new Array(30).join('a long meaning of what was paid. ').trim();
       stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: longT, source: '', draft: false, avoid: false });
-      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
-      var lbl = mean && mean.querySelector('.pnb-hm-label'), shownT = lbl ? lbl.textContent : '';
+      ab = await openHead('V_AMOUNT');
+      var shownT = tipHead(ab) || '';
       ok('longCut', shownT.length <= 283 && shownT.length > 200 && /\.\.\.$/.test(shownT) && longT.indexOf(shownT.slice(0, -3)) === 0
-         && /[\s.,;:]/.test(longT.charAt(shownT.length - 3)) && !!mean && mean.getAttribute('aria-label') === 'What it means: ' + longT, [shownT.length, shownT.slice(-24)]);
-      var cs = lbl && getComputedStyle(lbl), sr = s && s.getBoundingClientRect(), mr = mean && mean.getBoundingClientRect();
-      ok('meanWraps', !!cs && cs.whiteSpace === 'normal' && s.scrollWidth <= s.clientWidth + 1 && sr.width <= 342.5 && mr.height > 60,   // (max-width 340 + its 1px border)
-         cs && [cs.whiteSpace, s.scrollWidth, s.clientWidth, Math.round(sr.width), Math.round(mr.height)]);
+         && /[\s.,;:]/.test(longT.charAt(shownT.length - 3)) && tipOf(ab) === shownT + CLICK_SAYS, [shownT.length, shownT.slice(-24)]);
+      var hm = document.getElementById('pnbHeadMenu'), ar = ab ? ab.getBoundingClientRect() : null;
+      ok('meanWraps', !!ab && !!hm && ab.textContent.trim() === 'What this column means' && ar.height < 40 && hm.scrollWidth <= hm.clientWidth + 1,
+         ab && [ab.textContent.trim().slice(0, 40), Math.round(ar.height), hm && hm.scrollWidth, hm && hm.clientWidth]);
       closeMenu();
       // a do-not-use entry with no text yet: its tag first, "No description yet.", its source
       stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: '', source: 'T.X', draft: false, avoid: true });
-      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
-      var av = mean && mean.querySelector('.pnb-hm-tag-avoid'), bl = mean && mean.querySelector('.pnb-hm-mean-blank');
-      ok('avoidBlank', !!av && av.textContent === 'Do not use' && !!bl && bl.textContent === 'No description yet.' && mean.querySelector('.pnb-hm-label').firstElementChild === av
-         && mean.getAttribute('aria-label') === 'What it means: Do not use. No description yet. Source: T.X', mean && mean.getAttribute('aria-label'));
+      ab = await openHead('V_AMOUNT');
+      ok('avoidBlank', tipOf(ab) === 'Do not use. No description yet.\nSource: T.X' + CLICK_SAYS, tipOf(ab));
       closeMenu();
       // (the review) no space past 60% of the way: a hard cut at 280, never between an emoji's two halves
       var emo = String.fromCharCode(0xD83D, 0xDE00), hard = new Array(280).join('x') + emo + new Array(100).join('y');   // the emoji at 279-280
       stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: hard, source: '', draft: false, avoid: false });
-      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
-      lbl = mean && mean.querySelector('.pnb-hm-label'); shownT = lbl ? lbl.textContent : '';
+      ab = await openHead('V_AMOUNT'); shownT = tipHead(ab) || '';
       var lastC = shownT.charCodeAt(shownT.length - 4);
       ok('hardCut', /\.\.\.$/.test(shownT) && shownT.length === 282 && !(lastC >= 0xD800 && lastC <= 0xDBFF), [shownT.length, lastC]);
       closeMenu();
       // (the review) a cut landing after an opening bracket: no "(" left before the dots
       var tidy = new Array(51).join('word ') + 'x( ' + new Array(61).join('z');   // 250 chars, "x(", a space at 252
       stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: tidy, source: '', draft: false, avoid: false });
-      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
-      lbl = mean && mean.querySelector('.pnb-hm-label'); shownT = lbl ? lbl.textContent : '';
+      ab = await openHead('V_AMOUNT'); shownT = tipHead(ab) || '';
       ok('cutTidy', / x\.\.\.$/.test(shownT), shownT.slice(-12));
       closeMenu();
-      // an entry named by the heading's LABEL, not the column's name: the list reads the open menu's own heading
+      // an entry named by the heading's LABEL, not the column's name: the item is there, its tip that entry's
       var th0 = fth('V_AMOUNT'), tn = null;
       (function find(n) { for (var c = n.firstChild; c && !tn; c = c.nextSibling) { if (c.nodeType === 3 && c.nodeValue.indexOf('V_AMOUNT') !== -1) { tn = c; } else if (c.nodeType === 1 && !c.matches('.sort-icon, .sr-only, button, [aria-hidden="true"]')) { find(c); } } })(th0);
       var tv = tn ? tn.nodeValue : null;
       if (tn) { tn.nodeValue = tv.replace('V_AMOUNT', 'Paid amount'); }
       dd.entryFor = function (col, label) { return label === 'Paid amount' ? { name: 'Paid amount', key: 'PAID AMOUNT', text: 'Named by its heading.', source: '', draft: false, avoid: false } : null; };
-      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
-      ok('byLabel', !!tn && !!mean && mean.textContent.indexOf('Named by its heading.') !== -1, [!!tn, mean ? mean.textContent.slice(0, 40) : null]);
+      ab = await openHead('V_AMOUNT');
+      ok('byLabel', !!tn && !!ab && tipHead(ab) === 'Named by its heading.', [!!tn, tipOf(ab)]);
       closeMenu();
       if (tn) { tn.nodeValue = tv; }
-      // an entry found by the heading's label (another name): the header's item and the meaning open the dictionary at it
+      // an entry found by the heading's label (another name): the item opens the dictionary at it, and Column stats has no line to click
       stub({ name: 'Paid amount', key: 'PAID AMOUNT', text: 'Found by its label.', source: '', draft: false, avoid: false });
       window.Penumbra.openDataDictionary = function (f) { spy.push(f); };
-      closeMenu(); rclick(fth('V_AMOUNT'));
-      await until(function () { return !!menuItem('about'); }, 3000);
-      var hadAbout = !!menuItem('about');
-      if (hadAbout) menuItem('about').click();
+      ab = await openHead('V_AMOUNT');
+      var hadAbout = !!ab;
+      if (hadAbout) ab.click();
       await sleep(80);
-      var afterAbout = spy.slice();
-      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
-      if (mean) mean.click();
-      await sleep(80);
-      ok('opensAtEntry', JSON.stringify(spy) === JSON.stringify(['Paid amount', 'Paid amount']), { item: hadAbout, afterItem: afterAbout, all: spy.slice() });
-      // the keyboard: ArrowRight on Column stats enters the list AT the meaning; Enter opens the dictionary
+      s = await openStats('V_AMOUNT');
+      ok('opensAtEntry', JSON.stringify(spy) === JSON.stringify(['Paid amount']) && !!s && !s.querySelector('.pnb-hm-mean'), { item: hadAbout, all: spy.slice() });
+      // the keyboard: ArrowRight on Column stats enters its counts (no meaning ahead of them); Enter on the item opens the dictionary
       dd.entryFor = real; spy.length = 0;
-      closeMenu(); rclick(fth('V_AMOUNT'));
-      await until(function () { return !!menuItem('stats'); }, 3000);
+      await openHead('V_AMOUNT');
       var st = menuItem('stats');
       if (st) st.focus();
       keyAt('ArrowRight');
       await sleep(60);
-      var ae = document.activeElement, atMean = !!ae && ae.classList.contains('pnb-hm-mean');
+      var ae = document.activeElement, inCounts = !!ae && ae.classList.contains('pnb-hm-info') && !!ae.closest('.pnb-hm-sub');
+      ab = await openHead('V_AMOUNT');
+      if (ab) ab.focus();
       keyAt('Enter');
       await sleep(80);
-      ok('keyboard', atMean && JSON.stringify(spy) === JSON.stringify(['V_AMOUNT']), [atMean, ae && ae.className, spy.slice()]);
+      ok('keyboard', inCounts && JSON.stringify(spy) === JSON.stringify(['V_AMOUNT']), [inCounts, ae && ae.className, spy.slice()]);
     } finally {
       dd.entryFor = real; window.Penumbra.openDataDictionary = realOpen; closeMenu();
     }

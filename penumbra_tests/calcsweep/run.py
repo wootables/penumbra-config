@@ -47,7 +47,9 @@ MUTANTS = {
                     "            if (editing && x.name === editing) return;")], ['edit-keeps-order', 'edit-col-order']),
     'norename': ([("        var fix = function (x) { return renamed ? renameRefs(x, editing, r.def.name) : x; };",
                    "        var fix = function (x) { return x; };")], ['rename-dep']),
-    'noloopcheck': ([("        if (loop) return { error: 'That would make a loop: '", "        if (false) return { error: 'That would make a loop: '")],
+    # (2026-11-26) re-anchored on the formula path's own lookup: cgroups (889f605, 2026-11-25) gave the groups kind a loop check of its
+    # own with the same words, so the bare line was found twice and stopped --mutants there
+    'noloopcheck': ([("        var loop = loopThrough(name || editing, cc.refs);\n        if (loop) return { error: 'That would make a loop: '", "        var loop = loopThrough(name || editing, cc.refs);\n        if (false) return { error: 'That would make a loop: '")],
                     ['cycle-refused']),
     # the Save strip
     'stripgroup': ([("            if (keepLv.length !== levels.length) {", "            if (false) {")], ['strip-all-levels']),

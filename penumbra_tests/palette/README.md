@@ -162,3 +162,9 @@ stays, drawn as an X (28px square, same chip style, same name "Close quick actio
 matchCountKept(guard) pickCount pickNone colCount bucketCount themeCount escDesktopSame(guard) leadSaid leadCapped) and
 `pnarrow` (the runner sets a 400px window: sheetFull(guard) escNarrowShown escNarrowCloses). Mutants wm-none wm-pick wm-col
 wm-bucket wm-theme wm-lead wm-uncap wm-drawn wm-noesc wm-noglyph wm-wide (the guard escDesktopSame). NEW_WM = those less the guards.
+
+(2026-11-26) `S-entryPoints` was red on live from 2026-11-23: the API token panel's five buttons (apiTokenCreate, apiTokenCopy,
+apiTokenDismiss, apiAddrApply, saveApiTokenManage; apifix / apitok / apiremote) had no row and no reason. They are steps inside
+the Copy dialog's API option and the Save dialog's Security & Access card (one panel, two homes), so ENTRY_SKIP_RULES names them one
+by one: a NEW button of the panel still needs a row or a reason. Proven without a browser (the rules lifted from run.py): red with
+the old rules, green now, red again for an added apiTokenRevokeAll, apiTokenCreateX or zzEntryProbe button.
