@@ -34,7 +34,7 @@ SCN_Q = {'rload': q('MINE|{H_NUM} + 1'), 'rsave': q('A|{H_NUM} + 1', 'B|{H_NUM} 
 CHK = {
     # (2026-10-18, calcadj) a link's column with an adjustable value: shown at it; moved, the query
     # re-runs; the save carries the moved value as the report's default, and the override is spent
-    'radj': ['shown', 'moved', 'kept', 'spent'],
+    'radj': ['shown', 'moved', 'listed', 'kept', 'stays', 'published', 'spent'],   # (calcfix #5) listed / stays / published
     'rload': ['shown', 'first', 'source', 'tag', 'notCalc', 'summable'],
     'rsave': ['before', 'listed', 'hint', 'hintFollows', 'kept', 'positions', 'depSaid', 'nowReport', 'untickedKept'],
     'rnolist': ['reportKept', 'mineGone'],
@@ -42,6 +42,39 @@ CHK = {
 # (2026-10-22) the checks this round adds: red on live (its names forced to upper case)
 NEW = {'P-labelKeys', 'P-labelClean', 'H-sched-label'}
 MUTANTS = {
+    # --- (2026-11-26, calctext) the text functions' twin, each rule broken
+    'p-tx-unent': ([('lib', "    $s = _pnb_calc_unent($s);\n    return $s === '' ? null : $s;\n", "    return $s === '' ? null : $s;\n")], ['P-corpus*'], []),
+    'p-tx-chars': ([('lib', "    return function_exists('mb_substr') ? mb_substr($s, $start, $len, 'UTF-8') : implode('', array_slice(_pnb_calc_chars($s), $start, $len));", "    return substr($s, $start, $len);")], ['P-corpus*'], []),   # (p2 sweep) the characters are mb_substr's now
+    'p-tx-collapse': ([('lib', "]+/u', ' ', $s)));", "]+/u', '  ', $s)));")], ['P-corpus*'], []),
+    'p-tx-rx': ([('lib', "'args' => array($args[0]), 'rx' => $rx);", "'args' => array($args[0]), 'rx' => \"\\x01\" . $pat . \"\\x01iu\");")], ['P-corpus*'], []),
+    'p-tx-in': ([('lib', "if (_pnb_calc_cmp_vals($v0, _pnb_calc_eval($A[$i], $get)) === 0) return true;", "if (_pnb_calc_as_text($v0) === _pnb_calc_as_text(_pnb_calc_eval($A[$i], $get))) return true;")], ['P-corpus*'], []),
+    'p-tx-part': ([('lib', "$ix = $n > 0 ? $n - 1 : count($ps) + $n;", "$ix = $n > 0 ? $n - 1 : count($ps) + $n - 1;")], ['P-corpus*'], []),
+    'p-tx-rxcheck': ([('lib', "                if ($why !== null) throw new PnbCalcError('MATCHES: ' . $why . '.');\n", "")], ['P-textRefusals'], []),
+    # --- (p2 sweep) the text functions' bug sweep, each server rule broken (the class and control character checks only
+    # name the reason on the server - PCRE refuses those patterns anyway - so their mutants are the browser's, in calccol)
+    'p-sw-targ': ([('lib', "            $raw = $get($x['n'], true);", "            $raw = $get($x['n']);")], ['P-shownText'], []),
+    'p-sw-cmphtml': ([('lib', "    if (is_string($va) && strncmp($va, '@@HTML', 6) === 0) $va = (string)preg_replace('/<[^>]*>/', '', substr($va, 6));\n", "")], ['P-corpus*'], []),
+    'p-sw-fold': ([('lib', "array(\"\\xCF\\x83\", 'ss'), _pnb_calc_lower($s)); }", "array(\"\\xCF\\x82\", \"\\xC3\\x9F\"), _pnb_calc_lower($s)); }")], ['P-corpus*'], []),
+    'p-sw-u16': ([('lib', "    $cc = _pnb_calc_u16cmp($sa, $sb);", "    $cc = strcmp($sa, $sb);")], ['P-corpus*'], []),
+    'p-sw-ent': ([('lib', "        return isset($E[$e]) ? _pnb_calc_chr($E[$e]) : $m[0];", "        return $m[0];")], ['P-corpus*'], []),
+    'p-sw-fout': ([('lib', "(string)preg_replace('/@(?=@)/', '&#64;', _pnb_calc_esc_lit($s))", "_pnb_calc_esc_lit($s)")], ['P-corpus*'], []),
+    'p-sw-partws': ([('lib', "            $ps = preg_match('/^' . $ws . '+$/u', $dl) ?", "            $ps = false ?")], ['P-corpus*'], []),
+    'p-sw-expo': ([('lib', "if (strpos($s, '.') !== false && stripos($s, 'e') === false) {", "if (strpos($s, '.') !== false) {")], ['P-corpus*'], []),
+    'p-sw-ws': ([('lib', "                if ($pat === '' || _pnb_calc_js_len($pat)", "                if (_pnb_calc_trim($pat) === '' || _pnb_calc_js_len($pat)")], ['P-corpus*'], []),
+    'p-sw-nested': ([('lib', "            if ($had && $rep) return true;", "            if (false) return true;")], ['P-rxRefusals'], []),
+    'p-sw-open': ([('lib', "    if (_pnb_calc_grp_rx_chain($s)) return", "    if (false) return")], ['P-rxRefusals'], []),
+    # (calcfix) re-anchored: _pnb_calc_grp_rx_chain weighs a chain now
+    'p-sw-chainshare': ([('lib', "            if ($chain && $mn >= 1 && !$tailShares($atom)) { $chain = array(); $cost = 1; }\n            $chain[] = array('a' => $atom, 'mn' => $mn); $cost *= $w;", "            $chain[] = array('a' => $atom, 'mn' => $mn); $cost *= $w;")], ['P-corpus*'], []),
+    'p-sw-chainsep': ([('lib', "        } elseif ($mn >= 1) {\n            if ($chain && !$tailShares($atom)) { $chain = array(); $cost = 1; }", "        } elseif ($mn >= 1) {")], ['P-corpus*'], []),
+    # (calcfix) the top 20's engine fixes, each taken back in the server twin
+    'p-cf-trail': ([('lib', "        if ($w > 1 && $trailing($i, $depth)) $w = 1;   // nothing after it to give back to\n", "")], ['P-corpus*'], []),
+    'p-cf-anch': ([('lib', "            if (($anch ? 1 : $open) * $cost > $max) return true;", "            if ($open * $cost > $max) return true;")], ['P-corpus*'], []),
+    'p-cf-width': ([('lib', "($mm[3] === '' ? $open : max(1, min($open, (int)$mm[3] - $mn + 1)))", "($mm[3] === '' ? $open : 1)")], ['P-corpus*'], []),
+    'p-cf-pct': ([('lib', "    if ($pct) $n = $n / 100;\n", "")], ['P-corpus*'], []),
+    'p-cf-htmlnum': ([('lib', "    if (strncmp($s, '@@HTML', 6) === 0) $s = _pnb_calc_trim((string)preg_replace('/<[^>]*>/', '', substr($s, 6)));\n    if ($s === '') return null;", "    if ($s === '') return null;")], ['P-corpus*'], []),
+    'p-cf-truthy': ([('lib', "if ($t === 'FALSE' || $t === 'NO' || $t === 'N') return false;", "if ($t === 'FALSE') return false;")], ['P-corpus*'], []),
+    'p-cf-rawv': ([('lib', "(is_string($val) ? _pnb_calc_to_num($val) : null)) : null;", "null) : null;")], ['P-passThrough'], []),
+    'p-sw-size': ([('lib', "    if (_pnb_calc_grp_rx_size($s) > 60000) return", "    if (_pnb_calc_grp_rx_size($s) > 6000000) return")], ['P-rxRefusals'], []),
     # --- (2026-10-22) the twin's label: never kept; the row keyed by the name; the scheduler's totals check on the name
     'p-label': ([('lib', "    if ($lb !== $name) $out['label'] = $lb;\n", "")], ['P-labelClean', 'P-labels', 'H-sched-label'], []),
     'p-rowkey': ([('lib', "$key[$kd['name']] = isset($kd['label']) ? $kd['label'] : $kd['name'];", "$key[$kd['name']] = $kd['name'];")], ['P-labels', 'H-sched-label'], []),
@@ -54,20 +87,19 @@ MUTANTS = {
     'p-jslen': ([('lib', "_pnb_calc_js_len($formula) > PNB_CALC_MAX_FORMULA) return null;", "strlen($formula) > PNB_CALC_MAX_FORMULA) return null;")], ['P-names'], []),
     'p-first20': ([('lib', "        if (count($good) >= PNB_CALC_MAX_DEFS) break;\n", "")], ['P-manyDupes'], []),
     # (2026-10-18, calcadj) an adjustable value read as blank; its highest not enforced
-    'p-inp': ([('lib', "        case 'inp': return _pnb_calc_to_num($get('@' . $node['n']));\n", "        case 'inp': return null;\n")], ['P-inputs'], []),
+    'p-inp': ([('lib', "        case 'inp': $iv = $get('@' . $node['n']); $inn = _pnb_calc_to_num($iv); return $inn !== null ? $inn : _pnb_calc_to_date($iv);\n", "        case 'inp': return null;\n")], ['P-inputs'], []),   # (p2 sweep) re-anchored: the line round 5 rewrote
     'p-inpclamp': ([('lib', "    if ($mx !== null) { $o['max'] = $mx; if ($o['value'] > $mx) $o['value'] = $mx; }\n", "    if ($mx !== null) { $o['max'] = $mx; }\n")], ['P-inputs', 'P-inputClean'], []),
     # (2026-10-19, round 5) a date value read as a number only (blank)
     'p-datekind': ([('lib', "        case 'inp': $iv = $get('@' . $node['n']); $inn = _pnb_calc_to_num($iv); return $inn !== null ? $inn : _pnb_calc_to_date($iv);\n",
                      "        case 'inp': return _pnb_calc_to_num($get('@' . $node['n']));\n")], ['P-dateInputs'], []),
     # the hooks (schedule_runner.php CRLF, index.php LF)
-    'h-sched': ([('sr', "        $apiData['data'] = pnb_calc_apply_rows($apiData['data'], $state['calcColumns'], $calcProblems);\r\n", "")], ['H-sched-rows'], []),
+    'h-sched': ([('sr', "        $apiData['data'] = pnb_calc_apply_rows($apiData['data'], pnb_calc_defs_iso($state['calcColumns']), $calcProblems, $calcApplied, $calcWarn);\r\n", "")], ['H-sched-rows'], []),   # (calcfix) re-anchored: ISO dates, rule warnings   # (p2 sweep) re-anchored: the cgroups sweep added $calcApplied
     'h-stream': ([('sr', "            $stream_row_callback = function ($row) use ($calcMap, $calcInner) { return $calcInner($calcMap($row)); };\r\n", "")], ['H-stream-rows'], []),
     'h-total': ([('sr', "    if (!empty($GLOBALS['penumbra_calc_summable']) && isset($GLOBALS['penumbra_calc_summable'][strtoupper((string)$header)])) return 'sum';\r\n", "")], ['H-total-calc'], []),
-    'h-reset': ([('sr', "    $GLOBALS['penumbra_calc_summable'] = array();\r\n    if (is_array($state) && !empty($state['calcColumns'])", "    if (is_array($state) && !empty($state['calcColumns'])")], ['H-sched-none'], []),
-    'h-json': ([('ix', "            $response['data'] = pnb_calc_apply_rows($response['data'], $state['calcColumns']);\n", "")], ['H-json-rows'], []),
+    'h-reset': ([('sr', "    $GLOBALS['penumbra_calc_summable'] = array();\r\n    $GLOBALS['penumbra_calc_group_orders'] = array();", "    $GLOBALS['penumbra_calc_group_orders'] = array();")], ['H-sched-none'], []),   # (p2 sweep) re-anchored: lines went in between
+    'h-json': ([('ix', "            $response['data'] = pnb_calc_apply_rows($response['data'], $pnbCalcDefsRun, $pnbCalcProblems, $pnbCalcApplied, $pnbCalcWarn);\n", "")], ['H-json-rows'], []),   # (calcfix) re-anchored: rule warnings   # (p2 sweep) re-anchored: apibatch5 rewrote the line
     # js/penumbra_calc.js (LF)
-    'j-reportfirst': ([('calc', "put(reportDefs, 'report'); put(savedDefs(), 'saved'); put(stateDefs, 'state'); put(urlDefs, 'url');",
-                        "put(savedDefs(), 'saved'); put(stateDefs, 'state'); put(urlDefs, 'url'); put(reportDefs, 'report');")], ['L-rload-first'], ['rload']),
+    'j-reportfirst': ([('calc', "put(reportDefs.filter(function (d) { return !linkDrops[d.name]; }), 'report'); put(locked() ? lockedOwn() : savedDefs(), 'saved'); put(stateDefs, 'state'); put(urlDefs, 'url');", "put(locked() ? lockedOwn() : savedDefs(), 'saved'); put(stateDefs, 'state'); put(urlDefs, 'url'); put(reportDefs.filter(function (d) { return !linkDrops[d.name]; }), 'report');")], ['L-rload-first'], ['rload']),   # (calcfix #13) re-anchored
     'j-renumber': ([('calc', "                if (!by) return v;\n", "                return v;\n")], ['L-rsave-positions'], ['rsave']),
     'j-closure': ([('calc', "                c.refs.forEach(function (r) { if (appliedBy[r] && !keep[r]) { keep[r] = true; added.push(r); grew = true; } });\n", "")], ['L-rsave-kept'], ['rsave']),
     'j-nolist': ([('calc', "            last.applied.forEach(function (d) { if (d.src === 'report') keep[d.name] = true; });\n", "")], ['L-rnolist-reportKept'], ['rnolist']),

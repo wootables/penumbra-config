@@ -52,6 +52,9 @@ rules that the line's cut (`meanHtml`, now dead) had - a real app bug, reported.
 says Column stats starts with the meaning (three passages did). Mutants re-anchored on `aboutItem`; x-meanback puts the line
 back; x-nowrapcss / x-notitem retired.
 
+(2026-11-26, tipcut) the app bug fixed: colmenu `meanCut` is the one cut of the tip and the old line (meanHtml), so hardCut /
+cutTidy are green again; hardCut's text now has a space at 3, so it holds the 60% rule too (new mutant x-sixty).
+
 ## Later rounds (all live)
 
 - 2026-10-22 b `4d15f3b` the pivot's part (`[pivot]` / `[columns]`): scenario `pdict`, `pv*` unit checks.

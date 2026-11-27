@@ -512,6 +512,86 @@
     // case, a pattern the server reads differently, "show it" in an edit, a rename keeps the grouping, a column not in
     // this run, a multi-line value, the lock and the report's own, the Group by dialog's arrow keys, a split level, a
     // split name
+    // (p2 sweep) the formula dialog's sweep - the report carries FIRSTW, FIRSTW_UP (reads it) and PCT (Percent); the page has
+    // penumbra_a11y.js, whose own first focus moved the dialog's
+    txsweep: async function () {
+      var C = window.PenumbraCalc;
+      function ov() { return document.getElementById('pnbCalcOverlay'); }
+      function err() { return ((document.getElementById('pnbCalcErr') || {}).textContent) || ''; }
+      function fx() { return document.getElementById('pnbCalcFormula'); }
+      function fmt() { return (document.getElementById('pnbCalcFmt') || {}).value; }
+      function typeIn(el, v) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
+      function key(el, k) { el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+      function cancel() { var o = ov(); if (o) o.querySelector('.pnb-calc-cancel').click(); }
+      function caret(el, at) { el.focus(); el.setSelectionRange(at, at); el.dispatchEvent(new Event('select', { bubbles: true })); }
+      // a new column: the focus stays in Name; Format follows the formula until the reader picks one
+      C.openDialog(null, {});
+      await sleep(400);
+      R.chk.focusName = document.activeElement === document.getElementById('pnbCalcName');
+      typeIn(fx(), 'RIGHT({V_ID}, 3)'); await sleep(300);
+      var f1 = fmt();
+      typeIn(fx(), '{H_NUM} * 2'); await sleep(300);
+      var f2 = fmt();
+      var sel = document.getElementById('pnbCalcFmt'); sel.value = 'currency'; sel.dispatchEvent(new Event('change', { bubbles: true })); await sleep(100);
+      typeIn(fx(), 'LEFT({V_ID}, 2)'); await sleep(300);
+      R.chk.fmtFollows = f1 === 'text' && f2 === 'number' && fmt() === 'currency';
+      R.info.fmt = [f1, f2, fmt()];
+      // a half-typed formula's complaint waits for a pause
+      typeIn(fx(), 'IFS('); await sleep(400);
+      var e1 = err();
+      await sleep(1100);
+      R.chk.errWaits = e1 === '' && err() !== '';
+      R.info.errWaits = [e1, err()];
+      // a click outside, then Esc: asked first; a second Esc closes
+      ov().dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      ov().dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0, detail: 1 }));
+      await sleep(150);
+      R.chk.backdropAsks = !!ov() && /not added: Cancel closes/.test(err());
+      if (!ov()) { C.openDialog(null, {}); await sleep(300); typeIn(fx(), 'IFS('); await sleep(200); }   // (a broken guard closed it: carry on)
+      key(fx(), 'Escape'); await sleep(150);
+      var asked = !!ov() && /Esc again/.test(err());
+      key(fx(), 'Escape'); await sleep(150);
+      R.chk.escAsksTwice = asked && !ov();
+      // an untouched dialog still closes on the first click outside
+      C.openDialog(null, {}); await sleep(300);
+      ov().dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      ov().dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0, detail: 1 }));
+      await sleep(150);
+      R.chk.cleanCloses = !ov();
+      // the column chips: Tab reaches them, Enter puts one in; clicked inside "quotes" it joins the column in
+      C.openDialog(null, {}); await sleep(300);
+      var chip = Array.prototype.filter.call(document.querySelectorAll('#pnbCalcCols code'), function (c) { return c.textContent === '{V_ID}'; })[0];
+      R.chk.chipFocusable = !!chip && chip.getAttribute('tabindex') === '0' && chip.getAttribute('role') === 'button';
+      typeIn(fx(), 'LEN()'); caret(fx(), 4);
+      if (chip) { chip.focus(); key(chip, 'Enter'); }
+      await sleep(200);
+      R.chk.chipEnter = fx().value === 'LEN({V_ID})';
+      typeIn(fx(), 'CONTAINS({V_NAME}, "")'); caret(fx(), 20);
+      if (chip) chip.click();
+      await sleep(200);
+      R.chk.chipInQuotes = fx().value === 'CONTAINS({V_NAME}, "" & {V_ID} & "")';
+      R.info.chips = [fx().value];
+      // the preview reads a calculated column as the table does: its value for math; an @@HTML cell's text
+      typeIn(fx(), '{PCT} * 100'); await sleep(400);
+      var pc = document.querySelector('#pnbCalcPrev tbody tr td.pnb-calc-res');
+      var want = String(Number((num(F().H_NUM) / 10).toFixed(6)));
+      R.chk.previewRaw = !!pc && pc.textContent === want;
+      typeIn(fx(), '{V_LINK} & " (x)"'); await sleep(400);
+      var lc = document.querySelector('#pnbCalcPrev tbody tr td.pnb-calc-res');
+      R.chk.previewHtmlText = !!lc && !/@@HTML|<a/.test(lc.textContent) && / \(x\)$/.test(lc.textContent);
+      R.info.preview = [pc && pc.textContent, want, lc && lc.textContent];
+      cancel(); await sleep(150);
+      // an edit: the formula has the focus, the caret at its end; renamed, the report's column reading it follows
+      C.openDialog('FIRSTW'); await sleep(400);
+      R.chk.editCaretEnd = document.activeElement === fx() && fx().selectionStart === fx().value.length && fx().value.length > 0;
+      typeIn(document.getElementById('pnbCalcName'), 'FIRSTW2');
+      var q0 = window.__queryDone;
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return window.__queryDone > q0; }, 8000); await sleep(900);
+      var act = C.active(), up = act.filter(function (d) { return d.name === 'FIRSTW_UP'; })[0];
+      R.chk.renameCarries = !!up && up.formula === 'UPPER({FIRSTW2})' && !(C.problems ? C.problems() : []).some(function (p) { return p.name === 'FIRSTW_UP'; });
+      R.info.renamed = act.map(function (d) { return d.name + '=' + (d.formula || '') + '/' + d.src; });
+    },
     cgsweep: async function () {
       var C = window.PenumbraCalc, q0 = window.__queryDone;
       function vt() { return Array.prototype.map.call(document.querySelectorAll('#pnbGrpVals .pnb-grp-vt'), function (e) { return e.textContent; }); }

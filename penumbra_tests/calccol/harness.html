@@ -209,6 +209,7 @@
     // hidcol: V_AMOUNT (2) hidden BETWEEN V_NAME (1) and V_DATE (3)
     if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];
     if (S === "cstate") st.calcColumns = [{ name: "TRIPLE", formula: "{H_NUM} * 3", format: "number" }];
+    if (S === "txsweep") st.calcColumns = [{ name: "FIRSTW", formula: "PART({V_NAME}, \" \", 1)", format: "text" }, { name: "FIRSTW_UP", formula: "UPPER({FIRSTW})", format: "text" }, { name: "PCT", formula: "{H_NUM} / 1000", format: "percent" }];
     // big: every row on one page
     if (S === "big") st.rowsPerPage = "all";
     // g*: the grouped view (every level open), by H_GROUP (gn*: H_GROUP then H_GROUP2)
@@ -326,11 +327,13 @@
 </script>
 <script src="penumbra_userseg.js"></script>
 <script src="help_stub.js"></script>
+<script>if (window.__SCN === "txsweep") document.write('<script src="penumbra_colfmt.js"></scr' + 'ipt>');</script>
 <script src="penumbra_calc.js"></script>
 <script>if (window.__SCN === "cadj" || window.__SCN === "cgrp" || window.__SCN === "cgsweep") document.write('<link rel="stylesheet" href="penumbra_colmenu.css"><script src="penumbra_tiles.js"></scr' + 'ipt>');</script>
 <script src="main_hc.js"></script>
 <!-- index.php order: the column-width tool, then the module (an EMPTY file in --control) -->
 <script src="penumbra_colwidths.js"></script>
+<script>if (window.__SCN === "txsweep") document.write('<script src="penumbra_a11y.js"></scr' + 'ipt>');</script>
 <script>if (window.__SCN === "cadj" || window.__SCN === "cgrp" || window.__SCN === "cgsweep") document.write('<script src="penumbra_colmenu.js"></scr' + 'ipt>');</script>
 <script src="driver.js"></script>
 </body></html>

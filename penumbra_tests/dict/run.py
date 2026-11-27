@@ -168,7 +168,7 @@ MUTANTS = {
     # the line back in Column stats (what D1 took out: the same entry twice; the focus lands on it)
     'x-meanback': ([('menu', '    function statsItems(col, given) { return statsBody(col, given); }', "    function statsItems(col, given) { var e = given ? null : dictEntry(col, col); return e ? [{ heading: 'What it means' }, { act: 'statsAbout', mean: e, title: '', run: function () { window.Penumbra.openDataDictionary(e.name); } }, '-'].concat(statsBody(col, given)) : statsBody(col, given); }")], ['L-dstats-meanShown', 'L-dstats-meanFirst', 'L-dstats-meanFocused'], ['dstats']),
     'x-rawtext': ([('menu', '(it.title ? \' title="\' + esc(it.title) + \'"\' : \'\')', '(it.title ? \' title="\' + it.title + \'"\' : \'\')')], ['L-dstats-meanEscaped'], ['dstats']),
-    'x-nocut': ([('menu', "cut = t.length > MEAN_MAX ? t.slice(0, MEAN_MAX).replace(/\\s+\\S*$/, '') + '...' : t;", 'cut = t;')], ['L-dstats-longCut'], ['dstats']),
+    'x-nocut': ([('menu', '        if (t.length <= MEAN_MAX) { return t; }', '        if (true) { return t; }')], ['L-dstats-longCut'], ['dstats']),   # (2026-11-26, tipcut) meanCut
     # the meaning drawn in the menu instead of its tip
     'x-meaninmenu': ([('menu', "label: 'What this column means', title: tip,", "label: cut || 'What this column means', title: tip,")], ['L-dstats-meanWraps'], ['dstats']),
     # the tip no longer says what a click does
@@ -182,10 +182,10 @@ MUTANTS = {
     'm17color': ([('dcss', "color: var(--brand-text, var(--brand-primary, #2a6ebb)); text-decoration: underline;", "color: var(--brand-primary, #2a6ebb); text-decoration: underline;")], ['L-dopts-aboutBrandText'], ['dopts']),
     'x-noavoid': ([('menu', "var tip = (e.avoid ? 'Do not use. ' : '') + ", 'var tip = ')], ['L-dstats-avoidBlank'], ['dstats']),
     # (the review) the hard cut splitting an emoji; the dots after an opening bracket; the heading's label never asked
-    # (2026-11-26) x-halfemoji / x-tidy still anchor in meanHtml, dead since D1: hardCut / cutTidy are red on live (the tip's cut,
-    # aboutItem, has neither rule), so these two pass only by that until aboutItem cuts as meanHtml did
-    'x-halfemoji': ([('menu', "            if (hi >= 0xD800 && hi <= 0xDBFF) { at--; }\n", "")], ['L-dstats-hardCut'], ['dstats']),
+    # (2026-11-26, tipcut) x-halfemoji / x-tidy / x-sixty: the rules of meanCut, the one cut of the tip (aboutItem) and the old line
+    'x-halfemoji': ([('menu', '        if (hi >= 0xD800 && hi <= 0xDBFF) { at--; }\n', '')], ['L-dstats-hardCut'], ['dstats']),
     'x-tidy': ([('menu', ".replace(/[\\s.,;:(\\[\\/-]+$/, '') + '...';", ".replace(/[\\s.,;:]+$/, '') + '...';")], ['L-dstats-cutTidy'], ['dstats']),
+    'x-sixty': ([('menu', 'at = sp > MEAN_MAX * 0.6 ? sp : MEAN_MAX', 'at = sp > 0 ? sp : MEAN_MAX')], ['L-dstats-hardCut'], ['dstats']),   # the cut back to ANY space
     'x-nolabel': ([('menu', '        var ent = dictEntry(col, name);\n', '        var ent = dictEntry(col, col);\n')], ['L-dstats-byLabel'], ['dstats']),
 }
 

@@ -18,6 +18,9 @@
 #   py -3 run.py --main F          another main.js (a candidate build)
 #   py -3 run.py --app DIR         another app folder for the scheduler half (and the page's libs)
 #   py -3 run.py --cases a,b       a subset, by name
+#   py -3 run.py --runner F        another schedule_runner.php for the scheduler half (a candidate build)
+#   py -3 run.py --calcphp F       another penumbra_calc.php for the scheduler half
+#   py -3 run.py --calcjs F        another js\penumbra_calc.js for the page (penumbra_colfmt.js comes from --app)
 #   py -3 run.py --control         the browser half never marks a cell as changed (one edit of main.js): MUST be
 #                                  RED on every case that has a Modified row, and only on those
 #   --keep                         keeps the staging dir
@@ -25,6 +28,12 @@
 # cases.json: keys = what the scheduler is given; browserKeys (optional) = what the browser is given instead;
 # expect "browser-stops" = the one intended difference (a key the snapshot lacks: the browser stops and names
 # it so a person can pick again, the scheduler carries on with the remaining keys).
+#
+# (snapdate, 2026-11-26) A case may carry calcColumns (the report's calculated columns: the page works them out with
+# penumbra_calc.js, the scheduler with penumbra_calc.php - a date-format one holds the date on the page and the
+# pattern's text in a run) and snapCreator (who saved the snapshot; SCHEDULER = it holds the pattern's text). Both
+# engines must compare such a column by the text it shows. snapdate_fetch.php (run first) checks the runner's baseline
+# fetch puts a hand-saved snapshot in the patterns, and that execute_scheduled_report notes them.
 #
 # A case that is RED is a real difference between what a reader sees in the Snapshot Manager and what a
 # scheduled e-mail of the same report says. Fix the engine that is wrong; never the fixture.
@@ -54,6 +63,9 @@ def flag(name):
     return False
 main_path = opt('--main', None)
 app_dir = opt('--app', APP)
+runner_path = opt('--runner', None)
+calcphp_path = opt('--calcphp', None)
+calcjs_path = opt('--calcjs', None)
 only = opt('--cases', None)
 control = flag('--control')
 keep = flag('--keep')
@@ -69,7 +81,12 @@ else:
     cases_run = cases
 
 # --- scheduler half --------------------------------------------------------------------------------
-p = subprocess.run([PHP, '-n', os.path.join(HERE, 'php_side.php'), '--app=' + app_dir], capture_output=True, text=True, cwd=tempfile.gettempdir())
+php_args = ['--app=' + app_dir] + (['--runner=' + runner_path] if runner_path else []) + (['--calc=' + calcphp_path] if calcphp_path else [])
+# (snapdate) the runner's baseline fetch and its wiring, on the mirror with the database stubbed
+q = subprocess.run([PHP, '-n', os.path.join(HERE, 'snapdate_fetch.php')] + php_args, capture_output=True, text=True, cwd=tempfile.gettempdir())
+fetch_lines = (q.stdout or '').strip().splitlines()
+fetch_ok = q.returncode == 0 and bool(fetch_lines) and fetch_lines[-1].startswith('SNAPDATE ok=') and fetch_lines[-1].endswith(' bad=0')
+p = subprocess.run([PHP, '-n', os.path.join(HERE, 'php_side.php')] + php_args, capture_output=True, text=True, cwd=tempfile.gettempdir())
 if p.returncode != 0: raise SystemExit('php_side.php failed: ' + (p.stderr or p.stdout)[:600])
 server = json.loads(p.stdout.strip().splitlines()[-1])
 
@@ -98,6 +115,9 @@ if control:
 
 stage = tempfile.mkdtemp(prefix='pnb_dp_')
 for f in LIBS: shutil.copyfile(os.path.join(app_dir, 'js', f), os.path.join(stage, f))
+# (snapdate) the page's column formats and formula engine, in index.php's order (before main.js runs its boot here)
+shutil.copyfile(os.path.join(app_dir, 'js', 'penumbra_colfmt.js'), os.path.join(stage, 'penumbra_colfmt.js'))
+shutil.copyfile(calcjs_path or os.path.join(app_dir, 'js', 'penumbra_calc.js'), os.path.join(stage, 'penumbra_calc.js'))
 shutil.copyfile(os.path.join(app_dir, 'css', 'main.css'), os.path.join(stage, 'main.css'))
 shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
 idx = read_b(os.path.join(app_dir, 'index.php'))
@@ -114,6 +134,13 @@ block = ("  window.__CASES = " + json.dumps(cases_run).replace('</', '<\\/') + "
          "  window.__COLS = window.__CASE.cols; window.__LIVE = window.__CASE.live; window.__SNAP = window.__CASE.snap; window.__KEYS = ('browserKeys' in window.__CASE) ? window.__CASE.browserKeys : window.__CASE.keys;\n"
          "  window.__QUERY = 'SELECT ' + window.__COLS.join(', ') + ' FROM DIFFPARITY_FIXTURE';\n")
 page = page[:fx.start()] + block + page[fx.end():]
+# (snapdate) a case's calculated columns ride in the report state; the engine and the formats load before main.js
+qa = '  // query.php answers with the live rows; nothing else is expected to be asked.'
+if page.count(qa) != 1: raise SystemExit('harness.html: query stub anchor missing')
+page = page.replace(qa, "  if (window.__CASE && window.__CASE.calcColumns) window.penumbra_vars.preloadedState.calcColumns = window.__CASE.calcColumns;\n" + qa)
+mt = '<script src="main_cf.js"></script>'
+if page.count(mt) != 1: raise SystemExit('harness.html: main_cf.js tag missing')
+page = page.replace(mt, '<script src="penumbra_colfmt.js"></script>\n<script src="penumbra_calc.js"></script>\n' + mt)
 open(os.path.join(stage, 'harness.html'), 'wb').write(page.encode('utf-8', 'surrogateescape'))
 open(os.path.join(stage, 'main_cf.js'), 'wb').write(hook(src).encode('utf-8', 'surrogateescape'))
 
@@ -168,7 +195,11 @@ ok_n = bad_n = 0
 red = []
 try:
     print('main.js: %s%s' % (main_path, '   (CONTROL: no cell is ever marked changed)' if control else ''))
-    print('runner : %s' % os.path.join(app_dir, 'schedule_runner.php'))
+    print('runner : %s' % (runner_path or os.path.join(app_dir, 'schedule_runner.php')))
+    print('fetch  : %s' % (fetch_lines[-1] if fetch_lines else ('snapdate_fetch.php failed: ' + (q.stderr or '')[:300])))
+    if not fetch_ok:
+        for line in fetch_lines[:-1][:20]: print('          ' + line)
+        if q.stderr: print('          ' + q.stderr.strip()[:500])
     for i, c in enumerate(cases_run):
         res = run_page(i)
         if 'timeout' in str(res.get('fatal', '')): res = run_page(i)   # a page that never booted: once more
@@ -190,6 +221,16 @@ try:
                 for g in ('new', 'removed', 'modified', 'unchanged'):
                     if b.get(g) != s.get(g):
                         problems.append('%s: browser %s | scheduler %s' % (g, json.dumps(b.get(g)), json.dumps(s.get(g))))
+            # (snapdate) a case with expectGroups pins the answer itself: both engines must give it, not only agree
+            exp = c.get('expectGroups')
+            if exp:
+                for side, got in (('browser', b), ('scheduler', s)):
+                    if got is None:
+                        problems.append('expected an answer from the %s, it called the pair not comparable' % side)
+                        continue
+                    for g in ('new', 'removed', 'modified', 'unchanged'):
+                        if got.get(g) != sorted(exp[g]):
+                            problems.append('expected %s %s %s, got %s' % (side, g, json.dumps(sorted(exp[g])), json.dumps(got.get(g))))
             for line in (res.get('identity') or []): problems.append('row identity: ' + line)
         if res.get('pageErrors'): problems.append('page errors: ' + ' | '.join(res['pageErrors'])[:300])
         good = not problems
@@ -205,7 +246,7 @@ try:
         print('CONTROL: %s (red: %s | expected: %s)' % ('as expected' if exact else 'UNEXPECTED', ' '.join(sorted(red)), ' '.join(want_red)))
         print('RESULT: GREEN' if exact else 'RESULT: RED')
     else:
-        print('RESULT: GREEN' if bad_n == 0 and ok_n > 0 else 'RESULT: RED')
+        print('RESULT: GREEN' if bad_n == 0 and ok_n > 0 and fetch_ok else 'RESULT: RED')
 finally:
     try: edge.kill()
     except Exception: pass

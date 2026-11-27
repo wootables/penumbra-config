@@ -30,6 +30,11 @@ rep('<div id="pnbStatusBar">', '<div id="action_overlay"></div>\n<div id="pnbSta
 rep('<div class="sp-actions"><button id="spApply">', '<button id="spClearStorage">Clear All Custom Preferences For This Report</button>\n  <div class="sp-actions"><button id="spApply">')
 rep('    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];',
     '    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];\n'
-    '    if (S === "cstate") st.calcColumns = [{ name: "TRIPLE", formula: "{H_NUM} * 3", format: "number" }];')
+    '    if (S === "cstate") st.calcColumns = [{ name: "TRIPLE", formula: "{H_NUM} * 3", format: "number" }];\n'
+    # (p2 sweep) txsweep: the report's own calculated columns - one another reads (a rename carries it), a Percent one
+    '    if (S === "txsweep") st.calcColumns = [{ name: "FIRSTW", formula: "PART({V_NAME}, \\" \\", 1)", format: "text" }, { name: "FIRSTW_UP", formula: "UPPER({FIRSTW})", format: "text" }, { name: "PCT", formula: "{H_NUM} / 1000", format: "percent" }];')
+# (p2 sweep) txsweep: the column formats and penumbra_a11y.js (its own first focus moved the dialog's), in index.php's order
+rep('<script src="penumbra_calc.js"></script>\n', '<script>if (window.__SCN === "txsweep") document.write(\'<script src="penumbra_colfmt.js"></scr\' + \'ipt>\');</script>\n<script src="penumbra_calc.js"></script>\n')
+rep('<script src="penumbra_colwidths.js"></script>\n', '<script src="penumbra_colwidths.js"></script>\n<script>if (window.__SCN === "txsweep") document.write(\'<script src="penumbra_a11y.js"></scr\' + \'ipt>\');</script>\n')
 open(os.path.join(HERE, 'harness.html'), 'w', encoding='utf-8', newline='\n').write(src)
 print('harness written')

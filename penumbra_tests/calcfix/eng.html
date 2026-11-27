@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>pending</title></head><body>
+<pre id="out"></pre>
+<script src="penumbra_colfmt.js"></script>
+<script src="penumbra_calc.js"></script>
+<script src="cases.js"></script>
+<script>
+// calcfix engine phase, the browser twin: each set's rows through js/penumbra_calc.js (as the page's report columns), the
+// appended cells, the rule warnings, and each pattern's verdict (PenumbraCalc.rxProblem)
+(function () {
+  var C = window.PenumbraCalc, res = { sets: [], rx: [] };
+  try {
+    (window.CF_SETS || []).forEach(function (s) {
+      C.fromState(s.defs, 'report');
+      var out = C.applyRows(s.rows.map(function (r) { var o = {}; for (var k in r) o[k] = r[k]; return o; }));
+      res.sets.push({ id: s.id, rows: out.map(function (r) { var o = {}; s.defs.forEach(function (d) { o[d.name] = r[d.label || d.name]; }); return o; }),
+                      warn: (typeof C.ruleWarnings === 'function') ? C.ruleWarnings() : null });
+    });
+    C.fromState([], 'report');
+    res.rx = (window.CF_RX || []).map(function (x) { return (typeof C.rxProblem === 'function') ? C.rxProblem(x[0]) : 'NO rxProblem'; });
+  } catch (e) { res.fatal = String(e && e.stack || e); }
+  document.getElementById('out').textContent = JSON.stringify(res);
+  document.title = 'done';
+})();
+</script></body></html>

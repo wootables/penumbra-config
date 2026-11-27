@@ -92,12 +92,24 @@
       await until(function () { return window.__queryDone > q0 && cell('D') === String(num(f.H_NUM) * 4); }, 15000); await sleep(300);
       R.chk.moved = cell('D') === String(num(f.H_NUM) * 4) && C.inputs().R.value === 4 && C.inputs().R.def === 3;
       C.renderSaveList();
+      // (calcfix #5) the moved value is listed, unticked: a save keeps the default and the move stays the viewer's
+      var pv = document.querySelector('#pnbCalcSaveRow input[data-calc-pubval="R"]');
+      R.chk.listed = !!pv && !pv.checked && /R 3 .* 4 as the default/.test(pv.parentNode.textContent);
       var sd = await save();
       var dd = sd && sd.calcColumns ? sd.calcColumns.filter(function (d) { return d.name === 'D'; })[0] : null;
-      R.chk.kept = !!dd && JSON.stringify(dd.input) === JSON.stringify({ name: 'R', value: 4, min: 1, max: 9 });
+      R.chk.kept = !!dd && JSON.stringify(dd.input) === JSON.stringify({ name: 'R', value: 3, min: 1, max: 9 });
+      await sleep(200);
+      R.chk.stays = C.inputs().R.value === 4 && C.inputs().R.def === 3 && C.active().some(function (d) { return d.name === 'D' && d.src === 'report'; });
+      // ...ticked, the save publishes it and the viewer's override is spent
+      C.renderSaveList();
+      var pv2 = document.querySelector('#pnbCalcSaveRow input[data-calc-pubval="R"]');
+      if (pv2) pv2.checked = true;
+      var sd2 = await save();
+      var dd2 = sd2 && sd2.calcColumns ? sd2.calcColumns.filter(function (d) { return d.name === 'D'; })[0] : null;
+      R.chk.published = !!dd2 && JSON.stringify(dd2.input) === JSON.stringify({ name: 'R', value: 4, min: 1, max: 9 });
       await sleep(200);
       R.chk.spent = C.inputs().R.value === 4 && C.inputs().R.def === 4 && C.active().some(function (d) { return d.name === 'D' && d.src === 'report'; });
-      R.info = { d: cell('D'), inputs: C.inputs(), dd: dd, act: C.active() };
+      R.info = { d: cell('D'), inputs: C.inputs(), dd: dd, dd2: dd2, act: C.active() };
     },
     rnolist: async function () {
       var sd = await save();

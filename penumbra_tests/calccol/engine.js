@@ -19,7 +19,7 @@
       // --- arithmetic -------------------------------------------------------------
       eq('add', run('{A} + {B}', { A: '1', B: '2' }), '3');
       eq('accounting', run('{A} - {B}', { A: '$1,234.50', B: '(500)' }), '1734.5');
-      eq('pctIn', run('{A} * 2', { A: '12%' }), '24');
+      eq('pctIn', run('{A} * 2', { A: '12%' }), '0.24');   // (calcfix #15) a % at the end reads as hundredths
       eq('divZero', run('{A} / {B}', { A: '5', B: '0' }), '');
       eq('textIsBlank', run('{A} * 2', { A: 'abc' }), '');
       eq('blankIsBlank', run('{A} * 2', { A: '' }), '');
@@ -62,7 +62,8 @@
       eq('fmtTextKeeps', run('IF(1, "Over", "Under")', null, 'currency'), 'Over');
       eq('fmtTextNumber', run('{A} * 1', { A: '1234.5' }, 'text'), '1234.5');
       // --- refusals ---------------------------------------------------------------
-      R.chk.errMissingOp = /Missing an operator before \{B\}/.test(err('{A} {B}')) && /%2B/.test(err('{A} {B}'));
+      // (p2 sweep) turned: + - * / and & named in the dialog; the link's %2B hint is a link column's notice
+      R.chk.errMissingOp = /Missing an operator before \{B\}/.test(err('{A} {B}')) && /\+ - \* \/ work a value out, & joins text/.test(err('{A} {B}'));
       R.chk.errBrace = /closing \}/.test(err('{A + 1'));
       R.chk.errEmptyBrace = /Empty braces/.test(err('{} + 1'));
       R.chk.errUnknownFn = /Unknown function FOO/.test(err('FOO(1)'));
@@ -102,8 +103,158 @@
       eq('dTodayCurrencyFmt', run('TODAY()', null, 'currency'), tIso);
       R.chk.errDaysArgs = /DAYS takes two dates/.test(err('DAYS({A})'));
       R.chk.errTodayArgs = /TODAY takes nothing/.test(err('TODAY(1)'));
-      R.chk.errUnknownLists = /ROUND, IF, DAYS and TODAY/.test(err('NOW()'));
-      R.chk.errAmpLink = /%26/.test(err('{A} {B}'));
+      R.chk.errUnknownLists = /ROUND, IF, IFS, DAYS, TODAY, .*PART and REPLACE/.test(err('NOW()'));   // (2026-11-26, calctext) every function named
+      // (p2 sweep) turned: the link's %26 hint went with every such message, in the dialog too - a link column's notice says it now
+      R.chk.errAmpLink = /& joins text/.test(err('{A} {B}')) && !/%26/.test(err('{A} {B}'));
+      // --- text functions (2026-11-26, calctext): each reads its text as the page shows it, writes it escaped ---------
+      eq('txLen', run('LEN({S})', { S: 'Abc' }), '3');
+      eq('txLenEmoji', run('LEN({S})', { S: 'a\ud83d\ude00b' }), '3');
+      eq('txLenBlank', run('LEN({S})', { S: '' }), '0');
+      eq('txLenEnt', run('LEN({S})', { S: 'R&amp;D' }), '3');
+      eq('txUpper', run('UPPER({S})', { S: 'o&#039;brien' }, 'text'), 'O&#039;BRIEN');
+      eq('txLower', run('LOWER({S})', { S: 'ABC' }, 'text'), 'abc');
+      eq('txLowerBlank', run('LOWER({S})', { S: '' }, 'text'), '');
+      eq('txTrim', run('TRIM({S})', { S: '  a \n\u00a0 b  ' }, 'text'), 'a b');
+      eq('txLeft', run('LEFT({S}, 2)', { S: 'ABCD' }, 'text'), 'AB');
+      eq('txLeftDefault', run('LEFT({S})', { S: 'ABCD' }, 'text'), 'A');
+      eq('txLeftHtml', run('LEFT({S}, 4)', { S: '@@HTML<a href="x">Duke &amp; Co</a>' }, 'text'), 'Duke');
+      eq('txLeftEsc', run('LEFT({S}, 3)', { S: 'R&amp;D Lab' }, 'text'), 'R&amp;D');
+      eq('txRight', run('RIGHT({S}, 3)', { S: 'ABCDE' }, 'text'), 'CDE');
+      eq('txRightOver', run('RIGHT({S}, 10)', { S: 'AB' }, 'text'), 'AB');
+      eq('txRightNeg', run('RIGHT({S}, -1)', { S: 'AB' }, 'text'), '');
+      eq('txMid', run('MID({S}, 2, 3)', { S: 'ABCDE' }, 'text'), 'BCD');
+      eq('txMidStart0', run('MID({S}, 0, 3)', { S: 'ABCDE' }, 'text'), '');
+      eq('txMidEmoji', run('MID({S}, 2, 1)', { S: 'a\ud83d\ude00b' }, 'text'), '\ud83d\ude00');
+      eq('txPart', run('PART({S}, ";", 2)', { S: 'Smith; Jones; Lee' }, 'text'), 'Jones');
+      eq('txPartLast', run('PART({S}, ";", -1)', { S: 'Smith; Jones; Lee' }, 'text'), 'Lee');
+      eq('txPartPast', run('PART({S}, ";", 4)', { S: 'Smith; Jones; Lee' }, 'text'), '');
+      eq('txPartZero', run('PART({S}, ";", 0)', { S: 'a;b' }, 'text'), '');
+      eq('txReplace', run('REPLACE({S}, "Dept.", "Department")', { S: 'Dept. of Math' }, 'text'), 'Department of Math');
+      eq('txReplaceCase', run('REPLACE({S}, "a", "X")', { S: 'aA' }, 'text'), 'XA');
+      eq('txReplaceAll', run('REPLACE({S}, " ", "")', { S: 'a b c' }, 'text'), 'abc');
+      eq('txContains', run('CONTAINS({S}, "state")', { S: 'NC State University' }), 'TRUE');
+      eq('txContainsNo', run('CONTAINS({S}, "duke")', { S: 'NC State University' }), 'FALSE');
+      eq('txContainsBlank', run('CONTAINS({S}, "x")', { S: '' }), 'FALSE');
+      eq('txContainsEmpty', run('CONTAINS({S}, "")', { S: 'abc' }), 'TRUE');
+      eq('txStarts', run('STARTS({S}, "nc ")', { S: '  NC State' }), 'TRUE');
+      eq('txStartsSpace', run('STARTS({S}, "nc ")', { S: 'NCSU' }), 'FALSE');
+      eq('txEnds', run('ENDS({S}, "@NCSU.EDU")', { S: 'a@ncsu.edu' }), 'TRUE');
+      eq('txMatches', run('MATCHES({S}, "^nc\\s")', { S: 'NC\u00a0State' }), 'TRUE');
+      eq('txMatchesWord', run('MATCHES({S}, "^\\w+$")', { S: '\u00e9clair' }), 'FALSE');
+      eq('txIn', run('IN({S}, "Open", "Pending")', { S: 'open' }), 'TRUE');
+      eq('txInNo', run('IN({S}, "Open", "Pending")', { S: 'Closed' }), 'FALSE');
+      eq('txInNum', run('IN({A}, 1, 2)', { A: '2.0' }), 'TRUE');
+      eq('txInDate', run('IN({D}, "2026-10-09")', { D: '10/9/2026' }), 'TRUE');
+      eq('txIfs', run('IFS({A} > 10, "big", {A} > 0, "small", TRUE, "none")', { A: '5' }, 'text'), 'small');
+      eq('txIfsElse', run('IFS({A} > 10, "big", TRUE, "none")', { A: '-1' }, 'text'), 'none');
+      eq('txIfsNone', run('IFS({A} > 10, "big")', { A: '1' }, 'text'), '');
+      eq('txIfsLazy', run('IFS(1, 7, 1 / 0, 8)'), '7');
+      eq('txTrueFalse', run('IF(FALSE, 1, 2)'), '2');
+      eq('txTrueCell', run('TRUE', null, 'text'), 'TRUE');
+      eq('txChain', run('UPPER(LEFT({S}, 1)) & LOWER(MID({S}, 2, 99))', { S: 'mARY' }, 'text'), 'Mary');
+      eq('txNumber', run('LEFT({A}, 2)', { A: '12345' }), '12');
+      eq('txNested', run('LEN(PART({S}, ";", 1))', { S: 'abc;de' }), '3');
+      eq('txJson', run('LEN({S})', { S: '@@JSON[{"A":1}]' }), '0');
+      R.chk.txErrArity = /LEFT takes/.test(err('LEFT()')) && /MID takes/.test(err('MID({A}, 1)')) && /IFS takes pairs/.test(err('IFS(1, 2, 3)')) && /IN takes/.test(err('IN({A})'));
+      R.chk.txErrMatchCol = /in quotes, not from a column/.test(err('MATCHES({A}, {B})'));
+      R.chk.txErrMatchRx = /read differently on the server/.test(err('MATCHES({A}, "\\p{L}")'));
+      R.chk.txErrMatchBad = /cannot be read/.test(err('MATCHES({A}, "(")'));
+      R.chk.txErrTrueCall = /TRUE is a value, not a function/.test(err('TRUE()'));   // (p2 sweep) turned: it said "Unknown function TRUE\"
+      R.chk.txRefsArgs = (function () { var c = C.compile('LEFT({X}, {@N}) & PART({Y}, ";", 1)'); return !!c.ok && c.refs.join(',') === 'X,Y' && c.inputs.join(',') === 'N'; })();
+      R.chk.txApply = (function () {
+        // TXB listed first: only the arguments' references (refsOf walks args) work TXA out before it
+        C.fromState([{ name: 'TXB', formula: 'UPPER({TXA})', format: 'text' }, { name: 'TXA', formula: 'PART({L}, ";", 1)', format: 'text' }], 'state');
+        var o = C.applyRows([{ L: 'smith; jones' }, { L: '' }]);
+        C.fromState([], 'state');
+        return o.length === 2 && o[0].TXA === 'smith' && o[0].TXB === 'SMITH' && o[1].TXA === '' && o[1].TXB === '';
+      })();
+      // --- (p2 sweep) the text functions' bug sweep ---------------------------------------------------------
+      R.chk.swTargPct = (function () {
+        C.fromState([{ name: 'PCT', formula: '{A} / 1000', format: 'percent' }, { name: 'CUR', formula: '{A} * 1000', format: 'currency' },
+          { name: 'T1', formula: 'CONTAINS({PCT}, "%")', format: 'text' }, { name: 'T2', formula: 'LEFT({CUR}, 1)', format: 'text' },
+          { name: 'T3', formula: '{PCT} * 2' }, { name: 'T4', formula: 'LEN({PCT})' }], 'state');
+        var o = C.applyRows([{ A: '261' }]);
+        C.fromState([], 'state');
+        R.info.swTargPct = o[0];
+        return o[0].PCT === '26.1%' && o[0].T1 === 'TRUE' && o[0].T2 === '$' && o[0].T3 === '0.522' && o[0].T4 === '5';
+      })();
+      eq('swInLink', run('IN({S}, "2014-0685", "x")', { S: '@@HTML<a class="resolver-link" href="x">2014-0685</a>' }), 'TRUE');
+      eq('swEqLinkEnt', run('{S} = "Duke & Co"', { S: '@@HTML<b>Duke &amp; Co</b>' }), 'TRUE');
+      eq('swSigma', run('CONTAINS({S}, "\u03a3")', { S: '\u039f\u0394\u039f\u03a3' }), 'TRUE');
+      eq('swSharpS', run('CONTAINS({S}, "STRASSE")', { S: 'Stra\u00dfe' }), 'TRUE');
+      eq('swInSharpS', run('IN({S}, "STRASSE")', { S: 'Stra\u00dfe' }), 'TRUE');
+      eq('swEntLen', run('LEN({S})', { S: '@@HTML<b>Caf&eacute;&nbsp;Bar</b>' }), '8');
+      eq('swEntUpper', run('UPPER({S})', { S: '@@HTML<b>Caf&eacute;</b>' }, 'text'), 'CAF\u00c9');
+      eq('swEntOnce', run('LEN({S})', { S: 'Caf&amp;eacute;' }), '11');
+      eq('swEntNum', run('LEN({S})', { S: '@@HTML<i>x&#8217;s &#x1F600;</i>' }), '5');
+      eq('swEntBogus', run('LEN({S})', { S: '@@HTML<i>&bogus;&#0;</i>' }), '11');
+      eq('swNoAtAt', run('REPLACE({S}, "x", "@")', { S: 'x@HTML&lt;b&gt;' }, 'text'), '&#64;@HTML&lt;b&gt;');
+      eq('swNoAtAtLen', run('LEN(REPLACE({S}, "x", "@"))', { S: 'x@HTML&lt;b&gt;' }), '9');
+      eq('swExpo', run('{A} * 1', { A: '1200000000000000000000000000000' }), '1.2e+30');
+      eq('swPartWs', run('PART({S}, " ", 2)', { S: 'Ann  Lee' }, 'text'), 'Lee');
+      eq('swPartWsEnds', run('PART({S}, " ", -1)', { S: '  Ann Lee  ' }, 'text'), 'Lee');
+      eq('swPartKeepsEmpty', run('PART({S}, ",", 2)', { S: 'a,,b' }, 'text'), '');
+      eq('swMatchSpace', run('MATCHES({S}, " ")', { S: 'Ann Lee' }), 'TRUE');
+      function rxErr(p) { return err('MATCHES({A}, "' + p + '")'); }
+      // (calcfix #7/#8) the repeats' cost: \w*\w*\w* and a*\w*.* end in a repeat that never gives back (they pass now)
+      R.chk.swRxRefused = [['^.*a.*a.*a.*b$', /split a long cell/], ['^\\w*\\w*\\w*\\w*\\w*\\w*$', /split a long cell/], ['.*a.*a.*b', /split a long cell/], ['\\w{0,50}\\w{0,50}\\w{0,50}!', /split a long cell/],
+        ['\\d+\\s*\\d+\\s*\\d+x', /split a long cell/], ['.{0,40}.{0,40}.{0,40}.{0,40}.{0,40}.{0,40}#', /split a long cell/], ['^(?:a|aa){26}$', /holds a repeat or a choice/],
+        ['^(?:\\w+\\s?){9}$', /holds a repeat or a choice/], ['(a?){9}', /holds a repeat or a choice/], ['[\\w-.]', /a - next to \\w/], ['[a-\\d]', /a - next to \\d/],
+        ['^[:digit:]+$', /\[: \.\.\. :\]/], ['[.a.]', /\[\. \.\.\. \.\]/], ['(?:..){1000}', /too long for the server/], ['a\u0001b', /control character/]]
+        .every(function (x) { var m = rxErr(x[0]); if (!x[1].test(m)) R.info['rx:' + x[0]] = m; return x[1].test(m); });
+      R.chk.swRxAllowed = [' ', '[^.]', '[.,;]', '[^:]', '[.]', '^\\d+-\\d+$', '(\\.\\d+)?$', '[\\w-]', '[-\\w]', '[a-z-\\d]', '^(\\d{3}-){2}\\d{4}$', '(?:\\s){600}', '^.*a.*b$', '(?:ab|cd)?x',
+        '^[^\\s]+ [^\\s]+ [^\\s]+$', '^\\d+-\\d+-\\d+$', '^\\s*\\d+\\s*$', '^\\w+\\s\\w+\\s\\w+$', 'x{2,}y+z*', '^[A-Z]+\\d+[A-Z]*$',
+        // (calcfix #7) the shapes the three-repeat count refused: a repeat at the end, three after a ^; resets by a mandatory repeat
+        // or character; bounded repeats narrow enough
+        '.*NC.*State.*', '^.*univ.*of.*$', '\\w*\\w*\\w*', 'a*\\w*.*', '^.*a.*a.*b$', '\\d+[a-z]+\\d+[a-z]+x', '^\\d+-\\d+-\\d+-\\d+$', '\\w{0,20}\\w{0,20}\\w{0,20}!', '.*a\\w{0,50}b']
+        .every(function (p) { var m = rxErr(p); if (m) R.info['rxok:' + p] = m; return !m; });
+      R.chk.swErrComma = /Missing a comma before 2 in LEFT/.test(err('LEFT({A} 2)'));
+      // --- (calcfix) the top 20's engine fixes ---------------------------------------
+      eq('cfPct', run('{A} * 2', { A: '52.5%' }), '1.05');                              // #15
+      eq('cfPctNeg', run('{A} * 100', { A: '(12%)' }), '-12');                          // #15
+      eq('cfPctShown', run('{A}', { A: '52.5%' }, 'percent'), '52.5%');                 // #15 a Percent pass-through
+      eq('cfHtmlNum', run('{A} + 1', { A: '@@HTML<a href="x">1,234.50</a>' }), '1235.5');   // #19
+      eq('cfHtmlDate', run('DAYS({A}, "2026-01-01")', { A: '@@HTML<b>2026-01-05</b>' }), '4');   // #19
+      eq('cfTruthyN', run('IF({A}, "y", "n")', { A: 'N' }, 'text'), 'n');               // #20
+      eq('cfTruthyNo', run('IF({A}, "y", "n")', { A: 'No' }, 'text'), 'n');             // #20
+      eq('cfTruthyF', run('IF({A}, "y", "n")', { A: 'F' }, 'text'), 'y');               // #20 a lone F is text, as on the page
+      (function () {   // #4 a pass-through column gives its value; #7 a refused rule is named
+        C.fromState([{ name: 'PC', formula: '{A}', format: 'currency' }, { name: 'PCX', formula: '{PC} * 1000', format: 'number' },
+          { name: 'PP', formula: '{R}', format: 'percent' }, { name: 'PPX', formula: '{PP} * {B}', format: 'currency' },
+          { name: 'G', groups: { col: 'S', sets: [{ name: 'NCSU', values: [], rule: { op: 'matches', v: '.*NC.*State.*' } },
+            { name: 'Bad', values: [], rule: { op: 'matches', v: '\\w{0,50}\\w{0,50}\\w{0,50}\\w{0,50}\\w{0,50}!' } }], rest: 'other', other: 'Other' } }], 'report');
+        var o = C.applyRows([{ A: '1234.567', R: '0.25', B: '1000', S: 'NC State University' }])[0];
+        eq('cfPassCur', o.PCX, '1234567');
+        eq('cfPassPct', o.PPX, '$250.00');
+        eq('cfGrpTrail', o.G, 'NCSU');
+        var w = (typeof C.ruleWarnings === 'function') ? C.ruleWarnings() : {};
+        R.chk.cfRuleWarn = /the rule of Bad is not used: its repeats could split a long cell/.test(String(w.G || ''));
+        if (!R.chk.cfRuleWarn) R.info.cfRuleWarn = w;
+        C.fromState([], 'report');
+      })();
+      R.chk.swErrOpenQuote = /missing its opening " before NIH/.test(err('CONTAINS({A}, NIH")'));
+      R.chk.swErrQuoteMark = /cannot hold a " mark/.test(err('REPLACE({A}, ' + '""' + '""' + ', "")'));
+      R.chk.swErrSemi = /separated by commas/.test(err('IN({A}, "a"; "b")'));
+      R.chk.swUrlPipeAt = (function () {
+        var d = { name: 'R', formula: 'CONTAINS({S}, "|@x=1")', format: 'number' }, u = C.urlValue(d), back = C.parseUrlValue(u);
+        R.info.swUrlPipeAt = u;
+        return !!back && back.formula === d.formula && back.format === 'number' && !back.input;
+      })();
+      // a link made before the fix (no format written): a last piece that is not an adjustable value stays the formula's
+      R.chk.swUrlHandMade = (function () { var back = C.parseUrlValue('R|CONTAINS({S}, "|@x")'); return !!back && back.formula === 'CONTAINS({S}, "|@x")' && !back.input; })();
+      // a text function reads a calculated column through its label's key (the value path skips it: labelRef reads 6 either way)
+      R.chk.labelTextRef = (function () {
+        C.fromState([{ name: 'Net Amount', formula: '{A} + {B}' }, { name: 'NETLEN', formula: 'LEN({net_amount}) & "|" & UPPER({net_amount})', format: 'text' }], 'state');
+        var o = C.applyRows([{ A: '1', B: '2' }]);
+        C.fromState([], 'state');
+        R.info.labelTextRef = o[0];
+        return o[0].NETLEN === '1|3';
+      })();
+      R.chk.swUrlPipeInput = (function () {
+        var d = { name: 'R', formula: 'MATCHES({S}, "@ncsu\\.edu$|@unc\\.edu$")', format: 'text', input: { name: 'N', value: 5 } }, u = C.urlValue(d), back = C.parseUrlValue(u);
+        R.info.swUrlPipeInput = u;
+        return !!back && back.formula === d.formula && back.format === 'text' && !!back.input && back.input.name === 'N';
+      })();
       // --- the &calc= value ---------------------------------------------------------
       function pu(v) { var d = C.parseUrlValue(v); return d ? d.name + '/' + d.formula + '/' + d.format : null; }
       eq('urlFull', pu('Remaining|{A}-{B}|currency'), 'REMAINING/{A}-{B}/currency');
@@ -170,7 +321,10 @@
       document.getElementById('pnbCalcGo').click();
       R.chk.dialogRefusesMissing = !!document.getElementById('pnbCalcOverlay') && /no column \{NOPE\}/.test(document.getElementById('pnbCalcErr').textContent);
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-      R.chk.escCloses = !document.getElementById('pnbCalcOverlay');
+      // (p2 sweep) turned: with a formula typed in, the first Esc asks (as the custom groups editor does), a second closes
+      var escAsked = !!document.getElementById('pnbCalcOverlay') && /Esc again/.test(document.getElementById('pnbCalcErr').textContent);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      R.chk.escCloses = escAsked && !document.getElementById('pnbCalcOverlay');
       // the link wins over a saved column of the same name
       try { var st2 = JSON.parse(localStorage.getItem('penumbra_calc_columns') || '{}'); st2.zzcalc.push({ name: 'URLCOL', formula: '{A} * 100', format: 'number' });
             localStorage.setItem('penumbra_calc_columns', JSON.stringify(st2)); } catch (e) {}

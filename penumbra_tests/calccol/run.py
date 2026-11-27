@@ -23,7 +23,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 CALC_URL = '&'.join('calc=' + urllib.parse.quote(v, safe='') for v in
                     ['HALF|{H_NUM} / 2', 'DBL|{V_AMOUNT} * 2|currency', 'FLAG|IF({V_STATUS} = "open", "yes", "no")|text', 'BAD|{NOPE} + 1'])
-SCN = ['curl', 'cadd', 'cstate', 'cclear', 'cadj', 'cgrp', 'cgsweep']
+SCN = ['curl', 'cadd', 'cstate', 'cclear', 'cadj', 'cgrp', 'cgsweep', 'txsweep']
 SCN_Q = {'curl': '&' + CALC_URL}
 CHK = {
     # (2026-10-18, calcadj) an adjustable value: the dialog's row, the panel's knob, Enter re-runs,
@@ -43,6 +43,9 @@ CHK = {
              'values', 'order', 'panelRow', 'stateCarries', 'groupedOrder', 'dlgEditEntry', 'dlgEntries', 'dlgNewOpens', 'dlgNewCancel', 'dlgUse', 'dlgNewCol', 'dlgNewSaves', 'dlgNewKeepsForm', 'dlgNewEditEntry', 'editOpens', 'edited',
              'lockKeepsGroups', 'lockRefusesFormula', 'lockOpensGroups', 'cancelCalled', 'menuItem', 'removed', 'removeLeavesGroupMode'],
     'cstate': ['stateShown', 'viewStateCarries', 'saveStrips'],
+    # (p2 sweep) the formula dialog's sweep
+    'txsweep': ['focusName', 'fmtFollows', 'errWaits', 'backdropAsks', 'escAsksTwice', 'cleanCloses', 'chipFocusable', 'chipEnter', 'chipInQuotes', 'previewRaw', 'previewHtmlText',
+                'editCaretEnd', 'renameCarries'],
     # (2026-11-25, cgroups sweep) the editor's sweep
     'cgsweep': ['findAutofocus', 'escFindClears', 'addToFollows', 'addFocusTarget', 'escAsks', 'backdropKeeps', 'colKeepsFocus', 'staleNamed', 'staleGoneBack', 'otherMerged', 'otherCaseRefused', 'rxRefused', 'saved', 'showFlips', 'renameKeepsGrouping', 'goneColKept', 'goneColSaves', 'multiLineValue', 'lockReportNoEdit', 'lockReportNoDialog', 'arrowArms', 'enterOpens', 'splitLevelCarried', 'staleTakenOut', 'splitNameRefused', 'dragOutKeeps', 'backdropCloses', 'gsumValues', 'noQuerySweep'],
 }
@@ -74,11 +77,69 @@ ENGINE = ['add', 'accounting', 'pctIn', 'divZero', 'textIsBlank', 'blankIsBlank'
           'dateTypingKept', 'dateLeaveSprings', 'dateTypedApplies', 'plainKindGuard', 'removeForgets', 'stripCarrierLeftOut', 'noticedAgain', 'popKnobIds', 'popToggle', 'popTabOut',
           # (2026-10-22) a name keeps the case it was typed in (its label)
           'labelDef', 'labelNoneUpper', 'labelUrl', 'labelRowKey', 'labelRef', 'labelBadDropped', 'labelApplied', 'labelSummable', 'labelState',
-          'labelOpenEdit', 'labelRemove']
+          'labelOpenEdit', 'labelRemove',
+          # (p2 sweep) the text functions' bug sweep
+          'swTargPct', 'swInLink', 'swEqLinkEnt', 'swSigma', 'swSharpS', 'swInSharpS', 'swEntLen', 'swEntUpper', 'swEntOnce', 'swEntNum', 'swEntBogus', 'swNoAtAt', 'swNoAtAtLen',
+          'swExpo', 'swPartWs', 'swPartWsEnds', 'swPartKeepsEmpty', 'swMatchSpace', 'swRxRefused', 'swRxAllowed', 'swErrComma',
+          'cfPct', 'cfPctNeg', 'cfPctShown', 'cfHtmlNum', 'cfHtmlDate', 'cfTruthyN', 'cfTruthyNo', 'cfTruthyF', 'cfPassCur', 'cfPassPct', 'cfGrpTrail', 'cfRuleWarn',   # (calcfix) 'swErrOpenQuote', 'swErrQuoteMark', 'swErrSemi',
+          'swUrlPipeAt', 'swUrlPipeInput', 'swUrlHandMade', 'labelTextRef',
+          # (2026-11-26, calctext) the text functions
+          'txLen', 'txLenEmoji', 'txLenBlank', 'txLenEnt', 'txUpper', 'txLower', 'txLowerBlank', 'txTrim', 'txLeft', 'txLeftDefault', 'txLeftHtml', 'txLeftEsc', 'txRight', 'txRightOver', 'txRightNeg', 'txMid', 'txMidStart0', 'txMidEmoji', 'txPart', 'txPartLast', 'txPartPast', 'txPartZero', 'txReplace', 'txReplaceCase', 'txReplaceAll', 'txContains', 'txContainsNo', 'txContainsBlank', 'txContainsEmpty', 'txStarts', 'txStartsSpace', 'txEnds', 'txMatches', 'txMatchesWord', 'txIn', 'txInNo', 'txInNum', 'txInDate', 'txIfs', 'txIfsElse', 'txIfsNone', 'txIfsLazy', 'txTrueFalse', 'txTrueCell', 'txChain', 'txNumber', 'txNested', 'txJson', 'txErrArity', 'txErrMatchCol', 'txErrMatchRx', 'txErrMatchBad', 'txErrTrueCall', 'txRefsArgs', 'txApply']
 # (2026-10-22) the checks this round adds or changes: red on live (its names forced to upper case)
 NEW = {'N-labelDef', 'N-labelUrl', 'N-labelRowKey', 'N-labelRef', 'N-labelApplied', 'N-labelState', 'N-labelOpenEdit', 'N-labelRemove',
        'L-cadd-added', 'L-cadd-panelLabel', 'L-cadd-editShowsLabel'}
 MUTANTS = {
+    # --- (p2 sweep) the text functions' bug sweep: the engine's rules (N-) and the dialog's (L-txsweep)
+    'j-sw-targ': ([('calc', "            if (x && x.k === 'col') { var raw = get(x.n, true);", "            if (x && x.k === 'col') { var raw = get(x.n);")], ['N-swTargPct'], []),
+    'j-sw-cmphtml': ([('calc', "        if (typeof va === 'string' && va.substring(0, 6) === '@@HTML') va = va.substring(6).replace(/<[^>]*>/g, '');\n", "")], ['N-swInLink'], []),
+    'j-sw-fold': ([('calc', ".replace(/\\u03c2/g, '\\u03c3').replace(/\\u00df/g, 'ss'); }", "; }")], ['N-swSigma', 'N-swSharpS', 'N-swInSharpS'], []),
+    'j-sw-ent': ([('calc', "            return Object.prototype.hasOwnProperty.call(ENT_NAMED, e) ? String.fromCodePoint(ENT_NAMED[e]) : m;", "            return (e === 'lt' || e === 'gt' || e === 'quot' || e === 'amp') ? String.fromCodePoint(ENT_NAMED[e]) : m;")], ['N-swEntLen', 'N-swEntUpper'], []),
+    'j-sw-entnum': ([('calc', "                return (cp > 0 && cp <= 0x10FFFF && (cp < 0xD800 || cp > 0xDFFF)) ? String.fromCodePoint(cp) : m;", "                return cp === 39 ? \"'\" : m;")], ['N-swEntNum'], []),
+    'j-sw-fout': ([('calc', "escLit(s).replace(/@(?=@)/g, '&#64;'); }", "escLit(s); }")], ['N-swNoAtAt'], []),
+    'j-sw-expo': ([('calc', "if (s.indexOf('.') !== -1 && s.indexOf('e') === -1) s = ", "if (s.indexOf('.') !== -1) s = ")], ['N-swExpo'], []),
+    'j-sw-partws': ([('calc', "var ps = /^\\s+$/.test(dl) ?", "var ps = false ?")], ['N-swPartWs', 'N-swPartWsEnds'], []),
+    'j-sw-nested': ([('calc', "                if (had && rep) return true;", "                if (false) return true;")], ['N-swRxRefused'], []),
+    'j-sw-open': ([('calc', "        if (grpRxChain(s)) return", "        if (false) return")], ['N-swRxRefused'], []),
+    # (calcfix) re-anchored: grpRxChain weighs a chain now
+    'j-sw-chainshare': ([('calc', "                if (chain.length && mn >= 1 && !tailShares(atom)) { chain = []; cost = 1; }\n                chain.push({ a: atom, mn: mn }); cost *= w;", "                chain.push({ a: atom, mn: mn }); cost *= w;")], ['N-swRxAllowed'], []),
+    'j-sw-chainsep': ([('calc', "            } else if (mn >= 1) {\n                if (chain.length && !tailShares(atom)) { chain = []; cost = 1; }", "            } else if (mn >= 1) {")], ['N-swRxAllowed'], []),
+    # (calcfix) the top 20's engine fixes, each taken back
+    'j-cf-trail': ([('calc', "            if (w > 1 && trailing(i, depth)) w = 1;   // nothing after it to give back to\n", "")], ['N-swRxAllowed'], []),
+    'j-cf-anch': ([('calc', "                if ((anch ? 1 : GRP_RX_OPEN) * cost > GRP_RX_COST) return true;", "                if (GRP_RX_OPEN * cost > GRP_RX_COST) return true;")], ['N-swRxAllowed'], []),
+    'j-cf-width': ([('calc', "(mm[3] === '' ? GRP_RX_OPEN : Math.max(1, Math.min(GRP_RX_OPEN, +mm[3] - mn + 1)))", "(mm[3] === '' ? GRP_RX_OPEN : 1)")], ['N-swRxRefused'], []),
+    'j-cf-optjoin': ([('calc', "                if (chain.length && mn >= 1 && !tailShares(atom)) { chain = []; cost = 1; }", "                if (chain.length && !tailShares(atom)) { chain = []; cost = 1; }")], ['N-swRxRefused'], []),
+    'j-cf-pct': ([('calc', "        if (pct) n = n / 100;\n", "")], ['N-pctIn', 'N-cfPct'], []),
+    'j-cf-htmlnum': ([('calc', "        if (s.substring(0, 6) === '@@HTML') s = s.substring(6).replace(/<[^>]*>/g, '').trim();\n        if (s === '') return null;", "        if (s === '') return null;")], ['N-cfHtmlNum'], []),
+    'j-cf-htmldate': ([('calc', "        if (s.substring(0, 6) === '@@HTML') s = s.substring(6).replace(/<[^>]*>/g, '').trim();   // (calcfix #19) a link's text\n", "")], ['N-cfHtmlDate'], []),
+    'j-cf-truthy': ([('calc', "if (t === 'FALSE' || t === 'NO' || t === 'N') return false;", "if (t === 'FALSE') return false;")], ['N-cfTruthyN', 'N-cfTruthyNo'], []),
+    'j-cf-rawv': ([('calc', "                    var oNum = typeof oVal === 'number' ? oVal : (typeof oVal === 'string' ? toNum(oVal) : null);", "                    var oNum = typeof oVal === 'number' ? oVal : null;")], ['N-cfPassCur'], []),
+    'j-cf-dropped': ([('calc', "                if (why !== null) { dropped.push({ set: s.name, why: why }); return; }", "                if (why !== null) return;")], ['N-cfRuleWarn'], []),
+    'j-sw-size': ([('calc', "        if (grpRxSize(s) > 60000) return", "        if (grpRxSize(s) > 6000000) return")], ['N-swRxRefused'], []),
+    'j-sw-cls': ([('calc', "                if (cw) return cw;", "                if (false) return cw;")], ['N-swRxRefused'], []),
+    'j-sw-ctl': ([('calc', "        if (/[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]/.test(s)) return 'it holds a control character';\n", "")], ['N-swRxRefused'], []),
+    'j-sw-ws': ([('calc', "if (pat === '' || pat.length > GRP_TEXT_MAX)", "if (pat.trim() === '' || pat.length > GRP_TEXT_MAX)")], ['N-swMatchSpace', 'N-swRxAllowed'], []),
+    'j-sw-comma': ([('calc', "                if (startsOperand(tk[p])) throw new CalcError('Missing a comma before ' + desc(tk[p]) + ' in ' + t.raw + '( ).');\n", "")], ['N-swErrComma'], []),
+    'j-sw-url': ([('calc', "(d.format !== 'number' || String(d.formula).indexOf('|') !== -1)", "d.format !== 'number'")], ['N-swUrlPipeAt'], []),
+    'j-sw-urlin': ([('calc', "if (parts.length > 1 && /^@\\s*[^=]+=/.test(parts[parts.length - 1])) { var pin = parseUrlInput(parts[parts.length - 1]); if (pin) { inp = pin; parts.pop(); } }", "if (parts.length > 1 && /^@/.test(parts[parts.length - 1])) inp = parseUrlInput(parts.pop());")], ['N-swUrlHandMade'], []),
+    'j-sw-fmtauto': ([('calc', "        fmtAuto = !d && !asGroups && !(opts.format && isFormat(opts.format));", "        fmtAuto = false;")], ['L-txsweep-fmtFollows'], ['txsweep']),
+    'j-sw-autofocus': ([('calc', "            f.setAttribute('autofocus', '');\n", "")], ['L-txsweep-focusName'], ['txsweep']),
+    'j-sw-caret': ([('calc', "            if (d && typeof f.setSelectionRange === 'function') { try { f.setSelectionRange(f.value.length, f.value.length); } catch (eSel) { } }\n", "")], ['L-txsweep-editCaretEnd'], ['txsweep']),
+    'j-sw-errwait': ([('calc', "        if (live === true && msg) {", "        if (false) {")], ['L-txsweep-errWaits'], ['txsweep']),
+    'j-sw-fxdirty': ([('calc', "            if (fxDirty()) { clearTimeout(errTimer); grpErr(", "            if (false) { clearTimeout(errTimer); grpErr(")], ['L-txsweep-backdropAsks'], ['txsweep']),
+    'j-sw-chipkey': ([('calc', "e.target.matches('#pnbCalcOverlay .pnb-tpl-placeholders code')) { e.preventDefault(); e.stopPropagation(); e.target.click(); return; }", "false) { }")], ['L-txsweep-chipEnter'], ['txsweep']),
+    'm-sw-chipquote': ([('main', "            if ((target.value.slice(0, chipAt).split('\"').length - 1) % 2 === 1) chipText = '\" & ' + chipText + ' & \"';\r\n", "")], ['L-txsweep-chipInQuotes'], ['txsweep']),
+    'j-sw-raw': ([('calc', "                if (!asText && raw0 && raw0[n] !== undefined) return raw0[n];\n", "")], ['L-txsweep-previewRaw'], ['txsweep']),
+    'j-sw-prevtext': ([('calc', "        if (t.indexOf('@@HTML') === 0) return unEnt(t.slice(6).replace(/<[^>]*>/g, ''));\n", "")], ['L-txsweep-previewHtmlText'], ['txsweep']),
+    'j-sw-rename': ([('calc', "        if (renamed) reportDefs.forEach(function (x) {", "        if (false) reportDefs.forEach(function (x) {")], ['L-txsweep-renameCarries'], ['txsweep']),
+    # --- (2026-11-26, calctext) the text functions' rules, each broken
+    'j-tx-unent': ([('calc', "        s = unEnt(s);\n        return s === '' ? null : s;\n", "        return s === '' ? null : s;\n")], ['N-txUpper', 'N-txLeftEsc', 'N-txLenEnt'], []),
+    'j-tx-chars': ([('calc', "    function chars(s) { return Array.from(String(s)); }", "    function chars(s) { return String(s).split(''); }")], ['N-txLenEmoji', 'N-txMidEmoji'], []),
+    'j-tx-partneg': ([('calc', "ix = n > 0 ? n - 1 : ps.length + n;", "ix = n > 0 ? n - 1 : ps.length + n - 1;")], ['N-txPartLast'], []),
+    'j-tx-rxcheck': ([('calc', "                    var why = grpRxProblem(pat);\n", "                    var why = null;\n")], ['N-txErrMatchRx'], []),
+    'j-tx-collapse': ([('calc', "fOut(s.replace(/\\s+/g, ' ').trim())", "fOut(s.trim())")], ['N-txTrim'], []),
+    'j-tx-subjtrim': ([('calc', "                subj = subj === null ? '' : subj.trim();\n", "                subj = subj === null ? '' : subj;\n")], ['N-txStarts'], []),
+    'j-tx-bool': ([('calc', "if (t.t === 'id' && (t.v === 'TRUE' || t.v === 'FALSE') && !isOp(tk[p + 1], '(')) { p++; return { k: 'bool', v: t.v === 'TRUE' }; }", "")], ['N-txTrueFalse', 'N-txTrueCell', 'N-txIfs'], []),
+    'j-tx-args': ([('calc', "        if (Array.isArray(ast.args)) ast.args.forEach(function (x) { refsOf(x, out); });   // (calctext) a function's arguments\n", "")], ['N-txRefsArgs', 'N-txApply'], []),
     # --- (2026-11-25, cgroups) custom groups: hidden column, the groups' order, no query, the lock, the dialog's entries, the menu
     'm-cg-hide': ([('main', "                                    if (d.groups && d.hide) visibleColumnsSet.delete(raw); else visibleColumnsSet.add(raw);\r\n",
                    "                                    visibleColumnsSet.add(raw);\r\n")], ['L-cgrp-hidden'], ['cgrp']),
@@ -113,31 +174,27 @@ MUTANTS = {
     'l-nolabel': ([('calc', "        if (lb !== name) out.label = lb;\n", "")], ['N-labelDef', 'N-labelRowKey', 'L-cadd-added'], ['cadd']),
     'l-plain': ([('calc', "        if (d.label) o.label = d.label;\n", "")], ['N-labelApplied', 'N-labelState', 'N-labelRowKey'], []),
     'l-rowkey': ([('calc', "order.forEach(function (e) { keyOf[e.def.name] = shown(e.def); });", "order.forEach(function (e) { keyOf[e.def.name] = e.def.name; });")], ['N-labelRowKey'], []),
-    'l-getkey': ([('calc', "var c = keyOf[n]; return r[c !== undefined ? c : n];", "return r[n];")], ['N-labelRef'], []),
+    'l-getkey': ([('calc', 'var c = keyOf[n]; return r[c !== undefined ? c : n];', 'return r[n];')], ['N-labelTextRef'], []),
     'l-open': ([('calc', "if (name) { var nk = cleanName(name);", "if (name) { var nk = name;")], ['N-labelOpenEdit'], []),
     'l-remove': ([('calc', "        name = cleanName(name);   // (2026-10-22) a label names it too\n", "")], ['N-labelRemove'], []),
-    'l-panel': ([('calc', '<li class="pnb-calc-item"><span class="pnb-calc-f" aria-hidden="true">&fnof;</span><span class="pnb-calc-n">\' + esc(shown(d)) + \'</span>', '<li class="pnb-calc-item"><span class="pnb-calc-f" aria-hidden="true">&fnof;</span><span class="pnb-calc-n">\' + esc(d.name) + \'</span>')], ['L-cadd-panelLabel'], ['cadd']),
+    'l-panel': ([('calc', '\'<li class="pnb-calc-item"><span class="pnb-calc-f" aria-hidden="true">\' + (d.groups ? \'&#9638;\' : \'&fnof;\') + \'</span><span class="pnb-calc-n">\' + esc(shown(d)) + \'</span>\'', '\'<li class="pnb-calc-item"><span class="pnb-calc-f" aria-hidden="true">\' + (d.groups ? \'&#9638;\' : \'&fnof;\') + \'</span><span class="pnb-calc-n">\' + esc(d.name) + \'</span>\'')], ['L-cadd-panelLabel'], ['cadd']),
     # the module (LF)
     'e-precedence': ([('calc', "while (isOp(tk[p], '+') || isOp(tk[p], '-')) { var op = tk[p++].v; a = { k: 'bin', op: op, a: a, b: mul() }; }",
                        "while (isOp(tk[p], '+') || isOp(tk[p], '-')) { var op = tk[p++].v; a = { k: 'bin', op: op, a: a, b: unary() }; }")], ['N-precedence'], []),
     # 2026-10-10 calcsweep: ROUND shifts the DECIMAL text (roundHalfAway); the mutant is the plain float multiply.
     'e-roundnudge': ([('calc', "var r = Math.round(Number(str + 'e' + pl));", "var r = Math.round(a * Math.pow(10, pl));")], ['N-round2'], []),
-    'e-numcmp': ([('calc', "if (na !== null && nb !== null) c = na < nb", "if (false) c = na < nb")], ['N-numCompare'], []),
-    'e-case': ([('calc', "var sa = va === null ? '' : String(va).toLowerCase(), sb = vb === null ? '' : String(vb).toLowerCase();",
-                 "var sa = va === null ? '' : String(va), sb = vb === null ? '' : String(vb);")], ['N-ifText'], []),
+    'e-numcmp': ([('calc', '        if (na !== null && nb !== null) return na < nb ? -1 : (na > nb ? 1 : 0);', '        if (false) return na < nb ? -1 : (na > nb ? 1 : 0);')], ['N-numCompare'], []),
+    'e-case': ([('calc', "        var sa = va === null ? '' : foldCase(String(va)), sb = vb === null ? '' : foldCase(String(vb));", "        var sa = va === null ? '' : String(va), sb = vb === null ? '' : String(vb);")], ['N-ifText'], []),
     'e-atat': ([('calc', "if (s.indexOf('@@') !== -1) throw new CalcError('Text may not contain @@.');", "")], ['N-errAtAt'], []),
     'e-blank': ([('calc', "if (a === null || b === null) return null;\n", "")], ['N-blankIsBlank'], []),
     'e-negzero': ([('calc', "(v < 0 && Number(Math.abs(v).toFixed(2)) !== 0 ? '-' : '')", "(v < 0 ? '-' : '')")], ['N-fmtCurrencyNegZero'], []),
     'e-stripsort': ([('calc', "        if (Array.isArray(state.sortCriteria)) {\n", "        if (false) {\n")], ['N-stripSort'], []),
-    'e-clash': ([('calc', "if (byUpper[d.name] !== undefined) e.why = 'a column named ' + d.name + ' is already in the report';", "if (false) e.why = '';")],
-                ['N-applySkipsClash'], []),
-    'e-urlwins': ([('calc', "put(savedDefs(), 'saved'); put(stateDefs, 'state'); put(urlDefs, 'url');", "put(urlDefs, 'url'); put(stateDefs, 'state'); put(savedDefs(), 'saved');")],
-                  ['N-urlWinsOverSaved'], []),
+    'e-clash': ([('calc', "if (byUpper[d.name] !== undefined) e.why = 'a column named ' + shown(d) + ' is already in the report';", "if (false) e.why = '';")], ['N-applySkipsClash'], []),
+    'e-urlwins': ([('calc', "put(locked() ? lockedOwn() : savedDefs(), 'saved'); put(stateDefs, 'state'); put(urlDefs, 'url');", "put(urlDefs, 'url'); put(stateDefs, 'state'); put(locked() ? lockedOwn() : savedDefs(), 'saved');")], ['N-urlWinsOverSaved'], []),
     # main.js (CRLF)
     'm-ingest': ([('main', "                        try { data = window.PenumbraCalc.applyRows(data) || data; } catch (_calcErr) { console.warn('calculated columns:', _calcErr); }\r\n", "")],
                  ['L-curl-halfShown', 'L-cstate-stateShown'], ['curl', 'cstate']),
-    'm-visible': ([('main', "                                if (raw && !(_calcSeen && _calcSeen.has(d.name))) visibleColumnsSet.add(raw);\r\n", "")],
-                  ['L-curl-halfShown', 'L-cstate-stateShown'], ['curl', 'cstate']),
+    'm-visible': ([('main', '                                    if (d.groups && d.hide) visibleColumnsSet.delete(raw); else visibleColumnsSet.add(raw);\r\n', '                                    if (d.groups && d.hide) visibleColumnsSet.delete(raw);\r\n')], ['L-curl-halfShown', 'L-cstate-stateShown'], ['curl', 'cstate']),
     'm-state': ([('main', "                    window.PenumbraCalc.fromState(decodedState.calcColumns, penumbra_vars.preloadedState ? 'report' : 'state');\r\n", "")], ['L-cstate-stateShown'], ['cstate']),
     'm-bso': ([('main', "            if (_calc.length) state.calcColumns = _calc;\r\n", "")], ['L-cstate-viewStateCarries'], ['cstate']),
     'e-chiprefresh': ([('calc', "        if (t.closest('#pnbCalcCols code, #pnbCalcAdjTok')) { setTimeout(preview, 0); return; }   // main.js puts it at the cursor\n", "")], ['L-cadd-preview'], ['cadd']),
@@ -146,7 +203,7 @@ MUTANTS = {
     'e-catprec': ([('calc', "            while (isOp(tk[p], '&')) { p++; a = { k: 'cat', a: a, b: add() }; }\n",
                     "            while (isOp(tk[p], '&')) { p++; a = { k: 'cat', a: a, b: mul() }; }\n")], ['N-catNumber'], []),
     'e-feb31': ([('calc', "        if (dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;   // 31-FEB is not a date\n", "")], ['N-dBadDay'], []),
-    'e-datecmp': ([('calc', "                else if (dva && dvb) c = dva.d < dvb.d ? -1 : (dva.d > dvb.d ? 1 : 0);   // two dates, as dates\n", "")], ['N-dCompare'], []),
+    'e-datecmp': ([('calc', '        if (dva && dvb) return dva.d < dvb.d ? -1 : (dva.d > dvb.d ? 1 : 0);   // two dates, as dates\n', '')], ['N-dCompare'], []),
     'e-oracle': ([('calc', "        if ((m = /^(\\d{1,2})-([A-Za-z]{3})-(\\d{2}|\\d{4})(?: .*)?$/.exec(s))) return MON[m[2].toUpperCase()] ? mkDate(yr(m[3]), MON[m[2].toUpperCase()], +m[1]) : null;\n", "")], ['N-dOracle'], []),
     'e-datefmt': ([('calc', "        if (typeof v === 'object' && typeof v.d === 'number') return dateText(v);   // a date (calcfn)\n", "")], ['N-dPlus'], []),
     'm-clear': ([('main', "            if (window.PenumbraCalc && typeof window.PenumbraCalc.clearSaved === 'function') window.PenumbraCalc.clearSaved();\r\n", "")], ['L-cclear-cleared'], ['cclear']),
@@ -156,12 +213,12 @@ MUTANTS = {
                     ['L-cclear-listed', 'L-cclear-cleared'], ['cclear']),
     'm-listrefresh': ([('main', "        if ($('#settingsPanel').hasClass('is-open')) populateSettingsColumns();\r\n", "")], ['L-cadd-listAfterAdd'], ['cadd']),
     'e-listwait': ([('calc', "            if (runs > start && (!!th === !!present)) {\n", "            if (false) {\n")], ['L-cadd-listAfterAdd'], ['cadd']),
-    'm-strip': ([('main', "            window.PenumbraCalc.stripFromState(stateObject, $('#resultsTable').data('columnNameToOriginalIndex'));\r\n", "")], ['L-cstate-saveStrips'], ['cstate']),
+    'm-strip': ([('main', '            window.PenumbraCalc.stripFromState(stateObject, _pnbStateNameToIndex(), preview, _scKeepUnrun);   // (savechg) quiet in the preview\r\n', '')], ['L-cstate-saveStrips'], ['cstate']),
     # moderate (2026-10-15, WCAG 2.4.3): the rebuilt list no longer puts focus back
     'e-nofocusback': ([('calc', "        if (key) restoreListFocus(key, list);\n", "")], ['L-cadd-editFocus', 'L-cadd-removeFocus'], ['cadd']),
     # ... Save forgets the Edit button that opened the dialog
     # (anchor retargeted 2026-10-19: the colmenu round added `, after = ...` to the line on 10-16)
-    'e-noopener': ([('calc', "        var back = openerKey, after = editing ? null : afterAdd;\n", "        var back = null, after = editing ? null : afterAdd;\n")], ['L-cadd-editFocus'], ['cadd']),
+    'e-noopener': ([('calc', '        var back = openerKey, after = afterDone || (editing ? null : afterAdd);\n', '        var back = null, after = afterDone || (editing ? null : afterAdd);\n')], ['L-cadd-editFocus'], ['cadd']),
     # (2026-10-18, calcadj) adjustable values: {@NAME} not read as a value by the parser (the
     # tokenizer mutant instead made {@R} a column named @R, which the engine page read from its
     # row fixture all the same and then died on a missing value: a FATAL, not a red check)
@@ -199,22 +256,16 @@ MUTANTS = {
     'e-kindwide': ([('calc', "        '#pnbCalcOverlay #pnbCalcAdjKind{min-width:0;width:100%;box-sizing:border-box;padding:4px 2px;}' +\n", "")], ['L-cadd-kindNoOverlap'], ['cadd']),
     # round 7: the date knob at a number's width; the error line back inside the scrolling content
     'e-dateknobnarrow': ([('calc', "        '.pnb-calc-knob .pnb-calc-knob-v.pnb-calc-knob-d{width:138px;min-width:138px;text-align:left;}' +\n", "")], ['N-knobDateWide'], []),
-    'e-errinside': ([('calc', "            '<div class=\"pnb-calc-err\" id=\"pnbCalcErr\" role=\"status\" aria-live=\"polite\"></div>' +\n            '<span style=\"display:flex; gap:8px; flex:0 0 auto;\">",
-                      "            '<span style=\"display:flex; gap:8px; flex:0 0 auto;\">"),
-                     ('calc', "            '<div class=\"pnb-calc-prev\" id=\"pnbCalcPrev\"></div>' +\n            '</div>' +\n            '<div class=\"modal-prompt-buttons\"",
-                      "            '<div class=\"pnb-calc-err\" id=\"pnbCalcErr\" role=\"status\" aria-live=\"polite\"></div>' +\n            '<div class=\"pnb-calc-prev\" id=\"pnbCalcPrev\"></div>' +\n            '</div>' +\n            '<div class=\"modal-prompt-buttons\"")],
-                    ['L-cadd-errInFooter'], ['cadd']),
+    'e-errinside': ([('calc', '            \'<div class="pnb-calc-err" id="pnbCalcErr" role="status" aria-live="polite"></div>\' +\n            \'<span style="display:flex; gap:8px; flex:0 0 auto;">', '            \'<span style="display:flex; gap:8px; flex:0 0 auto;">'), ('calc', '            \'<div class="pnb-calc-prev" id="pnbCalcPrev"></div>\' +\n', '            \'<div class="pnb-calc-err" id="pnbCalcErr" role="status" aria-live="polite"></div>\' +\n            \'<div class="pnb-calc-prev" id="pnbCalcPrev"></div>\' +\n')], ['L-cadd-errInFooter'], ['cadd']),
     'e-noreplay': ([('calc', "            if (window.Penumbra && typeof window.Penumbra.replayNextRun === 'function') { try { window.Penumbra.replayNextRun(); } catch (e) { } }\n", "")],
                    ['L-cadj-noQuery'], ['cadj']),
     # ... the cheat sheet's labels as gradient headers again; the box not springing to the bound; a run wiping the typed box; the reset dropping focus
     'e-cheatth': ([('calc', "background:none !important;border:0;cursor:default;height:auto;}' +", "}' +")], ['L-cadd-cheatPlain'], ['cadd']),
-    'e-boxspring': ([('calc', "        Array.prototype.forEach.call(document.querySelectorAll('[data-calc-input=\"' + name + '\"]'), function (el) { el.value = trimNum(inp.value, 10); });\n",
-                      "        Array.prototype.forEach.call(document.querySelectorAll('[data-calc-input=\"' + name + '\"]'), function (el) { if (el !== document.activeElement) el.value = trimNum(inp.value, 10); });\n")],
-                    ['L-cadj-boxSprings'], ['cadj']),
+    'e-boxspring': ([('calc', '        Array.prototype.forEach.call(document.querySelectorAll(\'[data-calc-input="\' + name + \'"]\'), function (el) { el.value = showInputValue(inp, inp.value); });\n', '        Array.prototype.forEach.call(document.querySelectorAll(\'[data-calc-input="\' + name + \'"]\'), function (el) { if (el !== document.activeElement) el.value = showInputValue(inp, inp.value); });\n')], ['L-cadj-boxSprings'], ['cadj']),
     'e-typedlost': ([('calc', "                if (knobBack.typed !== null && knobBack.attr === 'data-calc-input') kb.value = knobBack.typed;\n", "")], ['L-cadj-typedKept'], ['cadj']),
     'e-resetfocus': ([('calc', "            if (bx0) { try { bx0.focus(); } catch (err) { } }\n", "")], ['L-cadj-resetFocus'], ['cadj']),
     # ... a ticked column's carrier not saved with it; two carriers of one name
-    'e-stripcarrier': ([('calc', "                    if (who && appliedBy[who] && !keep[who]) { keep[who] = true; added.push(who); grew = true; }\n", "")], ['N-stripCarrier'], []),
+    'e-stripcarrier': ([('calc', '                    if (who && (appliedBy[who] || activeBy[who]) && !keep[who]) { keep[who] = true; added.push(who); grew = true; }\n', '')], ['N-stripCarrier'], []),
     'e-dupinput': ([('calc', "            if (carried[e.input.name]) delete e.input; else carried[e.input.name] = e.name;\n", "            carried[e.input.name] = e.name;\n")], ['N-dupInput'], []),
     # round 8 (2026-10-19, closing sweep): the override kind guard in plain(); Remove keeping the override; the left-out
     # carrier not saved; a notice once per page; the popover's shared ids / no toggle / staying on Tab out; the date box
@@ -283,6 +334,8 @@ shutil.copyfile(os.path.join(APP, 'js', 'penumbra_colwidths.js'), os.path.join(s
 shutil.copyfile(os.path.join(APP, 'js', 'penumbra_tiles.js'), os.path.join(stage, 'penumbra_tiles.js'))
 shutil.copyfile(os.path.join(APP, 'css', 'penumbra_colmenu.css'), os.path.join(stage, 'penumbra_colmenu.css'))
 open(os.path.join(stage, 'help_stub.js'), 'wb').write(b'window.__HELP_STUB = "";\n')
+# (p2 sweep) txsweep: the column formats and penumbra_a11y.js
+for f in ('penumbra_colfmt.js', 'penumbra_a11y.js'): shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
 subprocess.run([sys.executable, os.path.join(HERE, 'mk_harness.py')], check=True, stdout=subprocess.DEVNULL)
 for f in ('harness.html', 'driver.js', 'engine.html', 'engine.js'): shutil.copyfile(os.path.join(HERE, f), os.path.join(stage, f))
 def free_port():

@@ -128,7 +128,7 @@ CHK = {
     'vhuge': ['ignored', 'defaultView'], 'vbomb': ['ignored', 'defaultView'], 'vnoid': ['ignored', 'defaultView'], 'vstate': ['ignored', 'defaultView'],
     'vprompt': ['promptRides', 'multiGrammar', 'forcedHiddenSkipped', 'reservedSkipped', 'includesPrompts'],
     'vlimit': ['fits', 'droppedNamed'],
-    'vccA': ['calcShown', 'carriesCalc', 'reportNotRepeated', 'calcDialogViewLink'], 'vccB': ['note', 'calcApplied', 'calcValue', 'calcNotSaved', 'rtView'],
+    'vccA': ['calcShown', 'carriesCalc', 'reportNotRepeated', 'ltPadded', 'formatEditRides', 'calcDialogViewLink'], 'vccB': ['note', 'calcApplied', 'calcValue', 'calcNotSaved', 'rtView'],
     'vcchB': ['note', 'calcApplied', 'calcValue', 'calcNotSaved'],
     'vmail': ['copyWithoutSending', 'labelsReworded', 'rowShown', 'disabledUntilLink', 'enabledWithLink', 'noListUnticked', 'listsCustomizations', 'disabledAgain'],
     'vthA': ['carriesTheme', 'describedTheme'], 'vthB': ['note', 'themeApplied', 'prefsNotSaved', 'rtView'],
@@ -242,6 +242,9 @@ MUTANTS = {
     'm-noccapply': ([('main', "                    window.PenumbraCalc.fromState(_pnbViewLink.cc, 'state');\n", "")], ['L-vccB-calcApplied'], ['vccA', 'vccB']),
     # the report's own calculated columns repeated in the link
     'm-ccdupe': ([('main', "return x && !rep[_pnbViewCalcKey(x)];", "return !!x;")], ['L-vccA-reportNotRepeated'], ['vccA']),
+    # (p2 sweep) a formula's "<letter" spaced; the key counts the format
+    'm-sw-vlpad': ([('main', "                if (pf.length > 500) return x;\r\n", "                return x;\r\n")], ['L-vccA-ltPadded'], ['vccA']),
+    'm-sw-vlkey': ([('main', "        return JSON.stringify([String(x.name || ''), String(x.formula || ''), nz(x.format || 'number').toLowerCase(), lb, inp]);", "        return JSON.stringify([String(x.name || ''), String(x.formula || ''), inp && inp[1]]);")], ['L-vccA-formatEditRides'], ['vccA']),
     # the calc dialog keeps its old &calc= link on a saved report
     'm-calcold': ([('calc', "var url = (vb && vb.url) ? vb.url : linkFor(r.def);", "var url = linkFor(r.def);")], ['L-vccA-calcDialogViewLink'], ['vccA']),
     # the Email option usable without the link ticked

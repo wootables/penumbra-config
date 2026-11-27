@@ -678,7 +678,8 @@
       ok('avoidBlank', tipOf(ab) === 'Do not use. No description yet.\nSource: T.X' + CLICK_SAYS, tipOf(ab));
       closeMenu();
       // (the review) no space past 60% of the way: a hard cut at 280, never between an emoji's two halves
-      var emo = String.fromCharCode(0xD83D, 0xDE00), hard = new Array(280).join('x') + emo + new Array(100).join('y');   // the emoji at 279-280
+      // (2026-11-26, tipcut) with one space early on (at 3): a cut back to it would leave "See..."
+      var emo = String.fromCharCode(0xD83D, 0xDE00), hard = 'See ' + new Array(276).join('x') + emo + new Array(100).join('y');   // the emoji at 279-280
       stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: hard, source: '', draft: false, avoid: false });
       ab = await openHead('V_AMOUNT'); shownT = tipHead(ab) || '';
       var lastC = shownT.charCodeAt(shownT.length - 4);

@@ -211,6 +211,16 @@
       var ccn = (vc.cc || []).map(function (x) { return x.name; });
       R.chk.carriesCalc = ccn.indexOf('DOUBLE') >= 0 && (bc.included || []).indexOf('calculated columns') >= 0;
       R.chk.reportNotRepeated = ccn.indexOf('TRIPLE') < 0;
+      // (p2 sweep) a formula's < before a letter rides spaced; a format-only edit of the report's own column rides too
+      var ccPrev = (window.PenumbraCalc.active() || []).filter(function (d) { return d.src === 'state'; });
+      window.PenumbraCalc.fromState(ccPrev.concat([{ name: 'LTCOL', formula: 'IF(LEN({H_TEXT})<LEN({H_CODE}), "a", "b")', format: 'text' },
+        { name: 'TRIPLE', formula: '{H_NUM} * 3', format: 'text' }]), 'state');
+      var b2 = capture(), v2 = b2.token ? (V().decode(b2.token) || {}) : {};
+      var lt = (v2.cc || []).filter(function (x) { return x.name === 'LTCOL'; })[0], tr3 = (v2.cc || []).filter(function (x) { return x.name === 'TRIPLE'; })[0];
+      R.chk.ltPadded = !!lt && lt.formula === 'IF(LEN({H_TEXT})< LEN({H_CODE}), "a", "b")';
+      R.chk.formatEditRides = !!tr3 && tr3.format === 'text';
+      R.info.p2 = { lt: lt || null, tr: tr3 || null };
+      window.PenumbraCalc.fromState(ccPrev, 'state');
       // the calc dialog's own "Copy link with this column", for a column not added yet
       window.__clip = [];
       window.PenumbraCalc.openDialog(null); await sleep(600);

@@ -33,6 +33,7 @@
     SNAP.forEach(function (r) { Object.keys(r).forEach(function (k) { snapCols[k.toUpperCase()] = true; }); });
     var snap = {
       name: 'Parity snapshot', timestamp: Date.now() - 86400000, searchTerm: '', prompts: [], tables: '', notes: '',
+      creator: (window.__CASE && window.__CASE.snapCreator) || '',   // (snapdate) who saved it: SCHEDULER = the pattern's text
       columnNames: Object.keys(snapCols).sort(),
       compressedData: H.compress(JSON.stringify(SNAP.map(function (r) { return { rowData: r }; })))
     };

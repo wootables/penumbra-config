@@ -26,18 +26,21 @@
     eq('if-FALSE-text', run('IF({F}, "y", "n")', { F: 'FALSE' }), 'n', 'a calc boolean is written as FALSE');
     eq('if-false-lc', run('IF({F}, "y", "n")', { F: 'false' }), 'n');
     eq('if-TRUE-text', run('IF({F}, "y", "n")', { F: 'TRUE' }), 'y');
-    eq('if-Y-text', run('IF({F}, "y", "n")', { F: 'N' }), 'y', 'other text stays truthy (unchanged)');
+    eq('if-Y-text', run('IF({F}, "y", "n")', { F: 'Y' }), 'y', 'other text stays truthy (unchanged)');
+    eq('if-N-text', run('IF({F}, "y", "n")', { F: 'N' }), 'n', 'N reads false, as the page reads a yes/no column (calcfix #20)');
     // ---- comparisons -----------------------------------------------------------
     eq('blank-lt-5', run('IF({A} < 5, "y", "n")', { A: '' }), 'y');
     eq('blank-eq-0', run('IF({A} = 0, "y", "n")', { A: '' }), 'n', 'blank is text "", not 0 (documented: text compare)');
     eq('num-vs-text', run('IF({A} = "10", "y", "n")', { A: '10.0' }), 'y');
     // ---- formatting ----------------------------------------------------------
     eq('fmt-cur-neg', run('0 - 1234.5', null, 'currency'), '-$1,234.50');
-    eq('fmt-pct-str', run('IF(1, {R}, 0)', { R: '12%' }, 'percent'), '1200%', 'a 12% cell reads as 12 (page rule)');
+    eq('fmt-pct-str', run('IF(1, {R}, 0)', { R: '12%' }, 'percent'), '12%', 'a 12% cell reads as 0.12 (calcfix #15: as a spreadsheet)');
     eq('fmt-num-big', run('{A} * 1', { A: '12345678.5' }), '12345678.5');
     eq('fmt-bool-num', run('{A} > 1', { A: '5' }, 'number'), 'TRUE');
     // ---- tokenizer / parser errors ---------------------------------------------
-    eq('err-true-literal', run('IF({A} > 1, TRUE, FALSE)', { A: '2' }).slice(0, 4), 'ERR:', 'no TRUE/FALSE literals');
+    // (2026-11-26, calctext) TRUE and FALSE are values now (IFS(..., TRUE, "Other")); TRUE( ) is still no function
+    eq('err-true-literal', run('IF({A} > 1, TRUE, FALSE)', { A: '2' }), 'TRUE', 'TRUE / FALSE literals (calctext)');
+    eq('err-true-call', run('TRUE()').slice(0, 4), 'ERR:', 'TRUE( ) is no function');
     eq('err-2e5', run('2e5').slice(0, 4), 'ERR:');
     eq('chain-cmp', run('1 < 2 < 3').slice(0, 4), 'ERR:');
     eq('deep-parens', run(new Array(201).join('(') + '1' + new Array(201).join(')')), '1');

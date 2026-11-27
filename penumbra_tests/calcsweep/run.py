@@ -31,13 +31,14 @@ sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_te
 # What the build before the sweep gets wrong (frozen from the first control run, live 0570df0e).
 CONTROL_RED = ['round-big2', 'round-big2b', 'round-6pl', 'fmt-num-noise', 'if-FALSE-text', 'if-false-lc', 'chain-bool',
                'edit-keeps-order', 'edit-dep-still-works', 'edit-col-order', 'rename-dep', 'forward-ref-order', 'cycle-refused',
-               'cycle-named', 'summable-exact', 'iscalc', 'no-whitelist-push', 'strip-all-levels', 'strip-pivot-filter', 'strip-notice', 'link-deps']
+               'cycle-named', 'summable-exact', 'iscalc', 'no-whitelist-push', 'strip-all-levels', 'strip-pivot-filter', 'strip-notice', 'link-deps',
+               'if-N-text', 'fmt-pct-str']   # (calcfix #20, #15: the build before reads N as true, 12% as 12)
 
 MUTANTS = {
     'nudge': ([("            var r = Math.round(Number(str + 'e' + pl));", "            var r = Math.round(a * Math.pow(10, pl) * (1 + 1e-12));")],
               ['round-big2', 'round-big2b', 'round-6pl']),
     'noise': ([("        if (a >= 1) places = Math.max(0, Math.min(places, 15 - (Math.floor(Math.log10(a)) + 1)));\n", "")], ['fmt-num-noise']),
-    'falsy': ([("        if (t === 'FALSE') return false;\n", "")], ['if-FALSE-text', 'if-false-lc', 'chain-bool']),
+    'falsy': ([("        if (t === 'FALSE' || t === 'NO' || t === 'N') return false;\n", "")], ['if-FALSE-text', 'if-false-lc', 'chain-bool']),   # (calcfix #20) re-anchored
     'listorder': ([("        entries.forEach(function (e) { if (!e.why) resolve(e); });",
                     "        entries.forEach(function (e) { if (!e.why) { e.cc.refs.forEach(function (r) { if (byName[r] && byName[r].ix > e.ix) e.why = 'later'; }); if (!e.why) resolve(e); } });")],
                   ['forward-ref-order']),
@@ -63,7 +64,7 @@ MUTANTS = {
                         "            if (x.def.format !== 'text' && !isDateFormat(x.def.format)) { summableNames[x.def.name] = true; window.penumbra_vars.totalExemptions.push(x.def.name); }")],
                       ['no-whitelist-push']),
     # (2026-11-15) calcraw (7c207fc, 2026-11-14): a chained number column is read by its value, not its shown text
-    'rawread': ([("                    if (rv[n] !== undefined) return rv[n];\n", "")], ['chain-currency']),
+    'rawread': ([("                    if (!asText && rv[n] !== undefined) return rv[n];\n", "")], ['chain-currency']),   # (calcfix) re-anchored: the cgroups sweep added asText
 }
 CR = '\n'
 

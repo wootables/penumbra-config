@@ -194,5 +194,187 @@
       {"RID": "r2", "ID": "2", "NAME": "Bravo", "AMOUNT": "1000", "NOTE": "y"},
       {"RID": "r3", "ID": "3", "NAME": "Charlie", "AMOUNT": "300", "NOTE": "z"}
     ]
+  },
+  {
+    "name": "sd-sched-keys",
+    "what": "date-format calc column vs a scheduler snapshot, key RID",
+    "keys": ["RID"],
+    "cols": ["RID", "DSRC", "NOTE"],
+    "live": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a"},
+      {"RID": "r2", "DSRC": "2026-11-05", "NOTE": "b"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "c"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date"}
+    ],
+    "snap": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a", "DUE": "Nov 4, 2026"},
+      {"RID": "r2", "DSRC": "2026-11-20", "NOTE": "b", "DUE": "Nov 20, 2026"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "x", "DUE": "Dec 1, 2026"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d", "DUE": "Jan 15, 2026"},
+      {"RID": "r5", "DSRC": "2026-02-02", "NOTE": "e", "DUE": "Feb 2, 2026"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date", "DUE": ""}
+    ],
+    "snapCreator": "SCHEDULER",
+    "calcColumns": [
+      {"name": "DUE", "formula": "{DSRC}", "format": "date:MMM D, YYYY"}
+    ],
+    "expectGroups": {"new": [], "removed": ["r5"], "modified": ["r2:DSRC,DUE", "r3:NOTE"], "unchanged": ["r1", "r4", "r6"]}
+  },
+  {
+    "name": "sd-sched-all",
+    "what": "date-format calc column vs a scheduler snapshot, all columns",
+    "keys": null,
+    "cols": ["RID", "DSRC", "NOTE"],
+    "live": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a"},
+      {"RID": "r2", "DSRC": "2026-11-05", "NOTE": "b"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "c"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date"}
+    ],
+    "snap": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a", "DUE": "Nov 4, 2026"},
+      {"RID": "r2", "DSRC": "2026-11-20", "NOTE": "b", "DUE": "Nov 20, 2026"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "x", "DUE": "Dec 1, 2026"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d", "DUE": "Jan 15, 2026"},
+      {"RID": "r5", "DSRC": "2026-02-02", "NOTE": "e", "DUE": "Feb 2, 2026"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date", "DUE": ""}
+    ],
+    "snapCreator": "SCHEDULER",
+    "calcColumns": [
+      {"name": "DUE", "formula": "{DSRC}", "format": "date:MMM D, YYYY"}
+    ],
+    "expectGroups": {"new": ["r2", "r3"], "removed": ["r2", "r3", "r5"], "modified": [], "unchanged": ["r1", "r4", "r6"]}
+  },
+  {
+    "name": "sd-page-keys",
+    "what": "date-format calc column vs a page snapshot, key RID",
+    "keys": ["RID"],
+    "cols": ["RID", "DSRC", "NOTE"],
+    "live": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a"},
+      {"RID": "r2", "DSRC": "2026-11-05", "NOTE": "b"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "c"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date"}
+    ],
+    "snap": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a", "DUE": "2026-11-04"},
+      {"RID": "r2", "DSRC": "2026-11-20", "NOTE": "b", "DUE": "2026-11-20"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "x", "DUE": "2026-12-01"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d", "DUE": "2026-01-15"},
+      {"RID": "r5", "DSRC": "2026-02-02", "NOTE": "e", "DUE": "2026-02-02"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date", "DUE": ""}
+    ],
+    "snapCreator": "harness",
+    "calcColumns": [
+      {"name": "DUE", "formula": "{DSRC}", "format": "date:MMM D, YYYY"}
+    ],
+    "expectGroups": {"new": [], "removed": ["r5"], "modified": ["r2:DSRC,DUE", "r3:NOTE"], "unchanged": ["r1", "r4", "r6"]}
+  },
+  {
+    "name": "sd-page-all",
+    "what": "date-format calc column vs a page snapshot, all columns",
+    "keys": null,
+    "cols": ["RID", "DSRC", "NOTE"],
+    "live": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a"},
+      {"RID": "r2", "DSRC": "2026-11-05", "NOTE": "b"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "c"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date"}
+    ],
+    "snap": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a", "DUE": "2026-11-04"},
+      {"RID": "r2", "DSRC": "2026-11-20", "NOTE": "b", "DUE": "2026-11-20"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "x", "DUE": "2026-12-01"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d", "DUE": "2026-01-15"},
+      {"RID": "r5", "DSRC": "2026-02-02", "NOTE": "e", "DUE": "2026-02-02"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date", "DUE": ""}
+    ],
+    "snapCreator": "harness",
+    "calcColumns": [
+      {"name": "DUE", "formula": "{DSRC}", "format": "date:MMM D, YYYY"}
+    ],
+    "expectGroups": {"new": ["r2", "r3"], "removed": ["r2", "r3", "r5"], "modified": [], "unchanged": ["r1", "r4", "r6"]}
+  },
+  {
+    "name": "sd-dayfirst-sched",
+    "what": "day-first pattern vs a scheduler snapshot: its text is never re-read",
+    "keys": ["RID"],
+    "cols": ["RID", "DSRC", "NOTE"],
+    "live": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a"},
+      {"RID": "r2", "DSRC": "2026-11-05", "NOTE": "b"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "c"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date"}
+    ],
+    "snap": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a", "DUE": "04/11/2026"},
+      {"RID": "r2", "DSRC": "2026-11-20", "NOTE": "b", "DUE": "20/11/2026"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "x", "DUE": "01/12/2026"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d", "DUE": "15/01/2026"},
+      {"RID": "r5", "DSRC": "2026-02-02", "NOTE": "e", "DUE": "02/02/2026"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date", "DUE": ""}
+    ],
+    "snapCreator": "SCHEDULER",
+    "calcColumns": [
+      {"name": "DUE", "formula": "{DSRC}", "format": "date:DD/MM/YYYY"}
+    ],
+    "expectGroups": {"new": [], "removed": ["r5"], "modified": ["r2:DSRC,DUE", "r3:NOTE"], "unchanged": ["r1", "r4", "r6"]}
+  },
+  {
+    "name": "sd-month-page",
+    "what": "month-only pattern vs a page snapshot: a day moved within the month shows no change",
+    "keys": ["RID"],
+    "cols": ["RID", "DSRC", "NOTE"],
+    "live": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a"},
+      {"RID": "r2", "DSRC": "2026-11-05", "NOTE": "b"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "c"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date"}
+    ],
+    "snap": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a", "DUE": "2026-11-04"},
+      {"RID": "r2", "DSRC": "2026-11-20", "NOTE": "b", "DUE": "2026-11-20"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "x", "DUE": "2026-12-01"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d", "DUE": "2026-01-15"},
+      {"RID": "r5", "DSRC": "2026-02-02", "NOTE": "e", "DUE": "2026-02-02"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date", "DUE": ""}
+    ],
+    "snapCreator": "harness",
+    "calcColumns": [
+      {"name": "DUE", "formula": "{DSRC}", "format": "date:MMM YYYY"}
+    ],
+    "expectGroups": {"new": [], "removed": ["r5"], "modified": ["r2:DSRC", "r3:NOTE"], "unchanged": ["r1", "r4", "r6"]}
+  },
+  {
+    "name": "sd-month-sched",
+    "what": "month-only pattern vs a scheduler snapshot",
+    "keys": ["RID"],
+    "cols": ["RID", "DSRC", "NOTE"],
+    "live": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a"},
+      {"RID": "r2", "DSRC": "2026-11-05", "NOTE": "b"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "c"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date"}
+    ],
+    "snap": [
+      {"RID": "r1", "DSRC": "2026-11-04", "NOTE": "a", "DUE": "Nov 2026"},
+      {"RID": "r2", "DSRC": "2026-11-20", "NOTE": "b", "DUE": "Nov 2026"},
+      {"RID": "r3", "DSRC": "2026-12-01", "NOTE": "x", "DUE": "Dec 2026"},
+      {"RID": "r4", "DSRC": "2026-01-15", "NOTE": "d", "DUE": "Jan 2026"},
+      {"RID": "r5", "DSRC": "2026-02-02", "NOTE": "e", "DUE": "Feb 2026"},
+      {"RID": "r6", "DSRC": "", "NOTE": "blank date", "DUE": ""}
+    ],
+    "snapCreator": "SCHEDULER",
+    "calcColumns": [
+      {"name": "DUE", "formula": "{DSRC}", "format": "date:MMM YYYY"}
+    ],
+    "expectGroups": {"new": [], "removed": ["r5"], "modified": ["r2:DSRC", "r3:NOTE"], "unchanged": ["r1", "r4", "r6"]}
   }
 ]
