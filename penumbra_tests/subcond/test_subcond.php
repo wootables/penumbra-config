@@ -33,10 +33,18 @@ class FakeStmt {
     public function bindValue($k, $v, $t = null) { $this->binds[$k] = $v; return true; }
     public function execute($p = null) { if ($this->conn->throwOnExecute) throw new Exception('ORA-00000 fake'); return true; }
     public function fetch($mode = null) { return isset($this->rows[$this->i]) ? $this->rows[$this->i++] : false; }
+    public function fetchAll($mode = null, $arg = null) { $o = array(); foreach ($this->rows as $r) { $o[] = is_array($r) ? reset($r) : $r; } return $o; }
 }
 class FakeConn {
     public $statements = array(); public $queue = array(); public $throwOnExecute = false;
+    public $vocab = null; public $vocabQueries = 0;   // (tagfix 3) the tag list; null = its query fails
     public function prepare($sql) { $rows = count($this->queue) ? array_shift($this->queue) : array(); $st = new FakeStmt($this, $sql, $rows); $this->statements[] = $st; return $st; }
+    public function query($sql) {
+        $this->vocabQueries++;
+        if ($this->vocab === null) throw new Exception('ORA-00942 fake');
+        $rows = array(); foreach ($this->vocab as $t) $rows[] = array('TAG' => $t);
+        return new FakeStmt($this, $sql, $rows);
+    }
 }
 function vrow($over = array()) {   // one PENUMBRA_PEOPLE_V row
     return array_merge(array(
@@ -95,6 +103,9 @@ $p = penumbraSubCondParse('TAGS = /PRE/');
 eq($p['parsed'][0]['value'], '/PRE/', 'a regex keeps the engine\'s own meaning');
 $p = penumbraSubCondParse('{ tags } != cals_preaward');
 eq(array($p['parsed'][0]['column'], $p['parsed'][0]['op'], $p['parsed'][0]['value']), array('TAGS', '!/', '\|CALS_PREAWARD\|'), 'the braced (and spaced) {TAGS} gets the same membership rewrite');
+// (2026-11-27, tagfix 7) EMPTY fits the tag-name rule, but `= empty` / `!= empty` are the engine's own empty test.
+$p = penumbraSubCondParse('{TAGS} = empty');
+eq(array($p['parsed'][0]['op'], $p['parsed'][0]['value']), array('=', 'empty'), '= empty is left to the engine, not read as a tag called EMPTY');
 
 // ---------------------------------------------------------------- 3. matching
 echo "3. matching directory records (A: OUC 140201, PI 1, ENF, UP02, tags CALS_PREAWARD+OSP_LEADS; B: 060401, PI 0, SPA, C46114, no tags)\n";
@@ -106,6 +117,8 @@ eq(array(m('EMPL_CLASS = /^(EFX|ENF)$/', $recA), m('EMPL_CLASS = /^(EFX|ENF)$/',
 eq(array(m('TAGS = CALS_PREAWARD', $recA), m('TAGS = CALS_PREAWARD', $recB)), array(true, false), 'TAGS = X: has the tag');
 eq(m('TAGS = CALS', $recA), false, 'TAGS = CALS does not match CALS_PREAWARD (membership, not substring)');
 eq(array(m('TAGS != CALS_PREAWARD', $recA), m('TAGS != CALS_PREAWARD', $recB)), array(false, true), 'TAGS != X: does not have it (no tags at all counts)');
+eq(array(m('{TAGS} = empty', $recA), m('{TAGS} = empty', $recB)), array(false, true), 'TAGS = empty: has no tags (tagfix 7)');
+eq(array(m('{TAGS} != empty', $recA), m('{TAGS} != "empty"', $recB)), array(true, false), 'TAGS != empty: has any tag (tagfix 7)');
 eq(array(m('JOBCODE_PREFIX != UP', $recA), m('JOBCODE_PREFIX != UP', $recB)), array(false, true), 'JOBCODE_PREFIX, derived like the recipient variable');
 eq(array(m('{PI_ELIGIBLE} = 0', $recA), m('{PI_ELIGIBLE} = 0', $recB)), array(false, true), 'braced spelling evaluates the same column');
 eq(array(m('{ OUC2D } = 14 AND {pi_eligible} = 1', $recA), m('{ OUC2D } = 14 AND {pi_eligible} = 1', $recB)), array(true, false), 'spaced / lower-case braces evaluate the same columns');
@@ -177,10 +190,35 @@ $f = penumbraSubCondFilterEntries($c, 'FOO = 1', $subs);
 eq(array($f['checked'], count($f['dropped']), count($c->statements)), array(false, 0, 0), 'an unusable condition -> nobody dropped, no query');
 $c = new FakeConn(); $c->queue[] = array();
 $f = penumbraSubCondFilterEntries($c, 'PI_ELIGIBLE = 1', array_slice($subs, 0, 2));
-eq(array($f['checked'], count($f['dropped'])), array(false, 0), 'the directory returned NOBODY for two subscribers -> treated as broken, nobody dropped');
+eq(array($f['checked'], count($f['dropped']), strpos($f['reason'], 'returned nobody') !== false), array(false, 0, true), 'the directory returned NOBODY for two subscribers -> treated as broken, nobody dropped (its own reason, not the hold\'s)');
 $c = new FakeConn(); $c->queue[] = array();
 $f = penumbraSubCondFilterEntries($c, 'PI_ELIGIBLE = 1', array($subs[2]));
 eq(array($f['checked'], count($f['dropped'])), array(true, 1), 'ONE subscriber with no record is a real non-match -> dropped');
+
+// ---------------------------------------------------------------- 8b. the hold (tagfix 3)
+echo "8b. the HOLD (2026-11-27, tagfix 3): a drop that reads as a broken condition removes nobody that run\n";
+$two = array_slice($subs, 0, 2);   // jdoe (A) + bsmith (B)
+$c = new FakeConn(); $c->queue[] = array($A, $B);
+$f = penumbraSubCondFilterEntries($c, 'EMPL_CLASS = EFX', $two);
+eq(array($f['checked'], count($f['dropped']), strpos($f['reason'], 'all 2 subscribers at once') !== false, $c->vocabQueries),
+   array(false, 0, true, 0), 'EVERY subscriber at once (two) -> held; no tag list is read for a condition without {TAGS}');
+$Ar = vrow(array('TAGS' => '|CALS_PRE|OSP_LEADS|'));   // CALS_PREAWARD renamed to CALS_PRE in the Tags tool
+$c = new FakeConn(); $c->queue[] = array($Ar, $B); $c->vocab = array('CALS_PRE', 'OSP_LEADS');
+$f = penumbraSubCondFilterEntries($c, 'TAGS = CALS_PREAWARD OR PI_ELIGIBLE = 1', $two);
+eq(array($f['checked'], count($f['dropped']), strpos($f['reason'], 'names CALS_PREAWARD, which is no longer a tag') !== false),
+   array(false, 0, true), 'a {TAGS} name that is no longer a tag (renamed / deleted) -> held, even when only one of two would go');
+$c = new FakeConn(); $c->queue[] = array($A, $B); $c->vocab = array('CALS_PREAWARD', 'OSP_LEADS');
+$f = penumbraSubCondFilterEntries($c, 'TAGS = CALS_PREAWARD', $two);
+eq(array($f['checked'], array_map(function ($e) { return $e['email']; }, $f['dropped']), $c->vocabQueries),
+   array(true, array('bsmith@ncsu.edu'), 1), 'the tag still exists -> a real non-match is dropped as before (one tag-list read)');
+$c = new FakeConn(); $c->queue[] = array($A, $B);   // vocab null: the tag-list query fails
+$f = penumbraSubCondFilterEntries($c, 'TAGS = CALS_PREAWARD', $two);
+eq(array($f['checked'], count($f['dropped']), strpos($f['reason'], 'tag list could not be read') !== false), array(false, 0, true), 'an unreadable tag list -> held');
+$c = new FakeConn(); $c->queue[] = array($A, $B);
+$f = penumbraSubCondFilterEntries($c, 'TAGS = /PREAWARD/', $two);
+eq(array($f['checked'], count($f['dropped']), $c->vocabQueries), array(true, 1, 0), 'a pattern on TAGS names no tag: no tag-list read, the drop stands');
+$p = penumbraSubCondParse('(TAGS = cals_preaward OR TAGS != OSP_LEADS) AND TAGS = /X/ OR OUC2D = 14');
+eq(penumbraSubCondTagNames($p['parsed']), array('CALS_PREAWARD', 'OSP_LEADS'), 'the names a condition tests, inside parentheses too; a pattern names none');
 
 // ---------------------------------------------------------------- 9. the scan
 echo "9. penumbraSubCondScanDirectory (the editor's preview)\n";

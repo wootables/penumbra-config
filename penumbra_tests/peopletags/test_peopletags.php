@@ -51,6 +51,10 @@ eq(penumbraTagNormalize(str_repeat('A', 60)), str_repeat('A', 60), '60 character
 eq(penumbraTagNormalize(str_repeat('A', 61)), '', '61 do not');
 eq(penumbraTagNormalize("x\ty"), 'X_Y', 'a tab is a separator too');
 eq(penumbraTagNormalize('_'), '', 'only separators -> empty');
+// tagfix 7 (2026-11-27): the search filter's empty keyword is never a tag name; an existing one is still found by its shape
+eq(array(penumbraTagNormalize('empty'), penumbraTagNormalize(' Empty '), penumbraTagNormalize('empty_list')), array('', '', 'EMPTY_LIST'), 'EMPTY is reserved (any case); a longer word holding it is not');
+eq(array(penumbraTagNormalizeExisting('empty'), penumbraTagNormalizeExisting('cals preaward'), penumbraTagNormalizeExisting('1abc')), array('EMPTY', 'CALS_PREAWARD', ''), 'the shape half finds an existing name, a reserved one included, and refuses a bad shape');
+ok(strpos(penumbraTagRefusal('empty'), 'EMPTY cannot be a tag name') === 0 && penumbraTagRefusal('osp') === '' && penumbraTagRefusal('1x', 'That new name is not usable') === 'That new name is not usable: letters, digits and underscores, starting with a letter, up to 60 characters.', 'the refusal says why: the reserved word by name, else the shape rule after the lead');
 
 // ------------------------------------------------------- 2. pasted lists
 echo "2. penumbraTagParseIds()\n";
@@ -60,7 +64,7 @@ eq(penumbraTagParseIds("\"efox\" ('ggreen') [hhall]"), array('efox', 'ggreen', '
 eq(penumbraTagParseIds('!! ?? ' . str_repeat('a', 65) . ' ok_id'), array('ok_id'), 'junk and over-long tokens are dropped');
 eq(penumbraTagParseIds('a b c d e', 3), array('a', 'b', 'c'), 'the cap keeps the first N');
 eq(penumbraTagParseIds(''), array(), 'nothing -> nothing');
-eq(penumbraTagParseIds('john.doe@gmail.com'), array('john.doe'), 'any email keeps its local part (the lookup adds @ncsu.edu itself)');
+eq(penumbraTagParseIds('john.doe@gmail.com JDoe@NCSU.edu foo@bar'), array('john.doe@gmail.com', 'jdoe'), 'only @ncsu.edu is cut to its Unity ID; any other address stays whole for the EMAIL lookup, a shapeless one is junk (tagfix 1, 2026-11-27: jdoe@unc.edu is not NCSU\'s jdoe)');
 
 // ------------------------------------------------------------- 3. usage
 echo "3. penumbraTagSqlUsage()\n";
@@ -97,6 +101,11 @@ ok(strpos($r[0], 'AND EMPLID NOT IN (SELECT EMPLID FROM PENUMBRA_PEOPLE_TAGS WHE
 eq(substr_count($r[0], ':newtag'), 2, 'rename: :newtag appears twice (one bind, both places)');
 eq($r[1], 'DELETE FROM PENUMBRA_PEOPLE_TAGS WHERE TAG = :oldtag', 'rename: then the leftovers under the old name go (= merged)');
 eq(penumbraTagsSqlDeleteTag(), 'DELETE FROM PENUMBRA_PEOPLE_TAGS WHERE TAG = :tag', 'delete: the whole tag');
+// tagfix 6 + 4 (2026-11-27): the rows a rename / delete changes are read first; the merge keeps the old value / note
+eq(bindsOf(penumbraTagsSqlRowsOf()), array('newtag', 'oldtag'), 'rows of: the old name, each row beside its twin under the new one');
+ok(strpos(penumbraTagsSqlRowsOf(), 'LEFT JOIN PENUMBRA_PEOPLE_TAGS N ON N.EMPLID = O.EMPLID AND N.TAG = :newtag') !== false && strpos(penumbraTagsSqlRowsOf(), 'AS ON_NEW') !== false, 'rows of: ON_NEW says which rows a rename merges');
+eq(bindsOf(penumbraTagsSqlRenameFill()), array('oldtag', 'newtag'), 'fill: the two names');
+ok(strpos(penumbraTagsSqlRenameFill(), 'VAL = COALESCE(VAL,') !== false && strpos(penumbraTagsSqlRenameFill(), 'NOTE = COALESCE(NOTE,') !== false && strpos(penumbraTagsSqlRenameFill(), 'WHERE TAG = :newtag AND EXISTS') !== false, 'fill: only an empty value / note on the surviving row takes the old one');
 $s = penumbraTagsSqlRecent();
 ok(strpos($s, "ACTION LIKE 'PEOPLE_TAG%'") !== false && strpos($s, 'FETCH FIRST 40 ROWS ONLY') !== false && strpos($s, 'ORDER BY ID DESC') !== false, 'recent: this tool only, newest first, 40');
 ok(strpos($s, 'SOURCE_DATA') !== false && strpos($s, 'TO_CHAR("TIMESTAMP"') !== false, 'recent: the message rides in SOURCE_DATA; TIMESTAMP is a reserved word, quoted');
@@ -165,6 +174,15 @@ if ($page !== '' && is_file($page)) {
     ok(strpos($pg, 'penumbraSessionStart();') !== false || strpos($pg, 'session_start();') !== false, 'starts the session itself (db_connection.php does not): the CSRF token and the flash live there (penumbraSessionStart() since 2026-10-01)');
     ok(strpos($pg, 'OCI_NO_AUTO_COMMIT') !== false, 'statements run without auto-commit (one commit per request)');
     ok(strpos($pg, 'penumbraPeopleLookupByUnity(') !== false, 'a pasted list resolves through the directory resolver, not its own SQL');
+    // 2026-11-27, lane B (tagfix 1 / 3 / 4 / 6 / 7 / 9)
+    ok(strpos($pg, 'substr($email, -9) !== \'@ncsu.edu\' && (string)$existing[\'email\'] !== $email') !== false, 'tagfix 1: an outside address is refused only by the row that IS it');
+    ok(strpos($pg, 'function pnbTagsReadOnSession(') !== false && substr_count($pg, 'penumbraTagsSqlRowsOf()') === 2 && strpos($pg, '\'merged_rows\' => penumbraTagAuditRows(') !== false && strpos($pg, '\'rows\' => penumbraTagAuditRows($pRows, \'EMPLID\', true)') !== false, 'tagfix 6: rename and delete read their rows first, and the audit rows keep them');
+    ok(strpos($pg, 'Nothing carries $tag, so nothing was renamed and no audit row was written.') !== false && strpos($pg, 'Nothing carries $tag, so nothing was deleted and no audit row was written.') !== false && strpos($pg, '.flash.info {') !== false, 'tagfix 6: a name nothing carries writes nothing and says so, in the info dress');
+    $i6 = strpos($pg, '$sqls = penumbraTagsSqlRename();'); $j6 = ($i6 === false) ? false : strpos($pg, 'penumbraTagsSqlRenameFill()', $i6); $k6 = ($i6 === false) ? false : strpos($pg, 'pnbTagsWrite($oci, $sqls[1]', $i6);
+    ok($i6 !== false && $j6 !== false && $k6 !== false && $j6 < $k6, 'tagfix 4: the fill runs between the move and the drop');
+    ok(strpos($pg, 'if ($_SERVER[\'REQUEST_METHOD\'] !== \'POST\') session_write_close();') !== false && strpos($pg, 'if ($pnbAjax === \'counts\') $view = \'counts\';') !== false, 'tagfix 9: a GET lets go of the session; a badge count skips the coverage and the view reads');
+    ok(strpos($pg, 'function pnbTagsNamedElsewhere(') !== false && substr_count($pg, '$refs = pnbTagsNamedElsewhere($tag, ') === 2 && strpos($pg, 'penumbra_notice_retag($tag, $new)') !== false, 'tagfix 3: rename and delete list the conditions and report SQL naming the word and move a notice scope');
+    ok(strpos($pg, 'penumbraTagNormalizeExisting($_GET[\'tag\'])') !== false && strpos($pg, 'function reservedWhy(raw)') !== false && strpos($pg, 'TAG_RESERVED.indexOf(t) === -1 ? t :') !== false, 'tagfix 7: a reserved name still opens; the browser twin refuses it and says why');
     ok(preg_match('/\b(exec|shell_exec|system|passthru|popen|proc_open)\s*\(/', $pg) === 0, 'no process spawning');
     // Hand-registered accounts (2026-09-25): written on the writer, audited, offered on the index view.
     ok(strpos($pg, "strpos(\$do, 'acct_') === 0") !== false && strpos($pg, 'connectOracleWriter()') !== false && strpos($pg, 'pnbOciHandle()') !== false, 'accounts: the handlers run on the WRITER connection (the app session only reads the directory)');

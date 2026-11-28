@@ -23,7 +23,7 @@
 #
 # -n (skip php.ini): nothing here needs an extension or a database.
 #
-# EXPECTED TAIL: "PASS: 142   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-25, group accounts; sections 9-10 need the app folder, run.ps1 passes it)
+# EXPECTED TAIL: "PASS: 145   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-25, group accounts; sections 9-10 need the app folder, run.ps1 passes it)
 #
 # UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
 # a scriptblock rather than with -File. Never add a bare `exit` for the same
@@ -156,7 +156,9 @@ $mutants = @(
     @{ Name = 'OUC people list no longer restricted to active people';
        From = "`" WHERE ACTIVE = 1 AND KIND = 'person' AND UNITY_ID IS NOT NULL AND (`"";   To = "`" WHERE KIND = 'person' AND UNITY_ID IS NOT NULL AND (`"";   Expect = 1 },
     @{ Name = 'unity batches lose the unity@ncsu.edu EMAIL fallback (people HR gives no Unity ID vanish)';
-       From = "') OR EMAIL IN (' . implode(',', `$phE) . ')'";   To = "')'";   Expect = 1 },
+       From = "`$binds[':m' . `$i] = `$u . '@ncsu.edu';";   To = "`$binds[':m' . `$i] = 'nobody@nowhere.invalid';";   Expect = 1 },   # re-anchored 2026-11-27 (tagfix 1 rewrote the SQL line it used)
+    @{ Name = 'an outside address is looked up as its NCSU namesake again (tagfix X6)';
+       From = "`$ncsu = (substr(`$email, -9) === '@ncsu.edu');";   To = "`$ncsu = true;";   Expect = 3 },
     @{ Name = 'the OUCS list forgets the primary appointment (a person with no active job would have an empty list)';
        From = "if (`$ouc !== '') `$list[] = `$ouc;";   To = "if (false) `$list[] = `$ouc;";   Expect = 2 }
 )

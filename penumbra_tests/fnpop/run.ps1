@@ -118,8 +118,8 @@ $mutantDefs = [ordered]@{
   'hclabeldelay' = @{ file = 'main'; edits = @(,@('}, opts.delay || (opts.asLabel ? 400 : 150));', '}, opts.delay || 150);')); red = @('U3') }   # (2026-11-17) re-anchored: opts.delay (the help tips' hover delay)
   # (fnpop 5) the page's directory answers are not kept
   'rcnocache'  = @{ file = 'main'; edits = @(,@("            if (em.indexOf('@') > 0) _pnbDirCache[em] = penumbraDirVars(it);", '')); red = @('R2','R4','R7') }
-  # (fnpop 5) the mapper drops the multi-valued OUCs again
-  'rcmapper'   = @{ file = 'main'; edits = @(,@("            oucs: it.oucs || '', oucs2d: it.oucs2d || '', oucs4d: it.oucs4d || '',", '')); red = @('R1') }
+  # (fnpop 5) the mapper drops the multi-valued OUCs again (re-anchored 2026-11-27: tagfix X4 reads them through hr())
+  'rcmapper'   = @{ file = 'main'; edits = @(,@("            oucs: hr('oucs'), oucs2d: hr('oucs2d'), oucs4d: hr('oucs4d'),", '')); red = @('R1') }
   # (fnpop 5) the pills get no card
   'rcwithin'   = @{ file = 'main'; edits = @(,@("            _pnbHoverCard.attachWithin(document.getElementById(id), '.email-capsule, .access-capsule', pillOpts);", '')); red = @('R3','R6','R7','R8') }
   # (fnpop 5) a typed pill is not topped up when it is added

@@ -22,7 +22,8 @@
 #
 # -n (skip php.ini): nothing here needs an extension or a database.
 #
-# EXPECTED TAIL: "PASS: 78   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-23 late night:
+# EXPECTED TAIL: "PASS: 87   FAIL: 0" then "RESULT: GREEN"  (87 since 2026-11-27, tagfix 3 + 7: the
+# empty keyword, section 8b's hold; 78 as of 2026-09-23 late night:
 # + braces as the documented spelling, the Subscriptions "?" and the option's tooltip)
 # The four help pins read help\topics since 2026-10-21 (help_content.php is a shim since 2026-10-19).
 #
@@ -53,7 +54,8 @@ $latin1 = [Text.Encoding]::GetEncoding(28591)
 $tmp = Join-Path $env:TEMP ('pnb_subcond_mut_' + $PID)
 $files = @('penumbra_subscribe_condition.php', 'penumbra_search.php', 'penumbra_directory.php', 'index.php',
            'manage_subscription.php', 'manage_schedule.php', 'schedule_runner.php', 'js\main.js',
-           'help\topics\schedulerHelpLightbox.php', 'help\topics\schedulerPromptHelpLightbox.php')
+           'help\topics\schedulerHelpLightbox.php', 'help\topics\schedulerPromptHelpLightbox.php',
+           'penumbra_report_tags.php', 'penumbra_people_tags.php')   # (2026-11-27, tagfix 3) the hold reads the tag list through them
 foreach ($f in $files) {
     $dst = Join-Path $tmp $f
     New-Item -ItemType Directory -Force (Split-Path -Parent $dst) | Out-Null
@@ -68,7 +70,7 @@ $mutants = @(
     @{ Name = 'the validator lets an unknown (braced / row-number) column through'; File = 'penumbra_subscribe_condition.php';
        From = 'if (!isset($known[$col])) {';   To = 'if (false) {';   Expect = 2 },
     @{ Name = 'TAGS keeps plain string comparison (no membership rewrite)'; File = 'penumbra_subscribe_condition.php';
-       From = "if (`$col !== 'TAGS') continue;";   To = 'continue;';   Expect = 6 },
+       From = "if (`$col !== 'TAGS') continue;";   To = 'continue;';   Expect = 10 },   # 6 + four of section 8b (tagfix 3): their {TAGS} names need the rewrite
     # RETIRED 2026-09-23 late: 'the parse keeps the raw column (no canonical write-back)' (was 3).
     # Since the bracespace fix the SEARCH PARSER itself drops the spaces inside "{ OUC2D }", so
     # the library's write-back is defense in depth that no public call can reach any more - the
@@ -88,6 +90,15 @@ $mutants = @(
     @{ Name = 'the join gate fails OPEN for someone with no directory record'; File = 'penumbra_subscribe_condition.php';
        From = 'return $rec !== null && penumbraSubCondMatchRow($chk[''parsed''], $rec);';
        To   = 'return $rec === null || penumbraSubCondMatchRow($chk[''parsed''], $rec);';   Expect = 2 },
+    # (2026-11-27, tagfix 7 + 3) the empty keyword and the send-time hold.
+    @{ Name = 'the empty keyword is read as a tag called EMPTY again'; File = 'penumbra_subscribe_condition.php';
+       From = 'if (_search_is_empty_kw($p[''value''])) continue;';   To = '';   Expect = 3 },
+    @{ Name = 'the hold lets a renamed / deleted {TAGS} name through'; File = 'penumbra_subscribe_condition.php';
+       From = 'if ($gone) return ''held because the condition names ''';   To = 'if (false) return ''held because the condition names ''';   Expect = 1 },
+    @{ Name = 'the hold lets every subscriber go at once'; File = 'penumbra_subscribe_condition.php';
+       From = 'if ((int)$total >= 2 && (int)$dropped >= (int)$total) {';   To = 'if (false) {';   Expect = 1 },
+    @{ Name = 'the send-time filter never asks the hold'; File = 'penumbra_subscribe_condition.php';
+       From = '$hold = penumbraSubCondHoldReason($conn, $chk[''parsed''], count($entries), count($dropped));';   To = '$hold = '''';';   Expect = 4 },
     @{ Name = 'the preview counts inactive people too'; File = 'penumbra_subscribe_condition.php';
        From = "' WHERE ACTIVE = 1 ORDER BY LAST_NAME, FIRST_NAME'";   To = "' ORDER BY LAST_NAME, FIRST_NAME'";   Expect = 1 },
     @{ Name = 'the runner no longer prunes on the condition'; File = 'schedule_runner.php';

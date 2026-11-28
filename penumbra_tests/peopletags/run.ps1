@@ -24,7 +24,7 @@ param(
     [switch]$Mutant
 )
 $ErrorActionPreference = 'Stop'
-$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_penumbra\penumbra_tests\peopletags' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$here = 'C:\Users\bplimon\AppData\Local\Temp\claude\18ebbbea9b00e2ad\23d487a2-f271-4f49-ad90-597294ad0f45\scratchpad\tagfix\B\suite_drafts\peopletags'   # DRAFT copy in the lane B folder   # empty when run as a scriptblock: never fall back to the caller's cwd
 if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
 if (-not $here) { $here = '\' + '\oitras\d$\Utilities\PHP_penumbra\penumbra_tests\peopletags' }
 $php  = '\' + '\oitras\d$\Utilities\PHP_penumbra\php.exe'
@@ -44,7 +44,7 @@ $tmp  = Join-Path $env:TEMP ('pnb_peopletags_mut_' + $PID)
 New-Item -ItemType Directory -Force $tmp | Out-Null
 $mutants = @(
     @{ Name = 'names no longer upper-cased (CK_PEOPLE_TAG_SHAPE would reject what the page sends)';
-       From = '$t = strtoupper(trim((string)$raw));';   To = '$t = trim((string)$raw);';   Expect = 7 },
+       From = '$t = strtoupper(trim((string)$raw));';   To = '$t = trim((string)$raw);';   Expect = 10 },   # 7 -> 10 (lane B draft, 2026-11-27): the reserved-word pins read the same upper-casing
     @{ Name = 'the add MERGE overwrites an existing membership (value/note/added-by lost on a re-add)';
        From = '" WHEN NOT MATCHED THEN INSERT (EMPLID, TAG, VAL, SOURCE, ADDED_BY, ADDED_AT, NOTE)"';
        To   = '" WHEN MATCHED THEN UPDATE SET T.VAL = :val, T.NOTE = :note WHEN NOT MATCHED THEN INSERT (EMPLID, TAG, VAL, SOURCE, ADDED_BY, ADDED_AT, NOTE)"';   Expect = 2 },
@@ -55,7 +55,14 @@ $mutants = @(
     @{ Name = 'the account update loses its SOURCE guard (an HR person could be edited from the accounts form)';
        From = '. " DEPT_NAME = :dept, JOB_TITLE = :descr, UPDATED_AT = SYSDATE WHERE EMPLID = :emplid AND SOURCE = ''MANUAL''";';   To = '. " DEPT_NAME = :dept, JOB_TITLE = :descr, UPDATED_AT = SYSDATE WHERE EMPLID = :emplid";';   Expect = 1 },
     @{ Name = 'the members query drops KIND (an account would be labelled like a person again)';
-       From = 'P.ACTIVE, P.JOB_TITLE, P.KIND"';   To = 'P.ACTIVE, P.JOB_TITLE"';   Expect = 1 }
+       From = 'P.ACTIVE, P.JOB_TITLE, P.KIND"';   To = 'P.ACTIVE, P.JOB_TITLE"';   Expect = 1 },
+    # lane B draft (2026-11-27): one mutant per fix that lives in this library
+    @{ Name = 'tagfix 1: a pasted address is cut to its local part again, whatever its domain (jdoe@unc.edu tags NCSU''s jdoe)';
+       From = "if (`$at !== false && substr(`$tok, `$at) === '@ncsu.edu') `$tok = substr(`$tok, 0, `$at);";   To = "if (`$at !== false) `$tok = substr(`$tok, 0, `$at);";   Expect = 1 },
+    @{ Name = 'tagfix 7: the name rule takes the empty keyword again (EMPTY could be a tag no condition can ask for)';
+       From = "return (`$t !== '' && !penumbraTagIsReserved(`$t)) ? `$t : '';";   To = 'return $t;';   Expect = 2 },
+    @{ Name = 'tagfix 4: the merge fill overwrites the surviving value instead of filling an empty one';
+       From = '" VAL = COALESCE(VAL, (SELECT O.VAL';   To = '" VAL = ((SELECT O.VAL';   Expect = 1 }
 )
 $allGood = $true
 foreach ($m in $mutants) {

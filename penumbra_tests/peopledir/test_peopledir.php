@@ -131,6 +131,15 @@ ok(strpos($st->sql, 'ORDER BY ACTIVE DESC, LAST_SEEN DESC FETCH FIRST 1 ROWS ONL
 ok(strpos($st->sql, 'LOWER(') === false && strpos($st->sql, 'SUBSTR(') === false, 'no function wraps a column in the WHERE (the indexes stay usable)');
 $c = new FakeConn(); $c->queue[] = array();
 eq(penumbraPeopleLookupByEmail($c, 'nobody@example.org')['found'], false, 'unknown address: found false, no exception');
+// (2026-11-27, tagfix X6) the local part is a Unity ID only at ncsu.edu: an outside address is matched whole
+$c = new FakeConn(); $c->queue[] = array();
+penumbraPeopleLookupByEmail($c, ' JDoe@UNC.edu ');
+$st = $c->last();
+eq($st->binds, array(':e1' => 'jdoe@unc.edu'), 'an address outside ncsu.edu binds itself only, never its local part as a Unity ID');
+ok(strpos($st->sql, 'UNITY_ID = :u') === false && strpos($st->sql, 'WHERE EMAIL = :e1') !== false, '...and matches EMAIL alone: jdoe@unc.edu is not NCSU\'s jdoe');
+$c = new FakeConn(); $c->queue[] = array();
+penumbraPeopleLookupByEmail($c, 'jdoe@ncsu.edu.example.com');
+ok(strpos($c->last()->sql, 'UNITY_ID = :u') === false, 'ncsu.edu must be the domain: jdoe@ncsu.edu.example.com is matched whole');
 $c = new FakeConn();
 eq(count($c->statements) + (penumbraPeopleLookupByEmail($c, 'not-an-email')['found'] ? 1 : 0), 0, 'a value without @ never reaches the database');
 eq(penumbraPeopleLookupByEmail(null, 'x@y')['found'], false, 'no connection: found false');
@@ -350,7 +359,8 @@ if ($missing) {
                                                           'php_test_search_condition', '_search_get_cell_value', '_search_is_numeric_str', '_search_num_in_range_list', '_sr_resolve_keyword_date'),
                                                           // php_test_search_condition's value helpers since 2026-09-24 (accounting
                                                           // negatives, strict browser dates) - lifted when present.
-                                                          array_values(array_filter(array('_search_parse_num', '_search_parse_date', '_search_date_floor', '_sr_rr_year', '_sr_rr_date'),   // the last two: promptfix4 Z3 2026-11-20 (RR read)
+                                                          array_values(array_filter(array('_search_parse_num', '_search_parse_date', '_search_date_floor', '_sr_rr_year', '_sr_rr_date',   // the last two: promptfix4 Z3 2026-11-20 (RR read)
+                                                              '_search_js_trim', 'penumbra_fold', '_search_ukey', '_search_regex_utf8'),   // (2026-11-27, tagfix E) the tester calls these now
                                                               function ($fn) use ($src) { return strpos($src['penumbra_search.php'], 'function ' . $fn . '(') !== false; }))));
     $tmpf = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_peopledir_lift_' . getmypid() . '.php';
     file_put_contents($tmpf, "<?php\n" . $lifted);
